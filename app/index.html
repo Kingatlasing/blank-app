@@ -127,6 +127,8 @@
   .card-front.r-legendary{border-color:var(--c-legendary);box-shadow:0 0 30px rgba(255,176,32,.6);}
   .card-photo{position:relative;flex:1;background:#0b0e17;overflow:hidden;}
   .card-photo img{width:100%;height:100%;object-fit:cover;display:block;}
+  .img-fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font-size:40px;background:linear-gradient(135deg,#1b2338,#0a0d16);color:rgba(255,255,255,.28);}
   .card-info{padding:8px 10px 10px;background:linear-gradient(180deg,#171e30,#11172a);}
   .card-info .nm{font-weight:800;font-size:13px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .card-info .sub{font-size:10.5px;color:var(--sub);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -240,6 +242,15 @@ var CATEGORIES = [
   {key:"baseball",   label:"Baseball",      icon:"⚾", price:150, desc:"MLB rookies, aces & franchise cornerstones.",  theme:"t-baseball"},
   {key:"football",   label:"Football",      icon:"🏈", price:175, desc:"NFL playmakers ready to hit your binder.",     theme:"t-football"}
 ];
+
+function mediaHTML(card){
+  var icon = (CATEGORIES.filter(function(c){return c.key===card.category;})[0]||{}).icon || "🃏";
+  if(!card.image){
+    return '<div class="img-fallback">'+icon+'</div>';
+  }
+  return '<img src="'+card.image+'" alt="" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">' +
+         '<div class="img-fallback" style="display:none">'+icon+'</div>';
+}
 
 var RARITIES = ["common","uncommon","rare","epic","legendary"];
 var RARITY_LABEL = {common:"Common",uncommon:"Uncommon",rare:"Rare",epic:"Epic",legendary:"Legendary"};
@@ -406,7 +417,7 @@ function showReveal(cat, pulled){
           '<div class="card-face card-back"><div class="logo">🏆</div></div>' +
           '<div class="card-face card-front r-'+card.rarity+'">' +
             '<span class="rarity-tag r-'+card.rarity+'">'+RARITY_LABEL[card.rarity]+'</span>'+
-            '<div class="card-photo">'+(card.image? '<img src="'+card.image+'" alt="">':'')+'<div class="holo-sweep"></div></div>'+
+            '<div class="card-photo">'+mediaHTML(card)+'<div class="holo-sweep"></div></div>'+
             '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div></div>'+
           '</div>' +
         '</div>' +
@@ -518,7 +529,7 @@ function collectionHTML(){
     }
     return (
       '<div class="bind-cell owned r-'+card.rarity+'" onclick="showModal(\''+card.id+'\')">' +
-        (card.image? '<img src="'+card.image+'" alt="">':'') +
+        mediaHTML(card) +
         (count>1? '<div class="cnt">x'+count+'</div>':'') +
         '<div class="lbl">'+card.name+'</div>' +
       '</div>'
@@ -554,7 +565,7 @@ function showModal(id){
         '<div class="card-face card-front r-'+card.rarity+'">' +
           '<span class="rarity-tag r-'+card.rarity+'">'+RARITY_LABEL[card.rarity]+'</span>'+
           '<div class="dupe-tag">x'+(STATE.collection[card.id]||1)+'</div>'+
-          '<div class="card-photo">'+(card.image? '<img src="'+card.image+'" alt="">':'')+'<div class="holo-sweep"></div></div>'+
+          '<div class="card-photo">'+mediaHTML(card)+'<div class="holo-sweep"></div></div>'+
           '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div><div class="sub">'+(card.meta||"")+'</div></div>'+
         '</div>' +
       '</div>' +
