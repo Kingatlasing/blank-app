@@ -156,21 +156,37 @@
   .rip-hint{color:var(--sub);font-size:12.5px;font-weight:600;letter-spacing:.3px;flex:0 0 auto;
     padding:2px 0;position:relative;z-index:1;}
 
-  /* stacked-deck reveal, tiltable, flipped one at a time by the player */
-  .stack-tilt{position:relative;transform-style:preserve-3d;transition:transform .12s ease-out;
+  /* stacked-deck reveal, tiltable, flipped one at a time by the player.
+     NOTE: no CSS `transition` on .stack-tilt's transform — the tilt is driven
+     by a JS rAF loop that lerps toward the pointer target every frame (see
+     attachTilt()), which reads far smoother than re-triggering a CSS
+     transition on every pointermove event. */
+  .stack-tilt{position:relative;transform-style:preserve-3d;will-change:transform;
     --tx:0;--ty:0;}
-  .stack-tilt::after{content:"";position:absolute;inset:-12%;pointer-events:none;mix-blend-mode:screen;
-    opacity:0;border-radius:16px;transition:opacity .25s;
-    background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.7) 45%,rgba(255,180,255,.6) 52%,transparent 65%);
-    background-size:220% 220%;
-    background-position:calc(50% + var(--tx)*60%) calc(50% + var(--ty)*60%);}
-  .stack-tilt.foil-rare::after{opacity:.3;}
-  .stack-tilt.foil-epic::after{opacity:.55;}
-  .stack-tilt.foil-legendary::after{opacity:.85;
-    background:linear-gradient(115deg,transparent 25%,#ffd35c 38%,#ff6bcb 48%,#7c5cff 58%,transparent 72%);
-    background-size:260% 260%;}
   .stack-tilt .card-slot{position:absolute;inset:0;width:100%;height:100%;
-    perspective:none;transform-style:preserve-3d;}
+    perspective:none;transform-style:preserve-3d;will-change:transform;}
+
+  /* each stacked card hints at its own rarity on its face-down back — a
+     subtle rarity-tinted rim always shows (visible on the sliver of card
+     peeking out from behind the top one), and a foil sweep reacts to the
+     shared tilt via the inherited --tx/--ty custom properties so every card
+     in the stack, not just the top one, catches the light on its own. */
+  .card-back .cb-shine{position:absolute;inset:0;pointer-events:none;mix-blend-mode:color-dodge;
+    opacity:0;background-size:240% 240%;
+    background-position:calc(50% + var(--tx,0)*55%) calc(50% + var(--ty,0)*55%);}
+  .stack-card.r-common .card-back{box-shadow:inset 0 0 0 2px rgba(138,147,168,.3);}
+  .stack-card.r-uncommon .card-back{box-shadow:inset 0 0 0 2px rgba(61,220,132,.4);}
+  .stack-card.r-uncommon .cb-shine{opacity:.22;
+    background-image:linear-gradient(115deg,transparent 35%,rgba(255,255,255,.65) 50%,transparent 65%);}
+  .stack-card.r-rare .card-back{box-shadow:inset 0 0 0 2px rgba(77,163,255,.55);}
+  .stack-card.r-rare .cb-shine{opacity:.4;
+    background-image:linear-gradient(115deg,transparent 28%,rgba(140,190,255,.75) 46%,rgba(255,255,255,.5) 52%,transparent 70%);}
+  .stack-card.r-epic .card-back{box-shadow:inset 0 0 0 2px rgba(192,92,255,.65);}
+  .stack-card.r-epic .cb-shine{opacity:.6;
+    background-image:linear-gradient(115deg,transparent 22%,rgba(200,140,255,.75) 38%,rgba(255,255,255,.55) 48%,rgba(140,190,255,.7) 58%,transparent 76%);}
+  .stack-card.r-legendary .card-back{box-shadow:inset 0 0 0 2px rgba(255,176,32,.75);}
+  .stack-card.r-legendary .cb-shine{opacity:.85;
+    background-image:linear-gradient(115deg,transparent 12%,#ffd35c 28%,#ff6bcb 40%,#7c5cff 52%,#4da3ff 64%,transparent 82%);}
 
   .collected-strip{display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:nowrap;
     overflow-x:auto;padding:4px 4px;min-height:0;flex:0 0 auto;}
@@ -188,10 +204,10 @@
 
   .card-slot{width:190px;height:266px;perspective:1200px;}
   .card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;
-    transition:transform .7s cubic-bezier(.2,.9,.25,1.05);cursor:pointer;}
+    transition:transform .6s cubic-bezier(.34,1.56,.64,1);cursor:pointer;will-change:transform;}
   .card-slot.flipped .card-inner{transform:rotateY(180deg);}
-  .card-face{position:absolute;inset:0;backface-visibility:hidden;border-radius:14px;overflow:hidden;
-    box-shadow:0 12px 30px rgba(0,0,0,.5);}
+  .card-face{position:absolute;inset:0;-webkit-backface-visibility:hidden;backface-visibility:hidden;
+    border-radius:14px;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.5);}
   .card-back{background:linear-gradient(135deg,#1b2338,#0a0d16);
     border:1px solid var(--line);display:flex;align-items:center;justify-content:center;}
   .card-back.themed{background-size:200% 200%;animation:packshine 6s ease infinite;}
@@ -390,6 +406,7 @@ function cardBackHTML(catKey){
       '<div class="cb-pattern"></div>' +
       '<div class="cb-grain"></div>' +
       '<div class="cb-badge">'+categoryIconHTML(catKey)+'</div>' +
+      '<div class="cb-shine"></div>' +
     '</div>'
   );
 }
@@ -603,15 +620,26 @@ function showReveal(cat, pulled){
 }
 
 /* renders the remaining face-down stack; index 0 (top, interactive) sits above
-   the rest with a slight fan offset so you can see there's more than one card */
+   the rest with a consistent down-right cascade (like a real fanned deck) so
+   you can see there's more than one card, and each card's own rarity rim
+   peeks out along its exposed edge. */
 function renderStack(){
   var tilt = document.getElementById("stack-tilt");
   if(!tilt) return;
   var remaining = window.CURRENT_PULL.slice(window.STACK_INDEX);
   tilt.innerHTML = remaining.map(function(card, pos){
-    var dx = pos*4, dy = pos*-4, rot = (pos%2===0? pos : -pos)*1.4;
+    var dx = pos*5, dy = pos*4.5, rot = pos*2;
+    var scale = 1 - pos*0.012;
+    var dim = 1 - pos*0.045;
+    // translateZ pushes each card back in real 3D space (not just a z-index
+    // number) — inside a shared preserve-3d tilt context, coplanar siblings
+    // can hit-test ambiguously (a tap on the visible top card can resolve to
+    // one buried in the stack), so an explicit depth per card is what makes
+    // "the top card" unambiguous to the browser as well as to the eye.
+    var style = "transform:translate("+dx+"px,"+dy+"px) rotate("+rot+"deg) scale("+scale.toFixed(3)+") translateZ("+(-pos*3)+"px);" +
+      "z-index:"+(200-pos)+";filter:brightness("+dim.toFixed(3)+");";
     return (
-      '<div class="card-slot stack-card" style="transform:translate('+dx+'px,'+dy+'px) rotate('+rot+'deg);z-index:'+(200-pos)+';" '+
+      '<div class="card-slot stack-card r-'+card.rarity+'" style="'+style+'" '+
         (pos===0? 'onclick="flipTop()"' : '') + '>' +
         '<div class="card-inner">' +
           cardBackHTML(card.category) +
@@ -624,37 +652,40 @@ function renderStack(){
       '</div>'
     );
   }).join("");
-  setFoilHint(remaining);
 }
 
-/* hints at what's left in the stack via the tilt shimmer, without giving away
-   exactly which card it's on — mirrors a real foil pack catching the light */
-function setFoilHint(remaining){
-  var tilt = document.getElementById("stack-tilt");
-  if(!tilt) return;
-  var maxIdx = -1;
-  remaining.forEach(function(c){ maxIdx = Math.max(maxIdx, RARITIES.indexOf(c.rarity)); });
-  var cls = maxIdx>=4 ? "foil-legendary" : maxIdx>=3 ? "foil-epic" : maxIdx>=2 ? "foil-rare" : "";
-  tilt.className = "stack-tilt pack-media-size" + (cls? " "+cls : "");
-}
-
+/* smooth pointer tilt: instead of writing the pointer position straight to
+   the transform (which used to fight a CSS transition on every event and
+   read as janky), this runs its own rAF loop and lerps the current angle
+   toward the target a little each frame — a standard "smooth follow" that
+   stays buttery regardless of how choppy the incoming pointer events are,
+   and never collides with the card-flip's own transition. */
 function attachTilt(outerEl, tiltEl){
   if(!outerEl || !tiltEl) return;
-  var raf = null, rx = 0, ry = 0;
-  function apply(){
-    tiltEl.style.transform = "rotateX("+rx+"deg) rotateY("+ry+"deg)";
-    tiltEl.style.setProperty("--tx", (ry/26).toFixed(3));
-    tiltEl.style.setProperty("--ty", (-rx/20).toFixed(3));
-    raf = null;
+  var targetRX = 0, targetRY = 0, curRX = 0, curRY = 0;
+  var running = false;
+
+  function loop(){
+    curRX += (targetRX - curRX) * 0.18;
+    curRY += (targetRY - curRY) * 0.18;
+    tiltEl.style.transform = "rotateX("+curRX.toFixed(2)+"deg) rotateY("+curRY.toFixed(2)+"deg)";
+    tiltEl.style.setProperty("--tx", (curRY/26).toFixed(3));
+    tiltEl.style.setProperty("--ty", (-curRX/20).toFixed(3));
+    if(Math.abs(targetRX-curRX)>0.02 || Math.abs(targetRY-curRY)>0.02){
+      requestAnimationFrame(loop);
+    } else {
+      running = false;
+    }
   }
+  function kick(){ if(!running){ running = true; requestAnimationFrame(loop); } }
   function move(clientX, clientY){
     var r = outerEl.getBoundingClientRect();
     var px = (clientX - r.left)/r.width - 0.5;
     var py = (clientY - r.top)/r.height - 0.5;
-    ry = px*26; rx = -py*20;
-    if(!raf) raf = requestAnimationFrame(apply);
+    targetRY = px*26; targetRX = -py*20;
+    kick();
   }
-  function reset(){ rx=0; ry=0; if(!raf) raf = requestAnimationFrame(apply); }
+  function reset(){ targetRX = 0; targetRY = 0; kick(); }
   // NOTE: deliberately no setPointerCapture() here — capturing the pointer
   // redirects the browser's synthesized click back to this outer element,
   // which would silently swallow taps on the top card and break flipping.
