@@ -4138,5 +4138,5063 @@
     "image": "https://static.www.nfl.com/image/upload/f_auto,q_auto/league/z9au0ajgcwoeozfdu0ec",
     "rarity": "rare",
     "meta": "FS · Chargers · All-Pro Safety"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-clefable",
+    "name": "Clefable",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/1_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-electrode-jungle",
+    "name": "Electrode",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/2_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-flareon",
+    "name": "Flareon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/3_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-jolteon",
+    "name": "Jolteon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/4_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 70 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kangaskhan",
+    "name": "Kangaskhan",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/5_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mr-mime",
+    "name": "Mr. Mime",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/6_hires.png",
+    "rarity": "epic",
+    "meta": "HP 40 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-nidoqueen",
+    "name": "Nidoqueen",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/7_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pidgeot",
+    "name": "Pidgeot",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/8_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pinsir",
+    "name": "Pinsir",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/9_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-scyther",
+    "name": "Scyther",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/10_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-snorlax",
+    "name": "Snorlax",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/11_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-vaporeon",
+    "name": "Vaporeon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/12_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 80 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-venomoth",
+    "name": "Venomoth",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/13_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-victreebel",
+    "name": "Victreebel",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/14_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-vileplume",
+    "name": "Vileplume",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/15_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-wigglytuff",
+    "name": "Wigglytuff",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/16_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-clefable-jungle",
+    "name": "Clefable",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/17_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-electrode-jungle-18",
+    "name": "Electrode",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/18_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-flareon-jungle",
+    "name": "Flareon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/19_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-jolteon-jungle",
+    "name": "Jolteon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/20_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kangaskhan-jungle",
+    "name": "Kangaskhan",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/21_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mr-mime-jungle",
+    "name": "Mr. Mime",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/22_hires.png",
+    "rarity": "rare",
+    "meta": "HP 40 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-nidoqueen-jungle",
+    "name": "Nidoqueen",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/23_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pidgeot-jungle",
+    "name": "Pidgeot",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/24_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pinsir-jungle",
+    "name": "Pinsir",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/25_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-scyther-jungle",
+    "name": "Scyther",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/26_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-snorlax-jungle",
+    "name": "Snorlax",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/27_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-vaporeon-jungle",
+    "name": "Vaporeon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/28_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-venomoth-jungle",
+    "name": "Venomoth",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/29_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-victreebel-jungle",
+    "name": "Victreebel",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/30_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-vileplume-jungle",
+    "name": "Vileplume",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/31_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-wigglytuff-jungle",
+    "name": "Wigglytuff",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/32_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-butterfree",
+    "name": "Butterfree",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/33_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dodrio",
+    "name": "Dodrio",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/34_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-exeggutor",
+    "name": "Exeggutor",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/35_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 80 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-fearow",
+    "name": "Fearow",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/36_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-gloom",
+    "name": "Gloom",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/37_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-lickitung",
+    "name": "Lickitung",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/38_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 90 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-marowak",
+    "name": "Marowak",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/39_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-nidorina",
+    "name": "Nidorina",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/40_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-parasect",
+    "name": "Parasect",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/41_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-persian",
+    "name": "Persian",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/42_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-primeape",
+    "name": "Primeape",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/43_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rapidash",
+    "name": "Rapidash",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/44_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rhydon",
+    "name": "Rhydon",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/45_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 100 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-seaking",
+    "name": "Seaking",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/46_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-tauros",
+    "name": "Tauros",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/47_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-weepinbell",
+    "name": "Weepinbell",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/48_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-bellsprout",
+    "name": "Bellsprout",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/49_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-cubone",
+    "name": "Cubone",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/50_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-eevee",
+    "name": "Eevee",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/51_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-exeggcute",
+    "name": "Exeggcute",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/52_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-goldeen",
+    "name": "Goldeen",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/53_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-jigglypuff",
+    "name": "Jigglypuff",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/54_hires.png",
+    "rarity": "common",
+    "meta": "HP 60 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mankey",
+    "name": "Mankey",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/55_hires.png",
+    "rarity": "common",
+    "meta": "HP 30 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-meowth",
+    "name": "Meowth",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/56_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-nidoran-jungle",
+    "name": "Nidoran ♀",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/57_hires.png",
+    "rarity": "common",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-oddish",
+    "name": "Oddish",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/58_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-paras",
+    "name": "Paras",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/59_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pikachu-jungle",
+    "name": "Pikachu",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/60_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rhyhorn",
+    "name": "Rhyhorn",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/61_hires.png",
+    "rarity": "common",
+    "meta": "HP 70 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-spearow",
+    "name": "Spearow",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/62_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-venonat",
+    "name": "Venonat",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/63_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-pok-ball",
+    "name": "Poké Ball",
+    "subtitle": "Jungle",
+    "image": "https://images.pokemontcg.io/base2/64_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-aerodactyl",
+    "name": "Aerodactyl",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/1_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-articuno",
+    "name": "Articuno",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/2_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-ditto",
+    "name": "Ditto",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/3_hires.png",
+    "rarity": "epic",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dragonite",
+    "name": "Dragonite",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/4_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 100 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-gengar",
+    "name": "Gengar",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/5_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 80 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-haunter-fossil",
+    "name": "Haunter",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/6_hires.png",
+    "rarity": "epic",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-hitmonlee",
+    "name": "Hitmonlee",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/7_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-hypno",
+    "name": "Hypno",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/8_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kabutops",
+    "name": "Kabutops",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/9_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-lapras",
+    "name": "Lapras",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/10_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-magneton-fossil",
+    "name": "Magneton",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/11_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-moltres",
+    "name": "Moltres",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/12_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-muk",
+    "name": "Muk",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/13_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-raichu-fossil",
+    "name": "Raichu",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/14_hires.png",
+    "rarity": "epic",
+    "meta": "HP 90 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-zapdos-fossil",
+    "name": "Zapdos",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/15_hires.png",
+    "rarity": "epic",
+    "meta": "HP 80 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-aerodactyl-fossil",
+    "name": "Aerodactyl",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/16_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-articuno-fossil",
+    "name": "Articuno",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/17_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-ditto-fossil",
+    "name": "Ditto",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/18_hires.png",
+    "rarity": "rare",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dragonite-fossil",
+    "name": "Dragonite",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/19_hires.png",
+    "rarity": "rare",
+    "meta": "HP 100 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-gengar-fossil",
+    "name": "Gengar",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/20_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-haunter-fossil-21",
+    "name": "Haunter",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/21_hires.png",
+    "rarity": "rare",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-hitmonlee-fossil",
+    "name": "Hitmonlee",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/22_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-hypno-fossil",
+    "name": "Hypno",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/23_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kabutops-fossil",
+    "name": "Kabutops",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/24_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-lapras-fossil",
+    "name": "Lapras",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/25_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-magneton-fossil-26",
+    "name": "Magneton",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/26_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-moltres-fossil",
+    "name": "Moltres",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/27_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-muk-fossil",
+    "name": "Muk",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/28_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-raichu-fossil-29",
+    "name": "Raichu",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/29_hires.png",
+    "rarity": "rare",
+    "meta": "HP 90 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-zapdos-fossil-30",
+    "name": "Zapdos",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/30_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-arbok",
+    "name": "Arbok",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/31_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-cloyster",
+    "name": "Cloyster",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/32_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-gastly-fossil",
+    "name": "Gastly",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/33_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-golbat",
+    "name": "Golbat",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/34_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-golduck",
+    "name": "Golduck",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/35_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-golem",
+    "name": "Golem",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/36_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 80 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-graveler",
+    "name": "Graveler",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/37_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kingler",
+    "name": "Kingler",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/38_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-magmar-fossil",
+    "name": "Magmar",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/39_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-omastar",
+    "name": "Omastar",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/40_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-sandslash",
+    "name": "Sandslash",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/41_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 70 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-seadra",
+    "name": "Seadra",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/42_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-slowbro",
+    "name": "Slowbro",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/43_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-tentacruel",
+    "name": "Tentacruel",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/44_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-weezing",
+    "name": "Weezing",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/45_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-ekans",
+    "name": "Ekans",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/46_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-geodude",
+    "name": "Geodude",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/47_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-grimer",
+    "name": "Grimer",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/48_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-horsea",
+    "name": "Horsea",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/49_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-kabuto",
+    "name": "Kabuto",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/50_hires.png",
+    "rarity": "common",
+    "meta": "HP 30 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-krabby",
+    "name": "Krabby",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/51_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-omanyte",
+    "name": "Omanyte",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/52_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-psyduck",
+    "name": "Psyduck",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/53_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-shellder",
+    "name": "Shellder",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/54_hires.png",
+    "rarity": "common",
+    "meta": "HP 30 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-slowpoke",
+    "name": "Slowpoke",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/55_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-tentacool",
+    "name": "Tentacool",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/56_hires.png",
+    "rarity": "common",
+    "meta": "HP 30 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-zubat",
+    "name": "Zubat",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/57_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mr-fuji",
+    "name": "Mr. Fuji",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/58_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-energy-search",
+    "name": "Energy Search",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/59_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-gambler",
+    "name": "Gambler",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/60_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-recycle",
+    "name": "Recycle",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/61_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mysterious-fossil",
+    "name": "Mysterious Fossil",
+    "subtitle": "Fossil",
+    "image": "https://images.pokemontcg.io/base3/62_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-alakazam",
+    "name": "Dark Alakazam",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/1_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-arbok",
+    "name": "Dark Arbok",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/2_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-blastoise",
+    "name": "Dark Blastoise",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/3_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-charizard",
+    "name": "Dark Charizard",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/4_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 80 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-dragonite",
+    "name": "Dark Dragonite",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/5_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-dugtrio",
+    "name": "Dark Dugtrio",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/6_hires.png",
+    "rarity": "epic",
+    "meta": "HP 50 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-golbat",
+    "name": "Dark Golbat",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/7_hires.png",
+    "rarity": "epic",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-gyarados",
+    "name": "Dark Gyarados",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/8_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-hypno",
+    "name": "Dark Hypno",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/9_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-machamp",
+    "name": "Dark Machamp",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/10_hires.png",
+    "rarity": "epic",
+    "meta": "HP 70 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-magneton",
+    "name": "Dark Magneton",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/11_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-slowbro",
+    "name": "Dark Slowbro",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/12_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-vileplume",
+    "name": "Dark Vileplume",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/13_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-weezing",
+    "name": "Dark Weezing",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/14_hires.png",
+    "rarity": "epic",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-here-comes-team-rocket",
+    "name": "Here Comes Team Rocket!",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/15_hires.png",
+    "rarity": "epic",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rocket-s-sneak-attack",
+    "name": "Rocket's Sneak Attack",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/16_hires.png",
+    "rarity": "epic",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rainbow-energy",
+    "name": "Rainbow Energy",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/17_hires.png",
+    "rarity": "epic",
+    "meta": "Energy"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-alakazam-rocket",
+    "name": "Dark Alakazam",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/18_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-arbok-rocket",
+    "name": "Dark Arbok",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/19_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-blastoise-rocket",
+    "name": "Dark Blastoise",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/20_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-charizard-rocket",
+    "name": "Dark Charizard",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/21_hires.png",
+    "rarity": "rare",
+    "meta": "HP 80 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-dragonite-rocket",
+    "name": "Dark Dragonite",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/22_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-dugtrio-rocket",
+    "name": "Dark Dugtrio",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/23_hires.png",
+    "rarity": "rare",
+    "meta": "HP 50 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-golbat-rocket",
+    "name": "Dark Golbat",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/24_hires.png",
+    "rarity": "rare",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-gyarados-rocket",
+    "name": "Dark Gyarados",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/25_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-hypno-rocket",
+    "name": "Dark Hypno",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/26_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-machamp-rocket",
+    "name": "Dark Machamp",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/27_hires.png",
+    "rarity": "rare",
+    "meta": "HP 70 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-magneton-rocket",
+    "name": "Dark Magneton",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/28_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-slowbro-rocket",
+    "name": "Dark Slowbro",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/29_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-vileplume-rocket",
+    "name": "Dark Vileplume",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/30_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-weezing-rocket",
+    "name": "Dark Weezing",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/31_hires.png",
+    "rarity": "rare",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-charmeleon",
+    "name": "Dark Charmeleon",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/32_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-dragonair",
+    "name": "Dark Dragonair",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/33_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-electrode",
+    "name": "Dark Electrode",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/34_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-flareon",
+    "name": "Dark Flareon",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/35_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-gloom",
+    "name": "Dark Gloom",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/36_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-golduck",
+    "name": "Dark Golduck",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/37_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-jolteon",
+    "name": "Dark Jolteon",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/38_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-kadabra",
+    "name": "Dark Kadabra",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/39_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-machoke",
+    "name": "Dark Machoke",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/40_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-muk",
+    "name": "Dark Muk",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/41_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-persian",
+    "name": "Dark Persian",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/42_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-primeape",
+    "name": "Dark Primeape",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/43_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-rapidash",
+    "name": "Dark Rapidash",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/44_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-vaporeon",
+    "name": "Dark Vaporeon",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/45_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-wartortle",
+    "name": "Dark Wartortle",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/46_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 60 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-magikarp-rocket",
+    "name": "Magikarp",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/47_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 30 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-porygon-rocket",
+    "name": "Porygon",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/48_hires.png",
+    "rarity": "uncommon",
+    "meta": "HP 40 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-abra-rocket",
+    "name": "Abra",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/49_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-charmander-rocket",
+    "name": "Charmander",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/50_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-raticate",
+    "name": "Dark Raticate",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/51_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-diglett-rocket",
+    "name": "Diglett",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/52_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dratini-rocket",
+    "name": "Dratini",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/53_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-drowzee-rocket",
+    "name": "Drowzee",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/54_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-eevee-rocket",
+    "name": "Eevee",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/55_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-ekans-rocket",
+    "name": "Ekans",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/56_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-grimer-rocket",
+    "name": "Grimer",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/57_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-koffing-rocket",
+    "name": "Koffing",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/58_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-machop-rocket",
+    "name": "Machop",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/59_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-magnemite-rocket",
+    "name": "Magnemite",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/60_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-mankey-rocket",
+    "name": "Mankey",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/61_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Fighting"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-meowth-rocket",
+    "name": "Meowth",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/62_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-oddish-rocket",
+    "name": "Oddish",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/63_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-ponyta-rocket",
+    "name": "Ponyta",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/64_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Fire"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-psyduck-rocket",
+    "name": "Psyduck",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/65_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rattata-rocket",
+    "name": "Rattata",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/66_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Colorless"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-slowpoke-rocket",
+    "name": "Slowpoke",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/67_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Psychic"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-squirtle-rocket",
+    "name": "Squirtle",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/68_hires.png",
+    "rarity": "common",
+    "meta": "HP 50 · Water"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-voltorb-rocket",
+    "name": "Voltorb",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/69_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Lightning"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-zubat-rocket",
+    "name": "Zubat",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/70_hires.png",
+    "rarity": "common",
+    "meta": "HP 40 · Grass"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-here-comes-team-rocket-rocket",
+    "name": "Here Comes Team Rocket!",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/71_hires.png",
+    "rarity": "rare",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rocket-s-sneak-attack-rocket",
+    "name": "Rocket's Sneak Attack",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/72_hires.png",
+    "rarity": "rare",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-the-boss-s-way",
+    "name": "The Boss's Way",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/73_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-challenge",
+    "name": "Challenge!",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/74_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-digger",
+    "name": "Digger",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/75_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-imposter-oak-s-revenge",
+    "name": "Imposter Oak's Revenge",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/76_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-nightly-garbage-run",
+    "name": "Nightly Garbage Run",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/77_hires.png",
+    "rarity": "uncommon",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-goop-gas-attack",
+    "name": "Goop Gas Attack",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/78_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-sleep",
+    "name": "Sleep!",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/79_hires.png",
+    "rarity": "common",
+    "meta": "Trainer"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-rainbow-energy-rocket",
+    "name": "Rainbow Energy",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/80_hires.png",
+    "rarity": "rare",
+    "meta": "Energy"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-full-heal-energy",
+    "name": "Full Heal Energy",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/81_hires.png",
+    "rarity": "uncommon",
+    "meta": "Energy"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-potion-energy",
+    "name": "Potion Energy",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/82_hires.png",
+    "rarity": "uncommon",
+    "meta": "Energy"
+  },
+  {
+    "category": "pokemon",
+    "id": "pokemon-dark-raichu",
+    "name": "Dark Raichu",
+    "subtitle": "Team Rocket",
+    "image": "https://images.pokemontcg.io/base5/83_hires.png",
+    "rarity": "legendary",
+    "meta": "HP 70 · Lightning"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gate-guardian",
+    "name": "Gate Guardian",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/25833572.jpg",
+    "rarity": "legendary",
+    "meta": "ATK 3750 / DEF 3400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-feral-imp",
+    "name": "Feral Imp",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/41392891.jpg",
+    "rarity": "common",
+    "meta": "ATK 1300 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-winged-dragon-guardian-of-the-fortress-1",
+    "name": "Winged Dragon, Guardian of the Fortress #1",
+    "subtitle": "Metal Raiders · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/87796900.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-summoned-skull",
+    "name": "Summoned Skull",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/70781052.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rock-ogre-grotto-1",
+    "name": "Rock Ogre Grotto #1",
+    "subtitle": "Metal Raiders · Rock / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/68846917.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-armored-lizard",
+    "name": "Armored Lizard",
+    "subtitle": "Metal Raiders · Reptile / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/15480588.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-killer-needle",
+    "name": "Killer Needle",
+    "subtitle": "Metal Raiders · Insect / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/88979991.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-larvae-moth",
+    "name": "Larvae Moth",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/87756343.jpg",
+    "rarity": "common",
+    "meta": "ATK 500 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-harpie-lady",
+    "name": "Harpie Lady",
+    "subtitle": "Metal Raiders · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/76812113.jpg",
+    "rarity": "common",
+    "meta": "ATK 1300 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-harpie-lady-sisters",
+    "name": "Harpie Lady Sisters",
+    "subtitle": "Metal Raiders · Winged Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/12206212.jpg",
+    "rarity": "rare",
+    "meta": "ATK 1950 / DEF 2100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kojikocy",
+    "name": "Kojikocy",
+    "subtitle": "Metal Raiders · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/1184620.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cocoon-of-evolution",
+    "name": "Cocoon of Evolution",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/40240595.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-crawling-dragon",
+    "name": "Crawling Dragon",
+    "subtitle": "Metal Raiders · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/67494157.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-armored-zombie",
+    "name": "Armored Zombie",
+    "subtitle": "Metal Raiders · Zombie / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/20277860.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 0"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mask-of-darkness",
+    "name": "Mask of Darkness",
+    "subtitle": "Metal Raiders · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/28933734.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 900 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-doma-the-angel-of-silence",
+    "name": "Doma The Angel of Silence",
+    "subtitle": "Metal Raiders · Fairy / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/16972957.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-white-magical-hat",
+    "name": "White Magical Hat",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/15150365.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-big-eye",
+    "name": "Big Eye",
+    "subtitle": "Metal Raiders · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/16768387.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-black-skull-dragon",
+    "name": "Black Skull Dragon",
+    "subtitle": "Metal Raiders · Dragon / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/11901678.jpg",
+    "rarity": "epic",
+    "meta": "ATK 3200 / DEF 2500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-masked-sorcerer",
+    "name": "Masked Sorcerer",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/10189126.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 900 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-roaring-ocean-snake",
+    "name": "Roaring Ocean Snake",
+    "subtitle": "Metal Raiders · Aqua / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/19066538.jpg",
+    "rarity": "common",
+    "meta": "ATK 2100 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-water-omotics",
+    "name": "Water Omotics",
+    "subtitle": "Metal Raiders · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/2483611.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ground-attacker-bugroth",
+    "name": "Ground Attacker Bugroth",
+    "subtitle": "Metal Raiders · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/58314394.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-petit-moth",
+    "name": "Petit Moth",
+    "subtitle": "Metal Raiders · Insect / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/58192742.jpg",
+    "rarity": "common",
+    "meta": "ATK 300 / DEF 200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-elegant-egotist",
+    "name": "Elegant Egotist",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/90219263.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sanga-of-the-thunder",
+    "name": "Sanga of the Thunder",
+    "subtitle": "Metal Raiders · Thunder / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/25955164.jpg",
+    "rarity": "rare",
+    "meta": "ATK 2600 / DEF 2200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kazejin",
+    "name": "Kazejin",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/62340868.jpg",
+    "rarity": "rare",
+    "meta": "ATK 2400 / DEF 2200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-suijin",
+    "name": "Suijin",
+    "subtitle": "Metal Raiders · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/98434877.jpg",
+    "rarity": "rare",
+    "meta": "ATK 2500 / DEF 2400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystic-lamp",
+    "name": "Mystic Lamp",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/98049915.jpg",
+    "rarity": "common",
+    "meta": "ATK 400 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-steel-scorpion",
+    "name": "Steel Scorpion",
+    "subtitle": "Metal Raiders · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/13599884.jpg",
+    "rarity": "common",
+    "meta": "ATK 250 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ocubeam",
+    "name": "Ocubeam",
+    "subtitle": "Metal Raiders · Fairy / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/86088138.jpg",
+    "rarity": "common",
+    "meta": "ATK 1550 / DEF 1650"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-leghul",
+    "name": "Leghul",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/12472242.jpg",
+    "rarity": "common",
+    "meta": "ATK 300 / DEF 350"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ooguchi",
+    "name": "Ooguchi",
+    "subtitle": "Metal Raiders · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/58861941.jpg",
+    "rarity": "common",
+    "meta": "ATK 300 / DEF 250"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-leogun",
+    "name": "Leogun",
+    "subtitle": "Metal Raiders · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/10538007.jpg",
+    "rarity": "common",
+    "meta": "ATK 1750 / DEF 1550"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-blast-juggler",
+    "name": "Blast Juggler",
+    "subtitle": "Metal Raiders · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/70138455.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-jinzo-7",
+    "name": "Jinzo #7",
+    "subtitle": "Metal Raiders · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/32809211.jpg",
+    "rarity": "common",
+    "meta": "ATK 500 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-magician-of-faith",
+    "name": "Magician of Faith",
+    "subtitle": "Metal Raiders · Spellcaster / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/31560081.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 300 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ancient-elf",
+    "name": "Ancient Elf",
+    "subtitle": "Metal Raiders · Spellcaster / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/93221206.jpg",
+    "rarity": "common",
+    "meta": "ATK 1450 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-deepsea-shark",
+    "name": "Deepsea Shark",
+    "subtitle": "Metal Raiders · Fish / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/28593363.jpg",
+    "rarity": "common",
+    "meta": "ATK 1900 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bottom-dweller",
+    "name": "Bottom Dweller",
+    "subtitle": "Metal Raiders · Fish / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/81386177.jpg",
+    "rarity": "common",
+    "meta": "ATK 1650 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-destroyer-golem",
+    "name": "Destroyer Golem",
+    "subtitle": "Metal Raiders · Rock / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/73481154.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kaminari-attack",
+    "name": "Kaminari Attack",
+    "subtitle": "Metal Raiders · Thunder / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/9653271.jpg",
+    "rarity": "common",
+    "meta": "ATK 1900 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rainbow-flower",
+    "name": "Rainbow Flower",
+    "subtitle": "Metal Raiders · Plant / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/21347810.jpg",
+    "rarity": "common",
+    "meta": "ATK 400 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-morinphen",
+    "name": "Morinphen",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/55784832.jpg",
+    "rarity": "common",
+    "meta": "ATK 1550 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mega-thunderball",
+    "name": "Mega Thunderball",
+    "subtitle": "Metal Raiders · Thunder / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/21817254.jpg",
+    "rarity": "common",
+    "meta": "ATK 750 / DEF 600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tongyo",
+    "name": "Tongyo",
+    "subtitle": "Metal Raiders · Fish / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/69572024.jpg",
+    "rarity": "common",
+    "meta": "ATK 1350 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-empress-judge",
+    "name": "Empress Judge",
+    "subtitle": "Metal Raiders · Warrior / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/15237615.jpg",
+    "rarity": "common",
+    "meta": "ATK 2100 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-pale-beast",
+    "name": "Pale Beast",
+    "subtitle": "Metal Raiders · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/21263083.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-electric-lizard",
+    "name": "Electric Lizard",
+    "subtitle": "Metal Raiders · Thunder / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/55875323.jpg",
+    "rarity": "common",
+    "meta": "ATK 850 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hunter-spider",
+    "name": "Hunter Spider",
+    "subtitle": "Metal Raiders · Insect / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/80141480.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ancient-lizard-warrior",
+    "name": "Ancient Lizard Warrior",
+    "subtitle": "Metal Raiders · Reptile / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/43230671.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-queen-s-double",
+    "name": "Queen's Double",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/5901497.jpg",
+    "rarity": "common",
+    "meta": "ATK 350 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-trent",
+    "name": "Trent",
+    "subtitle": "Metal Raiders · Plant / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/78780140.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-disk-magician",
+    "name": "Disk Magician",
+    "subtitle": "Metal Raiders · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/76446915.jpg",
+    "rarity": "common",
+    "meta": "ATK 1350 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hyosube",
+    "name": "Hyosube",
+    "subtitle": "Metal Raiders · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/2118022.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hibikime",
+    "name": "Hibikime",
+    "subtitle": "Metal Raiders · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/64501875.jpg",
+    "rarity": "common",
+    "meta": "ATK 1450 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-fake-trap",
+    "name": "Fake Trap",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/3027001.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tribute-to-the-doomed",
+    "name": "Tribute to The Doomed",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/79759861.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-soul-release",
+    "name": "Soul Release",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/5758500.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-cheerful-coffin",
+    "name": "The Cheerful Coffin",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/41142615.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-change-of-heart",
+    "name": "Change of Heart",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/4031928.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-baby-dragon",
+    "name": "Baby Dragon",
+    "subtitle": "Metal Raiders · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/88819587.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-blackland-fire-dragon",
+    "name": "Blackland Fire Dragon",
+    "subtitle": "Metal Raiders · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/87564352.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-swamp-battleguard",
+    "name": "Swamp Battleguard",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/40453765.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-battle-steer",
+    "name": "Battle Steer",
+    "subtitle": "Metal Raiders · Beast-Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/18246479.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-time-wizard",
+    "name": "Time Wizard",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/71625222.jpg",
+    "rarity": "epic",
+    "meta": "ATK 500 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-saggi-the-dark-clown",
+    "name": "Saggi the Dark Clown",
+    "subtitle": "Metal Raiders · Spellcaster / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/66602787.jpg",
+    "rarity": "common",
+    "meta": "ATK 600 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dragon-piper",
+    "name": "Dragon Piper",
+    "subtitle": "Metal Raiders · Pyro / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/55763552.jpg",
+    "rarity": "common",
+    "meta": "ATK 200 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-illusionist-faceless-mage",
+    "name": "Illusionist Faceless Mage",
+    "subtitle": "Metal Raiders · Spellcaster / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/28546905.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 2200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sangan",
+    "name": "Sangan",
+    "subtitle": "Metal Raiders · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/26202165.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-great-moth",
+    "name": "Great Moth",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/14141448.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 2600 / DEF 2500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kuriboh",
+    "name": "Kuriboh",
+    "subtitle": "Metal Raiders · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/40640057.jpg",
+    "rarity": "rare",
+    "meta": "ATK 300 / DEF 200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-jellyfish",
+    "name": "Jellyfish",
+    "subtitle": "Metal Raiders · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/14851496.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-castle-of-dark-illusions",
+    "name": "Castle of Dark Illusions",
+    "subtitle": "Metal Raiders · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/62121.jpg",
+    "rarity": "common",
+    "meta": "ATK 920 / DEF 1930"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-king-of-yamimakai",
+    "name": "King of Yamimakai",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/69455834.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 1530"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-catapult-turtle",
+    "name": "Catapult Turtle",
+    "subtitle": "Metal Raiders · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/95727991.jpg",
+    "rarity": "rare",
+    "meta": "ATK 1000 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystic-horseman",
+    "name": "Mystic Horseman",
+    "subtitle": "Metal Raiders · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/68516705.jpg",
+    "rarity": "common",
+    "meta": "ATK 1300 / DEF 1550"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rabid-horseman",
+    "name": "Rabid Horseman",
+    "subtitle": "Metal Raiders · Beast-Warrior / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/94905343.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-crass-clown",
+    "name": "Crass Clown",
+    "subtitle": "Metal Raiders · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/93889755.jpg",
+    "rarity": "common",
+    "meta": "ATK 1350 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-pumpking-the-king-of-ghosts",
+    "name": "Pumpking the King of Ghosts",
+    "subtitle": "Metal Raiders · Zombie / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/29155212.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dream-clown",
+    "name": "Dream Clown",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/13215230.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tainted-wisdom",
+    "name": "Tainted Wisdom",
+    "subtitle": "Metal Raiders · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/28725004.jpg",
+    "rarity": "common",
+    "meta": "ATK 1250 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ancient-brain",
+    "name": "Ancient Brain",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/42431843.jpg",
+    "rarity": "common",
+    "meta": "ATK 1000 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-guardian-of-the-labyrinth",
+    "name": "Guardian of the Labyrinth",
+    "subtitle": "Metal Raiders · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/89272878.jpg",
+    "rarity": "common",
+    "meta": "ATK 1000 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-prevent-rat",
+    "name": "Prevent Rat",
+    "subtitle": "Metal Raiders · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/549481.jpg",
+    "rarity": "common",
+    "meta": "ATK 500 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-little-swordsman-of-aile",
+    "name": "The Little Swordsman of Aile",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/25109950.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-princess-of-tsurugi",
+    "name": "Princess of Tsurugi",
+    "subtitle": "Metal Raiders · Warrior / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/51371017.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 900 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-protector-of-the-throne",
+    "name": "Protector of the Throne",
+    "subtitle": "Metal Raiders · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/10071456.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tremendous-fire",
+    "name": "Tremendous Fire",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/46918794.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-jirai-gumo",
+    "name": "Jirai Gumo",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/94773007.jpg",
+    "rarity": "common",
+    "meta": "ATK 2200 / DEF 100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-shadow-ghoul",
+    "name": "Shadow Ghoul",
+    "subtitle": "Metal Raiders · Zombie / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/30778711.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1600 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-labyrinth-tank",
+    "name": "Labyrinth Tank",
+    "subtitle": "Metal Raiders · Machine / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/99551425.jpg",
+    "rarity": "common",
+    "meta": "ATK 2400 / DEF 2400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ryu-kishin-powered",
+    "name": "Ryu-Kishin Powered",
+    "subtitle": "Metal Raiders · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/24611934.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bickuribox",
+    "name": "Bickuribox",
+    "subtitle": "Metal Raiders · Fiend / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/25655502.jpg",
+    "rarity": "common",
+    "meta": "ATK 2300 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giltia-the-d-knight",
+    "name": "Giltia the D. Knight",
+    "subtitle": "Metal Raiders · Warrior / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/51828629.jpg",
+    "rarity": "common",
+    "meta": "ATK 1850 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-launcher-spider",
+    "name": "Launcher Spider",
+    "subtitle": "Metal Raiders · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/87322377.jpg",
+    "rarity": "common",
+    "meta": "ATK 2200 / DEF 2500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giga-tech-wolf",
+    "name": "Giga-Tech Wolf",
+    "subtitle": "Metal Raiders · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/8471389.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-thunder-dragon",
+    "name": "Thunder Dragon",
+    "subtitle": "Metal Raiders · Thunder / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/31786629.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-7-colored-fish",
+    "name": "7 Colored Fish",
+    "subtitle": "Metal Raiders · Fish / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/23771716.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-immortal-of-thunder",
+    "name": "The Immortal of Thunder",
+    "subtitle": "Metal Raiders · Thunder / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/84926738.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-punished-eagle",
+    "name": "Punished Eagle",
+    "subtitle": "Metal Raiders · Winged Beast / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/74703140.jpg",
+    "rarity": "common",
+    "meta": "ATK 2100 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-insect-soldiers-of-the-sky",
+    "name": "Insect Soldiers of the Sky",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/7019529.jpg",
+    "rarity": "common",
+    "meta": "ATK 1000 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hoshiningen",
+    "name": "Hoshiningen",
+    "subtitle": "Metal Raiders · Fairy / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/67629977.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 500 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-musician-king",
+    "name": "Musician King",
+    "subtitle": "Metal Raiders · Spellcaster / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/56907389.jpg",
+    "rarity": "common",
+    "meta": "ATK 1750 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-yado-karu",
+    "name": "Yado Karu",
+    "subtitle": "Metal Raiders · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/29380133.jpg",
+    "rarity": "common",
+    "meta": "ATK 900 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cyber-saurus",
+    "name": "Cyber Saurus",
+    "subtitle": "Metal Raiders · Machine / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/89112729.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cannon-soldier",
+    "name": "Cannon Soldier",
+    "subtitle": "Metal Raiders · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/11384280.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-muka-muka",
+    "name": "Muka Muka",
+    "subtitle": "Metal Raiders · Rock / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/46657337.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 600 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-bistro-butcher",
+    "name": "The Bistro Butcher",
+    "subtitle": "Metal Raiders · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/71107816.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-star-boy",
+    "name": "Star Boy",
+    "subtitle": "Metal Raiders · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/8201910.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 550 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-milus-radiant",
+    "name": "Milus Radiant",
+    "subtitle": "Metal Raiders · Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/7489323.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 300 / DEF 250"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-flame-cerebrus",
+    "name": "Flame Cerebrus",
+    "subtitle": "Metal Raiders · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/60862676.jpg",
+    "rarity": "common",
+    "meta": "ATK 2100 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-niwatori",
+    "name": "Niwatori",
+    "subtitle": "Metal Raiders · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/7805359.jpg",
+    "rarity": "common",
+    "meta": "ATK 900 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dark-elf",
+    "name": "Dark Elf",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/21417692.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 2000 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mushroom-man-2",
+    "name": "Mushroom Man #2",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/93900406.jpg",
+    "rarity": "common",
+    "meta": "ATK 1250 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-lava-battleguard",
+    "name": "Lava Battleguard",
+    "subtitle": "Metal Raiders · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/20394040.jpg",
+    "rarity": "common",
+    "meta": "ATK 1550 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-witch-of-the-black-forest",
+    "name": "Witch of the Black Forest",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/78010363.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1100 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-little-chimera",
+    "name": "Little Chimera",
+    "subtitle": "Metal Raiders · Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/68658728.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 600 / DEF 550"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bladefly",
+    "name": "Bladefly",
+    "subtitle": "Metal Raiders · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/28470714.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 600 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-lady-of-faith",
+    "name": "Lady of Faith",
+    "subtitle": "Metal Raiders · Spellcaster / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/17358176.jpg",
+    "rarity": "common",
+    "meta": "ATK 1100 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-twin-headed-thunder-dragon",
+    "name": "Twin-Headed Thunder Dragon",
+    "subtitle": "Metal Raiders · Thunder / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/54752875.jpg",
+    "rarity": "rare",
+    "meta": "ATK 2800 / DEF 2100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-witch-s-apprentice",
+    "name": "Witch's Apprentice",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/80741828.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 550 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-blue-winged-crown",
+    "name": "Blue-Winged Crown",
+    "subtitle": "Metal Raiders · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/41396436.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-skull-knight",
+    "name": "Skull Knight",
+    "subtitle": "Metal Raiders · Spellcaster / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/2504891.jpg",
+    "rarity": "common",
+    "meta": "ATK 2650 / DEF 2250"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gazelle-the-king-of-mythical-beasts",
+    "name": "Gazelle the King of Mythical Beasts",
+    "subtitle": "Metal Raiders · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/5818798.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-garnecia-elefantis",
+    "name": "Garnecia Elefantis",
+    "subtitle": "Metal Raiders · Beast-Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/49888191.jpg",
+    "rarity": "rare",
+    "meta": "ATK 2400 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-barrel-dragon",
+    "name": "Barrel Dragon",
+    "subtitle": "Metal Raiders · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/81480460.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2600 / DEF 2200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-solemn-judgment",
+    "name": "Solemn Judgment",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/41420027.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-magic-jammer",
+    "name": "Magic Jammer",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/77414722.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-seven-tools-of-the-bandit",
+    "name": "Seven Tools of the Bandit",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/3819470.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-horn-of-heaven",
+    "name": "Horn of Heaven",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/98069388.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-shield-sword",
+    "name": "Shield & Sword",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/52097679.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sword-of-deep-seated",
+    "name": "Sword of Deep-Seated",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/98495314.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-block-attack",
+    "name": "Block Attack",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/25880422.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-unhappy-maiden",
+    "name": "The Unhappy Maiden",
+    "subtitle": "Metal Raiders · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/51275027.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-robbin-goblin",
+    "name": "Robbin' Goblin",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/88279736.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-germ-infection",
+    "name": "Germ Infection",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/24668830.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-paralyzing-potion",
+    "name": "Paralyzing Potion",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/50152549.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mirror-force",
+    "name": "Mirror Force",
+    "subtitle": "Metal Raiders · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/44095762.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ring-of-magnetism",
+    "name": "Ring of Magnetism",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/20436034.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-share-the-pain",
+    "name": "Share the Pain",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/56830749.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-stim-pack",
+    "name": "Stim-Pack",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/83225447.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-heavy-storm",
+    "name": "Heavy Storm",
+    "subtitle": "Metal Raiders · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/19613556.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-thousand-dragon",
+    "name": "Thousand Dragon",
+    "subtitle": "Metal Raiders · Dragon / Fusion",
+    "image": "https://images.ygoprodeck.com/images/cards/41462083.jpg",
+    "rarity": "legendary",
+    "meta": "ATK 2400 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-blue-eyes-toon-dragon",
+    "name": "Blue-Eyes Toon Dragon",
+    "subtitle": "Spell Ruler · Dragon / Toon / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/53183600.jpg",
+    "rarity": "legendary",
+    "meta": "ATK 3000 / DEF 2500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-penguin-knight",
+    "name": "Penguin Knight",
+    "subtitle": "Spell Ruler · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/36039163.jpg",
+    "rarity": "common",
+    "meta": "ATK 900 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-axe-of-despair",
+    "name": "Axe of Despair",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/40619825.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-black-pendant",
+    "name": "Black Pendant",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/65169794.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-horn-of-light",
+    "name": "Horn of Light",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/38552107.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-malevolent-nuzzler",
+    "name": "Malevolent Nuzzler",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/99597615.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-spellbinding-circle",
+    "name": "Spellbinding Circle",
+    "subtitle": "Spell Ruler · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/18807108.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-metal-fish",
+    "name": "Metal Fish",
+    "subtitle": "Spell Ruler · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/55998462.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-electric-snake",
+    "name": "Electric Snake",
+    "subtitle": "Spell Ruler · Thunder / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/11324436.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-queen-bird",
+    "name": "Queen Bird",
+    "subtitle": "Spell Ruler · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/73081602.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ameba",
+    "name": "Ameba",
+    "subtitle": "Spell Ruler · Aqua / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/95174353.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 300 / DEF 350"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-peacock",
+    "name": "Peacock",
+    "subtitle": "Spell Ruler · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/20624263.jpg",
+    "rarity": "common",
+    "meta": "ATK 1700 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-maha-vailo",
+    "name": "Maha Vailo",
+    "subtitle": "Spell Ruler · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/93013676.jpg",
+    "rarity": "rare",
+    "meta": "ATK 1550 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-guardian-of-the-throne-room",
+    "name": "Guardian of the Throne Room",
+    "subtitle": "Spell Ruler · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/47879985.jpg",
+    "rarity": "common",
+    "meta": "ATK 1650 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-fire-kraken",
+    "name": "Fire Kraken",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/46534755.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-minar",
+    "name": "Minar",
+    "subtitle": "Spell Ruler · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/32539892.jpg",
+    "rarity": "common",
+    "meta": "ATK 850 / DEF 750"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-griggle",
+    "name": "Griggle",
+    "subtitle": "Spell Ruler · Plant / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/95744531.jpg",
+    "rarity": "common",
+    "meta": "ATK 350 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tyhone-2",
+    "name": "Tyhone #2",
+    "subtitle": "Spell Ruler · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/56789759.jpg",
+    "rarity": "common",
+    "meta": "ATK 1700 / DEF 1900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ancient-one-of-the-deep-forest",
+    "name": "Ancient One of the Deep Forest",
+    "subtitle": "Spell Ruler · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/14015067.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dark-witch",
+    "name": "Dark Witch",
+    "subtitle": "Spell Ruler · Fairy / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/35565537.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-weather-report",
+    "name": "Weather Report",
+    "subtitle": "Spell Ruler · Aqua / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/72053645.jpg",
+    "rarity": "common",
+    "meta": "ATK 950 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mechanical-snail",
+    "name": "Mechanical Snail",
+    "subtitle": "Spell Ruler · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/34442949.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giant-turtle-who-feeds-on-flames",
+    "name": "Giant Turtle Who Feeds on Flames",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/96981563.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-liquid-beast",
+    "name": "Liquid Beast",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/93108297.jpg",
+    "rarity": "common",
+    "meta": "ATK 950 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hiro-s-shadow-scout",
+    "name": "Hiro's Shadow Scout",
+    "subtitle": "Spell Ruler · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/81863068.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 650 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-high-tide-gyojin",
+    "name": "High Tide Gyojin",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/54579801.jpg",
+    "rarity": "common",
+    "meta": "ATK 1650 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-invader-of-the-throne",
+    "name": "Invader of the Throne",
+    "subtitle": "Spell Ruler · Warrior / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/3056267.jpg",
+    "rarity": "rare",
+    "meta": "ATK 1350 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-whiptail-crow",
+    "name": "Whiptail Crow",
+    "subtitle": "Spell Ruler · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/91996584.jpg",
+    "rarity": "common",
+    "meta": "ATK 1650 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-slot-machine",
+    "name": "Slot Machine",
+    "subtitle": "Spell Ruler · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/3797883.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 2300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-relinquished",
+    "name": "Relinquished",
+    "subtitle": "Spell Ruler · Spellcaster / Ritual / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/64631466.jpg",
+    "rarity": "epic",
+    "meta": "ATK 0 / DEF 0"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-red-archery-girl",
+    "name": "Red Archery Girl",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/65570596.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gravekeeper-s-servant",
+    "name": "Gravekeeper's Servant",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/16762927.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-curse-of-fiend",
+    "name": "Curse of Fiend",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/12470447.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-upstart-goblin",
+    "name": "Upstart Goblin",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/70368879.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-toll",
+    "name": "Toll",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/82003859.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-final-destiny",
+    "name": "Final Destiny",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/18591904.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-snatch-steal",
+    "name": "Snatch Steal",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/45986603.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-chorus-of-sanctuary",
+    "name": "Chorus of Sanctuary",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/81380218.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-confiscation",
+    "name": "Confiscation",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/17375316.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-delinquent-duo",
+    "name": "Delinquent Duo",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/44763025.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-darkness-approaches",
+    "name": "Darkness Approaches",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/80168720.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-fairy-s-hand-mirror",
+    "name": "Fairy's Hand Mirror",
+    "subtitle": "Spell Ruler · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/17653779.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-tailor-of-the-fickle",
+    "name": "Tailor of the Fickle",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/43641473.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rush-recklessly",
+    "name": "Rush Recklessly",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/70046172.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-reliable-guardian",
+    "name": "The Reliable Guardian",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/16430187.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-forceful-sentry",
+    "name": "The Forceful Sentry",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/42829885.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-chain-energy",
+    "name": "Chain Energy",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/79323590.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystical-space-typhoon",
+    "name": "Mystical Space Typhoon",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/5318639.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giant-trunade",
+    "name": "Giant Trunade",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/42703248.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-painful-choice",
+    "name": "Painful Choice",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/74191942.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-snake-fang",
+    "name": "Snake Fang",
+    "subtitle": "Spell Ruler · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/596051.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-black-illusion-ritual",
+    "name": "Black Illusion Ritual",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/41426869.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-octoberser",
+    "name": "Octoberser",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/74637266.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-psychic-kappa",
+    "name": "Psychic Kappa",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/7892180.jpg",
+    "rarity": "common",
+    "meta": "ATK 400 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-horn-of-the-unicorn",
+    "name": "Horn of the Unicorn",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/64047146.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-labyrinth-wall",
+    "name": "Labyrinth Wall",
+    "subtitle": "Spell Ruler · Rock / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/67284908.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 3000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-wall-shadow",
+    "name": "Wall Shadow",
+    "subtitle": "Spell Ruler · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/63162310.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 3000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-twin-long-rods-2",
+    "name": "Twin Long Rods #2",
+    "subtitle": "Spell Ruler · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/29692206.jpg",
+    "rarity": "common",
+    "meta": "ATK 850 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-stone-ogre-grotto",
+    "name": "Stone Ogre Grotto",
+    "subtitle": "Spell Ruler · Rock / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/15023985.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-magical-labyrinth",
+    "name": "Magical Labyrinth",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/64389297.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-eternal-rest",
+    "name": "Eternal Rest",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/95051344.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-megamorph",
+    "name": "Megamorph",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/22046459.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-commencement-dance",
+    "name": "Commencement Dance",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/43417563.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hamburger-recipe",
+    "name": "Hamburger Recipe",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/80811661.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-house-of-adhesive-tape",
+    "name": "House of Adhesive Tape",
+    "subtitle": "Spell Ruler · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/15083728.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-eatgaboon",
+    "name": "Eatgaboon",
+    "subtitle": "Spell Ruler · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/42578427.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-turtle-oath",
+    "name": "Turtle Oath",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/76806714.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-performance-of-sword",
+    "name": "Performance of Sword",
+    "subtitle": "Spell Ruler · Warrior / Ritual",
+    "image": "https://images.ygoprodeck.com/images/cards/4849037.jpg",
+    "rarity": "common",
+    "meta": "ATK 1950 / DEF 1850"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hungry-burger",
+    "name": "Hungry Burger",
+    "subtitle": "Spell Ruler · Warrior / Ritual",
+    "image": "https://images.ygoprodeck.com/images/cards/30243636.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 1850"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-crab-turtle",
+    "name": "Crab Turtle",
+    "subtitle": "Spell Ruler · Aqua / Ritual",
+    "image": "https://images.ygoprodeck.com/images/cards/91782219.jpg",
+    "rarity": "common",
+    "meta": "ATK 2550 / DEF 2500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ryu-ran",
+    "name": "Ryu-Ran",
+    "subtitle": "Spell Ruler · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/2964201.jpg",
+    "rarity": "common",
+    "meta": "ATK 2200 / DEF 2600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-manga-ryu-ran",
+    "name": "Manga Ryu-Ran",
+    "subtitle": "Spell Ruler · Dragon / Toon / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/38369349.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 2200 / DEF 2600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-toon-mermaid",
+    "name": "Toon Mermaid",
+    "subtitle": "Spell Ruler · Aqua / Toon / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/65458948.jpg",
+    "rarity": "epic",
+    "meta": "ATK 1400 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-toon-summoned-skull",
+    "name": "Toon Summoned Skull",
+    "subtitle": "Spell Ruler · Fiend / Toon / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/91842653.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2500 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-jigen-bakudan",
+    "name": "Jigen Bakudan",
+    "subtitle": "Spell Ruler · Pyro / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/90020065.jpg",
+    "rarity": "common",
+    "meta": "ATK 200 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hyozanryu",
+    "name": "Hyozanryu",
+    "subtitle": "Spell Ruler · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/62397231.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 2100 / DEF 2800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-toon-world",
+    "name": "Toon World",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/15259703.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cyber-jar",
+    "name": "Cyber Jar",
+    "subtitle": "Spell Ruler · Rock / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/34124316.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 900 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-banisher-of-the-light",
+    "name": "Banisher of the Light",
+    "subtitle": "Spell Ruler · Fairy / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/61528025.jpg",
+    "rarity": "rare",
+    "meta": "ATK 100 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giant-rat",
+    "name": "Giant Rat",
+    "subtitle": "Spell Ruler · Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/97017120.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1450"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-senju-of-the-thousand-hands",
+    "name": "Senju of the Thousand Hands",
+    "subtitle": "Spell Ruler · Fairy / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/23401839.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ufo-turtle",
+    "name": "UFO Turtle",
+    "subtitle": "Spell Ruler · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/60806437.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-flash-assailant",
+    "name": "Flash Assailant",
+    "subtitle": "Spell Ruler · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/96890582.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-karate-man",
+    "name": "Karate Man",
+    "subtitle": "Spell Ruler · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/23289281.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dark-zebra",
+    "name": "Dark Zebra",
+    "subtitle": "Spell Ruler · Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/59784896.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-giant-germ",
+    "name": "Giant Germ",
+    "subtitle": "Spell Ruler · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/95178994.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-nimble-momonga",
+    "name": "Nimble Momonga",
+    "subtitle": "Spell Ruler · Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/22567609.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-spear-cretin",
+    "name": "Spear Cretin",
+    "subtitle": "Spell Ruler · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/58551308.jpg",
+    "rarity": "common",
+    "meta": "ATK 500 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-shining-angel",
+    "name": "Shining Angel",
+    "subtitle": "Spell Ruler · Fairy / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/95956346.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-boar-soldier",
+    "name": "Boar Soldier",
+    "subtitle": "Spell Ruler · Beast-Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/21340051.jpg",
+    "rarity": "common",
+    "meta": "ATK 2000 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mother-grizzly",
+    "name": "Mother Grizzly",
+    "subtitle": "Spell Ruler · Beast-Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/57839750.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-flying-kamakiri-1",
+    "name": "Flying Kamakiri #1",
+    "subtitle": "Spell Ruler · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/84834865.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ceremonial-bell",
+    "name": "Ceremonial Bell",
+    "subtitle": "Spell Ruler · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/20228463.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 1850"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sonic-bird",
+    "name": "Sonic Bird",
+    "subtitle": "Spell Ruler · Winged Beast / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/57617178.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystic-tomato",
+    "name": "Mystic Tomato",
+    "subtitle": "Spell Ruler · Plant / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/83011277.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kotodama",
+    "name": "Kotodama",
+    "subtitle": "Spell Ruler · Fairy / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/19406822.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gaia-power",
+    "name": "Gaia Power",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/56594520.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-umiiruka",
+    "name": "Umiiruka",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/82999629.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-molten-destruction",
+    "name": "Molten Destruction",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/19384334.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rising-air-current",
+    "name": "Rising Air Current",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/45778932.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-luminous-spark",
+    "name": "Luminous Spark",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/81777047.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystic-plasma-zone",
+    "name": "Mystic Plasma Zone",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/18161786.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-messenger-of-peace",
+    "name": "Messenger of Peace",
+    "subtitle": "Spell Ruler · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/44656491.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-serpent-night-dragon",
+    "name": "Serpent Night Dragon",
+    "subtitle": "Spell Ruler · Dragon / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/66516792.jpg",
+    "rarity": "legendary",
+    "meta": "ATK 2350 / DEF 2400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-jinzo",
+    "name": "Jinzo",
+    "subtitle": "Pharaoh's Servant · Machine / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/77585513.jpg",
+    "rarity": "legendary",
+    "meta": "ATK 2400 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-steel-ogre-grotto-2",
+    "name": "Steel Ogre Grotto #2",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/90908427.jpg",
+    "rarity": "common",
+    "meta": "ATK 1900 / DEF 2200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-three-headed-geedo",
+    "name": "Three-Headed Geedo",
+    "subtitle": "Pharaoh's Servant · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/78423643.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 1400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-parasite-paracide",
+    "name": "Parasite Paracide",
+    "subtitle": "Pharaoh's Servant · Insect / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/27911549.jpg",
+    "rarity": "rare",
+    "meta": "ATK 500 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-7-completed",
+    "name": "7 Completed",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/86198326.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-lightforce-sword",
+    "name": "Lightforce Sword",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/49587034.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-chain-destruction",
+    "name": "Chain Destruction",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/1248895.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-time-seal",
+    "name": "Time Seal",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/35316708.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-graverobber",
+    "name": "Graverobber",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/61705417.jpg",
+    "rarity": "rare",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gift-of-the-mystical-elf",
+    "name": "Gift of The Mystical Elf",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/98299011.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-eye-of-truth",
+    "name": "The Eye of Truth",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/34694160.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dust-tornado",
+    "name": "Dust Tornado",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/60082869.jpg",
+    "rarity": "rare",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-call-of-the-haunted",
+    "name": "Call of the Haunted",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/97077563.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-solomon-s-lawbook",
+    "name": "Solomon's Lawbook",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/23471572.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-earthshaker",
+    "name": "Earthshaker",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/60866277.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-enchanted-javelin",
+    "name": "Enchanted Javelin",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/96355986.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mirror-wall",
+    "name": "Mirror Wall",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/22359980.jpg",
+    "rarity": "rare",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gust",
+    "name": "Gust",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/73079365.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-driving-snow",
+    "name": "Driving Snow",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/473469.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-armored-glass",
+    "name": "Armored Glass",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/36868108.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-world-suppression",
+    "name": "World Suppression",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/12253117.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mystic-probe",
+    "name": "Mystic Probe",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/49251811.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-metal-detector",
+    "name": "Metal Detector",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/75646520.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-numinous-healer",
+    "name": "Numinous Healer",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/2130625.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-appropriate",
+    "name": "Appropriate",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/48539234.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-forced-requisition",
+    "name": "Forced Requisition",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/74923978.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dna-surgery",
+    "name": "DNA Surgery",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/74701381.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-regulation-of-tribe",
+    "name": "The Regulation of Tribe",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/296499.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-backup-soldier",
+    "name": "Backup Soldier",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/36280194.jpg",
+    "rarity": "rare",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-major-riot",
+    "name": "Major Riot",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/9074847.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ceasefire",
+    "name": "Ceasefire",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/36468556.jpg",
+    "rarity": "epic",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-light-of-intervention",
+    "name": "Light of Intervention",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/62867251.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-respect-play",
+    "name": "Respect Play",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/8951260.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-magical-hats",
+    "name": "Magical Hats",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/81210420.jpg",
+    "rarity": "rare",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-nobleman-of-crossout",
+    "name": "Nobleman of Crossout",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/71044499.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-nobleman-of-extermination",
+    "name": "Nobleman of Extermination",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/17449108.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-shallow-grave",
+    "name": "The Shallow Grave",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/43434803.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-premature-burial",
+    "name": "Premature Burial",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/70828912.jpg",
+    "rarity": "epic",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-inspection",
+    "name": "Inspection",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/16227556.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-prohibition",
+    "name": "Prohibition",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/43711255.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-morphing-jar-2",
+    "name": "Morphing Jar #2",
+    "subtitle": "Pharaoh's Servant · Rock / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/79106360.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 800 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-flame-champion",
+    "name": "Flame Champion",
+    "subtitle": "Pharaoh's Servant · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/42599677.jpg",
+    "rarity": "common",
+    "meta": "ATK 1900 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-twin-headed-fire-dragon",
+    "name": "Twin-Headed Fire Dragon",
+    "subtitle": "Pharaoh's Servant · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/78984772.jpg",
+    "rarity": "common",
+    "meta": "ATK 2200 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-darkfire-soldier-1",
+    "name": "Darkfire Soldier #1",
+    "subtitle": "Pharaoh's Servant · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/5388481.jpg",
+    "rarity": "common",
+    "meta": "ATK 1700 / DEF 1150"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mr-volcano",
+    "name": "Mr. Volcano",
+    "subtitle": "Pharaoh's Servant · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/31477025.jpg",
+    "rarity": "common",
+    "meta": "ATK 2100 / DEF 1300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-darkfire-soldier-2",
+    "name": "Darkfire Soldier #2",
+    "subtitle": "Pharaoh's Servant · Pyro / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/78861134.jpg",
+    "rarity": "common",
+    "meta": "ATK 1700 / DEF 1100"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-kiseitai",
+    "name": "Kiseitai",
+    "subtitle": "Pharaoh's Servant · Fiend / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/4266839.jpg",
+    "rarity": "common",
+    "meta": "ATK 300 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cyber-falcon",
+    "name": "Cyber Falcon",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/30655537.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-flying-kamakiri-2",
+    "name": "Flying Kamakiri #2",
+    "subtitle": "Pharaoh's Servant · Insect / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/3134241.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sky-scout",
+    "name": "Sky Scout",
+    "subtitle": "Pharaoh's Servant · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/30532390.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-buster-blader",
+    "name": "Buster Blader",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/78193831.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2600 / DEF 2300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-michizure",
+    "name": "Michizure",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/37580756.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-minor-goblin-official",
+    "name": "Minor Goblin Official",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/1918087.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gamble",
+    "name": "Gamble",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/37313786.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-attack-and-receive",
+    "name": "Attack and Receive",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/63689843.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-solemn-wishes",
+    "name": "Solemn Wishes",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/35346968.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-skull-invitation",
+    "name": "Skull Invitation",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/98139712.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bubonic-vermin",
+    "name": "Bubonic Vermin",
+    "subtitle": "Pharaoh's Servant · Beast / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/6104968.jpg",
+    "rarity": "common",
+    "meta": "ATK 900 / DEF 600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dark-bat",
+    "name": "Dark Bat",
+    "subtitle": "Pharaoh's Servant · Winged Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/67049542.jpg",
+    "rarity": "common",
+    "meta": "ATK 1000 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-oni-tank-t-34",
+    "name": "Oni Tank T-34",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/66927994.jpg",
+    "rarity": "common",
+    "meta": "ATK 1400 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-overdrive",
+    "name": "Overdrive",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/2311603.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-burning-land",
+    "name": "Burning Land",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/24294108.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-cold-wave",
+    "name": "Cold Wave",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/60682203.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-fairy-meteor-crush",
+    "name": "Fairy Meteor Crush",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/97687912.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-limiter-removal",
+    "name": "Limiter Removal",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/23171610.jpg",
+    "rarity": "rare",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-rain-of-mercy",
+    "name": "Rain of Mercy",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/66719324.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-monster-recovery",
+    "name": "Monster Recovery",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/93108433.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-shift",
+    "name": "Shift",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/59560625.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-insect-imitation",
+    "name": "Insect Imitation",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/96965364.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dimensionhole",
+    "name": "Dimensionhole",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/22959079.jpg",
+    "rarity": "uncommon",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-ground-collapse",
+    "name": "Ground Collapse",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/90502999.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-magic-drain",
+    "name": "Magic Drain",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/59344077.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-infinite-dismissal",
+    "name": "Infinite Dismissal",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/54109233.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gravity-bind",
+    "name": "Gravity Bind",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/85742772.jpg",
+    "rarity": "uncommon",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-type-zero-magic-crusher",
+    "name": "Type Zero Magic Crusher",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/21237481.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-shadow-of-eyes",
+    "name": "Shadow of Eyes",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/58621589.jpg",
+    "rarity": "common",
+    "meta": "Trap"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-legendary-fisherman",
+    "name": "The Legendary Fisherman",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/3643300.jpg",
+    "rarity": "epic",
+    "meta": "ATK 1850 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-sword-hunter",
+    "name": "Sword Hunter",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/51345461.jpg",
+    "rarity": "common",
+    "meta": "ATK 2450 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-drill-bug",
+    "name": "Drill Bug",
+    "subtitle": "Pharaoh's Servant · Insect / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/88733579.jpg",
+    "rarity": "common",
+    "meta": "ATK 1100 / DEF 200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-deepsea-warrior",
+    "name": "Deepsea Warrior",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/24128274.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bite-shoes",
+    "name": "Bite Shoes",
+    "subtitle": "Pharaoh's Servant · Fiend / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/50122883.jpg",
+    "rarity": "common",
+    "meta": "ATK 500 / DEF 300"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-spikebot",
+    "name": "Spikebot",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/87511987.jpg",
+    "rarity": "common",
+    "meta": "ATK 1800 / DEF 1700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-invitation-to-a-dark-sleep",
+    "name": "Invitation to a Dark Sleep",
+    "subtitle": "Pharaoh's Servant · Spellcaster / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/52675689.jpg",
+    "rarity": "common",
+    "meta": "ATK 1500 / DEF 1800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-thousand-eyes-idol",
+    "name": "Thousand-Eyes Idol",
+    "subtitle": "Pharaoh's Servant · Spellcaster / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/27125110.jpg",
+    "rarity": "common",
+    "meta": "ATK 0 / DEF 0"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-thousand-eyes-restrict",
+    "name": "Thousand-Eyes Restrict",
+    "subtitle": "Pharaoh's Servant · Spellcaster / Fusion / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/63519819.jpg",
+    "rarity": "epic",
+    "meta": "ATK 0 / DEF 0"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-girochin-kuwagata",
+    "name": "Girochin Kuwagata",
+    "subtitle": "Pharaoh's Servant · Insect / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/84620194.jpg",
+    "rarity": "common",
+    "meta": "ATK 1700 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-hayabusa-knight",
+    "name": "Hayabusa Knight",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/21015833.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1000 / DEF 700"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-bombardment-beetle",
+    "name": "Bombardment Beetle",
+    "subtitle": "Pharaoh's Servant · Insect / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/57409948.jpg",
+    "rarity": "common",
+    "meta": "ATK 400 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-4-starred-ladybug-of-doom",
+    "name": "4-Starred Ladybug of Doom",
+    "subtitle": "Pharaoh's Servant · Insect / Flip / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/83994646.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gradius",
+    "name": "Gradius",
+    "subtitle": "Pharaoh's Servant · Machine / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/10992251.jpg",
+    "rarity": "common",
+    "meta": "ATK 1200 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-vampire-baby",
+    "name": "Vampire Baby",
+    "subtitle": "Pharaoh's Servant · Zombie / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/56387350.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 700 / DEF 1000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-mad-sword-beast",
+    "name": "Mad Sword Beast",
+    "subtitle": "Pharaoh's Servant · Dinosaur / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/79870141.jpg",
+    "rarity": "uncommon",
+    "meta": "ATK 1400 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-skull-mariner",
+    "name": "Skull Mariner",
+    "subtitle": "Pharaoh's Servant · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/5265750.jpg",
+    "rarity": "common",
+    "meta": "ATK 1600 / DEF 900"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-all-seeing-white-tiger",
+    "name": "The All-Seeing White Tiger",
+    "subtitle": "Pharaoh's Servant · Beast / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/32269855.jpg",
+    "rarity": "common",
+    "meta": "ATK 1300 / DEF 500"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-goblin-attack-force",
+    "name": "Goblin Attack Force",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/78658564.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2300 / DEF 0"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-island-turtle",
+    "name": "Island Turtle",
+    "subtitle": "Pharaoh's Servant · Aqua / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/4042268.jpg",
+    "rarity": "common",
+    "meta": "ATK 1100 / DEF 2000"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-wingweaver",
+    "name": "Wingweaver",
+    "subtitle": "Pharaoh's Servant · Fairy / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/31447217.jpg",
+    "rarity": "common",
+    "meta": "ATK 2750 / DEF 2400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-science-soldier",
+    "name": "Science Soldier",
+    "subtitle": "Pharaoh's Servant · Warrior / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/67532912.jpg",
+    "rarity": "common",
+    "meta": "ATK 800 / DEF 800"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-souls-of-the-forgotten",
+    "name": "Souls of the Forgotten",
+    "subtitle": "Pharaoh's Servant · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/4920010.jpg",
+    "rarity": "common",
+    "meta": "ATK 900 / DEF 200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-dokuroyaiba",
+    "name": "Dokuroyaiba",
+    "subtitle": "Pharaoh's Servant · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/30325729.jpg",
+    "rarity": "common",
+    "meta": "ATK 1000 / DEF 400"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-the-fiend-megacyber",
+    "name": "The Fiend Megacyber",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/66362965.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2200 / DEF 1200"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-gearfried-the-iron-knight",
+    "name": "Gearfried the Iron Knight",
+    "subtitle": "Pharaoh's Servant · Warrior / Effect",
+    "image": "https://images.ygoprodeck.com/images/cards/423705.jpg",
+    "rarity": "rare",
+    "meta": "ATK 1800 / DEF 1600"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-insect-barrier",
+    "name": "Insect Barrier",
+    "subtitle": "Pharaoh's Servant · Spell",
+    "image": "https://images.ygoprodeck.com/images/cards/23615409.jpg",
+    "rarity": "common",
+    "meta": "Spell"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-beast-of-talwar",
+    "name": "Beast of Talwar",
+    "subtitle": "Pharaoh's Servant · Fiend / Normal",
+    "image": "https://images.ygoprodeck.com/images/cards/11761845.jpg",
+    "rarity": "epic",
+    "meta": "ATK 2400 / DEF 2150"
+  },
+  {
+    "category": "yugioh",
+    "id": "yugioh-imperial-order",
+    "name": "Imperial Order",
+    "subtitle": "Pharaoh's Servant · Trap",
+    "image": "https://images.ygoprodeck.com/images/cards/61740673.jpg",
+    "rarity": "legendary",
+    "meta": "Trap"
   }
 ]
