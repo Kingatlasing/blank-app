@@ -270,6 +270,29 @@
   .burst{position:fixed;inset:0;pointer-events:none;z-index:80;}
   .burst i{position:absolute;display:block;border-radius:2px;}
 
+  /* ---------- Legendary reveal moment ---------- */
+  .legendary-flash{position:fixed;inset:0;pointer-events:none;z-index:88;
+    background:radial-gradient(circle at var(--sx,50%) var(--sy,50%), rgba(255,255,255,.9), rgba(255,220,140,.25) 40%, transparent 72%);
+    animation:legFlash .8s ease-out forwards;}
+  @keyframes legFlash{0%{opacity:0;}12%{opacity:1;}100%{opacity:0;}}
+  .legendary-scrim{position:fixed;inset:0;pointer-events:none;z-index:70;opacity:0;
+    background:radial-gradient(circle at var(--sx,50%) var(--sy,50%), transparent 0, transparent 130px, rgba(4,6,14,.8) 300px);
+    animation:legScrimIn .45s ease-out .05s forwards;}
+  .legendary-scrim.leaving{animation:legScrimOut .5s ease-in forwards;}
+  @keyframes legScrimIn{to{opacity:1;}}
+  @keyframes legScrimOut{to{opacity:0;}}
+  .legendary-ring{position:fixed;left:var(--sx,50%);top:var(--sy,50%);width:24px;height:24px;
+    margin:-12px 0 0 -12px;border-radius:50%;pointer-events:none;z-index:82;
+    border:2px solid rgba(255,211,92,.85);box-shadow:0 0 16px rgba(255,211,92,.5);
+    animation:legRing 1s cubic-bezier(.15,.7,.3,1) forwards;}
+  @keyframes legRing{to{width:380px;height:380px;margin:-190px 0 0 -190px;opacity:0;border-width:1px;}}
+  .legendary-rays{position:fixed;left:var(--sx,50%);top:var(--sy,50%);width:900px;height:900px;
+    margin:-450px 0 0 -450px;pointer-events:none;z-index:69;opacity:0;
+    background:repeating-conic-gradient(rgba(255,225,150,.16) 0deg 4deg, transparent 4deg 16deg);
+    animation:legRaysIn .5s ease-out forwards, legSpin 6s linear infinite;}
+  @keyframes legRaysIn{to{opacity:1;}}
+  @keyframes legSpin{to{transform:rotate(360deg);}}
+
   .stage-actions{display:flex;gap:12px;flex:0 0 auto;padding-top:4px;}
 
   /* ---------- Collection ---------- */
@@ -710,8 +733,13 @@ function flipTop(){
   var isNew = addToCollection(card);
   save(); renderTop();
 
-  if(card.rarity==="epic" || card.rarity==="legendary"){
-    setTimeout(function(){ burstAt(topEl, card.rarity==="legendary" ? "#ffb020" : "#c05cff"); }, 650);
+  if(card.rarity==="legendary"){
+    setTimeout(function(){
+      burstAt(topEl, "#ffb020", true);
+      legendaryMoment(topEl);
+    }, 600);
+  } else if(card.rarity==="epic"){
+    setTimeout(function(){ burstAt(topEl, "#c05cff"); }, 650);
   }
   if(isNew){
     setTimeout(function(){
@@ -722,8 +750,45 @@ function flipTop(){
     }, 420);
   }
 
-  var holdTime = (card.rarity==="epic" || card.rarity==="legendary") ? 1500 : 950;
+  var holdTime = card.rarity==="legendary" ? 2200 : card.rarity==="epic" ? 1500 : 950;
   setTimeout(function(){ settleToStrip(card); }, holdTime);
+}
+
+/* the "this is a huge pull" cinematic — a screen-wide flash, a spotlight
+   scrim that dims everything but the card, spinning light rays, and a
+   couple of expanding shockwave rings, all centered on the card itself and
+   fully self-removing so it never lingers or blocks later taps. */
+function legendaryMoment(cardEl){
+  var rect = cardEl.getBoundingClientRect();
+  var sx = (rect.left+rect.width/2)+"px", sy = (rect.top+rect.height/2)+"px";
+
+  var flash = document.createElement("div");
+  flash.className = "legendary-flash";
+  flash.style.setProperty("--sx", sx); flash.style.setProperty("--sy", sy);
+  document.body.appendChild(flash);
+  setTimeout(function(){ flash.remove(); }, 850);
+
+  var rays = document.createElement("div");
+  rays.className = "legendary-rays";
+  rays.style.setProperty("--sx", sx); rays.style.setProperty("--sy", sy);
+  document.body.appendChild(rays);
+
+  var scrim = document.createElement("div");
+  scrim.className = "legendary-scrim";
+  scrim.style.setProperty("--sx", sx); scrim.style.setProperty("--sy", sy);
+  document.body.appendChild(scrim);
+  setTimeout(function(){ scrim.classList.add("leaving"); }, 1400);
+  setTimeout(function(){ scrim.remove(); rays.remove(); }, 1950);
+
+  [0, 180, 380].forEach(function(delay){
+    setTimeout(function(){
+      var ring = document.createElement("div");
+      ring.className = "legendary-ring";
+      ring.style.setProperty("--sx", sx); ring.style.setProperty("--sy", sy);
+      document.body.appendChild(ring);
+      setTimeout(function(){ ring.remove(); }, 1050);
+    }, delay);
+  });
 }
 
 function settleToStrip(card){
@@ -748,23 +813,28 @@ function settleToStrip(card){
   }
 }
 
-function burstAt(el, color){
+var LEGENDARY_COLORS = ["#ffb020","#ff6bcb","#7c5cff","#4da3ff","#ffd35c"];
+
+function burstAt(el, color, big){
   var rect = el.getBoundingClientRect();
   var cx = rect.left+rect.width/2, cy = rect.top+rect.height/2;
   var wrap = document.createElement("div");
   wrap.className="burst";
-  var n = 26;
+  var n = big ? 60 : 26;
+  var maxDist = big ? 170 : 90;
+  var life = big ? 1300 : 900;
   for(var i=0;i<n;i++){
     var p = document.createElement("i");
     var ang = (Math.PI*2*i)/n + Math.random()*0.4;
-    var dist = 90+Math.random()*90;
+    var dist = maxDist*0.5 + Math.random()*maxDist;
     var dx = Math.cos(ang)*dist, dy = Math.sin(ang)*dist;
-    var size = 4+Math.random()*5;
+    var size = big ? 5+Math.random()*8 : 4+Math.random()*5;
+    var col = big ? LEGENDARY_COLORS[i%LEGENDARY_COLORS.length] : color;
     p.style.left = cx+"px"; p.style.top = cy+"px";
     p.style.width = size+"px"; p.style.height = size+"px";
-    p.style.background = color;
-    p.style.boxShadow = "0 0 8px "+color;
-    p.style.transition = "transform .8s cubic-bezier(.2,.8,.3,1), opacity .8s";
+    p.style.background = col;
+    p.style.boxShadow = "0 0 10px "+col;
+    p.style.transition = "transform "+(life/1000)+"s cubic-bezier(.2,.8,.3,1), opacity "+(life/1000)+"s";
     wrap.appendChild(p);
     (function(p,dx,dy){
       requestAnimationFrame(function(){
@@ -776,7 +846,7 @@ function burstAt(el, color){
     })(p,dx,dy);
   }
   document.body.appendChild(wrap);
-  setTimeout(function(){ wrap.remove(); }, 900);
+  setTimeout(function(){ wrap.remove(); }, life+100);
 }
 
 /* ======================= COLLECTION ======================= */
