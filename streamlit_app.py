@@ -40,4 +40,4 @@ def load_html() -> str:
     return html
 
 
-components.html(load_html(), height=1300, scrolling=True)
+components.html(load_html(), height=860, scrolling=True)

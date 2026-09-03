@@ -11,21 +11,24 @@
     --c-common:#8a93a8; --c-uncommon:#3ddc84; --c-rare:#4da3ff; --c-epic:#c05cff; --c-legendary:#ffb020;
   }
   *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  html,body{height:100%;margin:0;padding:0;background:var(--bg);color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
     overflow-x:hidden;}
   body{background:
       radial-gradient(1200px 600px at 15% -10%, #1c2748 0%, transparent 60%),
       radial-gradient(1000px 500px at 110% 10%, #2a1a3d 0%, transparent 55%),
       var(--bg);
-    min-height:100vh;}
-  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px;}
+    display:flex;flex-direction:column;}
+  .wrap{max-width:1180px;margin:0 auto;padding:18px 20px 60px;width:100%;}
+  #view-root{flex:1 1 auto;min-height:0;overflow-y:auto;}
+  #view-root.no-scroll{overflow:hidden;padding-bottom:14px;display:flex;flex-direction:column;height:100%;}
+  #view-root.no-scroll>.pack-open-view{flex:1 1 auto;min-height:0;}
   ::-webkit-scrollbar{width:10px;height:10px;}
   ::-webkit-scrollbar-thumb{background:#2a3350;border-radius:8px;}
 
   /* ---------- Top bar ---------- */
   .topbar{display:flex;align-items:center;justify-content:space-between;
-    padding:14px 20px;position:sticky;top:0;z-index:50;
+    padding:14px 20px;flex:0 0 auto;position:sticky;top:0;z-index:50;
     background:rgba(10,13,22,.85);backdrop-filter:blur(10px);
     border-bottom:1px solid var(--line);}
   .brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:.3px;}
@@ -90,23 +93,62 @@
   .t-football .pack-art{background-image:linear-gradient(135deg,#2f5d34,#5a3a22,#c8a04a);}
 
   /* ---------- Pack opening stage ---------- */
-  .stage{min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;}
+  .pack-open-view{display:flex;flex-direction:column;align-items:center;position:relative;
+    gap:4px;width:100%;text-align:center;}
   .stage-bg{position:absolute;inset:0;border-radius:24px;opacity:.35;filter:blur(60px);z-index:0;pointer-events:none;}
-  .back-link{align-self:flex-start;margin-bottom:6px;}
-  .rip-pack{width:220px;height:300px;border-radius:16px;position:relative;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;font-size:70px;
+  .back-link{align-self:flex-start;margin-bottom:6px;flex:0 0 auto;}
+  .rip-title{font-size:20px;font-weight:800;margin:0 0 2px;flex:0 0 auto;position:relative;z-index:1;}
+
+  /* the pack / card stack both share this responsive sizing so everything
+     scales down to fit inside the viewport with no scrolling */
+  .pack-media-size{height:min(340px,44vh);aspect-ratio:5/7;width:auto;}
+
+  .stack-outer{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;
+    perspective:1400px;position:relative;z-index:1;}
+
+  .rip-pack{border-radius:16px;position:relative;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:min(70px,9vh);
     background-size:200% 200%;animation:packshine 4s ease infinite, floaty 2.6s ease-in-out infinite;
-    box-shadow:0 20px 50px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.1);z-index:1;}
+    box-shadow:0 20px 50px rgba(0,0,0,.55), inset 0 0 0 1px rgba(255,255,255,.1);}
   .rip-pack::after{content:"";position:absolute;inset:0;border-radius:16px;
     background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.4) 42%,transparent 58%);
     background-size:250% 250%;animation:sheen 2.4s linear infinite;}
   @keyframes floaty{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-10px) rotate(1.5deg)}}
   .rip-pack.tearing{animation:tear .55s forwards;}
   @keyframes tear{0%{transform:scale(1)}40%{transform:scale(1.12) rotate(3deg)}100%{transform:scale(0) rotate(20deg);opacity:0;}}
-  .rip-hint{margin-top:22px;color:var(--sub);font-size:13.5px;font-weight:600;letter-spacing:.3px;}
-  .rip-title{font-size:22px;font-weight:800;margin-bottom:2px;}
+  .rip-hint{color:var(--sub);font-size:12.5px;font-weight:600;letter-spacing:.3px;flex:0 0 auto;
+    padding:2px 0;position:relative;z-index:1;}
 
-  .reveal-row{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;align-items:flex-end;min-height:340px;}
+  /* stacked-deck reveal, tiltable, flipped one at a time by the player */
+  .stack-tilt{position:relative;transform-style:preserve-3d;transition:transform .12s ease-out;
+    --tx:0;--ty:0;}
+  .stack-tilt::after{content:"";position:absolute;inset:-12%;pointer-events:none;mix-blend-mode:screen;
+    opacity:0;border-radius:16px;transition:opacity .25s;
+    background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.7) 45%,rgba(255,180,255,.6) 52%,transparent 65%);
+    background-size:220% 220%;
+    background-position:calc(50% + var(--tx)*60%) calc(50% + var(--ty)*60%);}
+  .stack-tilt.foil-rare::after{opacity:.3;}
+  .stack-tilt.foil-epic::after{opacity:.55;}
+  .stack-tilt.foil-legendary::after{opacity:.85;
+    background:linear-gradient(115deg,transparent 25%,#ffd35c 38%,#ff6bcb 48%,#7c5cff 58%,transparent 72%);
+    background-size:260% 260%;}
+  .stack-tilt .card-slot{position:absolute;inset:0;width:100%;height:100%;
+    perspective:none;transform-style:preserve-3d;}
+
+  .collected-strip{display:flex;gap:7px;justify-content:center;align-items:center;flex-wrap:nowrap;
+    overflow-x:auto;padding:4px 4px;min-height:0;flex:0 0 auto;}
+  .strip-thumb{position:relative;flex:0 0 auto;width:38px;aspect-ratio:5/7;border-radius:6px;overflow:hidden;
+    border:2px solid var(--line);opacity:0;transform:scale(.4) translateY(10px);
+    animation:stripPop .35s cubic-bezier(.3,1.5,.4,1) forwards;}
+  .strip-thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  .strip-thumb .img-fallback{font-size:14px;}
+  .strip-thumb.r-common{border-color:var(--c-common);}
+  .strip-thumb.r-uncommon{border-color:var(--c-uncommon);}
+  .strip-thumb.r-rare{border-color:var(--c-rare);}
+  .strip-thumb.r-epic{border-color:var(--c-epic);}
+  .strip-thumb.r-legendary{border-color:var(--c-legendary);}
+  @keyframes stripPop{to{opacity:1;transform:scale(1) translateY(0);}}
+
   .card-slot{width:190px;height:266px;perspective:1200px;}
   .card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;
     transition:transform .7s cubic-bezier(.2,.9,.25,1.05);cursor:pointer;}
@@ -154,7 +196,7 @@
   .burst{position:fixed;inset:0;pointer-events:none;z-index:80;}
   .burst i{position:absolute;display:block;border-radius:2px;}
 
-  .stage-actions{display:flex;gap:12px;margin-top:28px;}
+  .stage-actions{display:flex;gap:12px;flex:0 0 auto;padding-top:4px;}
 
   /* ---------- Collection ---------- */
   .filter-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
@@ -198,7 +240,7 @@
     .brand{font-size:16px;}
     .nav button{padding:7px 10px;font-size:12px;}
     .card-slot{width:150px;height:210px;}
-    .rip-pack{width:170px;height:230px;font-size:52px;}
+    .pack-media-size{height:min(240px,36vh);}
   }
 </style>
 </head>
@@ -370,16 +412,30 @@ function openStage(catKey){
   var cat = CATEGORIES.filter(function(c){return c.key===catKey;})[0];
   if(STATE.coins < cat.price){ toast("Not enough coins for that pack"); return; }
   var root = document.getElementById("view-root");
+  root.classList.add("no-scroll");
   root.innerHTML = stageHTML(cat);
+}
+
+function leavePackOpen(){
+  var root = document.getElementById("view-root");
+  if(root) root.classList.remove("no-scroll");
+  render();
+}
+function leaveToCollection(){
+  var root = document.getElementById("view-root");
+  if(root) root.classList.remove("no-scroll");
+  goto("collection");
 }
 
 function stageHTML(cat){
   return (
-    '<div class="back-link"><button class="btn" onclick="render()">&larr; Back to Packs</button></div>' +
-    '<div class="stage">' +
+    '<div class="back-link"><button class="btn" onclick="leavePackOpen()">&larr; Back to Packs</button></div>' +
+    '<div class="pack-open-view">' +
       '<div class="stage-bg" style="background:'+glowFor(cat.key)+'"></div>' +
       '<div class="rip-title">'+cat.label+' Pack</div>' +
-      '<div class="rip-pack '+cat.theme+'" id="rip-pack" onclick="ripPack(\''+cat.key+'\')">'+cat.icon+'</div>' +
+      '<div class="stack-outer">' +
+        '<div class="rip-pack pack-media-size '+cat.theme+'" id="rip-pack" onclick="ripPack(\''+cat.key+'\')">'+cat.icon+'</div>' +
+      '</div>' +
       '<div class="rip-hint">Tap the pack to rip it open</div>' +
     '</div>'
   );
@@ -409,10 +465,47 @@ function ripPack(catKey){
 }
 
 function showReveal(cat, pulled){
+  // sort weakest-to-strongest so the best pull always lands last, like a real pack
+  var sorted = pulled.slice().sort(function(a,b){
+    return RARITIES.indexOf(a.rarity) - RARITIES.indexOf(b.rarity);
+  });
+  window.CAT_KEY_CURRENT = cat.key;
+  window.CURRENT_PULL = sorted;
+  window.STACK_INDEX = 0;
+
   var root = document.getElementById("view-root");
-  var slots = pulled.map(function(card, i){
+  root.classList.add("no-scroll");
+  root.innerHTML = (
+    '<div class="back-link"><button class="btn" onclick="leavePackOpen()">&larr; Back to Packs</button></div>' +
+    '<div class="pack-open-view">' +
+      '<div class="rip-title">Your Pull</div>' +
+      '<div class="stack-outer" id="stack-outer">' +
+        '<div class="stack-tilt pack-media-size" id="stack-tilt"></div>' +
+      '</div>' +
+      '<div class="rip-hint" id="rip-hint">Tap the top card to flip it &middot; move/drag to tilt for foils</div>' +
+      '<div class="collected-strip" id="collected-strip"></div>' +
+      '<div class="stage-actions" id="stage-actions" style="display:none">' +
+        '<button class="btn primary" onclick="openStage(CAT_KEY_CURRENT)">Rip Another</button>' +
+        '<button class="btn" onclick="leaveToCollection()">View Collection</button>' +
+      '</div>' +
+    '</div>'
+  );
+
+  attachTilt(document.getElementById("stack-outer"), document.getElementById("stack-tilt"));
+  renderStack();
+}
+
+/* renders the remaining face-down stack; index 0 (top, interactive) sits above
+   the rest with a slight fan offset so you can see there's more than one card */
+function renderStack(){
+  var tilt = document.getElementById("stack-tilt");
+  if(!tilt) return;
+  var remaining = window.CURRENT_PULL.slice(window.STACK_INDEX);
+  tilt.innerHTML = remaining.map(function(card, pos){
+    var dx = pos*4, dy = pos*-4, rot = (pos%2===0? pos : -pos)*1.4;
     return (
-      '<div class="card-slot" id="slot-'+i+'" onclick="flipSlot('+i+')">' +
+      '<div class="card-slot stack-card" style="transform:translate('+dx+'px,'+dy+'px) rotate('+rot+'deg);z-index:'+(200-pos)+';" '+
+        (pos===0? 'onclick="flipTop()"' : '') + '>' +
         '<div class="card-inner">' +
           '<div class="card-face card-back"><div class="logo">🏆</div></div>' +
           '<div class="card-face card-front r-'+card.rarity+'">' +
@@ -424,56 +517,96 @@ function showReveal(cat, pulled){
       '</div>'
     );
   }).join("");
-
-  root.innerHTML = (
-    '<div class="back-link"><button class="btn" onclick="render()">&larr; Back to Packs</button></div>' +
-    '<div class="stage">' +
-      '<div class="rip-title">Your Pull</div>' +
-      '<p class="page-sub">Tap each card to flip it over</p>' +
-      '<div class="reveal-row">'+slots+'</div>' +
-      '<div class="stage-actions" id="stage-actions" style="display:none">' +
-        '<button class="btn primary" onclick="openStage(CAT_KEY_CURRENT)">Rip Another</button>' +
-        '<button class="btn" onclick="goto(\'collection\')">View Collection</button>' +
-      '</div>' +
-    '</div>'
-  );
-  window.CAT_KEY_CURRENT = cat.key;
-  window.CURRENT_PULL = pulled;
-  window.FLIPPED_COUNT = 0;
-
-  // auto-reveal sequentially with a slight cascade, still clickable to flip early
-  pulled.forEach(function(card, i){
-    setTimeout(function(){ flipSlot(i, card); }, 550 + i*550);
-  });
+  setFoilHint(remaining);
 }
 
-function flipSlot(i, cardArg){
-  var slot = document.getElementById("slot-"+i);
-  if(!slot || slot.classList.contains("flipped")) return;
-  var card = cardArg || window.CURRENT_PULL[i];
-  slot.classList.add("flipped");
+/* hints at what's left in the stack via the tilt shimmer, without giving away
+   exactly which card it's on — mirrors a real foil pack catching the light */
+function setFoilHint(remaining){
+  var tilt = document.getElementById("stack-tilt");
+  if(!tilt) return;
+  var maxIdx = -1;
+  remaining.forEach(function(c){ maxIdx = Math.max(maxIdx, RARITIES.indexOf(c.rarity)); });
+  var cls = maxIdx>=4 ? "foil-legendary" : maxIdx>=3 ? "foil-epic" : maxIdx>=2 ? "foil-rare" : "";
+  tilt.className = "stack-tilt pack-media-size" + (cls? " "+cls : "");
+}
+
+function attachTilt(outerEl, tiltEl){
+  if(!outerEl || !tiltEl) return;
+  var raf = null, rx = 0, ry = 0;
+  function apply(){
+    tiltEl.style.transform = "rotateX("+rx+"deg) rotateY("+ry+"deg)";
+    tiltEl.style.setProperty("--tx", (ry/26).toFixed(3));
+    tiltEl.style.setProperty("--ty", (-rx/20).toFixed(3));
+    raf = null;
+  }
+  function move(clientX, clientY){
+    var r = outerEl.getBoundingClientRect();
+    var px = (clientX - r.left)/r.width - 0.5;
+    var py = (clientY - r.top)/r.height - 0.5;
+    ry = px*26; rx = -py*20;
+    if(!raf) raf = requestAnimationFrame(apply);
+  }
+  function reset(){ rx=0; ry=0; if(!raf) raf = requestAnimationFrame(apply); }
+  // NOTE: deliberately no setPointerCapture() here — capturing the pointer
+  // redirects the browser's synthesized click back to this outer element,
+  // which would silently swallow taps on the top card and break flipping.
+  outerEl.addEventListener("pointermove", function(e){ move(e.clientX, e.clientY); });
+  outerEl.addEventListener("pointerdown", function(e){ move(e.clientX, e.clientY); });
+  outerEl.addEventListener("pointerup", reset);
+  outerEl.addEventListener("pointercancel", reset);
+  outerEl.addEventListener("pointerleave", reset);
+}
+
+function flipTop(){
+  var tiltEl = document.getElementById("stack-tilt");
+  if(!tiltEl) return;
+  var topEl = tiltEl.querySelector(".stack-card");
+  if(!topEl || topEl.classList.contains("flipped")) return;
+  var card = window.CURRENT_PULL[window.STACK_INDEX];
+
+  topEl.onclick = null;
+  topEl.classList.add("flipped");
+  topEl.style.zIndex = 300;
 
   var isNew = addToCollection(card);
   save(); renderTop();
 
   if(card.rarity==="epic" || card.rarity==="legendary"){
-    burstAt(slot, card.rarity==="legendary" ? "#ffb020" : "#c05cff");
+    setTimeout(function(){ burstAt(topEl, card.rarity==="legendary" ? "#ffb020" : "#c05cff"); }, 650);
   }
   if(isNew){
     setTimeout(function(){
-      var front = slot.querySelector(".card-front");
+      var front = topEl.querySelector(".card-front");
       var badge = document.createElement("div");
       badge.className="new-badge"; badge.textContent="NEW";
       front.appendChild(badge);
-    }, 380);
+    }, 420);
   }
 
-  window.FLIPPED_COUNT = (window.FLIPPED_COUNT||0) + 1;
-  if(window.FLIPPED_COUNT === window.CURRENT_PULL.length){
-    setTimeout(function(){
-      var a = document.getElementById("stage-actions");
-      if(a) a.style.display="flex";
-    }, 500);
+  var holdTime = (card.rarity==="epic" || card.rarity==="legendary") ? 1500 : 950;
+  setTimeout(function(){ settleToStrip(card); }, holdTime);
+}
+
+function settleToStrip(card){
+  var strip = document.getElementById("collected-strip");
+  if(strip){
+    var el = document.createElement("div");
+    el.className = "strip-thumb r-"+card.rarity;
+    el.innerHTML = mediaHTML(card);
+    strip.appendChild(el);
+  }
+
+  window.STACK_INDEX++;
+  if(window.STACK_INDEX >= window.CURRENT_PULL.length){
+    var hint = document.getElementById("rip-hint");
+    if(hint) hint.textContent = "That's the whole pack!";
+    var tiltEl = document.getElementById("stack-tilt");
+    if(tiltEl){ tiltEl.innerHTML=""; tiltEl.className="stack-tilt pack-media-size"; }
+    var actions = document.getElementById("stage-actions");
+    if(actions) actions.style.display = "flex";
+  } else {
+    renderStack();
   }
 }
 
