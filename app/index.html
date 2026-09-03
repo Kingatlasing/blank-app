@@ -540,9 +540,15 @@ var RARITY_VALUE_RANGE = {
 };
 function hashStr(s){ var h=0; for(var i=0;i<s.length;i++){ h=(h*31+s.charCodeAt(i))|0; } return Math.abs(h); }
 function cardValue(card){
+  if(typeof card.realValue === "number") return card.realValue;
   var range = RARITY_VALUE_RANGE[card.rarity];
   var frac = (hashStr(card.id) % 1000)/1000;
   return range[0]*Math.pow(range[1]/range[0], frac);
+}
+function hasRealValue(card){ return typeof card.realValue === "number"; }
+function valueLineHTML(card){
+  var label = hasRealValue(card) ? "Value" : "Est. value";
+  return '<div class="val">'+label+' '+formatMoney(cardValue(card))+'</div>';
 }
 function formatMoney(v){
   if(v>=1000) return "$"+(v/1000).toFixed(v>=10000?0:1)+"k";
@@ -799,7 +805,7 @@ function renderStack(){
           '<div class="card-face card-front r-'+card.rarity+'">' +
             rarityTagHTML(card.rarity) +
             '<div class="card-photo">'+mediaHTML(card)+'<div class="holo-sweep"></div></div>'+
-            '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div><div class="val">Est. value '+formatMoney(cardValue(card))+'</div></div>'+
+            '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div>'+valueLineHTML(card)+'</div>'+
           '</div>' +
         '</div>' +
       '</div>'
@@ -1041,7 +1047,7 @@ function showModal(id){
           rarityTagHTML(card.rarity) +
           '<div class="dupe-tag">x'+count+'</div>'+
           '<div class="card-photo">'+mediaHTML(card)+'<div class="holo-sweep"></div></div>'+
-          '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div><div class="sub">'+(card.meta||"")+'</div><div class="val">Est. value '+formatMoney(cardValue(card))+'</div></div>'+
+          '<div class="card-info"><div class="nm">'+card.name+'</div><div class="sub">'+card.subtitle+'</div><div class="sub">'+(card.meta||"")+'</div>'+valueLineHTML(card)+'</div>'+
         '</div>' +
       '</div>' +
     '</div>' +
