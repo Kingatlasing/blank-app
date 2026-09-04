@@ -25,6 +25,7 @@ This is a self-contained HTML/CSS/JS game (`app/index.html`, DOM-rendered with p
 - **Raft River-Run** — near the end of the trail (the Columbia River / The Dalles), a side-view dodge minigame: steer a real canoe sprite with your mouse past rocks and floating logs. Take three hits and the raft breaks apart — the rest of the journey continues on foot (slower pace, and you lose some food in the wreck). A clean run gains extra miles.
 
   While building this, testing surfaced a real bug worth calling out: landmarks were only recognized by landing within 1 mile of their exact position, but a travel day covers 12–30 miles — so in normal play, most landmarks (and the raft trigger) would silently get skipped rather than reliably stopping the party there. Travel now clamps to the next landmark/trigger's exact mile instead of freely adding the day's full distance, so arrivals are always hit exactly.
+- **Dueling Standoff** — a quick-draw reaction minigame that can trigger as a random encounter on the trail: a gunslinger (or, in zombie mode, a raider) challenges you. Talk your way out, walk away, or accept — wait for the "DRAW!" signal and click as fast as you can. React before the signal and you lose your nerve; react slower than your opponent and you lose. Winning pays out real cash; losing ends the journey, so it's real risk for real stakes.
 
 ### 🚧 Coming in the next milestones
 - **A raft river-run** near the end of the trail (Columbia River) — dodge rocks and logs; wreck the raft and you finish the journey on foot.

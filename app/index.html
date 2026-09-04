@@ -1001,8 +1001,8 @@ SCREENS.dialogue = function(){
   var list = el('div',{class:'choice-list'});
   ev.choices.forEach(function(c){
     list.appendChild(el('button',{class:'btn', onclick:function(){
-      c.run();
-      S._pendingEvent=null; S.screen='hub';
+      var nextScreen = c.run();
+      S._pendingEvent=null; S.screen = nextScreen || 'hub';
       if(!checkPartyWiped()) render();
     }},[c.label]));
   });
@@ -1865,6 +1865,170 @@ SCREENS.raftResult = function(){
       : ["You’ll cover ground slower on foot, but you’re still headed for "+T('arriveWord')+'.'])
   ]));
   wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ Raft=null; S.screen='hub'; render(); }},['Continue']));
+  return wrap;
+};
+
+
+/* =========================================================================
+   WESTWARD: THE TRAIL  —  Dueling Standoff
+   A quick-draw reaction duel, triggered as a random trail encounter.
+   Winning pays out; losing means the duel was fatal — the journey ends.
+   ========================================================================= */
+
+var DUEL_EVENT_NORMAL = {
+  title:'A Gunslinger\'s Challenge',
+  text:'A hard-eyed stranger blocks the trail, hand hovering near his holster. "Heard you\'ve got money on you. I\'ll be taking it — unless you\'d rather settle this the old way."',
+  choices:[
+    {label:'Accept the duel', run:function(){ S._duelOpponent='A Gunslinger'; return 'duelIntro'; }},
+    {label:'Try to talk your way out', run:function(){
+      if(Math.random()<0.55){ addLog('A little silver and a level head talked him down.'); S.money = Math.max(0, S.money - ri(10,25)); }
+      else { var m=pick(S.party.filter(function(p){return p.health>0;})); if(m){m.health=clamp(m.health-ri(10,20),0,100);} addLog('The talk went bad — a scuffle broke out before he rode off.'); }
+    }},
+    {label:'Refuse and walk away', run:function(){ addLog('You kept walking. He let you go, but you feel his eyes on your back for a mile.'); }}
+  ]
+};
+var DUEL_EVENT_ZOMBIE = {
+  title:'A Raider\'s Challenge',
+  text:'A scavenger in patched-together armor steps into the road, revolver holstered but ready. "Your convoy for your life. Or we settle it quick — just you and me."',
+  choices:[
+    {label:'Accept the duel', run:function(){ S._duelOpponent='A Raider'; return 'duelIntro'; }},
+    {label:'Try to talk your way out', run:function(){
+      if(Math.random()<0.55){ addLog('You talked him down, trading a little scrip for safe passage.'); S.money = Math.max(0, S.money - ri(10,25)); }
+      else { var m=pick(S.party.filter(function(p){return p.health>0;})); if(m){m.health=clamp(m.health-ri(10,20),0,100);} addLog('Talking failed — a scuffle broke out before he backed off.'); }
+    }},
+    {label:'Refuse and walk away', run:function(){ addLog('You kept the convoy moving. He didn\'t follow — this time.'); }}
+  ]
+};
+NORMAL_EVENTS.push(DUEL_EVENT_NORMAL);
+ZOMBIE_EVENTS.push(DUEL_EVENT_ZOMBIE);
+
+SCREENS.duelIntro = function(){
+  var wrap = el('div',{class:'title-screen'});
+  wrap.appendChild(el('h1',{class:'headline'},['High Noon']));
+  wrap.appendChild(el('div',{class:'panel',style:'max-width:520px;margin:0 auto;text-align:left;'},[
+    el('p',{class:'typewriter'},[
+      'Ten paces. '+(S._duelOpponent||'Your opponent')+' squares up across from you, hand loose at their side. Wait for the signal — draw too soon and you lose your nerve, draw too slow and you lose everything.'
+    ])
+  ]));
+  wrap.appendChild(el('button',{class:'btn danger', onclick:function(){ openDuel(); }},['Step to the Mark →']));
+  return wrap;
+};
+
+var Duel = null;
+function openDuel(){
+  var diff = DIFFICULTY[S.difficulty];
+  var npcReactionMs = {easy:[420,600], medium:[300,460], hard:[220,360]}[S.difficulty] || [300,460];
+  Duel = {
+    phase:'waiting', // waiting -> signal -> resolved
+    signalAt: null, playerReactMs:null, npcReactMs: ri(npcReactionMs[0], npcReactionMs[1]),
+    result:null, waitStart: performance.now(), waitFor: rnd(1600, 4200)
+  };
+  S.screen='duel';
+  render();
+}
+
+SCREENS.duel = function(){
+  var wrap = el('div',{});
+  wrap.appendChild(el('h1',{class:'headline',style:'text-align:center;'},['The Standoff']));
+  var stage = el('div',{class:'panel', id:'duel-stage', style:'text-align:center;padding:40px 20px;position:relative;min-height:220px;cursor:pointer;'});
+  var faces = el('div',{style:'display:flex;justify-content:space-between;align-items:flex-end;max-width:420px;margin:0 auto 18px;'});
+  var playerSkin = (S.party[0]&&S.party[0].skin)||'male';
+  faces.appendChild(img('char_'+playerSkin+'_idle','','width:72px;height:72px;object-fit:contain;'));
+  var npcImg = img('char_'+(playerSkin==='male'?'female':'male')+'_idle','','width:72px;height:72px;object-fit:contain;transform:scaleX(-1);filter:hue-rotate(160deg) saturate(1.4);');
+  faces.appendChild(npcImg);
+  stage.appendChild(faces);
+  stage.appendChild(el('h2',{id:'duel-msg',class:'headline',style:'font-size:32px;margin:10px 0;'},['Steady...']));
+  stage.appendChild(el('p',{class:'typewriter'},['Click anywhere below once you see DRAW!']));
+  wrap.appendChild(stage);
+  setTimeout(function(){ initDuelLoop(stage); }, 0);
+  return wrap;
+};
+
+function initDuelLoop(stage){
+  if(!stage || !stage.isConnected) return;
+  var msgEl = document.getElementById('duel-msg');
+
+  function setMsg(text, color){ if(msgEl){ msgEl.textContent=text; msgEl.style.color = color||''; } }
+
+  var raf;
+  function tick(now){
+    if(!stage.isConnected || !Duel || Duel.phase==='resolved') return;
+    if(Duel.phase==='waiting'){
+      var elapsed = now - Duel.waitStart;
+      if(elapsed >= Duel.waitFor){
+        Duel.phase='signal';
+        Duel.signalAt = now;
+        setMsg('DRAW!', '#e04b4b');
+        sfx('snd_click');
+      }
+    } else if(Duel.phase==='signal'){
+      var sinceSignal = now - Duel.signalAt;
+      if(sinceSignal >= Duel.npcReactMs && !Duel.result){
+        resolveDuel('npc_first');
+        return;
+      }
+    }
+    raf = requestAnimationFrame(tick);
+  }
+
+  stage.addEventListener('click', function(){
+    if(!Duel || Duel.result) return;
+    if(Duel.phase==='waiting'){
+      resolveDuel('early');
+    } else if(Duel.phase==='signal'){
+      Duel.playerReactMs = performance.now() - Duel.signalAt;
+      resolveDuel(Duel.playerReactMs < Duel.npcReactMs ? 'player_first' : 'npc_first');
+    }
+  });
+
+  raf = requestAnimationFrame(tick);
+}
+
+function resolveDuel(outcome){
+  if(!Duel || Duel.result) return;
+  Duel.result = outcome;
+  Duel.phase = 'resolved';
+  var win = outcome==='player_first';
+  synthShot(S.mode==='zombie'?'pistol':'rifle');
+  S.screen='duelResult';
+  S._duelWin = win;
+  S._duelOutcome = outcome;
+  render();
+}
+
+SCREENS.duelResult = function(){
+  var win = S._duelWin;
+  var outcome = S._duelOutcome;
+  var wrap = el('div',{class:'title-screen'});
+  var reactMs = Duel.playerReactMs ? Math.round(Duel.playerReactMs) : null;
+  if(win){
+    var reward = ri(40,110);
+    if(!S._duelSettled){
+      S.money += reward;
+      addLog('Won the standoff against '+S._duelOpponent+' in '+reactMs+'ms — collected '+fmtMoney(reward)+' off them.');
+      S._duelSettled = true;
+    }
+    wrap.appendChild(el('h1',{class:'headline'},['You Drew First']));
+    wrap.appendChild(el('div',{class:'panel',style:'max-width:460px;margin:0 auto;text-align:left;'},[
+      el('p',{},['Your reaction: '+reactMs+'ms']),
+      el('p',{},[S._duelOpponent+' hits the dirt before their gun clears leather.']),
+      el('p',{},['Winnings: '+fmtMoney(reward)])
+    ]));
+    wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ Duel=null; S._duelSettled=false; S.screen='hub'; render(); }},['Continue']));
+  } else {
+    var reason = outcome==='early' ? 'You drew before the signal — your nerve broke, and so did you.' :
+      (reactMs ? 'Too slow — '+reactMs+'ms wasn\'t enough. '+S._duelOpponent+' fired first.' :
+        S._duelOpponent+' fired first.');
+    wrap.appendChild(el('h1',{class:'headline'},['The Standoff Is Over']));
+    wrap.appendChild(el('div',{class:'panel',style:'max-width:460px;margin:0 auto;text-align:left;'},[
+      el('p',{},[reason])
+    ]));
+    if(!S._duelSettled){
+      S._duelSettled = true;
+      finishGame(false, (S.mode==='zombie' ? 'The raider\'s shot rings out across the empty road. ' : 'The gunslinger\'s shot rings out across the trail. ') + reason);
+    }
+    wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ S._duelSettled=false; S.screen='hub'; render(); }},['See the Trail\'s End']));
+  }
   return wrap;
 };
 
