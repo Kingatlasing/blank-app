@@ -29,7 +29,8 @@ splashes, wood cracks) are synthesized live in-browser with the Web Audio
 API rather than downloaded, in the same spirit as this repo's earlier
 Lemonade Stand Tycoon build.
 
-The casino minigames (Roulette, Blackjack, Baccarat, Coin Flip, Shell Game),
-when ported in, will reuse original code from this repo's own
+The casino minigames (Roulette, Blackjack, Baccarat, Coin Flip, Shell Game)
+port their rules and payout logic from this repo's own
 `claude/courtside-card-pack-mock-app-99fqki` branch (project name:
-ChaseBreak) — not third-party assets.
+ChaseBreak) — not third-party assets. Visuals were rebuilt in this game's
+own CSS/asset system rather than carried over wholesale.
