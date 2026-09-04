@@ -12,12 +12,15 @@ This is a self-contained HTML/CSS/JS game (`app/index.html`, DOM-rendered with p
 - **Party setup** — name your three travelers, pick their look, and choose a starting background (Banker/Carpenter/Farmer, or Ex-Soldier/Mechanic/Field Medic in zombie mode) that sets your starting funds and skills.
 - **Trail map hub** — a real map of the historical Oregon Trail landmarks (Independence → Kansas River → Fort Kearney → Chimney Rock → Fort Laramie → South Pass → Fort Bridger → Soda Springs → Fort Hall → Snake River → Blue Mountains → The Dalles → Willamette Valley), reskinned for the zombie campaign, with your party's position tracked live.
 - **Travel simulation** — choose pace and rations each leg, watch food and party health drift accordingly, and hit a pool of mode-specific random events (bandits/raiders, river crossings, sickness/infection, wagon breakdowns, trading encounters) with real branching choices and consequences.
-- **Town hub & General Store** — arrive at a landmark town, rest to heal up, or buy food/ammo/medical supplies/spare parts.
+- **Pre-trip outfitting shop** — spend your starting funds on food/ammo/medical supplies/spare parts at Independence (or the checkpoint) before you set out, on top of a small starting stockpile.
+- **Town hub & General Store** — arrive at a landmark town, rest to heal up, or buy more supplies at the same shop, now mid-trip.
+- **Hunting minigame** — a real canvas shooting session: animals (buffalo, bear, moose, goat, rabbit, duck, chicken) cross the field on a timer, click to fire using your actual ammo supply, downed animals add to your real food stock. In zombie mode, infected occasionally shamble through too — shoot them for a bonus, or take a small health hit if one reaches the far edge.
+- **Walking animation** — your lead party member's sprite now animates through its walk cycle on the trail map while you're travelling between landmarks (vehicles like the zombie-mode convoy rig stay as their icon).
 - **Party roster & health tracking** — per-member health bars, sickness/infection status, and permadeath.
 - **Win/lose states** — reach the end of the trail to win, or lose your whole party along the way.
 
 ### 🚧 Coming in the next milestones
-- **Hunting** and a dedicated **Shooting Range / practice range** minigame (assets already downloaded: a full carnival shooting-gallery kit, huntable animals, weapon sprites, crosshairs).
+- A dedicated **Shooting Range / practice range** minigame (assets already downloaded: a full carnival shooting-gallery kit, weapon sprites, crosshairs).
 - **Fishing** and **trapping** minigames.
 - **A raft river-run** near the end of the trail (Columbia River) — dodge rocks and logs; wreck the raft and you finish the journey on foot.
 - **A dueling-pistols standoff** minigame.
