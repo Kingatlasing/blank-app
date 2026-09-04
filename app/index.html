@@ -883,7 +883,12 @@ function addToCollection(card){
 function addCoins(n){ STATE.coins += n; save(); renderTop(); toast("+$"+n+" added (simulated — not real money)"); }
 
 /* ======================= RENDER: SHELL ======================= */
-function renderTop(){ document.getElementById("coin-count").textContent = "$"+STATE.coins.toLocaleString(); }
+function renderTop(){
+  var v = STATE.coins;
+  var text = Number.isInteger(v) ? v.toLocaleString()
+    : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2});
+  document.getElementById("coin-count").textContent = "$"+text;
+}
 
 function goto(view){
   STATE.view = view;
@@ -1413,11 +1418,11 @@ function collectionHTML(){
 function setFilter(key){ STATE.collFilter = key; render(); }
 function toggleOwnedOnly(){ STATE.collOwnedOnly = !STATE.collOwnedOnly; save(); render(); }
 
-// vault payout: 87% of estimated value, rounded down to the nearest dollar
-// 87% of value, floored to the nearest dollar, minimum $1 — a floor-to-$0
-// result reads as "this card is worthless," which isn't true and isn't a
-// meaningful choice, so cheap commons still sell for at least a dollar.
-function sellValue(card){ return Math.max(1, Math.floor(cardValue(card)*0.87)); }
+// selling pays exactly the card's displayed value, rounded to the nearest
+// cent so it always matches the "Value"/"Est. value" tag shown on the card
+// (a 0.15-precision float from cardValue() could otherwise display as
+// $0.50 but sell for something like $0.4998 due to floating point).
+function sellValue(card){ return Math.round(cardValue(card)*100)/100; }
 
 function showModal(id){
   var card = CARD_DATA.filter(function(c){return c.id===id;})[0];
@@ -1477,6 +1482,7 @@ function sellAllDuplicates(){
     }
   });
   if(n===0){ toast("No duplicates to vault"); return; }
+  total = Math.round(total*100)/100;
   STATE.coins += total;
   save(); renderTop();
   toast("Vaulted "+n+" duplicate"+(n>1?"s":"")+" for "+formatMoney(total));
