@@ -1359,8 +1359,9 @@ function render(t){
   // bench
   drawBench(760,groundYAt(760)+2);
 
-  // isometric plaza platform grounding the stand in the tilted street
-  drawSprite('plaza', STAND_X, GROUND_Y+8, 150, true);
+  // checkered paver plaza grounding the stand in the tilted street — a small
+  // isometric diamond grid of alternating pavers instead of a plain flat slab
+  drawCheckerPlaza(STAND_X, GROUND_Y+10, 118, 60, 8, sky.dark);
   // stand
   drawStand(STAND_X,GROUND_Y, t, sky.dark);
 
@@ -1411,6 +1412,25 @@ function drawMountains(sky){
   const baseY=GROUND_Y-20;
   drawRidge(baseY-14, sky.dark?'#242c48':'#93a8c8', 0.55, 46, 1);
   drawRidge(baseY+6, sky.dark?'#1a2140':'#7c93b8', 0.85, 62, 2);
+}
+function drawCheckerPlaza(cx,cy,pw,ph,n,dark){
+  // fills an isometric diamond (half-width pw, half-height ph, centered at
+  // cx,cy) with an n x n grid of alternating small diamond pavers
+  const colorA=dark?'#6b6a5c':'#e8e2cf', colorB=dark?'#57564a':'#cfc0a0', border=dark?'#3f3e35':'#a89b78';
+  const e1x=pw/n, e1y=-ph/n, e2x=pw/n, e2y=ph/n;
+  const pt=(i,j)=>({x:cx+i*e1x+j*e2x, y:cy+i*e1y+j*e2y});
+  ctx.save();
+  for(let i=-n/2;i<n/2;i++){
+    for(let j=-n/2;j<n/2;j++){
+      const p0=pt(i,j), p1=pt(i+1,j), p2=pt(i+1,j+1), p3=pt(i,j+1);
+      ctx.fillStyle=((i+j)&1)?colorB:colorA;
+      ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.lineTo(p3.x,p3.y); ctx.closePath(); ctx.fill();
+    }
+  }
+  ctx.strokeStyle=border; ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(cx-pw,cy); ctx.lineTo(cx,cy-ph); ctx.lineTo(cx+pw,cy); ctx.lineTo(cx,cy+ph); ctx.closePath(); ctx.stroke();
+  ctx.restore();
 }
 function drawSprite(key,x,y,size,centered){
   const img=SPRITES[key];
