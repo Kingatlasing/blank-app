@@ -693,7 +693,7 @@ SCREENS.hub = function(){
   if(atLandmark && atLandmark.kind!=='end'){
     actions.appendChild(el('h3',{},['You have reached '+atLandmark.name[S.mode]+'.']));
     if(atLandmark.kind==='town'){
-      actions.appendChild(el('button',{class:'btn gold', onclick:function(){ S.screen='town'; render(); }},['Enter '+atLandmark.name[S.mode]]));
+      actions.appendChild(el('button',{class:'btn gold', onclick:function(){ markLandmarkVisited(atLandmark); S.screen='town'; render(); }},['Enter '+atLandmark.name[S.mode]]));
     }
     actions.appendChild(el('button',{class:'btn', onclick:function(){ leaveLandmark(); }},['Push On →']));
   } else if(atLandmark && atLandmark.kind==='end'){
@@ -729,9 +729,14 @@ function currentLandmarkHere(){
   }
   return null;
 }
+function markLandmarkVisited(lm){
+  if(!lm) return;
+  var idx = LANDMARKS.indexOf(lm);
+  S.lastLandmarkVisited = idx;
+  S.nextLandmarkIdx = idx+1;
+}
 function leaveLandmark(){
-  var lm = currentLandmarkHere();
-  if(lm){ S.lastLandmarkVisited = LANDMARKS.indexOf(lm); S.nextLandmarkIdx = LANDMARKS.indexOf(lm)+1; }
+  markLandmarkVisited(currentLandmarkHere());
   render();
 }
 
@@ -1263,11 +1268,201 @@ SCREENS.huntResult = function(){
 
 
 /* =========================================================================
+   WESTWARD: THE TRAIL  —  Shooting Range minigame
+   A carnival-style target range using the shooting-gallery CC0 kit.
+   Pay-to-play with real ammo, payout in cash based on score.
+   ========================================================================= */
+
+var RANGE_TARGETS = [
+  {key:'range_target_red1', points:10, size:44},
+  {key:'range_target_red2', points:15, size:40},
+  {key:'range_target_red3', points:20, size:36},
+  {key:'range_target_white', points:12, size:44},
+  {key:'range_target_colored', points:18, size:40}
+];
+var RANGE_DUCKS = [
+  {key:'range_duck_brown', points:25, size:40},
+  {key:'range_duck_white', points:25, size:40},
+  {key:'range_duck_yellow', points:30, size:40}
+];
+
+var Range = null;
+function openRange(){
+  var capAmmo = Math.min(S.ammo, 20);
+  if(capAmmo<=0){ addLog('No '+T('ammoWord')+' left to spend at the range.'); render(); return; }
+  Range = {
+    ammoStart: capAmmo, ammo: capAmmo, time: 40, score: 0, hits:0, misses:0,
+    critters: [], spawnTimer: 0, running:true, returnTo: S.screen==='town'?'town':'hub'
+  };
+  S.screen='range';
+  render();
+}
+
+SCREENS.range = function(){
+  var wrap = el('div',{});
+  wrap.appendChild(el('h1',{class:'headline',style:'text-align:center;'},[T('rangeName')]));
+  wrap.appendChild(el('p',{class:'typewriter',style:'text-align:center;'},[
+    'Pay your shots, take your shot. Targets and ducks are worth points — cash out for '+T('currency')+' when the round ends.'
+  ]));
+  var mgWrap = el('div',{class:'minigame-wrap'});
+  var canvas = el('canvas',{width:800,height:400,id:'range-canvas'});
+  mgWrap.appendChild(canvas);
+  var hud = el('div',{class:'minigame-hud'});
+  hud.appendChild(el('span',{id:'range-hud-ammo'},['Bullets: '+Range.ammo]));
+  hud.appendChild(el('span',{id:'range-hud-score'},['Score: '+Range.score]));
+  hud.appendChild(el('span',{id:'range-hud-time'},['Time: '+Range.time+'s']));
+  mgWrap.appendChild(hud);
+  wrap.appendChild(mgWrap);
+  wrap.appendChild(el('div',{style:'text-align:center;margin-top:10px;'},[
+    el('button',{class:'btn secondary', onclick:function(){ endRange(); }},['Cash Out & Leave'])
+  ]));
+  setTimeout(function(){ initRangeLoop(canvas); }, 0);
+  return wrap;
+};
+
+function initRangeLoop(canvas){
+  if(!canvas || !canvas.isConnected) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, Hh = canvas.height;
+  var railY = Hh*0.62;
+  var lanes = [railY-70, railY-30, railY+10];
+
+  function spawnTarget(){
+    var isDuck = Math.random()<0.35;
+    var pool = isDuck ? RANGE_DUCKS : RANGE_TARGETS;
+    var t = pick(pool);
+    var fromLeft = Math.random()<0.5;
+    Range.critters.push({
+      key:t.key, points:t.points, size:t.size, isDuck:isDuck,
+      x: fromLeft?-40:W+40, y: pick(lanes), dir: fromLeft?1:-1,
+      speed: (isDuck?1.5:0.9) * (0.8+Math.random()*0.6), alive:true
+    });
+  }
+
+  var lastT = performance.now();
+  function frame(now){
+    if(!canvas.isConnected || !Range || !Range.running) return;
+    var dt = Math.min(0.05, (now-lastT)/1000); lastT = now;
+
+    Range.spawnTimer -= dt;
+    if(Range.spawnTimer<=0 && Range.critters.length<5){
+      spawnTarget();
+      Range.spawnTimer = 0.55 + Math.random()*0.6;
+    }
+    Range.time -= dt;
+
+    Range.critters.forEach(function(c){
+      if(!c.alive) return;
+      c.x += c.dir * c.speed * 70 * dt;
+      if(c.x < -80 || c.x > W+80) c.alive=false;
+    });
+    Range.critters = Range.critters.filter(function(c){return c.alive;});
+
+    if(Range.time<=0) endRange();
+    else if(Range.ammo<=0 && Range.critters.length===0) endRange();
+
+    draw();
+    updateHud();
+    if(Range && Range.running) requestAnimationFrame(frame);
+  }
+
+  function drawBg(){
+    var im = huntImg('range_bg_wood');
+    if(im.complete && im.naturalWidth) ctx.drawImage(im, 0, 0, W, Hh);
+    else { ctx.fillStyle='#7a5230'; ctx.fillRect(0,0,W,Hh); }
+    var cloud1 = huntImg('range_cloud1'), cloud2 = huntImg('range_cloud2');
+    if(cloud1.complete) ctx.drawImage(cloud1, 60, 20, 90, 50);
+    if(cloud2.complete) ctx.drawImage(cloud2, 560, 10, 100, 55);
+    [80,700].forEach(function(x){
+      var t = huntImg(x<400?'range_tree_pine':'range_tree_oak');
+      if(t.complete && t.naturalWidth) ctx.drawImage(t, x, railY-60, 60, 70);
+    });
+    ctx.fillStyle='#6b4321'; ctx.fillRect(0,railY+40,W,10);
+    var grass = huntImg('range_grass1');
+    for(var gx=0; gx<W; gx+=48){
+      if(grass.complete && grass.naturalWidth) ctx.drawImage(grass, gx, railY+30, 48, 40);
+    }
+    var curtainTop = huntImg('range_curtain_top');
+    if(curtainTop.complete && curtainTop.naturalWidth) ctx.drawImage(curtainTop, 0, 0, W, 34);
+  }
+  function draw(){
+    drawBg();
+    Range.critters.forEach(function(c){
+      var im = huntImg(c.key);
+      var s = c.size;
+      if(im.complete && im.naturalWidth){
+        ctx.save();
+        if(c.dir<0){ ctx.translate(c.x+s/2, c.y-s/2); ctx.scale(-1,1); ctx.drawImage(im, -s/2, -s/2, s, s); }
+        else { ctx.drawImage(im, c.x-s/2, c.y-s/2, s, s); }
+        ctx.restore();
+      }
+    });
+  }
+  function updateHud(){
+    var a=document.getElementById('range-hud-ammo'); if(a) a.textContent='Bullets: '+Range.ammo;
+    var sc=document.getElementById('range-hud-score'); if(sc) sc.textContent='Score: '+Range.score;
+    var t=document.getElementById('range-hud-time'); if(t) t.textContent='Time: '+Math.max(0,Math.ceil(Range.time))+'s';
+  }
+
+  canvas.addEventListener('click', function(evt){
+    if(!Range || !Range.running || Range.ammo<=0) return;
+    var rect = canvas.getBoundingClientRect();
+    var mx = (evt.clientX-rect.left) * (W/rect.width);
+    var my = (evt.clientY-rect.top) * (Hh/rect.height);
+    Range.ammo--;
+    synthShot('rifle');
+    var hitIdx = -1;
+    for(var i=0;i<Range.critters.length;i++){
+      var c = Range.critters[i];
+      var s=c.size;
+      if(mx>c.x-s/2 && mx<c.x+s/2 && my>c.y-s/2 && my<c.y+s/2){ hitIdx=i; break; }
+    }
+    if(hitIdx>=0){
+      var c = Range.critters[hitIdx];
+      Range.hits++;
+      Range.score += c.points;
+      sfx('snd_impact',0.5);
+      Range.critters.splice(hitIdx,1);
+    } else {
+      Range.misses++;
+    }
+  });
+
+  requestAnimationFrame(frame);
+}
+
+function endRange(){
+  if(!Range || !Range.running) return;
+  Range.running = false;
+  var bulletsUsed = Range.ammoStart - Range.ammo;
+  var payout = Math.round(Range.score * 0.6);
+  S.ammo = Math.max(0, S.ammo - bulletsUsed);
+  S.money += payout;
+  addLog('Shooting range: scored '+Range.score+' points, won '+T('currencySym')+payout+' ('+bulletsUsed+' '+T('ammoWord')+' spent).');
+  sfx(payout>0?'snd_coin':'snd_error');
+  S.screen='rangeResult';
+  render();
+}
+
+SCREENS.rangeResult = function(){
+  var payout = Math.round(Range.score*0.6);
+  var wrap = el('div',{class:'title-screen'});
+  wrap.appendChild(el('h1',{class:'headline'},['Range Results']));
+  wrap.appendChild(el('div',{class:'panel',style:'max-width:420px;margin:0 auto;text-align:left;'},[
+    el('p',{},['Score: '+Range.score]),
+    el('p',{},['Hits: '+Range.hits+' · Misses: '+Range.misses]),
+    el('p',{},[T('ammoWord')+' spent: '+(Range.ammoStart-Range.ammo)]),
+    el('p',{},['Winnings: '+T('currencySym')+payout])
+  ]));
+  wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ var back=Range.returnTo||'hub'; Range=null; S.screen=back; render(); }},['Back']));
+  return wrap;
+};
+
+
+/* =========================================================================
    Temporary stubs for systems not yet built in this milestone
    (hunting / shooting range / raft / casino). Replaced in later passes.
    ========================================================================= */
-function openRange(){ S.screen='comingSoon'; S._comingSoonLabel=T('rangeName'); render(); }
-
 SCREENS.comingSoon = function(){
   var wrap = el('div',{class:'title-screen'});
   wrap.appendChild(el('h1',{class:'headline'},[S._comingSoonLabel||'Coming Soon']));

@@ -19,8 +19,9 @@ This is a self-contained HTML/CSS/JS game (`app/index.html`, DOM-rendered with p
 - **Party roster & health tracking** — per-member health bars, sickness/infection status, and permadeath.
 - **Win/lose states** — reach the end of the trail to win, or lose your whole party along the way.
 
+- **Shooting Range** — a carnival-style target range at every town, built from a real shooting-gallery CC0 kit (wooden stall backdrop, curtains, clouds, targets, ducks). Costs real ammo to play, pays out real cash based on score — available at any town alongside the General Store, Camp & Rest, and the (still-placeholder) saloon.
+
 ### 🚧 Coming in the next milestones
-- A dedicated **Shooting Range / practice range** minigame (assets already downloaded: a full carnival shooting-gallery kit, weapon sprites, crosshairs).
 - **Fishing** and **trapping** minigames.
 - **A raft river-run** near the end of the trail (Columbia River) — dodge rocks and logs; wreck the raft and you finish the journey on foot.
 - **A dueling-pistols standoff** minigame.
