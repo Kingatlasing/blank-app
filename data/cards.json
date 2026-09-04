@@ -1966,7 +1966,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Plant / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/53293545.jpg",
     "rarity": "common",
-    "meta": "ATK 700 / DEF 600"
+    "meta": "ATK 700 / DEF 600",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6673,7 +6674,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/2483611.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1200"
+    "meta": "ATK 1400 / DEF 1200",
+    "realValue": 0.9
   },
   {
     "category": "yugioh",
@@ -6682,7 +6684,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/58314394.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1000"
+    "meta": "ATK 1500 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6691,7 +6694,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/58192742.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 200"
+    "meta": "ATK 300 / DEF 200",
+    "realValue": 1.75
   },
   {
     "category": "yugioh",
@@ -6740,7 +6744,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/98049915.jpg",
     "rarity": "common",
-    "meta": "ATK 400 / DEF 300"
+    "meta": "ATK 400 / DEF 300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6749,7 +6754,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/13599884.jpg",
     "rarity": "common",
-    "meta": "ATK 250 / DEF 300"
+    "meta": "ATK 250 / DEF 300",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6758,7 +6764,8 @@
     "subtitle": "Metal Raiders \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/86088138.jpg",
     "rarity": "common",
-    "meta": "ATK 1550 / DEF 1650"
+    "meta": "ATK 1550 / DEF 1650",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6767,7 +6774,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/12472242.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 350"
+    "meta": "ATK 300 / DEF 350",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6776,7 +6784,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/58861941.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 250"
+    "meta": "ATK 300 / DEF 250",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6785,7 +6794,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/10538007.jpg",
     "rarity": "common",
-    "meta": "ATK 1750 / DEF 1550"
+    "meta": "ATK 1750 / DEF 1550",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6794,7 +6804,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/70138455.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 900"
+    "meta": "ATK 800 / DEF 900",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6803,7 +6814,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/32809211.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 400"
+    "meta": "ATK 500 / DEF 400",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -6822,7 +6834,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/93221206.jpg",
     "rarity": "common",
-    "meta": "ATK 1450 / DEF 1200"
+    "meta": "ATK 1450 / DEF 1200",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -6831,7 +6844,8 @@
     "subtitle": "Metal Raiders \u00b7 Fish / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/28593363.jpg",
     "rarity": "common",
-    "meta": "ATK 1900 / DEF 1600"
+    "meta": "ATK 1900 / DEF 1600",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -6840,7 +6854,8 @@
     "subtitle": "Metal Raiders \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/81386177.jpg",
     "rarity": "common",
-    "meta": "ATK 1650 / DEF 1700"
+    "meta": "ATK 1650 / DEF 1700",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -6849,7 +6864,8 @@
     "subtitle": "Metal Raiders \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/73481154.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1000"
+    "meta": "ATK 1500 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6858,7 +6874,8 @@
     "subtitle": "Metal Raiders \u00b7 Thunder / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/9653271.jpg",
     "rarity": "common",
-    "meta": "ATK 1900 / DEF 1400"
+    "meta": "ATK 1900 / DEF 1400",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -6867,7 +6884,8 @@
     "subtitle": "Metal Raiders \u00b7 Plant / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/21347810.jpg",
     "rarity": "common",
-    "meta": "ATK 400 / DEF 500"
+    "meta": "ATK 400 / DEF 500",
+    "realValue": 2.25
   },
   {
     "category": "yugioh",
@@ -6876,7 +6894,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/55784832.jpg",
     "rarity": "common",
-    "meta": "ATK 1550 / DEF 1300"
+    "meta": "ATK 1550 / DEF 1300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6885,7 +6904,8 @@
     "subtitle": "Metal Raiders \u00b7 Thunder / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/21817254.jpg",
     "rarity": "common",
-    "meta": "ATK 750 / DEF 600"
+    "meta": "ATK 750 / DEF 600",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -6894,7 +6914,8 @@
     "subtitle": "Metal Raiders \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/69572024.jpg",
     "rarity": "common",
-    "meta": "ATK 1350 / DEF 800"
+    "meta": "ATK 1350 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6903,7 +6924,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/15237615.jpg",
     "rarity": "common",
-    "meta": "ATK 2100 / DEF 1700"
+    "meta": "ATK 2100 / DEF 1700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6912,7 +6934,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/21263083.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1200"
+    "meta": "ATK 1500 / DEF 1200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6921,7 +6944,8 @@
     "subtitle": "Metal Raiders \u00b7 Thunder / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/55875323.jpg",
     "rarity": "common",
-    "meta": "ATK 850 / DEF 800"
+    "meta": "ATK 850 / DEF 800",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -6930,7 +6954,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/80141480.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1400"
+    "meta": "ATK 1600 / DEF 1400",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6939,7 +6964,8 @@
     "subtitle": "Metal Raiders \u00b7 Reptile / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/43230671.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1100"
+    "meta": "ATK 1400 / DEF 1100",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -6948,7 +6974,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/5901497.jpg",
     "rarity": "common",
-    "meta": "ATK 350 / DEF 300"
+    "meta": "ATK 350 / DEF 300",
+    "realValue": 0.85
   },
   {
     "category": "yugioh",
@@ -6957,7 +6984,8 @@
     "subtitle": "Metal Raiders \u00b7 Plant / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/78780140.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1800"
+    "meta": "ATK 1500 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6975,7 +7003,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/2118022.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 900"
+    "meta": "ATK 1500 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6984,7 +7013,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/64501875.jpg",
     "rarity": "common",
-    "meta": "ATK 1450 / DEF 1000"
+    "meta": "ATK 1450 / DEF 1000",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7013,7 +7043,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/5758500.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.55
   },
   {
     "category": "yugioh",
@@ -7022,7 +7053,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/41142615.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7041,7 +7073,8 @@
     "subtitle": "Metal Raiders \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/88819587.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 700"
+    "meta": "ATK 1200 / DEF 700",
+    "realValue": 2.5
   },
   {
     "category": "yugioh",
@@ -7050,7 +7083,8 @@
     "subtitle": "Metal Raiders \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/87564352.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 800"
+    "meta": "ATK 1500 / DEF 800",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7059,7 +7093,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/40453765.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1500"
+    "meta": "ATK 1800 / DEF 1500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -7068,7 +7103,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast-Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/18246479.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1300"
+    "meta": "ATK 1800 / DEF 1300",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7087,7 +7123,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/66602787.jpg",
     "rarity": "common",
-    "meta": "ATK 600 / DEF 1500"
+    "meta": "ATK 600 / DEF 1500",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7096,7 +7133,8 @@
     "subtitle": "Metal Raiders \u00b7 Pyro / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/55763552.jpg",
     "rarity": "common",
-    "meta": "ATK 200 / DEF 1800"
+    "meta": "ATK 200 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7105,7 +7143,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/28546905.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 2200"
+    "meta": "ATK 1200 / DEF 2200",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7144,7 +7183,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/14851496.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1500"
+    "meta": "ATK 1200 / DEF 1500",
+    "realValue": 1.5
   },
   {
     "category": "yugioh",
@@ -7153,7 +7193,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/62121.jpg",
     "rarity": "common",
-    "meta": "ATK 920 / DEF 1930"
+    "meta": "ATK 920 / DEF 1930",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7162,7 +7203,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/69455834.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 1530"
+    "meta": "ATK 2000 / DEF 1530",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7181,7 +7223,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/68516705.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 1550"
+    "meta": "ATK 1300 / DEF 1550",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -7190,7 +7233,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast-Warrior / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/94905343.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 1700"
+    "meta": "ATK 2000 / DEF 1700",
+    "realValue": 1.25
   },
   {
     "category": "yugioh",
@@ -7199,7 +7243,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/93889755.jpg",
     "rarity": "common",
-    "meta": "ATK 1350 / DEF 1400"
+    "meta": "ATK 1350 / DEF 1400",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -7217,7 +7262,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/13215230.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 900"
+    "meta": "ATK 1200 / DEF 900",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7226,7 +7272,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/28725004.jpg",
     "rarity": "common",
-    "meta": "ATK 1250 / DEF 800"
+    "meta": "ATK 1250 / DEF 800",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7235,7 +7282,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/42431843.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 700"
+    "meta": "ATK 1000 / DEF 700",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7244,7 +7292,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/89272878.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 1200"
+    "meta": "ATK 1000 / DEF 1200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7253,7 +7302,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/549481.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 2000"
+    "meta": "ATK 500 / DEF 2000",
+    "realValue": 1.25
   },
   {
     "category": "yugioh",
@@ -7262,7 +7312,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/25109950.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1300"
+    "meta": "ATK 800 / DEF 1300",
+    "realValue": 0.85
   },
   {
     "category": "yugioh",
@@ -7281,7 +7332,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/10071456.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1500"
+    "meta": "ATK 800 / DEF 1500",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7290,7 +7342,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/46918794.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7299,7 +7352,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/94773007.jpg",
     "rarity": "common",
-    "meta": "ATK 2200 / DEF 100"
+    "meta": "ATK 2200 / DEF 100",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -7318,7 +7372,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/99551425.jpg",
     "rarity": "common",
-    "meta": "ATK 2400 / DEF 2400"
+    "meta": "ATK 2400 / DEF 2400",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7327,7 +7382,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/24611934.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1200"
+    "meta": "ATK 1600 / DEF 1200",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7336,7 +7392,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/25655502.jpg",
     "rarity": "common",
-    "meta": "ATK 2300 / DEF 2000"
+    "meta": "ATK 2300 / DEF 2000",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7345,7 +7402,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/51828629.jpg",
     "rarity": "common",
-    "meta": "ATK 1850 / DEF 1500"
+    "meta": "ATK 1850 / DEF 1500",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -7354,7 +7412,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/87322377.jpg",
     "rarity": "common",
-    "meta": "ATK 2200 / DEF 2500"
+    "meta": "ATK 2200 / DEF 2500",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7363,7 +7422,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/8471389.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1400"
+    "meta": "ATK 1200 / DEF 1400",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7372,7 +7432,8 @@
     "subtitle": "Metal Raiders \u00b7 Thunder / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/31786629.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1500"
+    "meta": "ATK 1600 / DEF 1500",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -7381,7 +7442,8 @@
     "subtitle": "Metal Raiders \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/23771716.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 800"
+    "meta": "ATK 1800 / DEF 800",
+    "realValue": 2.25
   },
   {
     "category": "yugioh",
@@ -7390,7 +7452,8 @@
     "subtitle": "Metal Raiders \u00b7 Thunder / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/84926738.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1300"
+    "meta": "ATK 1500 / DEF 1300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7399,7 +7462,8 @@
     "subtitle": "Metal Raiders \u00b7 Winged Beast / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/74703140.jpg",
     "rarity": "common",
-    "meta": "ATK 2100 / DEF 1800"
+    "meta": "ATK 2100 / DEF 1800",
+    "realValue": 2.5
   },
   {
     "category": "yugioh",
@@ -7408,7 +7472,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/7019529.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 800"
+    "meta": "ATK 1000 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7427,7 +7492,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/56907389.jpg",
     "rarity": "common",
-    "meta": "ATK 1750 / DEF 1500"
+    "meta": "ATK 1750 / DEF 1500",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7436,7 +7502,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/29380133.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 1700"
+    "meta": "ATK 900 / DEF 1700",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7445,7 +7512,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/89112729.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1400"
+    "meta": "ATK 1800 / DEF 1400",
+    "realValue": 0.6
   },
   {
     "category": "yugioh",
@@ -7474,7 +7542,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/71107816.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1000"
+    "meta": "ATK 1800 / DEF 1000",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7503,7 +7572,8 @@
     "subtitle": "Metal Raiders \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/60862676.jpg",
     "rarity": "common",
-    "meta": "ATK 2100 / DEF 1800"
+    "meta": "ATK 2100 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7512,7 +7582,8 @@
     "subtitle": "Metal Raiders \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/7805359.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 800"
+    "meta": "ATK 900 / DEF 800",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7531,7 +7602,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/93900406.jpg",
     "rarity": "common",
-    "meta": "ATK 1250 / DEF 800"
+    "meta": "ATK 1250 / DEF 800",
+    "realValue": 1.75
   },
   {
     "category": "yugioh",
@@ -7540,7 +7612,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/20394040.jpg",
     "rarity": "common",
-    "meta": "ATK 1550 / DEF 1800"
+    "meta": "ATK 1550 / DEF 1800",
+    "realValue": 1.25
   },
   {
     "category": "yugioh",
@@ -7579,7 +7652,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/17358176.jpg",
     "rarity": "common",
-    "meta": "ATK 1100 / DEF 800"
+    "meta": "ATK 1100 / DEF 800",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -7608,7 +7682,8 @@
     "subtitle": "Metal Raiders \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/41396436.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1200"
+    "meta": "ATK 1600 / DEF 1200",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7617,7 +7692,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/2504891.jpg",
     "rarity": "common",
-    "meta": "ATK 2650 / DEF 2250"
+    "meta": "ATK 2650 / DEF 2250",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7626,7 +7702,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/5818798.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1200"
+    "meta": "ATK 1500 / DEF 1200",
+    "realValue": 2.5
   },
   {
     "category": "yugioh",
@@ -7705,7 +7782,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/98495314.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7714,7 +7792,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/25880422.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7723,7 +7802,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/51275027.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 100"
+    "meta": "ATK 0 / DEF 100",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -7742,7 +7822,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/24668830.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7751,7 +7832,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/50152549.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7770,7 +7852,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/20436034.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7779,7 +7862,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/56830749.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7788,7 +7872,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/83225447.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7827,7 +7912,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/36039163.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 800"
+    "meta": "ATK 900 / DEF 800",
+    "realValue": 2.75
   },
   {
     "category": "yugioh",
@@ -7856,7 +7942,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/38552107.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7865,7 +7952,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/99597615.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.85
   },
   {
     "category": "yugioh",
@@ -7884,7 +7972,8 @@
     "subtitle": "Spell Ruler \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/55998462.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1900"
+    "meta": "ATK 1600 / DEF 1900",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7893,7 +7982,8 @@
     "subtitle": "Spell Ruler \u00b7 Thunder / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/11324436.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 900"
+    "meta": "ATK 800 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -7902,7 +7992,8 @@
     "subtitle": "Spell Ruler \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/73081602.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 2000"
+    "meta": "ATK 1200 / DEF 2000",
+    "realValue": 2.0
   },
   {
     "category": "yugioh",
@@ -7921,7 +8012,8 @@
     "subtitle": "Spell Ruler \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/20624263.jpg",
     "rarity": "common",
-    "meta": "ATK 1700 / DEF 1500"
+    "meta": "ATK 1700 / DEF 1500",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7940,7 +8032,8 @@
     "subtitle": "Spell Ruler \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/47879985.jpg",
     "rarity": "common",
-    "meta": "ATK 1650 / DEF 1600"
+    "meta": "ATK 1650 / DEF 1600",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -7949,7 +8042,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/46534755.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1500"
+    "meta": "ATK 1600 / DEF 1500",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7958,7 +8052,8 @@
     "subtitle": "Spell Ruler \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/32539892.jpg",
     "rarity": "common",
-    "meta": "ATK 850 / DEF 750"
+    "meta": "ATK 850 / DEF 750",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -7967,7 +8062,8 @@
     "subtitle": "Spell Ruler \u00b7 Plant / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/95744531.jpg",
     "rarity": "common",
-    "meta": "ATK 350 / DEF 300"
+    "meta": "ATK 350 / DEF 300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7976,7 +8072,8 @@
     "subtitle": "Spell Ruler \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/56789759.jpg",
     "rarity": "common",
-    "meta": "ATK 1700 / DEF 1900"
+    "meta": "ATK 1700 / DEF 1900",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7985,7 +8082,8 @@
     "subtitle": "Spell Ruler \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/14015067.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1900"
+    "meta": "ATK 1800 / DEF 1900",
+    "realValue": 2.25
   },
   {
     "category": "yugioh",
@@ -7994,7 +8092,8 @@
     "subtitle": "Spell Ruler \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/35565537.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1700"
+    "meta": "ATK 1800 / DEF 1700",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8003,7 +8102,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/72053645.jpg",
     "rarity": "common",
-    "meta": "ATK 950 / DEF 1500"
+    "meta": "ATK 950 / DEF 1500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8012,7 +8112,8 @@
     "subtitle": "Spell Ruler \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/34442949.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1000"
+    "meta": "ATK 800 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8021,7 +8122,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/96981563.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1800"
+    "meta": "ATK 1400 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8030,7 +8132,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/93108297.jpg",
     "rarity": "common",
-    "meta": "ATK 950 / DEF 800"
+    "meta": "ATK 950 / DEF 800",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -8049,7 +8152,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/54579801.jpg",
     "rarity": "common",
-    "meta": "ATK 1650 / DEF 1300"
+    "meta": "ATK 1650 / DEF 1300",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -8068,7 +8172,8 @@
     "subtitle": "Spell Ruler \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/91996584.jpg",
     "rarity": "common",
-    "meta": "ATK 1650 / DEF 1600"
+    "meta": "ATK 1650 / DEF 1600",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8077,7 +8182,8 @@
     "subtitle": "Spell Ruler \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/3797883.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 2300"
+    "meta": "ATK 2000 / DEF 2300",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8096,7 +8202,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/65570596.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1500"
+    "meta": "ATK 1400 / DEF 1500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8105,7 +8212,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/16762927.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 1.65
   },
   {
     "category": "yugioh",
@@ -8114,7 +8222,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/12470447.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.85
   },
   {
     "category": "yugioh",
@@ -8123,7 +8232,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/70368879.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8141,7 +8251,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/18591904.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8160,7 +8271,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/81380218.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -8189,7 +8301,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/80168720.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8198,7 +8311,8 @@
     "subtitle": "Spell Ruler \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/17653779.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8207,7 +8321,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/43641473.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8226,7 +8341,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/16430187.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8245,7 +8361,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/79323590.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -8284,7 +8401,8 @@
     "subtitle": "Spell Ruler \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/596051.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8303,7 +8421,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/74637266.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1400"
+    "meta": "ATK 1600 / DEF 1400",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8312,7 +8431,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/7892180.jpg",
     "rarity": "common",
-    "meta": "ATK 400 / DEF 1000"
+    "meta": "ATK 400 / DEF 1000",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8331,7 +8451,8 @@
     "subtitle": "Spell Ruler \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/67284908.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 3000"
+    "meta": "ATK 0 / DEF 3000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8340,7 +8461,8 @@
     "subtitle": "Spell Ruler \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/63162310.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 3000"
+    "meta": "ATK 1600 / DEF 3000",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -8349,7 +8471,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/29692206.jpg",
     "rarity": "common",
-    "meta": "ATK 850 / DEF 700"
+    "meta": "ATK 850 / DEF 700",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8358,7 +8481,8 @@
     "subtitle": "Spell Ruler \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/15023985.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1500"
+    "meta": "ATK 1600 / DEF 1500",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -8367,7 +8491,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/64389297.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8376,7 +8501,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/95051344.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8395,7 +8521,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/43417563.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8404,7 +8531,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/80811661.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8413,7 +8541,8 @@
     "subtitle": "Spell Ruler \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/15083728.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8422,7 +8551,8 @@
     "subtitle": "Spell Ruler \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/42578427.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8431,7 +8561,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/76806714.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8440,7 +8571,8 @@
     "subtitle": "Spell Ruler \u00b7 Warrior / Ritual",
     "image": "https://images.ygoprodeck.com/images/cards/4849037.jpg",
     "rarity": "common",
-    "meta": "ATK 1950 / DEF 1850"
+    "meta": "ATK 1950 / DEF 1850",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8449,7 +8581,8 @@
     "subtitle": "Spell Ruler \u00b7 Warrior / Ritual",
     "image": "https://images.ygoprodeck.com/images/cards/30243636.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 1850"
+    "meta": "ATK 2000 / DEF 1850",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8458,7 +8591,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Ritual",
     "image": "https://images.ygoprodeck.com/images/cards/91782219.jpg",
     "rarity": "common",
-    "meta": "ATK 2550 / DEF 2500"
+    "meta": "ATK 2550 / DEF 2500",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8467,7 +8601,8 @@
     "subtitle": "Spell Ruler \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/2964201.jpg",
     "rarity": "common",
-    "meta": "ATK 2200 / DEF 2600"
+    "meta": "ATK 2200 / DEF 2600",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -8506,7 +8641,8 @@
     "subtitle": "Spell Ruler \u00b7 Pyro / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/90020065.jpg",
     "rarity": "common",
-    "meta": "ATK 200 / DEF 1000"
+    "meta": "ATK 200 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8585,7 +8721,8 @@
     "subtitle": "Spell Ruler \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/96890582.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 2000"
+    "meta": "ATK 2000 / DEF 2000",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -8604,7 +8741,8 @@
     "subtitle": "Spell Ruler \u00b7 Beast / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/59784896.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 400"
+    "meta": "ATK 1800 / DEF 400",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8633,7 +8771,8 @@
     "subtitle": "Spell Ruler \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/58551308.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 500"
+    "meta": "ATK 500 / DEF 500",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8652,7 +8791,8 @@
     "subtitle": "Spell Ruler \u00b7 Beast-Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/21340051.jpg",
     "rarity": "common",
-    "meta": "ATK 2000 / DEF 500"
+    "meta": "ATK 2000 / DEF 500",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -8709,7 +8849,8 @@
     "subtitle": "Spell Ruler \u00b7 Fairy / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/19406822.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 1600"
+    "meta": "ATK 0 / DEF 1600",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8718,7 +8859,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/56594520.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8727,7 +8869,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/82999629.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8754,7 +8897,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/81777047.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -8763,7 +8907,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/18161786.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -8802,7 +8947,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/90908427.jpg",
     "rarity": "common",
-    "meta": "ATK 1900 / DEF 2200"
+    "meta": "ATK 1900 / DEF 2200",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
