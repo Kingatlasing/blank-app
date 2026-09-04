@@ -468,18 +468,55 @@
   .coin-face.tails{background:linear-gradient(135deg,#cfd6e6,#8993ad);transform:rotateY(180deg);}
 
   /* ---------- Roulette ---------- */
-  .wheel-outer{width:min(140px,24vh);aspect-ratio:1;border-radius:50%;margin:0 auto;position:relative;
-    background:radial-gradient(circle at 35% 30%, #3a4364, #0a0d16 70%);
-    box-shadow:0 10px 30px rgba(0,0,0,.5), inset 0 0 0 4px rgba(255,255,255,.15);
-    display:flex;align-items:center;justify-content:center;}
-  .wheel-outer.spinning{animation:wheelSpin 1.8s cubic-bezier(.15,.75,.25,1) forwards;}
-  @keyframes wheelSpin{from{transform:rotate(0deg);}to{transform:rotate(1800deg);}}
-  .wheel-result{font-family:var(--font-display);font-size:2em;font-weight:800;color:#fff;}
-  .wheel-result.c-red{color:#ff4d5e;}
-  .wheel-result.c-black{color:#c7cede;}
-  .wheel-result.c-green{color:var(--c-uncommon);}
-  .roulette-grid{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;flex:0 0 auto;}
-  .roulette-grid .btn{font-size:12px;}
+  .rl-top{flex:1 1 auto;min-height:0;width:100%;display:flex;align-items:center;justify-content:center;
+    gap:min(22px,4vw);position:relative;z-index:1;}
+  .rl-wheel-wrap{width:min(168px,27vh);aspect-ratio:1;position:relative;flex:0 0 auto;
+    filter:drop-shadow(0 12px 26px rgba(0,0,0,.55));}
+  .rl-wheel{position:absolute;inset:0;border-radius:50%;box-shadow:inset 0 0 0 5px #1a1f30,inset 0 0 22px rgba(0,0,0,.6);
+    border:3px solid #3a4364;}
+  .rl-wheel::after{content:"";position:absolute;inset:0;border-radius:50%;opacity:.14;mix-blend-mode:overlay;
+    background-image:var(--grain);background-size:90px 90px;}
+  .rl-hub{position:absolute;left:50%;top:50%;width:34%;height:34%;border-radius:50%;transform:translate(-50%,-50%);
+    background:radial-gradient(circle at 35% 30%,#4a5578,#12151f 75%);box-shadow:0 4px 12px rgba(0,0,0,.6),inset 0 0 0 2px rgba(255,255,255,.12);z-index:2;}
+  .rl-ball{position:absolute;left:50%;top:50%;width:7.5%;height:7.5%;border-radius:50%;margin:-3.75% 0 0 -3.75%;
+    background:radial-gradient(circle at 35% 30%,#fff,#c7cede 70%);box-shadow:0 2px 5px rgba(0,0,0,.6);z-index:3;
+    will-change:transform;}
+  .rl-readout{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 auto;}
+  .rl-badge{width:min(56px,9vh);height:min(56px,9vh);border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-family:var(--font-display);font-size:1.5em;font-weight:800;color:#fff;background:var(--panel2);
+    border:2px solid var(--line);box-shadow:0 6px 16px rgba(0,0,0,.4);}
+  .rl-badge.c-red{background:#8a1024;border-color:#d3223f;}
+  .rl-badge.c-black{background:#151a26;border-color:#3a4364;}
+  .rl-badge.c-green{background:#0a4326;border-color:var(--c-uncommon);}
+  .rl-history{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;max-width:120px;}
+  .rl-hist-chip{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+    font-size:8.5px;font-weight:800;color:#fff;}
+  .rl-hist-chip.c-red{background:#d3223f;}
+  .rl-hist-chip.c-black{background:#3a4364;}
+  .rl-hist-chip.c-green{background:var(--c-uncommon);color:#062;}
+
+  .rl-table{flex:0 0 auto;width:100%;max-width:480px;margin:0 auto;display:flex;flex-direction:column;gap:4px;}
+  .rl-grid-outer{display:flex;gap:3px;align-items:stretch;}
+  .rl-num-grid{display:flex;flex-direction:column;gap:3px;flex:1 1 auto;min-width:0;}
+  .rl-grid-row{display:flex;gap:3px;}
+  .rl-zero{display:flex;flex-direction:column;gap:3px;flex:0 0 auto;width:min(30px,7.5vw);}
+  .rl-cell{flex:1 1 0;min-width:0;height:min(26px,4.4vh);border-radius:4px;display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:800;color:#fff;cursor:pointer;border:1px solid rgba(255,255,255,.08);
+    transition:transform .12s,box-shadow .12s;position:relative;}
+  .rl-cell:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.4);z-index:1;}
+  .rl-cell.c-red{background:linear-gradient(160deg,#e0304f,#8a1024);}
+  .rl-cell.c-black{background:linear-gradient(160deg,#2b3350,#12151f);}
+  .rl-zero .rl-cell.c-green{flex:1 1 0;height:auto;background:linear-gradient(160deg,#2fdc8c,#0a4326);}
+  .rl-col-bet{flex:0 0 auto;width:min(44px,10vw);height:min(26px,4.4vh);border-radius:4px;background:var(--panel2);
+    border:1px solid var(--line);color:var(--sub);font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .rl-col-bet:hover{color:var(--text);border-color:var(--accent);}
+  .rl-outside-row{display:flex;gap:3px;}
+  .rl-outside{flex:1 1 0;min-width:0;height:min(28px,4.6vh);border-radius:5px;font-size:10.5px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);
+    background:var(--panel2);border:1px solid var(--line);}
+  .rl-outside:hover{border-color:var(--accent);}
+  .rl-outside.c-red{background:linear-gradient(160deg,#e0304f,#8a1024);color:#fff;border:none;}
+  .rl-outside.c-black{background:linear-gradient(160deg,#2b3350,#12151f);color:#fff;border:none;}
 
   /* ---------- Blackjack / Baccarat card table ---------- */
   .card-table{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;justify-content:center;
@@ -1364,7 +1401,7 @@ function sellAllDuplicates(){
 // anywhere in this app. It's a closed-loop mock currency, same as packs.
 var GAMES = [
   {key:"coinflip",  label:"Coin Flip",  icon:"circle-half-stroke", theme:"g-coinflip",  desc:"Call it in the air. Win pays 1.95x your bet."},
-  {key:"roulette",  label:"Roulette",   icon:"compact-disc",       theme:"g-roulette",  desc:"Red, black, odd, even, high or low. Win pays 2x."},
+  {key:"roulette",  label:"Roulette",   icon:"compact-disc",       theme:"g-roulette",  desc:"Straight numbers, dozens, columns, red/black & more."},
   {key:"blackjack", label:"Blackjack",  icon:"table-cells",        theme:"g-blackjack", desc:"Beat the dealer to 21. Blackjack pays 3:2."},
   {key:"baccarat",  label:"Baccarat",   icon:"crown",              theme:"g-baccarat",  desc:"Bet Player, Banker, or Tie."},
   {key:"shellgame", label:"Shell Game", icon:"shuffle",            theme:"g-shellgame", desc:"Track the marble through the shuffle. Win pays 2.9x."}
@@ -1396,7 +1433,7 @@ function openGame(key){
   var root = document.getElementById("view-root");
   root.classList.add("no-scroll");
   if(key==="coinflip") root.innerHTML = coinflipHTML();
-  else if(key==="roulette") root.innerHTML = rouletteHTML();
+  else if(key==="roulette"){ root.innerHTML = rouletteHTML(); rlInitWheel(); }
   else if(key==="blackjack") root.innerHTML = blackjackHTML();
   else if(key==="baccarat") root.innerHTML = baccaratHTML();
   else if(key==="shellgame") root.innerHTML = shellgameHTML();
@@ -1404,6 +1441,7 @@ function openGame(key){
 function leaveGame(){
   window.GAME_BUSY = false;
   window.BJ = null; window.SG = null;
+  if(window.RL_BALL_RAF){ cancelAnimationFrame(window.RL_BALL_RAF); window.RL_BALL_RAF = null; }
   var root = document.getElementById("view-root");
   if(root) root.classList.remove("no-scroll");
   goto("games");
@@ -1493,66 +1531,204 @@ function playCoinflip(call){
   }, 1250);
 }
 
-/* ---- Roulette (European single-zero, outside bets only) ---- */
+/* ---- Roulette (American double-zero wheel, straight/dozen/column/outside bets) ---- */
+// standard American wheel pocket order, clockwise from the top
+var AMERICAN_WHEEL = [0,28,9,26,30,11,7,20,32,17,5,22,34,15,3,24,36,13,1,"00",27,10,25,29,12,8,19,31,18,6,21,33,16,4,23,35,14,2];
 var ROULETTE_RED = [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36];
 
+function rlColor(n){
+  if(n===0 || n==="00") return "green";
+  return ROULETTE_RED.indexOf(n)>=0 ? "red" : "black";
+}
+function rlHistoryHTML(){
+  return (window.RL_HISTORY||[]).map(function(h){
+    return '<div class="rl-hist-chip c-'+h.color+'">'+h.n+'</div>';
+  }).join("");
+}
+
 function rouletteHTML(){
+  var rows = [[],[],[]];
+  for(var c=0;c<12;c++){
+    rows[0].push(c*3+3); // top row:    3,6,9,...,36
+    rows[1].push(c*3+2); // middle row: 2,5,8,...,35
+    rows[2].push(c*3+1); // bottom row: 1,4,7,...,34
+  }
+  var gridRows = rows.map(function(row, ri){
+    var cells = row.map(function(n){
+      return '<div class="rl-cell c-'+rlColor(n)+'" onclick="playRoulette(\'straight\','+n+')">'+n+'</div>';
+    }).join("");
+    var colNum = 3-ri;
+    return '<div class="rl-grid-row">'+cells+'<div class="rl-col-bet" onclick="playRoulette(\'column\','+colNum+')">2:1</div></div>';
+  }).join("");
+
+  var lastBadge = (window.RL_HISTORY && window.RL_HISTORY[0]) || null;
+
   return (
     '<div class="back-link"><button class="btn" onclick="leaveGame()">'+ICON("chevron-left")+'Back</button></div>' +
     '<div class="pack-open-view">' +
       '<div class="rip-title">Roulette</div>' +
-      '<div class="stack-outer" style="flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;">' +
-        '<div class="wheel-outer" id="rl-wheel"><div class="wheel-result" id="rl-num">?</div></div>' +
+      '<div class="rl-top">' +
+        '<div class="rl-wheel-wrap" id="rl-wheel-wrap">' +
+          '<div class="rl-wheel" id="rl-wheel"></div>' +
+          '<div class="rl-hub"></div>' +
+          '<div class="rl-ball" id="rl-ball"></div>' +
+        '</div>' +
+        '<div class="rl-readout">' +
+          '<div class="rl-badge'+(lastBadge?' c-'+lastBadge.color:'')+'" id="rl-badge">'+(lastBadge?lastBadge.n:'?')+'</div>' +
+          '<div class="rl-history" id="rl-history">'+rlHistoryHTML()+'</div>' +
+        '</div>' +
       '</div>' +
-      '<div class="rip-hint" id="rl-result">Pick a bet, then spin the wheel.</div>' +
+      '<div class="rip-hint" id="rl-result">Tap a number or outside bet to spin.</div>' +
       betRowHTML() +
-      '<div class="roulette-grid">' +
-        '<button class="btn" onclick="playRoulette(\'red\')">Red</button>' +
-        '<button class="btn" onclick="playRoulette(\'black\')">Black</button>' +
-        '<button class="btn" onclick="playRoulette(\'odd\')">Odd</button>' +
-        '<button class="btn" onclick="playRoulette(\'even\')">Even</button>' +
-        '<button class="btn" onclick="playRoulette(\'low\')">1-18</button>' +
-        '<button class="btn" onclick="playRoulette(\'high\')">19-36</button>' +
+      '<div class="rl-table">' +
+        '<div class="rl-grid-outer">' +
+          '<div class="rl-zero">' +
+            '<div class="rl-cell c-green" onclick="playRoulette(\'straight\',0)">0</div>' +
+            '<div class="rl-cell c-green" onclick="playRoulette(\'straight\',\'00\')">00</div>' +
+          '</div>' +
+          '<div class="rl-num-grid">'+gridRows+'</div>' +
+        '</div>' +
+        '<div class="rl-outside-row">' +
+          '<div class="rl-outside" onclick="playRoulette(\'dozen\',1)">1st 12</div>' +
+          '<div class="rl-outside" onclick="playRoulette(\'dozen\',2)">2nd 12</div>' +
+          '<div class="rl-outside" onclick="playRoulette(\'dozen\',3)">3rd 12</div>' +
+        '</div>' +
+        '<div class="rl-outside-row">' +
+          '<div class="rl-outside" onclick="playRoulette(\'low\')">1-18</div>' +
+          '<div class="rl-outside" onclick="playRoulette(\'even\')">Even</div>' +
+          '<div class="rl-outside c-red" onclick="playRoulette(\'red\')">Red</div>' +
+          '<div class="rl-outside c-black" onclick="playRoulette(\'black\')">Black</div>' +
+          '<div class="rl-outside" onclick="playRoulette(\'odd\')">Odd</div>' +
+          '<div class="rl-outside" onclick="playRoulette(\'high\')">19-36</div>' +
+        '</div>' +
       '</div>' +
     '</div>'
   );
 }
-function playRoulette(betType){
+
+function rlWheelRadius(){
+  var wrap = document.getElementById("rl-wheel-wrap");
+  return wrap ? wrap.clientWidth/2 : 80;
+}
+// angleDeg is measured clockwise from the top (12 o'clock), matching the
+// wheel's own rotate() convention, so a pocket's screen angle and the
+// ball's screen angle are directly comparable.
+function rlSetBall(angleDeg, radiusPx){
+  var ball = document.getElementById("rl-ball");
+  if(!ball) return;
+  var rad = angleDeg*Math.PI/180;
+  var x = Math.sin(rad)*radiusPx, y = -Math.cos(rad)*radiusPx;
+  ball.style.transform = "translate("+x.toFixed(2)+"px,"+y.toFixed(2)+"px)";
+}
+function rlInitWheel(){
+  var wheel = document.getElementById("rl-wheel");
+  if(!wheel) return;
+  var seg = 360/AMERICAN_WHEEL.length;
+  var stops = AMERICAN_WHEEL.map(function(n,i){
+    var col = rlColor(n)==="red" ? "#d3223f" : (rlColor(n)==="black" ? "#3a4468" : "#1fbf6d");
+    return col+" "+(i*seg).toFixed(3)+"deg "+((i+1)*seg).toFixed(3)+"deg";
+  }).join(",");
+  wheel.style.backgroundImage = "repeating-conic-gradient(from 0deg,rgba(255,255,255,.22) 0deg 0.5deg,transparent 0.5deg "+seg.toFixed(3)+"deg), conic-gradient(from 0deg,"+stops+")";
+  wheel.style.transition = "none";
+  wheel.style.transform = "rotate("+(window.RL_ROTATION||0)+"deg)";
+  rlSetBall(0, rlWheelRadius()*0.62);
+}
+
+function playRoulette(betType, betValue){
   if(window.GAME_BUSY) return;
   var bet = takeBet();
   if(!bet) return;
   window.GAME_BUSY = true;
-  var wheel = document.getElementById("rl-wheel");
-  var numEl = document.getElementById("rl-num");
   var resEl = document.getElementById("rl-result");
-  wheel.classList.remove("spinning");
-  numEl.className = "wheel-result";
-  numEl.textContent = "";
-  void wheel.offsetWidth;
-  wheel.classList.add("spinning");
+  var badge = document.getElementById("rl-badge");
+  badge.className = "rl-badge";
+  badge.textContent = "?";
   resEl.textContent = "Spinning...";
-  var n = Math.floor(Math.random()*37); // 0-36, European single-zero
-  var color = n===0 ? "green" : (ROULETTE_RED.indexOf(n)>=0 ? "red" : "black");
-  setTimeout(function(){
-    numEl.textContent = n;
-    numEl.classList.add("c-"+color);
-    var win = false;
-    if(n!==0){
-      if(betType==="red") win = color==="red";
-      else if(betType==="black") win = color==="black";
-      else if(betType==="odd") win = n%2===1;
-      else if(betType==="even") win = n%2===0;
-      else if(betType==="low") win = n<=18;
-      else if(betType==="high") win = n>=19;
+
+  var resultIndex = Math.floor(Math.random()*AMERICAN_WHEEL.length);
+  var n = AMERICAN_WHEEL[resultIndex];
+  var color = rlColor(n);
+  var seg = 360/AMERICAN_WHEEL.length;
+
+  // the wheel spins first and comes to a full stop...
+  var wheel = document.getElementById("rl-wheel");
+  var wheelTurns = 4 + Math.floor(Math.random()*2);
+  var wheelDuration = 3400;
+  window.RL_ROTATION = (window.RL_ROTATION||0) + 360*wheelTurns + Math.random()*360;
+  wheel.style.transition = "transform "+wheelDuration+"ms cubic-bezier(.12,.68,.2,1)";
+  wheel.style.transform = "rotate("+window.RL_ROTATION+"deg)";
+
+  // absolute on-screen angle of the winning pocket's center once the wheel is at rest
+  var targetAngle = ((resultIndex+0.5)*seg + window.RL_ROTATION) % 360;
+
+  // ...then the ball keeps rolling/bouncing for a bit longer before it drops
+  // into that exact pocket — matches a real wheel where the ball outlasts
+  // the rotor. Direction is opposite the wheel, like a real table.
+  var ballDuration = wheelDuration + 1300;
+  var ballTurns = 8 + Math.floor(Math.random()*2);
+  var ballOuterR = rlWheelRadius()*0.86, ballInnerR = rlWheelRadius()*0.62;
+  var ballStartAngle = Math.random()*360;
+  var baseSweepMod = ((ballStartAngle - targetAngle) % 360 + 360) % 360;
+  var totalSweep = 360*ballTurns + baseSweepMod;
+  var ballFinalAngle = ballStartAngle - totalSweep;
+
+  if(window.RL_BALL_RAF) cancelAnimationFrame(window.RL_BALL_RAF);
+  var t0 = performance.now();
+  function frame(now){
+    if(!document.getElementById("rl-ball")) return;
+    var t = Math.min(1, (now-t0)/ballDuration);
+    var eased = 1 - Math.pow(1-t, 3);
+    var angle = ballStartAngle + (ballFinalAngle-ballStartAngle)*eased;
+    var radius = ballOuterR - (ballOuterR-ballInnerR)*eased;
+    var wobble = t<0.92 ? (1-t)*4*Math.sin(t*40) : 0;
+    rlSetBall(angle, radius+wobble);
+    if(t<1){
+      window.RL_BALL_RAF = requestAnimationFrame(frame);
+    } else {
+      rlSetBall(targetAngle, ballInnerR);
+      rlFinishSpin(betType, betValue, n, color, bet);
     }
-    var payout = win ? bet*2 : 0;
-    if(payout>0) STATE.coins += payout;
-    var msg = win ? (n+" "+color.toUpperCase()+"! You won "+formatMoney(payout))
-                  : (n+" "+color.toUpperCase()+" — you lost "+formatMoney(bet));
-    resEl.innerHTML = '<span class="'+outcomeClass(payout,bet)+'">'+msg+'</span>';
-    save(); renderTop();
-    window.GAME_BUSY = false;
-  }, 1850);
+  }
+  window.RL_BALL_RAF = requestAnimationFrame(frame);
+}
+
+function rlFinishSpin(betType, betValue, n, color, bet){
+  var badge = document.getElementById("rl-badge");
+  var resEl = document.getElementById("rl-result");
+  if(badge){ badge.textContent = n; badge.classList.add("c-"+color); }
+
+  window.RL_HISTORY = window.RL_HISTORY || [];
+  window.RL_HISTORY.unshift({n:n, color:color});
+  window.RL_HISTORY = window.RL_HISTORY.slice(0,8);
+  var histEl = document.getElementById("rl-history");
+  if(histEl) histEl.innerHTML = rlHistoryHTML();
+
+  var isZero = (n===0 || n==="00");
+  var win = false, payout = 0;
+  if(betType==="straight"){
+    win = String(n)===String(betValue);
+    if(win) payout = bet*36;
+  } else if(betType==="dozen" && !isZero){
+    win = Math.ceil(n/12)===betValue;
+    if(win) payout = bet*3;
+  } else if(betType==="column" && !isZero){
+    win = (((n-1)%3)+1)===betValue;
+    if(win) payout = bet*3;
+  } else if(!isZero){
+    if(betType==="red") win = color==="red";
+    else if(betType==="black") win = color==="black";
+    else if(betType==="odd") win = n%2===1;
+    else if(betType==="even") win = n%2===0;
+    else if(betType==="low") win = n<=18;
+    else if(betType==="high") win = n>=19;
+    if(win) payout = bet*2;
+  }
+  if(payout>0) STATE.coins += payout;
+  var label = isZero ? n : (n+" "+color.toUpperCase());
+  var msg = win ? (label+"! You won "+formatMoney(payout)) : (label+" — you lost "+formatMoney(bet));
+  if(resEl) resEl.innerHTML = '<span class="'+outcomeClass(payout,bet)+'">'+msg+'</span>';
+  save(); renderTop();
+  window.GAME_BUSY = false;
 }
 
 /* ---- Blackjack (also supplies card-deck helpers used by Baccarat) ---- */
