@@ -69,6 +69,7 @@
   .stat-chip.cash{color:var(--green-dark);border-color:#bfe6c4;background:#effaf0;}
   .stat-chip.day{color:#7a4b1e;}
   .stat-chip.weather{color:#1e6fa8;border-color:#bfe0f6;background:#eef8ff;}
+  .stat-chip.loc{color:#7a3b8a;border-color:#e4c8ee;background:#f8effa;}
   .stars{color:var(--gold);letter-spacing:1px;font-size:15px;}
   .icon-btn{
     width:36px;height:36px;border-radius:10px;border:2px solid var(--panel-border);background:#fff;
@@ -247,6 +248,7 @@
     </div>
     <div class="topstat-group">
       <div class="stat-chip day"><span class="ic">📅</span><span id="dayLabel">Day 1</span></div>
+      <div class="stat-chip loc"><span class="ic">📍</span><span id="locLabel">Maple Street</span></div>
       <div class="stat-chip weather"><span class="ic" id="weatherIcon">☀️</span><span id="weatherLabel">Sunny 82°F</span></div>
       <div class="stat-chip cash"><span class="ic">💰</span><span id="cashLabel">$20.00</span></div>
       <div class="stat-chip"><span class="stars" id="repStars">★★★☆☆</span></div>
@@ -343,6 +345,7 @@
         </div>
       </div>
       <button class="ghost-btn" id="openUpgradeShopBtn">🔧 Upgrade Shop</button>
+      <button class="ghost-btn" id="openLocationsBtn">📍 Move Location</button>
     </div>
 
     <div class="card" id="forecastCard">
@@ -481,6 +484,40 @@ const DIFFICULTIES=[
   {id:'normal', name:'Normal', cash:20, desc:'Classic challenge'},
   {id:'hard', name:'Hard', cash:10, desc:'Tight margins'},
 ];
+const LOCATIONS=[
+  {id:'maple', name:'Maple Street', icon:'🏡', cost:0, traffic:1.0, priceTol:1.0,
+    desc:'Your cozy home street. Steady, friendly regulars year-round.'},
+  {id:'park', name:'Riverside Park', icon:'🌳', cost:75, traffic:1.25, priceTol:0.92,
+    desc:'Joggers and families passing through — brisk foot traffic, but price-sensitive.'},
+  {id:'downtown', name:'Downtown Plaza', icon:'🏙️', cost:180, traffic:1.6, priceTol:1.18,
+    desc:'Office crowds on their lunch break — huge foot traffic and big spenders.'},
+  {id:'beach', name:'Beach Boardwalk', icon:'🏖️', cost:130, traffic:1.15, priceTol:1.08,
+    desc:'Sun-soaked crowds love a cold cup — best on hot days, quieter when it\'s cool.'},
+];
+function locationDef(){ return LOCATIONS.find(l=>l.id===state.location) || LOCATIONS[0]; }
+const LOC_THEME={
+  maple:{
+    grassL:'#5cb85c', grassD:'#2f5a37', sidewalkL:'#dcd6c4', sidewalkD:'#5a5a63',
+    roadL0:'#57575f', roadL1:'#3d3d44', roadD0:'#3a3a42', roadD1:'#232329',
+    crossL:'#4a4a52', crossD:'#3a3a42', filter:'none', treeKey:'tree',
+  },
+  park:{
+    grassL:'#4bab63', grassD:'#254a30', sidewalkL:'#d7dcc2', sidewalkD:'#4d5450',
+    roadL0:'#57575f', roadL1:'#3d3d44', roadD0:'#3a3a42', roadD1:'#232329',
+    crossL:'#4a4a52', crossD:'#3a3a42', filter:'hue-rotate(25deg) saturate(1.15)', treeKey:'tree',
+  },
+  downtown:{
+    grassL:'#7aa869', grassD:'#33452f', sidewalkL:'#c9ccd2', sidewalkD:'#484b52',
+    roadL0:'#4a4a52', roadL1:'#2f2f36', roadD0:'#2c2c33', roadD1:'#1a1a1f',
+    crossL:'#3f3f47', crossD:'#2c2c33', filter:'grayscale(0.4) hue-rotate(180deg)', treeKey:'treepine',
+  },
+  beach:{
+    grassL:'#c7be76', grassD:'#5a5238', sidewalkL:'#ecdcae', sidewalkD:'#5f5540',
+    roadL0:'#8f7a52', roadL1:'#6a5837', roadD0:'#4a3f2c', roadD1:'#302819',
+    crossL:'#7a6748', crossD:'#4a3f2c', filter:'hue-rotate(-20deg) saturate(1.2)', treeKey:'tree',
+  },
+};
+function locTheme(){ return LOC_THEME[state.location]||LOC_THEME.maple; }
 const NAMES_F=['Mia','Ava','Zoe','Ivy','Nia','Ella','Ruby','Lucy','Nora','Sadie','Maya','Wren'];
 const NAMES_M=['Sam','Leo','Max','Ben','Cole','Tom','Jay','Finn','Kai','Owen','Eli','Theo'];
 const SKIN=['#f2c199','#e0a877','#c58a5e','#8a5a3c','#f5d7b0','#a9704a'];
@@ -625,6 +662,8 @@ function freshState(diffCash){
     lifetimeRevenue:0,
     seenMilestones:[],
     rivalDaysLeft:0,
+    location:'maple',
+    unlockedLocations:['maple'],
   };
 }
 const MILESTONES=[
@@ -734,6 +773,7 @@ document.querySelectorAll('[data-buy]').forEach(btn=>{
   });
 });
 $('openUpgradeShopBtn').addEventListener('click',()=>openUpgradeShop(false));
+$('openLocationsBtn').addEventListener('click',()=>openLocationPicker(false));
 $('startDayBtn').addEventListener('click',startDay);
 $('muteBtn').addEventListener('click',()=>{
   state.muted=!state.muted; Audio_.setMuted(state.muted); $('muteBtn').textContent=state.muted?'🔇':'🔊';
@@ -762,7 +802,7 @@ function makeCustomer(overrides){
   const idealCold=clamp(rand(0.4,0.75)+hotBias*0.35,0.05,0.98);
   const fairBase=0.62+hotBias*0.25;
   let priceTolAdd=hasUpg('cups')?0.12:0;
-  const maxPrice=Math.max(0.30, fairBase*rand(0.8,1.6)*(1+priceTolAdd));
+  const maxPrice=Math.max(0.30, fairBase*rand(0.8,1.6)*(1+priceTolAdd)*locationDef().priceTol);
   const tolBoost=hasUpg('umbrella')?0.06:0;
   const isFemale=Math.random()<0.5;
   const name=isFemale?choice(NAMES_F):choice(NAMES_M);
@@ -917,6 +957,7 @@ function customerIntervalSeconds(p){
   base/=(1+(state.reputation-3)*0.09);
   base/=timeOfDayMultiplier(p);
   if(hasUpg('sign')) base/=1.15;
+  base/=locationDef().traffic;
   if(state.consumableFlyer) base/=1.4;
   if(state.rivalDaysLeft>0) base*=1.35;
   const cpc=costPerCup();
@@ -1288,10 +1329,11 @@ function render(t){
   // behind the near building row (inside its silhouette) so it reads as a
   // street receding into the block, not a bar floating over the skyline.
   // Several of these divide the town into distinct blocks, forming a grid.
+  const lt=locTheme();
   const CROSS_X=[121,309,685,873];
   CROSS_X.forEach(cx=>{
     const gy=groundYAt(cx), w=34;
-    ctx.fillStyle= sky.dark?'#3a3a42':'#4a4a52';
+    ctx.fillStyle= sky.dark?lt.crossD:lt.crossL;
     ctx.beginPath();
     ctx.moveTo(cx-w/2, gy+10); ctx.lineTo(cx+w/2, gy+10);
     ctx.lineTo(cx+w*0.55, gy-90); ctx.lineTo(cx-w*0.55, gy-90);
@@ -1306,7 +1348,7 @@ function render(t){
   // Drawn far-to-near so nearer buildings correctly overlap farther ones.
   // Building x positions land in the gaps between the cross streets above,
   // so each street divides the skyline into a distinct town block.
-  ctx.save(); ctx.globalAlpha= sky.dark? 0.45 : 0.8;
+  ctx.save(); ctx.globalAlpha= sky.dark? 0.45 : 0.8; ctx.filter=lt.filter;
   const houseKeys=['bld1','bld2','bld3','bld4','bld5','bld6','bld7','bld8','bld9','bld10'];
   for(let i=10;i>=0;i--){
     const key=houseKeys[i%houseKeys.length];
@@ -1328,15 +1370,15 @@ function render(t){
     ctx.closePath();
   };
   // grass verge, with a repeating row of park-tile turf blocks for texture
-  ctx.fillStyle= sky.dark?'#2f5a37':'#5cb85c';
+  ctx.fillStyle= sky.dark?lt.grassD:lt.grassL;
   bandPath(-6,14); ctx.fill();
-  ctx.save(); if(sky.dark) ctx.globalAlpha=0.6;
+  ctx.save(); if(sky.dark) ctx.globalAlpha=0.6; ctx.filter=lt.filter;
   for(let x=-30;x<CW+30;x+=64){ drawSprite('parkTile', x, groundYAt(x)+3, 42, true); }
   ctx.restore();
   // sidewalk, tiled with paver blocks plus cross-tick expansion joints
-  ctx.fillStyle=sky.dark?'#5a5a63':'#dcd6c4';
+  ctx.fillStyle=sky.dark?lt.sidewalkD:lt.sidewalkL;
   bandPath(14,40); ctx.fill();
-  ctx.save(); if(sky.dark) ctx.globalAlpha=0.55;
+  ctx.save(); if(sky.dark) ctx.globalAlpha=0.55; ctx.filter=lt.filter;
   for(let x=-26;x<CW+26;x+=52){ drawSprite('paveTile', x, groundYAt(x)+27, 46, true); }
   ctx.restore();
   ctx.strokeStyle=sky.dark?'#44444c':'#c4bda8'; ctx.lineWidth=2;
@@ -1344,7 +1386,7 @@ function render(t){
   // paved road, filling the rest of the band down to the bottom of the canvas
   const roadTopY=Math.min(gy0,gyW)+40;
   const rg=ctx.createLinearGradient(0,roadTopY,0,CH);
-  rg.addColorStop(0, sky.dark?'#3a3a42':'#57575f'); rg.addColorStop(1, sky.dark?'#232329':'#3d3d44');
+  rg.addColorStop(0, sky.dark?lt.roadD0:lt.roadL0); rg.addColorStop(1, sky.dark?lt.roadD1:lt.roadL1);
   ctx.fillStyle=rg;
   ctx.beginPath(); ctx.moveTo(0,gy0+40); ctx.lineTo(CW,gyW+40); ctx.lineTo(CW,CH); ctx.lineTo(0,CH); ctx.closePath(); ctx.fill();
   // dashed centerline down the middle of the road
@@ -1352,12 +1394,13 @@ function render(t){
   ctx.strokeStyle='rgba(255,224,102,0.85)'; ctx.lineWidth=3; ctx.setLineDash([16,14]);
   ctx.beginPath(); ctx.moveTo(0,roadMidY(0)); ctx.lineTo(CW,roadMidY(CW)); ctx.stroke();
   ctx.setLineDash([]);
-  // trees, placed on the tilted ground at their x position
-  const treeKey = (state.forecast[0].type==='snow') ? 'treesnow' : (state.forecast[0].type==='cool'||state.forecast[0].type==='foggy') ? 'treepine' : 'tree';
+  // trees, placed on the tilted ground at their x position — weather overrides
+  // the location's usual tree type (snow/fog always look wintry/misty)
+  const treeKey = (state.forecast[0].type==='snow') ? 'treesnow' : (state.forecast[0].type==='cool'||state.forecast[0].type==='foggy') ? 'treepine' : lt.treeKey;
   drawSpriteBottomAnchored(treeKey, 70, groundYAt(70)+2, 130);
   drawSpriteBottomAnchored(treeKey==='tree'?'treepine':treeKey, 880, groundYAt(880)-2, 118);
-  // bench
-  drawBench(760,groundYAt(760)+2);
+  // bench, or a small park monument when set up in Riverside Park
+  if(state.location==='park'){ drawMonument(760,groundYAt(760)+2); } else { drawBench(760,groundYAt(760)+2); }
 
   // checkered paver plaza grounding the stand in the tilted street — a small
   // isometric diamond grid of alternating pavers instead of a plain flat slab
@@ -1508,6 +1551,15 @@ function drawBench(x,y){
   ctx.fillStyle='#8a5a30';
   ctx.fillRect(x,y-18,60,6); ctx.fillRect(x,y-4,60,5);
   ctx.fillRect(x+2,y-12,4,18); ctx.fillRect(x+54,y-12,4,18);
+}
+function drawMonument(x,y){
+  ctx.save(); ctx.translate(x+30,y);
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(0,2,30,9,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#9a978a'; ctx.beginPath(); ctx.ellipse(0,-2,26,10,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#7a776a'; ctx.fillRect(-14,-34,28,32);
+  ctx.fillStyle='#5a5850'; ctx.fillRect(-9,-58,18,26);
+  ctx.fillStyle='#c9a227'; ctx.beginPath(); ctx.moveTo(0,-70); ctx.lineTo(-6,-58); ctx.lineTo(6,-58); ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 function drawStand(x,y,t,dark){
   ctx.save(); ctx.translate(x,y);
@@ -1671,6 +1723,7 @@ function roundRect(ctx,x,y,w,h,r){
 function updateTopbar(){
   const season=seasonForDay(state.day);
   $('dayLabel').textContent=season.icon+' Day '+state.day;
+  $('locLabel').textContent=locationDef().icon+' '+locationDef().name;
   const w=state.forecast[0]; const d=weatherDef(w.type);
   $('weatherIcon').textContent=d.icon;
   $('weatherLabel').textContent=d.label+' '+w.temp+'°F'+(state.rivalDaysLeft>0?' · 🏪 rival nearby':'');
@@ -1802,6 +1855,35 @@ function openUpgradeShop(afterSummary){
   });
   $('closeUpgrades').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } else { updateRecipeUI(); updateStockUI(); } });
 }
+function openLocationPicker(afterSummary){
+  let list=LOCATIONS.map(l=>{
+    const unlocked=state.unlockedLocations.includes(l.id);
+    const here=state.location===l.id;
+    let btnLabel, btnClass, action;
+    if(here){ btnLabel='Here'; btnClass=' owned'; action='none'; }
+    else if(unlocked){ btnLabel='Move'; btnClass=''; action='move'; }
+    else { btnLabel=fmt$(l.cost); btnClass=''; action='unlock'; }
+    return '<div class="upgrade-item"><div class="u-icon">'+l.icon+'</div><div class="u-info"><div class="u-name">'+l.name+(here?' (current)':'')+'</div><div class="u-desc">'+l.desc+'</div></div>'+
+      '<button class="u-buy'+btnClass+'" data-loc="'+l.id+'" data-action="'+action+'" '+(action==='none'?'disabled':'')+'>'+btnLabel+'</button></div>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h2>📍 Move Location</h2><p>Cash: '+fmt$(state.cash)+'</p></div>'+
+    '<div class="modal-body"><div class="upgrade-list">'+list+'</div></div>'+
+    '<div class="modal-foot"><button class="big-btn" id="closeLocations">Done</button></div>'
+  );
+  document.querySelectorAll('[data-loc]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const id=btn.dataset.loc, action=btn.dataset.action, l=LOCATIONS.find(x=>x.id===id);
+      if(action==='unlock' && state.cash>=l.cost){
+        state.cash-=l.cost; state.unlockedLocations.push(id); state.location=id;
+        Audio_.coin(); saveGame(); updateTopbar(); openLocationPicker(afterSummary);
+      } else if(action==='move'){
+        state.location=id; Audio_.click(); saveGame(); updateTopbar(); openLocationPicker(afterSummary);
+      } else if(action==='unlock'){ Audio_.complaintBlip(); }
+    });
+  });
+  $('closeLocations').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } });
+}
 function openDaySummary(){
   const s=state.todayStats;
   const total=s.happy+Object.values(s.complaints).reduce((a,b)=>a+b,0);
@@ -1884,6 +1966,8 @@ function boot(){
     if(typeof state.lifetimeRevenue!=='number') state.lifetimeRevenue=0;
     if(!Array.isArray(state.seenMilestones)) state.seenMilestones=[];
     if(typeof state.rivalDaysLeft!=='number') state.rivalDaysLeft=0;
+    if(!state.location) state.location='maple';
+    if(!Array.isArray(state.unlockedLocations)) state.unlockedLocations=['maple'];
     Audio_.setMuted(state.muted);
     $('muteBtn').textContent=state.muted?'🔇':'🔊';
     // normalize transient phases back to a safe resumable phase
