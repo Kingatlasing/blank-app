@@ -66,13 +66,23 @@
     border:1px solid #4a3a10;color:var(--gold);font-weight:800;padding:8px 14px;border-radius:999px;font-size:14px;
     font-family:var(--font-display);}
   .coins .icon{filter:drop-shadow(0 0 4px rgba(255,211,92,.7));}
-  .btn{cursor:pointer;border:none;border-radius:10px;font-weight:700;font-size:13px;padding:9px 14px;
+  .btn{cursor:pointer;border-radius:10px;font-weight:700;font-size:13px;padding:9px 14px;
     font-family:var(--font-display);display:inline-flex;align-items:center;gap:7px;
-    background:var(--panel2);color:var(--text);border:1px solid var(--line);transition:.15s;}
-  .btn:hover{border-color:#3d4a72;transform:translateY(-1px);}
-  .btn:active{transform:translateY(0) scale(.97);}
-  .btn.primary{background:linear-gradient(135deg,var(--accent),#a06bff);color:#fff;border:none;box-shadow:0 4px 18px rgba(124,92,255,.4);}
-  .btn.gold{background:linear-gradient(135deg,#ffcf4d,#ff9d3d);color:#231400;border:none;}
+    background:linear-gradient(180deg,#2c3557,var(--panel2) 55%,#141a2b);color:var(--text);
+    border:1px solid var(--line);transition:.12s;position:relative;
+    box-shadow:0 3px 0 rgba(0,0,0,.4),0 5px 12px rgba(0,0,0,.35),inset 0 1px 0 rgba(255,255,255,.12);}
+  .btn:hover{border-color:#3d4a72;transform:translateY(-1px);
+    box-shadow:0 4px 0 rgba(0,0,0,.4),0 8px 16px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.16);}
+  .btn:active{transform:translateY(2px);
+    box-shadow:0 1px 0 rgba(0,0,0,.4),0 2px 6px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.1);}
+  .btn.primary{background:linear-gradient(180deg,#9576ff,var(--accent) 55%,#5c3fd9);color:#fff;
+    border:1px solid #6a4fd9;box-shadow:0 3px 0 #4a35a8,0 6px 16px rgba(124,92,255,.45),inset 0 1px 0 rgba(255,255,255,.35);}
+  .btn.primary:hover{box-shadow:0 4px 0 #4a35a8,0 10px 20px rgba(124,92,255,.5),inset 0 1px 0 rgba(255,255,255,.4);}
+  .btn.primary:active{box-shadow:0 1px 0 #4a35a8,0 3px 8px rgba(124,92,255,.4),inset 0 1px 0 rgba(255,255,255,.25);}
+  .btn.gold{background:linear-gradient(180deg,#ffe08a,#ffcf4d 45%,#ff9d3d);color:#231400;
+    border:1px solid #d9822a;box-shadow:0 3px 0 #a85f10,0 6px 16px rgba(255,157,61,.4),inset 0 1px 0 rgba(255,255,255,.55);}
+  .btn.gold:hover{box-shadow:0 4px 0 #a85f10,0 10px 20px rgba(255,157,61,.45),inset 0 1px 0 rgba(255,255,255,.6);}
+  .btn.gold:active{box-shadow:0 1px 0 #a85f10,0 3px 8px rgba(255,157,61,.35),inset 0 1px 0 rgba(255,255,255,.4);}
 
   h1.page-title{font-family:var(--font-display);font-size:26px;margin:6px 0 4px;font-weight:800;letter-spacing:-.2px;}
   p.page-sub{color:var(--sub);margin:0 0 22px;font-size:14.5px;}
@@ -102,10 +112,13 @@
   .pack-name{font-family:var(--font-display);font-weight:800;font-size:16.5px;margin-bottom:2px;}
   .pack-desc{color:var(--sub);font-size:12.5px;margin-bottom:14px;min-height:32px;}
   .pack-buy{width:100%;padding:10px;border-radius:10px;font-family:var(--font-display);
-    font-weight:700;font-size:13.5px;border:none;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;gap:7px;
-    background:linear-gradient(135deg,var(--gold),#ff9d3d);color:#241500;}
-  .pack-buy:disabled{background:#2a3350;color:#6c7692;cursor:not-allowed;}
+    font-weight:700;font-size:13.5px;border:1px solid #d9822a;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;gap:7px;transition:.12s;
+    background:linear-gradient(180deg,#ffe08a,var(--gold) 45%,#ff9d3d);color:#241500;
+    box-shadow:0 3px 0 #a85f10,0 6px 14px rgba(255,157,61,.35),inset 0 1px 0 rgba(255,255,255,.5);}
+  .pack-buy:hover{transform:translateY(-1px);}
+  .pack-buy:active{transform:translateY(2px);box-shadow:0 1px 0 #a85f10,0 2px 6px rgba(255,157,61,.3),inset 0 1px 0 rgba(255,255,255,.3);}
+  .pack-buy:disabled{background:#2a3350;color:#6c7692;cursor:not-allowed;border-color:var(--line);box-shadow:none;transform:none;}
   .odds{margin-top:10px;font-size:10.5px;color:var(--sub);display:flex;gap:6px;flex-wrap:wrap;justify-content:center;}
   .odds span{padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);
     display:inline-flex;align-items:center;gap:3px;}
@@ -373,6 +386,13 @@
     font-size:12.5px;font-weight:700;color:var(--sub);cursor:pointer;
     display:inline-flex;align-items:center;gap:6px;font-family:var(--font-display);}
   .chip.active{background:var(--accent);color:#fff;border-color:transparent;}
+  .chip.owned-toggle{margin-left:auto;}
+  .chip.owned-toggle.active{background:linear-gradient(135deg,var(--gold),#ff9d3d);color:#231400;}
+  .vault-section{margin-bottom:28px;}
+  .vault-section:last-child{margin-bottom:0;}
+  .vault-section-head{display:flex;align-items:center;gap:8px;font-family:var(--font-display);
+    font-weight:800;font-size:15px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .vault-section-count{margin-left:auto;font-size:12px;font-weight:700;color:var(--sub);}
   .stat-row{display:flex;gap:14px;margin-bottom:18px;flex-wrap:wrap;}
   .stat-box{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 18px;min-width:120px;
     display:flex;align-items:center;gap:12px;}
@@ -535,8 +555,21 @@
     box-shadow:0 4px 10px rgba(0,0,0,.4);opacity:0;transform:scale(.5) translateY(8px);
     animation:stripPop .3s cubic-bezier(.3,1.5,.4,1) forwards;}
   .mini-card.red{color:#c8102e;}
-  .mini-card.back{background:linear-gradient(135deg,var(--accent),#ff5c9a);position:relative;overflow:hidden;color:transparent;}
-  .mini-card.back::after{content:"";position:absolute;inset:2px;border:1px solid rgba(255,255,255,.3);border-radius:4px;}
+  /* classic red casino card back: a woven diamond lattice (two crossed thin-line
+     gradients) over a deep red base, a double-line border, and a small center
+     diamond — the same generic motif every casino deck uses, drawn procedurally
+     so the app never depends on a downloaded card-back image. */
+  .mini-card.back{position:relative;overflow:hidden;color:transparent;border:1px solid #6b0f1d;
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.16) 0 1px, transparent 1px 5px),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,.16) 0 1px, transparent 1px 5px),
+      linear-gradient(160deg,#c9203f,#8a1024 55%,#5c0a15);
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.22), 0 4px 10px rgba(0,0,0,.4);}
+  .mini-card.back::after{content:"";position:absolute;inset:3px;border:1px solid rgba(255,255,255,.45);
+    border-radius:3px;pointer-events:none;}
+  .mini-card.back::before{content:"";position:absolute;left:50%;top:50%;width:9px;height:9px;
+    transform:translate(-50%,-50%) rotate(45deg);background:rgba(255,255,255,.5);
+    box-shadow:0 0 0 1px rgba(255,255,255,.3);pointer-events:none;}
 
   /* ---------- Shell game ---------- */
   .cups-row{display:flex;gap:min(22px,4vw);justify-content:center;align-items:flex-end;flex:1 1 auto;min-height:0;
@@ -789,7 +822,7 @@ function formatMoney(v){
 }
 
 /* ======================= STATE ======================= */
-var STATE = {coins:250, collection:{}, view:"packs", collFilter:"all", packsOpened:0};
+var STATE = {coins:250, collection:{}, view:"packs", collFilter:"all", collOwnedOnly:false, packsOpened:0};
 try{
   var saved = localStorage.getItem("chasebreak-state");
   if(saved) STATE = JSON.parse(saved);
@@ -1309,20 +1342,12 @@ function burstAt(el, color, big){
 }
 
 /* ======================= COLLECTION ======================= */
-function collectionHTML(){
-  var owned = Object.keys(STATE.collection).length;
-  var total = CARD_DATA.length;
-  var pct = total? Math.round((owned/total)*100) : 0;
-  var dupes = 0;
-  Object.keys(STATE.collection).forEach(function(k){ dupes += (STATE.collection[k]-1); });
-
-  var chips = ['<div class="chip '+(STATE.collFilter==="all"?"active":"")+'" onclick="setFilter(\'all\')">'+ICON("layer-group")+'All</div>']
-    .concat(CATEGORIES.map(function(c){
-      return '<div class="chip '+(STATE.collFilter===c.key?"active":"")+'" onclick="setFilter(\''+c.key+'\')">'+ICON(c.icon)+c.label+'</div>';
-    })).join("");
-
-  var pool = STATE.collFilter==="all" ? CARD_DATA : poolFor(STATE.collFilter);
-  var cells = pool.map(function(card){
+function vaultCellsHTML(pool){
+  var filtered = STATE.collOwnedOnly ? pool.filter(function(c){ return STATE.collection[c.id]; }) : pool;
+  if(!filtered.length){
+    return '<div class="empty-note">'+ICON("lock")+(STATE.collOwnedOnly? "No owned cards in this set yet." : "No cards in this set yet.")+'</div>';
+  }
+  var cells = filtered.map(function(card){
     var count = STATE.collection[card.id]||0;
     if(!count){
       return '<div class="bind-cell locked">'+ICON("lock")+'</div>';
@@ -1335,6 +1360,41 @@ function collectionHTML(){
       '</div>'
     );
   }).join("");
+  return '<div class="bind-grid">'+cells+'</div>';
+}
+
+function collectionHTML(){
+  var owned = Object.keys(STATE.collection).length;
+  var total = CARD_DATA.length;
+  var pct = total? Math.round((owned/total)*100) : 0;
+  var dupes = 0;
+  Object.keys(STATE.collection).forEach(function(k){ dupes += (STATE.collection[k]-1); });
+
+  var chips = ['<div class="chip '+(STATE.collFilter==="all"?"active":"")+'" onclick="setFilter(\'all\')">'+ICON("layer-group")+'All</div>']
+    .concat(CATEGORIES.map(function(c){
+      return '<div class="chip '+(STATE.collFilter===c.key?"active":"")+'" onclick="setFilter(\''+c.key+'\')">'+ICON(c.icon)+c.label+'</div>';
+    })).join("") +
+    '<div class="chip owned-toggle '+(STATE.collOwnedOnly?"active":"")+'" onclick="toggleOwnedOnly()">'+ICON("circle-check")+'Owned Only</div>';
+
+  // "All" splits every category into its own section (Pokemon with Pokemon,
+  // Yu-Gi-Oh with Yu-Gi-Oh, etc.) instead of mixing every card into one grid;
+  // picking a specific category chip narrows to just that one section.
+  var body;
+  if(STATE.collFilter==="all"){
+    body = CATEGORIES.map(function(c){
+      var pool = poolFor(c.key);
+      var ownedInCat = pool.filter(function(card){ return STATE.collection[card.id]; }).length;
+      return (
+        '<div class="vault-section">' +
+          '<div class="vault-section-head">'+ICON(c.icon)+'<span>'+c.label+'</span>'+
+            '<span class="vault-section-count">'+ownedInCat+' / '+pool.length+'</span></div>' +
+          vaultCellsHTML(pool) +
+        '</div>'
+      );
+    }).join("");
+  } else {
+    body = vaultCellsHTML(poolFor(STATE.collFilter));
+  }
 
   return (
     '<h1 class="page-title">Vault</h1>' +
@@ -1346,11 +1406,12 @@ function collectionHTML(){
       '<div class="stat-box"><div class="stat-icon">'+ICON("box-open")+'</div><div><div class="v">'+STATE.packsOpened+'</div><div class="l">Packs Opened</div></div></div>' +
     '</div>' +
     '<div class="filter-row">'+chips+'</div>' +
-    (pool.length? '<div class="bind-grid">'+cells+'</div>' : '<div class="empty-note">'+ICON("lock")+'No cards in this set yet.</div>')
+    body
   );
 }
 
 function setFilter(key){ STATE.collFilter = key; render(); }
+function toggleOwnedOnly(){ STATE.collOwnedOnly = !STATE.collOwnedOnly; save(); render(); }
 
 // vault payout: 87% of estimated value, rounded down to the nearest dollar
 // 87% of value, floored to the nearest dollar, minimum $1 — a floor-to-$0
@@ -1569,6 +1630,26 @@ function takeBet(){
 function outcomeClass(payout, bet){
   return payout>bet ? "win-text" : (payout===bet ? "" : "lose-text");
 }
+// win celebration, reusing the same fixed-position particle burst (and, for
+// a big win, the gold ring) already built for pack rare-pull moments — all
+// position:fixed and self-removing, so it never affects page layout/scroll.
+function gameWinFX(el, big){
+  if(!el) return;
+  burstAt(el, big ? "#ffd35c" : "#3ddc84", !!big);
+  if(big){
+    var rect = el.getBoundingClientRect();
+    var sx=(rect.left+rect.width/2)+"px", sy=(rect.top+rect.height/2)+"px";
+    [0,150].forEach(function(delay){
+      setTimeout(function(){
+        var ring = document.createElement("div");
+        ring.className = "legendary-ring";
+        ring.style.setProperty("--sx", sx); ring.style.setProperty("--sy", sy);
+        document.body.appendChild(ring);
+        setTimeout(function(){ ring.remove(); }, 1050);
+      }, delay);
+    });
+  }
+}
 
 /* ---- Coin Flip ---- */
 function coinflipHTML(){
@@ -1609,6 +1690,7 @@ function playCoinflip(call){
     var msg = win ? (result.toUpperCase()+"! You won "+formatMoney(payout))
                   : (result.toUpperCase()+" — you lost "+formatMoney(bet));
     resEl.innerHTML = '<span class="'+outcomeClass(payout,bet)+'">'+msg+'</span>';
+    if(win) gameWinFX(coin, false);
     save(); renderTop();
     window.GAME_BUSY = false;
   }, 1250);
@@ -1837,6 +1919,7 @@ function rlFinishSpin(betType, betValue, n, color, bet){
   var label = isZero ? n : (n+" "+color.toUpperCase());
   var msg = win ? (label+"! You won "+formatMoney(payout)) : (label+" — you lost "+formatMoney(bet));
   if(resEl) resEl.innerHTML = '<span class="'+outcomeClass(payout,bet)+'">'+msg+'</span>';
+  if(win) gameWinFX(badge, payout>=bet*9);
   save(); renderTop();
   window.GAME_BUSY = false;
 }
@@ -1965,6 +2048,7 @@ function bjSettle(){
   }
   if(payout>0) STATE.coins += payout;
   resEl.innerHTML = '<span class="'+outcomeClass(payout,s.bet)+'">'+msg+'</span>';
+  if(payout>s.bet) gameWinFX(document.getElementById("bj-player-hand"), payout>=s.bet*2.5);
   save(); renderTop();
   document.getElementById("bj-actions").innerHTML = '<button class="btn primary" onclick="bjDeal()">'+ICON("box-open")+'Deal Again</button>';
   window.GAME_BUSY = false;
@@ -2050,6 +2134,7 @@ function playBaccarat(betType){
   }
   if(payout>0) STATE.coins += payout;
   resEl.innerHTML = '<span class="'+outcomeClass(payout,bet)+'">'+msg+'</span>';
+  if(payout>bet) gameWinFX(document.getElementById("bc-table"), betType==="tie");
   save(); renderTop();
   window.GAME_BUSY = false;
 }
@@ -2133,6 +2218,7 @@ function pickCup(i){
   var msg = win ? ("Cup "+(i+1)+" — the marble was there! You won "+formatMoney(payout))
                 : ("Cup "+(i+1)+" was empty. Marble was under cup "+(s.finalPos+1)+" — you lost "+formatMoney(s.bet));
   resEl.innerHTML = '<span class="'+outcomeClass(payout,s.bet)+'">'+msg+'</span>';
+  if(win) gameWinFX(document.getElementById("sg-cup-"+i), false);
   save(); renderTop();
   document.getElementById("sg-actions").innerHTML = '<button class="btn primary" onclick="sgStart()">'+ICON("shuffle")+'Shuffle Again</button>';
   window.GAME_BUSY = false;
