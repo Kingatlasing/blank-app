@@ -1284,10 +1284,28 @@ function render(t){
   // reads as rising from behind the mountains and the town sits in front.
   drawMountains(sky);
 
+  // cross streets — side streets cutting up from the main road, each ending
+  // behind the near building row (inside its silhouette) so it reads as a
+  // street receding into the block, not a bar floating over the skyline.
+  // Several of these divide the town into distinct blocks, forming a grid.
+  const CROSS_X=[121,309,685,873];
+  CROSS_X.forEach(cx=>{
+    const gy=groundYAt(cx), w=34;
+    ctx.fillStyle= sky.dark?'#3a3a42':'#4a4a52';
+    ctx.beginPath();
+    ctx.moveTo(cx-w/2, gy+10); ctx.lineTo(cx+w/2, gy+10);
+    ctx.lineTo(cx+w*0.55, gy-90); ctx.lineTo(cx-w*0.55, gy-90);
+    ctx.closePath(); ctx.fill();
+    ctx.strokeStyle='rgba(255,224,102,0.7)'; ctx.lineWidth=2; ctx.setLineDash([8,7]);
+    ctx.beginPath(); ctx.moveTo(cx,gy+8); ctx.lineTo(cx,gy-88); ctx.stroke(); ctx.setLineDash([]);
+  });
+
   // isometric skyline along the receding street: far buildings (upper-right,
   // toward town) are small and high; near ones (lower-left, toward the
   // viewer) are bigger and low, matching the tilt customers walk along.
   // Drawn far-to-near so nearer buildings correctly overlap farther ones.
+  // Building x positions land in the gaps between the cross streets above,
+  // so each street divides the skyline into a distinct town block.
   ctx.save(); ctx.globalAlpha= sky.dark? 0.45 : 0.8;
   const houseKeys=['bld1','bld2','bld3','bld4','bld5','bld6','bld7','bld8','bld9','bld10'];
   for(let i=10;i>=0;i--){
@@ -1297,20 +1315,6 @@ function render(t){
     drawSpriteBottomAnchored(key, bx, groundYAt(bx)-24, bh);
   }
   ctx.restore();
-  // cross streets — short side-street stubs cutting between building blocks,
-  // so the town reads as a grid of blocks with streets between them, not one
-  // strip of buildings along a single road.
-  const crossStreetX=[210,810];
-  crossStreetX.forEach(cx=>{
-    const gy=groundYAt(cx), w=36;
-    ctx.fillStyle= sky.dark?'#3a3a42':'#4a4a52';
-    ctx.beginPath();
-    ctx.moveTo(cx-w/2, gy+10); ctx.lineTo(cx+w/2, gy+10);
-    ctx.lineTo(cx+w*0.62, gy-72); ctx.lineTo(cx-w*0.62, gy-72);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(255,224,102,0.7)'; ctx.lineWidth=2; ctx.setLineDash([8,7]);
-    ctx.beginPath(); ctx.moveTo(cx,gy+8); ctx.lineTo(cx,gy-70); ctx.stroke(); ctx.setLineDash([]);
-  });
   // street ground — a tilted band following the isometric street line (since
   // groundYAt is linear in x, its endpoints at x=0 and x=CW fully define it).
   // Layered far-to-near as: a thin grass verge (front yards below the
