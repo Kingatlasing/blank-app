@@ -481,6 +481,9 @@
   .rl-ball{position:absolute;left:50%;top:50%;width:7.5%;height:7.5%;border-radius:50%;margin:-3.75% 0 0 -3.75%;
     background:radial-gradient(circle at 35% 30%,#fff,#c7cede 70%);box-shadow:0 2px 5px rgba(0,0,0,.6);z-index:3;
     will-change:transform;}
+  .rl-deflector{position:absolute;left:50%;top:50%;width:8px;height:8px;
+    background:linear-gradient(135deg,#f2f4fb,#8993ad);box-shadow:0 1px 3px rgba(0,0,0,.6),inset 0 0 0 1px rgba(255,255,255,.4);
+    border-radius:2px;z-index:2;}
   .rl-readout{display:flex;flex-direction:column;align-items:center;gap:8px;flex:0 0 auto;}
   .rl-badge{width:min(56px,9vh);height:min(56px,9vh);border-radius:50%;display:flex;align-items:center;justify-content:center;
     font-family:var(--font-display);font-size:1.5em;font-weight:800;color:#fff;background:var(--panel2);
@@ -1631,7 +1634,19 @@ function rlInitWheel(){
   wheel.style.backgroundImage = "repeating-conic-gradient(from 0deg,rgba(255,255,255,.22) 0deg 0.5deg,transparent 0.5deg "+seg.toFixed(3)+"deg), conic-gradient(from 0deg,"+stops+")";
   wheel.style.transition = "none";
   wheel.style.transform = "rotate("+(window.RL_ROTATION||0)+"deg)";
-  rlSetBall(0, rlWheelRadius()*0.62);
+
+  // 8 metal deflector pins between the outer track and the pockets — fixed
+  // to the wheel (they're children of it, so they spin with it) and it's
+  // these the ball actually bounces off as it loses momentum.
+  var R = rlWheelRadius();
+  var defR = R*0.79;
+  var pins = "";
+  for(var i=0;i<8;i++){
+    pins += '<div class="rl-deflector" style="transform:translate(-50%,-50%) rotate('+(i*45)+'deg) translateY(-'+defR.toFixed(1)+'px) rotate(45deg)"></div>';
+  }
+  wheel.innerHTML = pins;
+
+  rlSetBall(0, R*0.62);
 }
 
 function playRoulette(betType, betValue){
@@ -1672,6 +1687,15 @@ function playRoulette(betType, betValue){
   var totalSweep = 360*ballTurns + baseSweepMod;
   var ballFinalAngle = ballStartAngle - totalSweep;
 
+  // real roulette balls run smooth in the outer track, then start clattering
+  // off the deflector pins as they lose speed — each hit knocks a little
+  // height and a little angle off, in decreasing amounts, until it's lost
+  // enough energy to drop and rattle to a stop in a pocket.
+  var trackW = ballOuterR - ballInnerR;
+  var bounceStart = 0.45; // fraction of ballDuration before the first deflector hit
+  var bounceHits = 7;     // visible bumps as it crosses the deflector ring
+  function easeInOutQuad(x){ return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2; }
+
   if(window.RL_BALL_RAF) cancelAnimationFrame(window.RL_BALL_RAF);
   var t0 = performance.now();
   function frame(now){
@@ -1679,9 +1703,16 @@ function playRoulette(betType, betValue){
     var t = Math.min(1, (now-t0)/ballDuration);
     var eased = 1 - Math.pow(1-t, 3);
     var angle = ballStartAngle + (ballFinalAngle-ballStartAngle)*eased;
-    var radius = ballOuterR - (ballOuterR-ballInnerR)*eased;
-    var wobble = t<0.92 ? (1-t)*4*Math.sin(t*40) : 0;
-    rlSetBall(angle, radius+wobble);
+
+    var tb = Math.max(0, (t-bounceStart)/(1-bounceStart));
+    var ampEnv = trackW*0.55*Math.pow(1-tb, 2.2);
+    var radiusBase = t<bounceStart ? ballOuterR : ballOuterR - trackW*easeInOutQuad(tb);
+    var bounceLift = tb>0 ? ampEnv*Math.abs(Math.sin(tb*bounceHits*Math.PI)) : 0;
+    var angleJitter = tb>0 ? (ampEnv/trackW)*7*Math.sin(tb*bounceHits*Math.PI+1.3) : 0;
+
+    var radius = Math.min(ballOuterR*1.06, Math.max(ballInnerR*0.85, radiusBase+bounceLift));
+    rlSetBall(angle+angleJitter, radius);
+
     if(t<1){
       window.RL_BALL_RAF = requestAnimationFrame(frame);
     } else {
