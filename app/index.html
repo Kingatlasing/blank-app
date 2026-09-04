@@ -363,12 +363,14 @@
       </div>
       <button class="ghost-btn" id="openUpgradeShopBtn">🔧 Upgrade Shop</button>
       <button class="ghost-btn" id="openLocationsBtn">📍 Move Location</button>
+      <button class="ghost-btn" id="openMarketingBtn">📣 Marketing &amp; Staff</button>
     </div>
 
     <div class="card" id="forecastCard">
       <h3>🌤 Forecast</h3>
       <div class="forecast-strip" id="forecastStrip"></div>
       <p style="font-size:11.5px;color:#8a6a3a;font-weight:700;margin:10px 0 0;">Hotter days mean thirstier crowds — but stock up, rain scares customers away!</p>
+      <p id="billsPreview" style="font-size:11.5px;color:#a05a2c;font-weight:800;margin:6px 0 0;"></p>
       <button class="big-btn" id="startDayBtn" style="margin-top:12px;">☀️ Open For Business</button>
     </div>
   </div>
@@ -457,13 +459,10 @@ const Audio_ = (function(){
 })();
 
 /* ============================= GAME CONSTANTS ============================= */
-const CW=960, CH=540, GROUND_Y=420, STAND_X=560;
-// Isometric street tilt: the "ground" is a shallow diagonal (far/small to the
-// upper-right where town recedes, near/large to the lower-left toward the viewer)
-// instead of a flat horizontal line, matching the isometric building art's angle.
-const TILT=0.13, TILT_BG=0.15, SCALE_RATE=0.0005, MIN_SCALE=0.75, MAX_SCALE=1.3;
-function groundYAt(x){ return GROUND_Y+(STAND_X-x)*TILT; }
-function depthScaleAt(x){ return clamp(1+(STAND_X-x)*SCALE_RATE, MIN_SCALE, MAX_SCALE); }
+const CW=960, CH=540, GROUND_Y=430, STAND_X=480, SKY_BOTTOM=170, FLOOR_Y=460;
+// a flat, contained "diorama" scene (a small strip of sky, a backdrop of
+// buildings at the horizon, a full-frame paved floor) rather than a receding
+// isometric street — customers and props sit on a single flat baseline.
 const DAY_LENGTH_SEC=95; // real seconds at 1x speed
 const COSTS={lemon:0.05, sugar:0.02, ice:0.015, cup:0.03};
 const WEATHER_TYPES=[
@@ -502,36 +501,33 @@ const DIFFICULTIES=[
   {id:'hard', name:'Hard', cash:10, desc:'Tight margins'},
 ];
 const LOCATIONS=[
-  {id:'maple', name:'Maple Street', icon:'🏡', cost:0, traffic:1.0, priceTol:1.0,
+  {id:'maple', name:'Maple Street', icon:'🏡', cost:0, rent:0, traffic:1.0, priceTol:1.0,
     desc:'Your cozy home street. Steady, friendly regulars year-round.'},
-  {id:'park', name:'Riverside Park', icon:'🌳', cost:75, traffic:1.25, priceTol:0.92,
+  {id:'park', name:'Riverside Park', icon:'🌳', cost:75, rent:8, traffic:1.25, priceTol:0.92,
     desc:'Joggers and families passing through — brisk foot traffic, but price-sensitive.'},
-  {id:'downtown', name:'Downtown Plaza', icon:'🏙️', cost:180, traffic:1.6, priceTol:1.18,
+  {id:'downtown', name:'Downtown Plaza', icon:'🏙️', cost:180, rent:22, traffic:1.6, priceTol:1.18,
     desc:'Office crowds on their lunch break — huge foot traffic and big spenders.'},
-  {id:'beach', name:'Beach Boardwalk', icon:'🏖️', cost:130, traffic:1.15, priceTol:1.08,
+  {id:'beach', name:'Beach Boardwalk', icon:'🏖️', cost:130, rent:14, traffic:1.15, priceTol:1.08,
     desc:'Sun-soaked crowds love a cold cup — best on hot days, quieter when it\'s cool.'},
 ];
+const STAFF_WAGE=12, STAFF_PATIENCE_BOOST=2, STAFF_TRAFFIC_MULT=1.12;
 function locationDef(){ return LOCATIONS.find(l=>l.id===state.location) || LOCATIONS[0]; }
 const LOC_THEME={
   maple:{
-    grassL:'#5cb85c', grassD:'#2f5a37', sidewalkL:'#dcd6c4', sidewalkD:'#5a5a63',
-    roadL0:'#57575f', roadL1:'#3d3d44', roadD0:'#3a3a42', roadD1:'#232329',
-    crossL:'#4a4a52', crossD:'#3a3a42', filter:'none', treeKey:'tree',
+    floorA:'#e8dfc0', floorB:'#cbb98e', floorAD:'#5a5240', floorBD:'#413b2e',
+    filter:'none', treeKey:'tree',
   },
   park:{
-    grassL:'#4bab63', grassD:'#254a30', sidewalkL:'#d7dcc2', sidewalkD:'#4d5450',
-    roadL0:'#57575f', roadL1:'#3d3d44', roadD0:'#3a3a42', roadD1:'#232329',
-    crossL:'#4a4a52', crossD:'#3a3a42', filter:'hue-rotate(25deg) saturate(1.15)', treeKey:'tree',
+    floorA:'#cfe0c0', floorB:'#a9c290', floorAD:'#3a4a34', floorBD:'#2a3627',
+    filter:'hue-rotate(25deg) saturate(1.15)', treeKey:'tree',
   },
   downtown:{
-    grassL:'#7aa869', grassD:'#33452f', sidewalkL:'#c9ccd2', sidewalkD:'#484b52',
-    roadL0:'#4a4a52', roadL1:'#2f2f36', roadD0:'#2c2c33', roadD1:'#1a1a1f',
-    crossL:'#3f3f47', crossD:'#2c2c33', filter:'grayscale(0.4) hue-rotate(180deg)', treeKey:'treepine',
+    floorA:'#d6d8dc', floorB:'#aeb2ba', floorAD:'#3a3c40', floorBD:'#292a2d',
+    filter:'grayscale(0.4) hue-rotate(180deg)', treeKey:'treepine',
   },
   beach:{
-    grassL:'#c7be76', grassD:'#5a5238', sidewalkL:'#ecdcae', sidewalkD:'#5f5540',
-    roadL0:'#8f7a52', roadL1:'#6a5837', roadD0:'#4a3f2c', roadD1:'#302819',
-    crossL:'#7a6748', crossD:'#4a3f2c', filter:'hue-rotate(-20deg) saturate(1.2)', treeKey:'tree',
+    floorA:'#f2e2ab', floorB:'#e0c67a', floorAD:'#5c4f2e', floorBD:'#41381f',
+    filter:'hue-rotate(-20deg) saturate(1.2)', treeKey:'tree',
   },
 };
 function locTheme(){ return LOC_THEME[state.location]||LOC_THEME.maple; }
@@ -681,6 +677,7 @@ function freshState(diffCash){
     rivalDaysLeft:0,
     location:'maple',
     unlockedLocations:['maple'],
+    staffHired:false,
   };
 }
 const MILESTONES=[
@@ -791,6 +788,7 @@ document.querySelectorAll('[data-buy]').forEach(btn=>{
 });
 $('openUpgradeShopBtn').addEventListener('click',()=>openUpgradeShop(false));
 $('openLocationsBtn').addEventListener('click',()=>openLocationPicker(false));
+$('openMarketingBtn').addEventListener('click',()=>openMarketing(false));
 $('startDayBtn').addEventListener('click',startDay);
 $('muteBtn').addEventListener('click',()=>{
   state.muted=!state.muted; Audio_.setMuted(state.muted); $('muteBtn').textContent=state.muted?'🔇':'🔊';
@@ -827,10 +825,10 @@ function makeCustomer(overrides){
   const startX=CW+30;
   return Object.assign({
     id:Math.random(), name, archetype,
-    x:startX, y:groundYAt(startX), targetX: STAND_X-90-randInt(0,3)*44,
+    x:startX, y:FLOOR_Y, targetX: STAND_X-90-randInt(0,3)*44,
     state:'walking_in', walkSpeed:rand(38,58), bob:rand(0,10),
     idealSweet, idealTart, idealCold, maxPrice, tolBoost,
-    patience: rand(6,10)+(hasUpg('pitcher')?2.5:0), patienceLeft:0,
+    patience: rand(6,10)+(hasUpg('pitcher')?2.5:0)+(state.staffHired?STAFF_PATIENCE_BOOST:0), patienceLeft:0,
     decisionTimer:0, resultIcon:null, resultTimer:0, bubbleTimer:0,
     outcome:null, exitDir:-1, isCritic:false, turnedBack:false,
   }, overrides||{});
@@ -888,6 +886,8 @@ function addCoinPop(x,y,text,color){
 let sim=null;
 function startDay(){
   const w=state.forecast[0];
+  const rentDue=locationDef().rent||0, wageDue=state.staffHired?STAFF_WAGE:0;
+  state.cash-=(rentDue+wageDue);
   const eventTimes=[rand(0.25,0.85),rand(0.25,0.85),rand(0.25,0.85)];
   eventTimes.sort((a,b)=>a-b);
   if(eventTimes[1]-eventTimes[0]<0.12) eventTimes[1]=eventTimes[0]+0.12;
@@ -897,7 +897,7 @@ function startDay(){
     robberTriggered:false, squeezeTriggered:false, iceTriggered:false, closing:false,
     robberAt:eventTimes[0], squeezeAt:eventTimes[1], iceAt:eventTimes[2],
     criticTriggered:!sim_pendingCritic, criticAt:rand(0.3,0.7), criticSpawned:false,
-    outOfStock:false,
+    outOfStock:false, rentPaid:rentDue, wagePaid:wageDue,
   };
   sim_pendingCritic=false;
   customers=[]; particles=[]; coinPops=[]; robber=null;
@@ -920,7 +920,7 @@ function endDay(){
   const tierBefore=standTier();
   state.lifetimeRevenue += stats.revenue;
   const tierAfter=standTier();
-  state.todayStats={...stats, happyRatio, repDelta, weather:state.forecast[0], tierUp: tierAfter>tierBefore?tierAfter:0};
+  state.todayStats={...stats, happyRatio, repDelta, weather:state.forecast[0], tierUp: tierAfter>tierBefore?tierAfter:0, rentPaid:sim.rentPaid||0, wagePaid:sim.wagePaid||0};
   if(state.rivalDaysLeft>0) state.rivalDaysLeft-=1;
   // advance forecast
   state.forecast.shift(); state.forecast.push(rollWeather(state.day+4));
@@ -975,6 +975,7 @@ function customerIntervalSeconds(p){
   base/=timeOfDayMultiplier(p);
   if(hasUpg('sign')) base/=1.15;
   base/=locationDef().traffic;
+  if(state.staffHired) base/=STAFF_TRAFFIC_MULT;
   if(state.consumableFlyer) base/=1.4;
   if(state.rivalDaysLeft>0) base*=1.35;
   const cpc=costPerCup();
@@ -1023,8 +1024,7 @@ function updateCustomers(dt){
   for(const c of customers){
     if(c.state==='walking_in'){
       c.x-=c.walkSpeed*dt;
-      c.y=groundYAt(c.x);
-      if(c.x<=c.targetX){ c.x=c.targetX; c.y=groundYAt(c.x); c.state='queueing'; c.decisionTimer=rand(0.4,0.9); }
+      if(c.x<=c.targetX){ c.x=c.targetX; c.state='queueing'; c.decisionTimer=rand(0.4,0.9); }
     } else if(c.state==='queueing'){
       c.decisionTimer-=dt;
       if(c.decisionTimer<=0){
@@ -1038,7 +1038,6 @@ function updateCustomers(dt){
       }
     } else if(c.state==='leaving'){
       c.x+=c.exitDir*c.walkSpeed*1.15*dt;
-      c.y=groundYAt(c.x);
       if(c.x<-60 || c.x>CW+60) c.state='gone';
     }
   }
@@ -1305,25 +1304,25 @@ function render(t){
   ctx.clearRect(0,0,CW,CH);
   const p= sim? sim.progress : 0.3;
   const sky=skyColors(clamp(p,0,1));
-  const grad=ctx.createLinearGradient(0,0,0,GROUND_Y);
+  const grad=ctx.createLinearGradient(0,0,0,SKY_BOTTOM);
   grad.addColorStop(0,sky.top); grad.addColorStop(1,sky.bottom);
   ctx.fillStyle=grad; ctx.fillRect(0,0,CW,CH);
 
-  // sun/moon arc
-  const arcX=lerp(60,CW-60,clamp(p,0,1));
-  const arcY=140-Math.sin(clamp(p,0,1)*Math.PI)*90;
+  // sun/moon arc — a small contained sky strip, so the arc stays compact
+  const arcX=lerp(70,CW-70,clamp(p,0,1));
+  const arcY=70-Math.sin(clamp(p,0,1)*Math.PI)*46;
   if(sky.dark){
-    drawSprite('moon',arcX,arcY,54,true);
+    drawSprite('moon',arcX,arcY,38,true);
   } else {
     ctx.save();
-    ctx.beginPath(); ctx.arc(arcX,arcY,60,0,Math.PI*2);
-    const sg=ctx.createRadialGradient(arcX,arcY,5,arcX,arcY,60); sg.addColorStop(0,'rgba(255,220,120,.55)'); sg.addColorStop(1,'rgba(255,220,120,0)');
+    ctx.beginPath(); ctx.arc(arcX,arcY,42,0,Math.PI*2);
+    const sg=ctx.createRadialGradient(arcX,arcY,4,arcX,arcY,42); sg.addColorStop(0,'rgba(255,220,120,.55)'); sg.addColorStop(1,'rgba(255,220,120,0)');
     ctx.fillStyle=sg; ctx.fill(); ctx.restore();
-    drawSprite('sun',arcX,arcY,74,true);
+    drawSprite('sun',arcX,arcY,50,true);
   }
   if(sky.dark){
-    for(let i=0;i<40;i++){
-      const sx=(i*137.5)%CW, sy=(i*77)%(GROUND_Y-40);
+    for(let i=0;i<24;i++){
+      const sx=(i*137.5)%CW, sy=(i*37)%(SKY_BOTTOM-20);
       ctx.fillStyle='rgba(255,255,255,'+(0.3+0.3*Math.sin(t*2+i))+')';
       ctx.fillRect(sx,sy,2,2);
     }
@@ -1337,92 +1336,32 @@ function render(t){
   if(wtype==='snow') drawSnow(t);
   if(wtype==='heatwave'||wtype==='hot') drawHeatShimmer(t);
 
-  // mountain range behind the town — sits in front of the sun/moon (drawn
-  // above) and behind the building skyline (drawn below), so the sun/moon
-  // reads as rising from behind the mountains and the town sits in front.
-  drawMountains(sky);
-
-  // cross streets — side streets cutting up from the main road, each ending
-  // behind the near building row (inside its silhouette) so it reads as a
-  // street receding into the block, not a bar floating over the skyline.
-  // Several of these divide the town into distinct blocks, forming a grid.
+  // contained diorama scene: a backdrop of buildings sitting at the horizon,
+  // a full-frame paved floor in forced perspective, and one signature prop
+  // per neighborhood — a small, staged scene rather than a receding street.
   const lt=locTheme();
-  const CROSS_X=[121,309,685,873];
-  CROSS_X.forEach(cx=>{
-    const gy=groundYAt(cx), w=34;
-    ctx.fillStyle= sky.dark?lt.crossD:lt.crossL;
-    ctx.beginPath();
-    ctx.moveTo(cx-w/2, gy+10); ctx.lineTo(cx+w/2, gy+10);
-    ctx.lineTo(cx+w*0.55, gy-90); ctx.lineTo(cx-w*0.55, gy-90);
-    ctx.closePath(); ctx.fill();
-    ctx.strokeStyle='rgba(255,224,102,0.7)'; ctx.lineWidth=2; ctx.setLineDash([8,7]);
-    ctx.beginPath(); ctx.moveTo(cx,gy+8); ctx.lineTo(cx,gy-88); ctx.stroke(); ctx.setLineDash([]);
-  });
-
-  // isometric skyline along the receding street: far buildings (upper-right,
-  // toward town) are small and high; near ones (lower-left, toward the
-  // viewer) are bigger and low, matching the tilt customers walk along.
-  // Drawn far-to-near so nearer buildings correctly overlap farther ones.
-  // Building x positions land in the gaps between the cross streets above,
-  // so each street divides the skyline into a distinct town block.
-  ctx.save(); ctx.globalAlpha= sky.dark? 0.45 : 0.8; ctx.filter=lt.filter;
+  ctx.save(); ctx.globalAlpha= sky.dark? 0.55 : 0.9; ctx.filter=lt.filter;
   const houseKeys=['bld1','bld2','bld3','bld4','bld5','bld6','bld7','bld8','bld9','bld10'];
-  for(let i=10;i>=0;i--){
-    const key=houseKeys[i%houseKeys.length];
-    const bx=i*94-20;
-    const bh=(78+((i*47)%46))*clamp(1+(STAND_X-bx)*0.00025,0.85,1.2);
-    drawSpriteBottomAnchored(key, bx, groundYAt(bx)-24, bh);
-  }
+  const backdropX=[90,260,700,870];
+  backdropX.forEach((bx,i)=>{ drawSpriteBottomAnchored(houseKeys[i%houseKeys.length], bx, SKY_BOTTOM+6, 150); });
   ctx.restore();
-  // street ground — a tilted band following the isometric street line (since
-  // groundYAt is linear in x, its endpoints at x=0 and x=CW fully define it).
-  // Layered far-to-near as: a thin grass verge (front yards below the
-  // buildings), a paver-tiled sidewalk, then a wide paved road nearest the
-  // viewer — so this reads as a town street grid, not a grass hill.
-  const gy0=groundYAt(0), gyW=groundYAt(CW);
-  const bandPath=(off0,off1)=>{
-    ctx.beginPath();
-    ctx.moveTo(0,gy0+off0); ctx.lineTo(CW,gyW+off0);
-    ctx.lineTo(CW,gyW+off1); ctx.lineTo(0,gy0+off1);
-    ctx.closePath();
-  };
-  // grass verge, with a repeating row of park-tile turf blocks for texture
-  ctx.fillStyle= sky.dark?lt.grassD:lt.grassL;
-  bandPath(-6,14); ctx.fill();
-  ctx.save(); if(sky.dark) ctx.globalAlpha=0.6; ctx.filter=lt.filter;
-  for(let x=-30;x<CW+30;x+=64){ drawSprite('parkTile', x, groundYAt(x)+3, 42, true); }
-  ctx.restore();
-  // sidewalk, tiled with paver blocks plus cross-tick expansion joints
-  ctx.fillStyle=sky.dark?lt.sidewalkD:lt.sidewalkL;
-  bandPath(14,40); ctx.fill();
-  ctx.save(); if(sky.dark) ctx.globalAlpha=0.55; ctx.filter=lt.filter;
-  for(let x=-26;x<CW+26;x+=52){ drawSprite('paveTile', x, groundYAt(x)+27, 46, true); }
-  ctx.restore();
-  ctx.strokeStyle=sky.dark?'#44444c':'#c4bda8'; ctx.lineWidth=2;
-  for(let x=0;x<CW;x+=70){ const gy=groundYAt(x); ctx.beginPath(); ctx.moveTo(x,gy+14); ctx.lineTo(x,gy+40); ctx.stroke(); }
-  // paved road, filling the rest of the band down to the bottom of the canvas
-  const roadTopY=Math.min(gy0,gyW)+40;
-  const rg=ctx.createLinearGradient(0,roadTopY,0,CH);
-  rg.addColorStop(0, sky.dark?lt.roadD0:lt.roadL0); rg.addColorStop(1, sky.dark?lt.roadD1:lt.roadL1);
-  ctx.fillStyle=rg;
-  ctx.beginPath(); ctx.moveTo(0,gy0+40); ctx.lineTo(CW,gyW+40); ctx.lineTo(CW,CH); ctx.lineTo(0,CH); ctx.closePath(); ctx.fill();
-  // dashed centerline down the middle of the road
-  const roadMidY=x=>{ const top=groundYAt(x)+40; return top+(CH-top)*0.5; };
-  ctx.strokeStyle='rgba(255,224,102,0.85)'; ctx.lineWidth=3; ctx.setLineDash([16,14]);
-  ctx.beginPath(); ctx.moveTo(0,roadMidY(0)); ctx.lineTo(CW,roadMidY(CW)); ctx.stroke();
-  ctx.setLineDash([]);
-  // trees, placed on the tilted ground at their x position — weather overrides
-  // the location's usual tree type (snow/fog always look wintry/misty)
-  const treeKey = (state.forecast[0].type==='snow') ? 'treesnow' : (state.forecast[0].type==='cool'||state.forecast[0].type==='foggy') ? 'treepine' : lt.treeKey;
-  drawSpriteBottomAnchored(treeKey, 70, groundYAt(70)+2, 130);
-  drawSpriteBottomAnchored(treeKey==='tree'?'treepine':treeKey, 880, groundYAt(880)-2, 118);
-  // bench, or a small park monument when set up in Riverside Park
-  if(state.location==='park'){ drawMonument(760,groundYAt(760)+2); } else { drawBench(760,groundYAt(760)+2); }
 
-  // checkered paver plaza grounding the stand in the tilted street — a small
-  // isometric diamond grid of alternating pavers instead of a plain flat slab
-  drawCheckerPlaza(STAND_X, GROUND_Y+10, 118, 60, 8, sky.dark);
-  // stand
+  // full-frame checkered floor in forced perspective (narrower at the
+  // horizon, full width at the front), tiled with the location's palette
+  drawFloorGrid(SKY_BOTTOM, CH, 250, 8, 6, sky.dark?lt.floorAD:lt.floorA, sky.dark?lt.floorBD:lt.floorB);
+
+  // trees flank the scene — weather overrides the location's usual tree type
+  const treeKey = (state.forecast[0].type==='snow') ? 'treesnow' : (state.forecast[0].type==='cool'||state.forecast[0].type==='foggy') ? 'treepine' : lt.treeKey;
+  drawSpriteBottomAnchored(treeKey, 90, FLOOR_Y+30, 140);
+  drawSpriteBottomAnchored(treeKey==='tree'?'treepine':treeKey, 870, FLOOR_Y+26, 128);
+
+  // one signature prop per neighborhood
+  if(state.location==='park') drawMonument(690,FLOOR_Y+18);
+  else if(state.location==='downtown') drawCar(720,FLOOR_Y+22);
+  else if(state.location==='beach') drawUmbrella(720,FLOOR_Y+30);
+  else drawBench(660,FLOOR_Y+18);
+
+  // stand, front and center
   drawStand(STAND_X,GROUND_Y, t, sky.dark);
 
   // customers
@@ -1452,44 +1391,46 @@ function render(t){
   vg.addColorStop(0,'rgba(0,0,0,0)'); vg.addColorStop(1,'rgba(0,0,0,0.16)');
   ctx.fillStyle=vg; ctx.fillRect(0,0,CW,CH);
 }
-function drawRidge(baseY,color,alpha,amp,seed){
-  ctx.globalAlpha=alpha;
-  ctx.fillStyle=color;
-  ctx.beginPath();
-  ctx.moveTo(0,baseY);
-  const peaks=7, w=CW/peaks;
-  for(let i=0;i<=peaks;i++){
-    const x=i*w;
-    const ph=Math.sin(i*1.7+seed*3.1)*0.5+Math.sin(i*0.6+seed)*0.5;
-    ctx.lineTo(x, baseY-amp-ph*amp*0.6);
-    if(i<peaks) ctx.lineTo(x+w/2, baseY-amp*0.35-Math.cos(i*1.3+seed)*amp*0.25);
-  }
-  ctx.lineTo(CW,baseY+40); ctx.lineTo(0,baseY+40); ctx.closePath(); ctx.fill();
-  ctx.globalAlpha=1;
-}
-function drawMountains(sky){
-  // a simple procedural mountain range silhouette behind the town skyline
-  const baseY=GROUND_Y-20;
-  drawRidge(baseY-14, sky.dark?'#242c48':'#93a8c8', 0.55, 46, 1);
-  drawRidge(baseY+6, sky.dark?'#1a2140':'#7c93b8', 0.85, 62, 2);
-}
-function drawCheckerPlaza(cx,cy,pw,ph,n,dark){
-  // fills an isometric diamond (half-width pw, half-height ph, centered at
-  // cx,cy) with an n x n grid of alternating small diamond pavers
-  const colorA=dark?'#6b6a5c':'#e8e2cf', colorB=dark?'#57564a':'#cfc0a0', border=dark?'#3f3e35':'#a89b78';
-  const e1x=pw/n, e1y=-ph/n, e2x=pw/n, e2y=ph/n;
-  const pt=(i,j)=>({x:cx+i*e1x+j*e2x, y:cy+i*e1y+j*e2y});
-  ctx.save();
-  for(let i=-n/2;i<n/2;i++){
-    for(let j=-n/2;j<n/2;j++){
-      const p0=pt(i,j), p1=pt(i+1,j), p2=pt(i+1,j+1), p3=pt(i,j+1);
-      ctx.fillStyle=((i+j)&1)?colorB:colorA;
-      ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.lineTo(p3.x,p3.y); ctx.closePath(); ctx.fill();
+function drawFloorGrid(topY,bottomY,topInset,cols,rows,colorA,colorB){
+  // a single-point-perspective checkerboard floor: narrower at the horizon
+  // (topY, inset by topInset on each side), full width at the front (bottomY)
+  const rowY=[];
+  for(let r=0;r<=rows;r++){ rowY.push(lerp(topY,bottomY,Math.pow(r/rows,1.6))); }
+  for(let r=0;r<rows;r++){
+    const y0=rowY[r], y1=rowY[r+1];
+    const f0=(y0-topY)/(bottomY-topY), f1=(y1-topY)/(bottomY-topY);
+    const xL0=lerp(topInset,0,f0), xR0=lerp(CW-topInset,CW,f0);
+    const xL1=lerp(topInset,0,f1), xR1=lerp(CW-topInset,CW,f1);
+    for(let c=0;c<cols;c++){
+      const cf0=c/cols, cf1=(c+1)/cols;
+      const p0x=lerp(xL0,xR0,cf0), p1x=lerp(xL0,xR0,cf1);
+      const p2x=lerp(xL1,xR1,cf1), p3x=lerp(xL1,xR1,cf0);
+      ctx.fillStyle=((r+c)&1)?colorB:colorA;
+      ctx.beginPath(); ctx.moveTo(p0x,y0); ctx.lineTo(p1x,y0); ctx.lineTo(p2x,y1); ctx.lineTo(p3x,y1); ctx.closePath(); ctx.fill();
     }
   }
-  ctx.strokeStyle=border; ctx.lineWidth=3;
-  ctx.beginPath();
-  ctx.moveTo(cx-pw,cy); ctx.lineTo(cx,cy-ph); ctx.lineTo(cx+pw,cy); ctx.lineTo(cx,cy+ph); ctx.closePath(); ctx.stroke();
+}
+function drawCar(x,y){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,.18)'; ctx.beginPath(); ctx.ellipse(0,4,50,11,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#3a6fb0';
+  ctx.beginPath(); ctx.moveTo(-48,0); ctx.lineTo(-42,-18); ctx.lineTo(-22,-30); ctx.lineTo(24,-30); ctx.lineTo(42,-18); ctx.lineTo(48,0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#bfe0f6';
+  ctx.beginPath(); ctx.moveTo(-18,-18); ctx.lineTo(-12,-27); ctx.lineTo(16,-27); ctx.lineTo(22,-18); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#222'; ctx.beginPath(); ctx.arc(-27,2,10,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(27,2,10,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#888'; ctx.beginPath(); ctx.arc(-27,2,4,0,Math.PI*2); ctx.fill(); ctx.beginPath(); ctx.arc(27,2,4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+function drawUmbrella(x,y){
+  ctx.save(); ctx.translate(x,y);
+  ctx.fillStyle='rgba(0,0,0,.15)'; ctx.beginPath(); ctx.ellipse(0,2,28,7,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#c9a06a'; ctx.fillRect(-3,-72,6,74);
+  const colors=['#e64545','#fff6e8'];
+  for(let i=0;i<8;i++){
+    const a0=Math.PI+(i/8)*Math.PI, a1=Math.PI+((i+1)/8)*Math.PI;
+    ctx.fillStyle=colors[i%2];
+    ctx.beginPath(); ctx.moveTo(0,-72); ctx.arc(0,-72,46,a0,a1); ctx.closePath(); ctx.fill();
+  }
   ctx.restore();
 }
 function drawSprite(key,x,y,size,centered){
@@ -1668,11 +1609,10 @@ function drawCustomer(c,t){
   const bobPhase= walking? Math.sin(t*9+c.bob)*3 : Math.sin(t*2+c.bob)*1;
   const pose=customerPose(c,t);
   const img=SPRITES[c.archetype+'_'+pose] || SPRITES[c.archetype+'_idle'];
-  const depthScale=depthScaleAt(c.x);
-  const dispH=78*depthScale, dispW= img? dispH*(img.naturalWidth/img.naturalHeight) : 58*depthScale;
+  const dispH=96, dispW= img? dispH*(img.naturalWidth/img.naturalHeight) : 70;
 
   ctx.save(); ctx.translate(c.x,c.y+bobPhase);
-  ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(0,2,17*depthScale,5*depthScale,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(0,2,20,6,0,0,Math.PI*2); ctx.fill();
   if(img && img.complete && img.naturalWidth){
     ctx.imageSmoothingEnabled=false;
     ctx.drawImage(img, -dispW/2, -dispH, dispW, dispH);
@@ -1737,6 +1677,10 @@ function roundRect(ctx,x,y,w,h,r){
 }
 
 /* ============================= TOP BAR / HUD UI ============================= */
+function updateBillsPreview(){
+  const rentDue=locationDef().rent||0, wageDue=state.staffHired?STAFF_WAGE:0;
+  $('billsPreview').textContent= (rentDue+wageDue)>0 ? ('💸 Today\'s bills: '+fmt$(rentDue+wageDue)+' (rent'+(wageDue>0?' + staff wage':'')+'), due at opening') : '';
+}
 function updateTopbar(){
   const season=seasonForDay(state.day);
   $('dayLabel').textContent=season.icon+' Day '+state.day;
@@ -1904,9 +1848,10 @@ function renderDistrictInfo(id, afterSummary){
   const here=state.location===id;
   const btnHtml= here ? '<button class="big-btn" disabled style="opacity:.6">You\'re here</button>'
     : '<button class="big-btn" id="districtActionBtn">'+(unlocked?'Move Here':'Unlock for '+fmt$(l.cost))+'</button>';
+  const rentNote= l.rent>0 ? ' <strong>Rent: '+fmt$(l.rent)+'/day.</strong>' : ' <strong>No rent.</strong>';
   $('districtInfo').innerHTML=
     '<div class="district-card"><div class="district-icon">'+l.icon+'</div>'+
-    '<div class="district-text"><div class="district-name">'+l.name+(here?' (current)':'')+'</div><div class="district-desc">'+l.desc+'</div></div></div>'+
+    '<div class="district-text"><div class="district-name">'+l.name+(here?' (current)':'')+'</div><div class="district-desc">'+l.desc+rentNote+'</div></div></div>'+
     btnHtml;
   const btn=$('districtActionBtn');
   if(btn) btn.addEventListener('click',()=>{
@@ -1914,7 +1859,7 @@ function renderDistrictInfo(id, afterSummary){
       if(state.cash<l.cost){ Audio_.complaintBlip(); return; }
       state.cash-=l.cost; state.unlockedLocations.push(id); Audio_.coin();
     } else { Audio_.click(); }
-    state.location=id; saveGame(); updateTopbar();
+    state.location=id; saveGame(); updateTopbar(); updateBillsPreview();
     openCityMap(afterSummary);
   });
 }
@@ -1935,6 +1880,32 @@ function openCityMap(afterSummary){
   $('closeLocations').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } });
 }
 function openLocationPicker(afterSummary){ openCityMap(afterSummary); }
+const FLYER_COST=15;
+function openMarketing(afterSummary){
+  const flyerActive=state.consumableFlyer;
+  const flyerRow='<div class="upgrade-item"><div class="u-icon">📣</div><div class="u-info"><div class="u-name">Flyer Campaign</div>'+
+    '<div class="u-desc">Papers the neighborhood with flyers — +40% customers for today only.</div></div>'+
+    '<button class="u-buy'+(flyerActive?' owned':'')+'" id="flyerBtn" '+(flyerActive?'disabled':'')+'>'+(flyerActive?'Active today':fmt$(FLYER_COST))+'</button></div>';
+  const staffRow='<div class="upgrade-item"><div class="u-icon">🧑‍🍳</div><div class="u-info"><div class="u-name">Hire a Cashier</div>'+
+    '<div class="u-desc">'+fmt$(STAFF_WAGE)+'/day wage — extra hands mean shorter lines: +'+STAFF_PATIENCE_BOOST+' patience and more customers stop by while employed.</div></div>'+
+    '<button class="u-buy" id="staffBtn">'+(state.staffHired?'Let Go':'Hire ('+fmt$(STAFF_WAGE)+'/day)')+'</button></div>';
+  openModal(
+    '<div class="modal-head"><h2>📣 Marketing &amp; Staff</h2><p>Cash: '+fmt$(state.cash)+'</p></div>'+
+    '<div class="modal-body"><div class="upgrade-list">'+flyerRow+staffRow+'</div></div>'+
+    '<div class="modal-foot"><button class="big-btn" id="closeMarketing">Done</button></div>'
+  );
+  $('flyerBtn').addEventListener('click',()=>{
+    if(state.consumableFlyer) return;
+    if(state.cash<FLYER_COST){ Audio_.complaintBlip(); return; }
+    state.cash-=FLYER_COST; state.consumableFlyer=true; Audio_.coin(); saveGame(); updateTopbar();
+    openMarketing(afterSummary);
+  });
+  $('staffBtn').addEventListener('click',()=>{
+    state.staffHired=!state.staffHired; Audio_.click(); saveGame(); updateBillsPreview();
+    openMarketing(afterSummary);
+  });
+  $('closeMarketing').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } });
+}
 function openDaySummary(){
   const s=state.todayStats;
   const total=s.happy+Object.values(s.complaints).reduce((a,b)=>a+b,0);
@@ -1955,12 +1926,15 @@ function openDaySummary(){
   if(s.tierUp){
     tierUpHtml='<p style="color:#e6a417;font-weight:800;">🌟 Your stand just leveled up — customers can tell you\'re running a top-notch operation!</p>';
   }
+  const billsPaid=(s.rentPaid||0)+(s.wagePaid||0);
+  const billsHtml= billsPaid>0 ? '<div class="summary-item loss"><div class="si-label">Rent &amp; wages</div><div class="si-val">-'+fmt$(billsPaid)+'</div></div>' : '';
   openModal(
     '<div class="modal-head"><h2>📊 Day '+(state.day-1)+' Summary</h2><p>'+weatherDef(s.weather.type).icon+' '+weatherDef(s.weather.type).label+', '+s.weather.temp+'°F</p></div>'+
     '<div class="modal-body">'+
       '<div class="summary-grid">'+
         '<div class="summary-item"><div class="si-label">Cups sold</div><div class="si-val">'+s.cupsSold+'</div></div>'+
         '<div class="summary-item '+profitClass+'"><div class="si-label">Revenue</div><div class="si-val">'+fmt$(s.revenue)+'</div></div>'+
+        billsHtml+
         '<div class="summary-item"><div class="si-label">Reputation</div><div class="si-val">'+repChange+' ★</div></div>'+
         '<div class="summary-item"><div class="si-label">Cash on hand</div><div class="si-val">'+fmt$(state.cash)+'</div></div>'+
       '</div>'+
@@ -2000,7 +1974,7 @@ function enterPrep(){
   state.phase='prep';
   state.consumableFlyer=false;
   prepPanel.classList.remove('hidden');
-  updateRecipeUI(); updateStockUI(); renderForecast(); updateTopbar();
+  updateRecipeUI(); updateStockUI(); renderForecast(); updateTopbar(); updateBillsPreview();
   $('lemonSlider').value=state.recipe.lemon; $('sugarSlider').value=state.recipe.sugar; $('iceSlider').value=state.recipe.ice;
   $('priceSlider').value=Math.round(state.price*100);
   updateRecipeUI();
@@ -2019,6 +1993,7 @@ function boot(){
     if(typeof state.rivalDaysLeft!=='number') state.rivalDaysLeft=0;
     if(!state.location) state.location='maple';
     if(!Array.isArray(state.unlockedLocations)) state.unlockedLocations=['maple'];
+    if(typeof state.staffHired!=='boolean') state.staffHired=false;
     Audio_.setMuted(state.muted);
     $('muteBtn').textContent=state.muted?'🔇':'🔊';
     // normalize transient phases back to a safe resumable phase
