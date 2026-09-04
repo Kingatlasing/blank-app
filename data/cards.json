@@ -356,7 +356,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/33066139.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1380 / DEF 1930"
+    "meta": "ATK 1380 / DEF 1930",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -365,7 +366,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/80770678.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 800 / DEF 2000"
+    "meta": "ATK 800 / DEF 2000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -384,7 +386,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast-Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/76184692.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1000"
+    "meta": "ATK 1200 / DEF 1000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -393,7 +396,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Zombie / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/32274490.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 200"
+    "meta": "ATK 300 / DEF 200",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -402,7 +406,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/89091579.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 700"
+    "meta": "ATK 500 / DEF 700",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -411,7 +416,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dinosaur / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/40374923.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 800"
+    "meta": "ATK 1200 / DEF 800",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -420,7 +426,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/90357090.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 800"
+    "meta": "ATK 1200 / DEF 800",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -429,7 +436,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/39111158.jpg",
     "rarity": "common",
-    "meta": "ATK 2850 / DEF 2350"
+    "meta": "ATK 2850 / DEF 2350",
+    "realValue": 10.0
   },
   {
     "category": "yugioh",
@@ -438,7 +446,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast-Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/32452818.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1500"
+    "meta": "ATK 1200 / DEF 1500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -447,7 +456,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/36304921.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1300"
+    "meta": "ATK 1400 / DEF 1300",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -456,7 +466,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dinosaur / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/1784619.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 800"
+    "meta": "ATK 1500 / DEF 800",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -465,7 +476,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/54541900.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1200"
+    "meta": "ATK 1500 / DEF 1200",
+    "realValue": 0.7
   },
   {
     "category": "basketball",
@@ -1884,7 +1896,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/9159938.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 900"
+    "meta": "ATK 800 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -1893,7 +1906,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/77827521.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 900"
+    "meta": "ATK 1300 / DEF 900",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -1902,7 +1916,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/90963488.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 700"
+    "meta": "ATK 800 / DEF 700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -1911,7 +1926,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Zombie / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/32864.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 900"
+    "meta": "ATK 1200 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -1920,7 +1936,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Pyro / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/37421579.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1100 / DEF 800"
+    "meta": "ATK 1100 / DEF 800",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -1929,7 +1946,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/34460851.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 1000"
+    "meta": "ATK 900 / DEF 1000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -1938,7 +1956,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/36121917.jpg",
     "rarity": "common",
-    "meta": "ATK 600 / DEF 900"
+    "meta": "ATK 600 / DEF 900",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -1956,7 +1975,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/17881964.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1500 / DEF 1250"
+    "meta": "ATK 1500 / DEF 1250",
+    "realValue": 3.25
   },
   {
     "category": "yugioh",
@@ -1965,7 +1985,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/53375573.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 800"
+    "meta": "ATK 1200 / DEF 800",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -1974,7 +1995,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/2863439.jpg",
     "rarity": "common",
-    "meta": "ATK 1100 / DEF 1400"
+    "meta": "ATK 1100 / DEF 1400",
+    "realValue": 0.24
   },
   {
     "category": "yugioh",
@@ -1983,7 +2005,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/1641882.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 900 / DEF 700"
+    "meta": "ATK 900 / DEF 700",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -1992,7 +2015,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/37313348.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 1500"
+    "meta": "ATK 1000 / DEF 1500",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -2001,7 +2025,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/75356564.jpg",
     "rarity": "common",
-    "meta": "ATK 600 / DEF 700"
+    "meta": "ATK 600 / DEF 700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2010,7 +2035,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/38142739.jpg",
     "rarity": "common",
-    "meta": "ATK 600 / DEF 900"
+    "meta": "ATK 600 / DEF 900",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -2019,7 +2045,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/96851799.jpg",
     "rarity": "common",
-    "meta": "ATK 600 / DEF 500"
+    "meta": "ATK 600 / DEF 500",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -2028,7 +2055,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/85639257.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1200 / DEF 2000"
+    "meta": "ATK 1200 / DEF 2000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2037,7 +2065,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/15401633.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 400"
+    "meta": "ATK 800 / DEF 400",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
@@ -2046,7 +2075,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Zombie / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/58528964.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1000 / DEF 800"
+    "meta": "ATK 1000 / DEF 800",
+    "realValue": 1.5
   },
   {
     "category": "yugioh",
@@ -2055,7 +2085,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dinosaur / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/57305373.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 700"
+    "meta": "ATK 900 / DEF 700",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2064,7 +2095,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/40826495.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 1000"
+    "meta": "ATK 900 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2073,7 +2105,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/39004808.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 800"
+    "meta": "ATK 900 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2082,7 +2115,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/18710707.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 700"
+    "meta": "ATK 800 / DEF 700",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2091,7 +2125,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Plant / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/22910685.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 1600"
+    "meta": "ATK 500 / DEF 1600",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2100,7 +2135,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/85309439.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 1000"
+    "meta": "ATK 1000 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2109,7 +2145,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/84686841.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 900"
+    "meta": "ATK 1000 / DEF 900",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2118,7 +2155,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/83464209.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1000"
+    "meta": "ATK 800 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2127,7 +2165,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/44287299.jpg",
     "rarity": "common",
-    "meta": "ATK 1100 / DEF 1100"
+    "meta": "ATK 1100 / DEF 1100",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2136,7 +2175,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/85705804.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 800"
+    "meta": "ATK 800 / DEF 800",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2145,7 +2185,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/61854111.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2154,7 +2195,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/46009906.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2163,7 +2205,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/15052462.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2172,7 +2215,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/91595718.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2181,7 +2225,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/77027445.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2190,7 +2235,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/50045299.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2199,7 +2245,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/87430998.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2208,7 +2255,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/23424603.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2217,7 +2265,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/50913601.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2226,7 +2275,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/86318356.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2235,7 +2285,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/22702055.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2244,7 +2295,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/59197169.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2253,7 +2305,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/38199696.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2262,7 +2315,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/76103675.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2271,7 +2325,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/46130346.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2300,7 +2355,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/51482758.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -2309,7 +2365,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/83887306.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2318,7 +2375,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/72842870.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1400"
+    "meta": "ATK 1200 / DEF 1400",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2327,7 +2385,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/82542267.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2336,7 +2395,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/94675535.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1000"
+    "meta": "ATK 800 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2345,7 +2405,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/20060230.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 1200"
+    "meta": "ATK 300 / DEF 1200",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2354,7 +2415,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Plant / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/93553943.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 600"
+    "meta": "ATK 800 / DEF 600",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2363,7 +2425,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/56342351.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 500"
+    "meta": "ATK 1000 / DEF 500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2372,7 +2435,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/92731455.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 1000"
+    "meta": "ATK 500 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2381,7 +2445,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/53153481.jpg",
     "rarity": "common",
-    "meta": "ATK 700 / DEF 1300"
+    "meta": "ATK 700 / DEF 1300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2390,7 +2455,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/63308047.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1300"
+    "meta": "ATK 1200 / DEF 1300",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2399,7 +2465,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/98818516.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1000"
+    "meta": "ATK 1200 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2408,7 +2475,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/56283725.jpg",
     "rarity": "common",
-    "meta": "ATK 700 / DEF 1400"
+    "meta": "ATK 700 / DEF 1400",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2417,7 +2485,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/76211194.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 400"
+    "meta": "ATK 800 / DEF 400",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2426,7 +2495,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/75376965.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 900"
+    "meta": "ATK 1200 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2435,7 +2505,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/71407486.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 1000"
+    "meta": "ATK 1300 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2444,7 +2515,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/70681994.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1200 / DEF 900"
+    "meta": "ATK 1200 / DEF 900",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -2453,7 +2525,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/33064647.jpg",
     "rarity": "common",
-    "meta": "ATK 700 / DEF 1300"
+    "meta": "ATK 700 / DEF 1300",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2462,7 +2535,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/4614116.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2471,7 +2545,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/77007920.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2480,7 +2555,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/39774685.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2489,7 +2565,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/1557499.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -2498,7 +2575,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/1435851.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2507,7 +2585,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/37820550.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2516,7 +2595,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/36607978.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2525,7 +2605,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/63102017.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -2534,7 +2615,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/25769732.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -2543,7 +2625,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/51267887.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2552,7 +2635,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/98252586.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2561,7 +2645,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/11868825.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2570,7 +2655,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/73134081.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2589,7 +2675,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Machine / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/9293977.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1850 / DEF 1700"
+    "meta": "ATK 1850 / DEF 1700",
+    "realValue": 1.75
   },
   {
     "category": "yugioh",
@@ -2598,7 +2685,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Sea Serpent / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/85326399.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1300"
+    "meta": "ATK 1600 / DEF 1300",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2607,7 +2695,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Thunder / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/45042329.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1300"
+    "meta": "ATK 1200 / DEF 1300",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -2616,7 +2705,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/10202894.jpg",
     "rarity": "common",
-    "meta": "ATK 1550 / DEF 1200"
+    "meta": "ATK 1550 / DEF 1200",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2625,7 +2715,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/9076207.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 300 / DEF 300"
+    "meta": "ATK 300 / DEF 300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2634,7 +2725,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/95952802.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1800 / DEF 1400"
+    "meta": "ATK 1800 / DEF 1400",
+    "realValue": 1.8
   },
   {
     "category": "yugioh",
@@ -2653,7 +2745,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/73051941.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 1600"
+    "meta": "ATK 1300 / DEF 1600",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2662,7 +2755,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Beast / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/7089711.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 450 / DEF 500"
+    "meta": "ATK 450 / DEF 500",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -2671,7 +2765,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Fish / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/33178416.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1600"
+    "meta": "ATK 1400 / DEF 1600",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2680,7 +2775,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/29172562.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1800"
+    "meta": "ATK 1400 / DEF 1800",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2689,7 +2785,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/55444629.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1000"
+    "meta": "ATK 1200 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2698,7 +2795,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Plant / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/43500484.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 900"
+    "meta": "ATK 1200 / DEF 900",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -2707,7 +2805,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Reptile / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/16353197.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 800"
+    "meta": "ATK 900 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2716,7 +2815,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/17535588.jpg",
     "rarity": "common",
-    "meta": "ATK 850 / DEF 1400"
+    "meta": "ATK 850 / DEF 1400",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -2725,7 +2825,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/55291359.jpg",
     "rarity": "common",
-    "meta": "ATK 1650 / DEF 1300"
+    "meta": "ATK 1650 / DEF 1300",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -2804,7 +2905,8 @@
     "subtitle": "Legend of Blue-Eyes White Dragon \u00b7 Dragon / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/66889139.jpg",
     "rarity": "common",
-    "meta": "ATK 2600 / DEF 2100"
+    "meta": "ATK 2600 / DEF 2100",
+    "realValue": 0.35
   },
   {
     "category": "basketball",
@@ -6371,7 +6473,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/41392891.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 1400"
+    "meta": "ATK 1300 / DEF 1400",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -6380,7 +6483,8 @@
     "subtitle": "Metal Raiders \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/87796900.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1200"
+    "meta": "ATK 1400 / DEF 1200",
+    "realValue": 0.1
   },
   {
     "category": "yugioh",
@@ -6399,7 +6503,8 @@
     "subtitle": "Metal Raiders \u00b7 Rock / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/68846917.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1200"
+    "meta": "ATK 800 / DEF 1200",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -6408,7 +6513,8 @@
     "subtitle": "Metal Raiders \u00b7 Reptile / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/15480588.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1200"
+    "meta": "ATK 1500 / DEF 1200",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6417,7 +6523,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/88979991.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1000"
+    "meta": "ATK 1200 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6426,7 +6533,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/87756343.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 400"
+    "meta": "ATK 500 / DEF 400",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -6435,7 +6543,8 @@
     "subtitle": "Metal Raiders \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/76812113.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 1400"
+    "meta": "ATK 1300 / DEF 1400",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -6454,7 +6563,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/1184620.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1200"
+    "meta": "ATK 1500 / DEF 1200",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6463,7 +6573,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/40240595.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 2000"
+    "meta": "ATK 0 / DEF 2000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -6472,7 +6583,8 @@
     "subtitle": "Metal Raiders \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/67494157.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1400"
+    "meta": "ATK 1600 / DEF 1400",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -6481,7 +6593,8 @@
     "subtitle": "Metal Raiders \u00b7 Zombie / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/20277860.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 0"
+    "meta": "ATK 1500 / DEF 0",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6500,7 +6613,8 @@
     "subtitle": "Metal Raiders \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/16972957.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1400"
+    "meta": "ATK 1600 / DEF 1400",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -6509,7 +6623,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/15150365.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1000 / DEF 700"
+    "meta": "ATK 1000 / DEF 700",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -6518,7 +6633,8 @@
     "subtitle": "Metal Raiders \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/16768387.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1000"
+    "meta": "ATK 1200 / DEF 1000",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6537,7 +6653,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/10189126.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 900 / DEF 1400"
+    "meta": "ATK 900 / DEF 1400",
+    "realValue": 0.6
   },
   {
     "category": "yugioh",
@@ -6546,7 +6663,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Fusion",
     "image": "https://images.ygoprodeck.com/images/cards/19066538.jpg",
     "rarity": "common",
-    "meta": "ATK 2100 / DEF 1800"
+    "meta": "ATK 2100 / DEF 1800",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -6582,7 +6700,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/90219263.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -6874,7 +6993,8 @@
     "subtitle": "Metal Raiders \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/3027001.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7004,7 +7124,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/14141448.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 2600 / DEF 2500"
+    "meta": "ATK 2600 / DEF 2500",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7150,7 +7271,8 @@
     "subtitle": "Metal Raiders \u00b7 Warrior / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/51371017.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 900 / DEF 700"
+    "meta": "ATK 900 / DEF 700",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7186,7 +7308,8 @@
     "subtitle": "Metal Raiders \u00b7 Zombie / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/30778711.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1600 / DEF 1300"
+    "meta": "ATK 1600 / DEF 1300",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -7294,7 +7417,8 @@
     "subtitle": "Metal Raiders \u00b7 Fairy / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/67629977.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 500 / DEF 700"
+    "meta": "ATK 500 / DEF 700",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -7340,7 +7464,8 @@
     "subtitle": "Metal Raiders \u00b7 Rock / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/46657337.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 600 / DEF 300"
+    "meta": "ATK 600 / DEF 300",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7358,7 +7483,8 @@
     "subtitle": "Metal Raiders \u00b7 Aqua / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/8201910.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 550 / DEF 500"
+    "meta": "ATK 550 / DEF 500",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7367,7 +7493,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/7489323.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 300 / DEF 250"
+    "meta": "ATK 300 / DEF 250",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -7394,7 +7521,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/21417692.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 2000 / DEF 800"
+    "meta": "ATK 2000 / DEF 800",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -7431,7 +7559,8 @@
     "subtitle": "Metal Raiders \u00b7 Beast / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/68658728.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 600 / DEF 550"
+    "meta": "ATK 600 / DEF 550",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -7440,7 +7569,8 @@
     "subtitle": "Metal Raiders \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/28470714.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 600 / DEF 700"
+    "meta": "ATK 600 / DEF 700",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -7468,7 +7598,8 @@
     "subtitle": "Metal Raiders \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/80741828.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 550 / DEF 500"
+    "meta": "ATK 550 / DEF 500",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -7564,7 +7695,8 @@
     "subtitle": "Metal Raiders \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/52097679.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7779,7 +7911,8 @@
     "subtitle": "Spell Ruler \u00b7 Aqua / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/95174353.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 300 / DEF 350"
+    "meta": "ATK 300 / DEF 350",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -7906,7 +8039,8 @@
     "subtitle": "Spell Ruler \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/81863068.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 650 / DEF 500"
+    "meta": "ATK 650 / DEF 500",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8082,7 +8216,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/70046172.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8186,7 +8321,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/64047146.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8340,7 +8476,8 @@
     "subtitle": "Spell Ruler \u00b7 Dragon / Toon / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/38369349.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 2200 / DEF 2600"
+    "meta": "ATK 2200 / DEF 2600",
+    "realValue": 1.0
   },
   {
     "category": "yugioh",
@@ -8378,7 +8515,8 @@
     "subtitle": "Spell Ruler \u00b7 Dragon / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/62397231.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 2100 / DEF 2800"
+    "meta": "ATK 2100 / DEF 2800",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -8417,7 +8555,8 @@
     "subtitle": "Spell Ruler \u00b7 Beast / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/97017120.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1450"
+    "meta": "ATK 1400 / DEF 1450",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -8426,7 +8565,8 @@
     "subtitle": "Spell Ruler \u00b7 Fairy / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/23401839.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1000"
+    "meta": "ATK 1400 / DEF 1000",
+    "realValue": 0.85
   },
   {
     "category": "yugioh",
@@ -8435,7 +8575,8 @@
     "subtitle": "Spell Ruler \u00b7 Machine / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/60806437.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1200"
+    "meta": "ATK 1400 / DEF 1200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8453,7 +8594,8 @@
     "subtitle": "Spell Ruler \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/23289281.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1000 / DEF 1000"
+    "meta": "ATK 1000 / DEF 1000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8471,7 +8613,8 @@
     "subtitle": "Spell Ruler \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/95178994.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1000 / DEF 100"
+    "meta": "ATK 1000 / DEF 100",
+    "realValue": 0.4
   },
   {
     "category": "yugioh",
@@ -8518,7 +8661,8 @@
     "subtitle": "Spell Ruler \u00b7 Beast-Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/57839750.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1000"
+    "meta": "ATK 1400 / DEF 1000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8527,7 +8671,8 @@
     "subtitle": "Spell Ruler \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/84834865.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 900"
+    "meta": "ATK 1400 / DEF 900",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -8554,7 +8699,8 @@
     "subtitle": "Spell Ruler \u00b7 Plant / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/83011277.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1100"
+    "meta": "ATK 1400 / DEF 1100",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -8693,7 +8839,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/49587034.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -8869,7 +9016,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/48539234.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -8878,7 +9026,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/74923978.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -8972,7 +9121,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/17449108.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -8981,7 +9131,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/43434803.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9009,7 +9160,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/43711255.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.75
   },
   {
     "category": "yugioh",
@@ -9018,7 +9170,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Rock / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/79106360.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 800 / DEF 700"
+    "meta": "ATK 800 / DEF 700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9118,7 +9271,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/37580756.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -9163,7 +9317,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/98139712.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.25
   },
   {
     "category": "yugioh",
@@ -9255,7 +9410,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/93108433.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9264,7 +9420,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/59560625.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9282,7 +9439,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/22959079.jpg",
     "rarity": "uncommon",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9300,7 +9458,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/59344077.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9318,7 +9477,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/85742772.jpg",
     "rarity": "uncommon",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9437,7 +9597,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/21015833.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1000 / DEF 700"
+    "meta": "ATK 1000 / DEF 700",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -9473,7 +9634,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Zombie / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/56387350.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 700 / DEF 1000"
+    "meta": "ATK 700 / DEF 1000",
+    "realValue": 0.2
   },
   {
     "category": "yugioh",
@@ -9482,7 +9644,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Dinosaur / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/79870141.jpg",
     "rarity": "uncommon",
-    "meta": "ATK 1400 / DEF 1200"
+    "meta": "ATK 1400 / DEF 1200",
+    "realValue": 0.45
   },
   {
     "category": "yugioh",
