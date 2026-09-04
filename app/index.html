@@ -1498,38 +1498,35 @@ function drawMonument(x,y){
   ctx.restore();
 }
 function drawStand(x,y,t,dark){
-  // a chunky pixel-art market stall, built from flat rectangles/trapezoids
-  // with hard edges (no gradients/curves) to match the village tileset art
+  // drawn top-down, same angle as the village houses: a roof/canopy seen
+  // mostly from above (tapered top-to-bottom like the house roofs) sitting
+  // directly over a short front wall/counter band — no tall side-view posts.
   ctx.save(); ctx.translate(x,y);
-  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(-95,-8,190,10);
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(-92,2,184,8);
   if(dark) ctx.filter='brightness(0.6)';
 
-  // posts
-  ctx.fillStyle='#8a5a2f'; ctx.fillRect(-88,-168,16,156); ctx.fillRect(72,-168,16,156);
-  ctx.fillStyle='#6b4423'; ctx.fillRect(-88,-168,5,156); ctx.fillRect(83,-168,5,156);
+  const eaveY=-58, roofTop=-146, halfTop=82, halfBot=106, stripes=8;
+  // counter / front wall band (the short "face" of the stall, like a house's wall under its roof)
+  ctx.fillStyle='#caa06a'; ctx.fillRect(-92,eaveY,184,50);
+  ctx.fillStyle='#a97f4a'; ctx.fillRect(-92,eaveY+34,184,16);
+  ctx.strokeStyle='#5a3d1f'; ctx.lineWidth=2; ctx.strokeRect(-92,eaveY,184,50);
 
-  // counter / table
-  ctx.fillStyle='#caa06a'; ctx.fillRect(-104,-40,208,26);
-  ctx.fillStyle='#a97f4a'; ctx.fillRect(-104,-18,208,8);
-  ctx.strokeStyle='#5a3d1f'; ctx.lineWidth=2; ctx.strokeRect(-104,-40,208,26);
-
-  // striped awning roof
-  const roofTop=-222, roofBot=-168, halfTop=62, halfBot=104, stripes=8;
+  // striped canopy roof, tapered top-to-bottom like the house sprites' roofs
   for(let i=0;i<stripes;i++){
     const f0=i/stripes, f1=(i+1)/stripes;
     ctx.fillStyle= (i%2===0)? '#c0392b' : '#f4ece1';
     ctx.beginPath();
     ctx.moveTo(lerp(-halfTop,halfTop,f0),roofTop); ctx.lineTo(lerp(-halfTop,halfTop,f1),roofTop);
-    ctx.lineTo(lerp(-halfBot,halfBot,f1),roofBot); ctx.lineTo(lerp(-halfBot,halfBot,f0),roofBot);
+    ctx.lineTo(lerp(-halfBot,halfBot,f1),eaveY); ctx.lineTo(lerp(-halfBot,halfBot,f0),eaveY);
     ctx.closePath(); ctx.fill();
   }
   ctx.strokeStyle='#3a2010'; ctx.lineWidth=3;
-  ctx.beginPath(); ctx.moveTo(-halfTop,roofTop); ctx.lineTo(halfTop,roofTop); ctx.lineTo(halfBot,roofBot); ctx.lineTo(-halfBot,roofBot); ctx.closePath(); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(-halfTop,roofTop); ctx.lineTo(halfTop,roofTop); ctx.lineTo(halfBot,eaveY); ctx.lineTo(-halfBot,eaveY); ctx.closePath(); ctx.stroke();
 
   const tier=standTier();
   // stand-tier flair: banners that grow with lifetime earnings
   if(tier>=2){
-    ctx.save(); ctx.translate(-halfBot-10,roofBot+16); ctx.rotate(-0.5);
+    ctx.save(); ctx.translate(-halfBot-10,eaveY+20); ctx.rotate(-0.5);
     ctx.fillStyle='#3d8bd8'; ctx.fillRect(-4,0,58,18);
     ctx.fillStyle='#fff'; ctx.font='bold 10px Baloo 2, sans-serif'; ctx.textAlign='center';
     ctx.fillText('POPULAR!',25,13);
@@ -1551,28 +1548,28 @@ function drawStand(x,y,t,dark){
     ctx.strokeStyle='#fff'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(-33,roofTop-16); ctx.lineTo(-33,roofTop-22); ctx.moveTo(33,roofTop-16); ctx.lineTo(33,roofTop-22); ctx.stroke();
   }
-  // sign, hanging just under the canopy
-  const signY=roofBot+18;
-  ctx.fillStyle='#fff'; ctx.fillRect(-40,signY,80,28); ctx.strokeStyle='#e6a417'; ctx.lineWidth=3; ctx.strokeRect(-40,signY,80,28);
-  ctx.fillStyle='#e6a417'; ctx.font='bold 13px Baloo 2, sans-serif'; ctx.textAlign='center';
-  ctx.fillText('LEMONADE',0,signY+17);
-  ctx.font='bold 11px Nunito, sans-serif'; ctx.fillStyle='#3fae56';
-  ctx.fillText(fmt$(state.price),0,signY+30);
+  // sign, hanging from the canopy's front edge, above the counter and props
+  const signY=eaveY-30;
+  ctx.fillStyle='#fff'; ctx.fillRect(-40,signY,80,26); ctx.strokeStyle='#e6a417'; ctx.lineWidth=3; ctx.strokeRect(-40,signY,80,26);
+  ctx.fillStyle='#e6a417'; ctx.font='bold 12px Baloo 2, sans-serif'; ctx.textAlign='center';
+  ctx.fillText('LEMONADE',0,signY+15);
+  ctx.font='bold 10px Nunito, sans-serif'; ctx.fillStyle='#3fae56';
+  ctx.fillText(fmt$(state.price),0,signY+26);
   if(hasUpg('neon') && dark){
-    ctx.save(); ctx.shadowColor='#4dd0ff'; ctx.shadowBlur=14; ctx.strokeStyle='#4dd0ff'; ctx.lineWidth=2; ctx.strokeRect(-40,signY,80,28); ctx.restore();
+    ctx.save(); ctx.shadowColor='#4dd0ff'; ctx.shadowBlur=14; ctx.strokeStyle='#4dd0ff'; ctx.lineWidth=2; ctx.strokeRect(-40,signY,80,26); ctx.restore();
   }
   ctx.filter='none';
 
-  const counterY=-26; // approx height of the stall's front counter plank
+  const counterY=-12; // front edge of the counter band, where props sit
   // lemons and cups on the counter
-  drawSpriteBottomAnchored('lemon', -76, counterY, 22);
-  drawSpriteBottomAnchored('lemon', -58, counterY, 18);
-  for(let i=0;i<3;i++){ drawSpriteBottomAnchored('cup', 6+i*20, counterY, 26); }
+  drawSpriteBottomAnchored('lemon', -76, counterY, 20);
+  drawSpriteBottomAnchored('lemon', -58, counterY, 16);
+  for(let i=0;i<3;i++){ drawSpriteBottomAnchored('cup', 6+i*18, counterY, 22); }
   // cash box
-  ctx.fillStyle='#2f8a43'; ctx.fillRect(78,counterY-18,26,18); ctx.strokeStyle='#1f5a2c'; ctx.strokeRect(78,counterY-18,26,18);
-  ctx.fillStyle='#ffd34d'; ctx.fillRect(88,counterY-12,6,4);
+  ctx.fillStyle='#2f8a43'; ctx.fillRect(70,counterY-16,24,16); ctx.strokeStyle='#1f5a2c'; ctx.strokeRect(70,counterY-16,24,16);
+  ctx.fillStyle='#ffd34d'; ctx.fillRect(79,counterY-11,6,4);
   if(hasUpg('dog')){
-    drawSpriteBottomAnchored('dog', 128, 6, 36);
+    drawSpriteBottomAnchored('dog', 118, 6, 32);
   }
   ctx.restore();
 }
