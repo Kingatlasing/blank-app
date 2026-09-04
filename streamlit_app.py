@@ -3,7 +3,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Lemonade Stand Tycoon", page_icon="🍋", layout="wide")
+st.set_page_config(page_title="Westward: The Trail", page_icon="🐎", layout="wide")
 
 # Streamlit adds default padding/whitespace around the page; strip it so the
 # embedded game fills the frame like a real full-screen web app.
