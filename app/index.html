@@ -216,7 +216,13 @@
   .strip-thumb.r-rare{border-color:var(--c-rare);}
   .strip-thumb.r-epic{border-color:var(--c-epic);}
   .strip-thumb.r-legendary{border-color:var(--c-legendary);}
+  .strip-thumb.sold{opacity:.55 !important;filter:grayscale(.4);}
+  .sold-tag{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    background:rgba(4,6,12,.4);color:var(--gold);font-size:13px;}
   @keyframes stripPop{to{opacity:1;transform:scale(1) translateY(0);}}
+
+  /* per-card Sell/Vault choice, shown after each flip in place of the hint */
+  .card-choice{display:flex;gap:12px;flex:0 0 auto;padding:2px 0;position:relative;z-index:1;}
 
   .card-slot{width:190px;height:266px;perspective:1200px;}
   .card-inner{position:relative;width:100%;height:100%;transform-style:preserve-3d;
@@ -251,10 +257,25 @@
   .card-back .cb-corner.tr{top:6.5%;right:6.5%;border-top:2px solid;border-right:2px solid;border-radius:0 5px 0 0;}
   .card-back .cb-corner.bl{bottom:6.5%;left:6.5%;border-bottom:2px solid;border-left:2px solid;border-radius:0 0 0 5px;}
   .card-back .cb-corner.br{bottom:6.5%;right:6.5%;border-bottom:2px solid;border-right:2px solid;border-radius:0 0 5px 0;}
+  /* an engraved medallion behind the badge (concentric rings, like a coin or
+     a real card's back-of-pack emblem) plus small diamond ticks at the four
+     compass points of the frame — the ornamental detail that turns a flat
+     icon-on-a-gradient into something that reads as "engraved." */
+  .card-back .cb-medallion{position:absolute;left:50%;top:50%;width:64%;aspect-ratio:1;
+    transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;
+    background:repeating-radial-gradient(circle at center, rgba(255,255,255,.07) 0 1.5px, transparent 1.5px 9px);
+    box-shadow:0 0 0 1px rgba(255,255,255,.2), 0 0 0 7px rgba(255,255,255,.045), 0 0 0 8px rgba(255,255,255,.14);}
+  .card-back .cb-diamond{position:absolute;width:7px;height:7px;background:rgba(255,255,255,.4);
+    transform:rotate(45deg);pointer-events:none;box-shadow:0 0 5px rgba(255,255,255,.3);}
+  .card-back .cb-diamond.n{top:11%;left:50%;margin-left:-3.5px;}
+  .card-back .cb-diamond.s{bottom:11%;left:50%;margin-left:-3.5px;}
+  .card-back .cb-diamond.e{right:11%;top:50%;margin-top:-3.5px;}
+  .card-back .cb-diamond.w{left:11%;top:50%;margin-top:-3.5px;}
   .card-back .cb-badge{position:relative;z-index:1;width:40%;aspect-ratio:1;border-radius:50%;
     display:flex;align-items:center;justify-content:center;font-size:1.9em;color:#fff;
     background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.4), rgba(255,255,255,.06) 65%);
-    box-shadow:0 0 0 2px rgba(255,255,255,.28), 0 10px 24px rgba(0,0,0,.45);}
+    box-shadow:0 0 0 2px rgba(255,255,255,.28), 0 10px 24px rgba(0,0,0,.45);
+    transform:translate(calc(var(--tx,0) * -7px), calc(var(--ty,0) * -7px));}
   .card-back .cb-stamp{position:absolute;z-index:1;bottom:8%;right:8%;width:15%;aspect-ratio:1;
     border-radius:28%;background:linear-gradient(145deg,rgba(255,255,255,.9),rgba(255,255,255,.55));
     display:flex;align-items:center;justify-content:center;padding:16%;
@@ -308,6 +329,18 @@
 
   .burst{position:fixed;inset:0;pointer-events:none;z-index:80;}
   .burst i{position:absolute;display:block;border-radius:2px;}
+
+  /* ---------- Rare / epic reveal moments (lighter than legendary's) ---------- */
+  .rare-ring{position:fixed;left:var(--sx,50%);top:var(--sy,50%);width:16px;height:16px;
+    margin:-8px 0 0 -8px;border-radius:50%;pointer-events:none;z-index:81;
+    border:2px solid rgba(77,163,255,.85);box-shadow:0 0 14px rgba(77,163,255,.55);
+    animation:rareRingOut .65s ease-out forwards;}
+  @keyframes rareRingOut{to{width:230px;height:230px;margin:-115px 0 0 -115px;opacity:0;border-width:1px;}}
+  .epic-ring{position:fixed;left:var(--sx,50%);top:var(--sy,50%);width:18px;height:18px;
+    margin:-9px 0 0 -9px;border-radius:50%;pointer-events:none;z-index:81;
+    border:2px solid rgba(192,92,255,.85);box-shadow:0 0 16px rgba(192,92,255,.55);
+    animation:epicRingOut .8s cubic-bezier(.2,.7,.3,1) forwards;}
+  @keyframes epicRingOut{to{width:300px;height:300px;margin:-150px 0 0 -150px;opacity:0;border-width:1px;}}
 
   /* ---------- Legendary reveal moment ---------- */
   .legendary-flash{position:fixed;inset:0;pointer-events:none;z-index:88;
@@ -378,9 +411,15 @@
   .modal-sell{position:relative;z-index:1;margin-top:16px;}
   .modal-hint{position:relative;z-index:1;margin-top:14px;color:var(--sub);font-size:12px;text-align:center;max-width:230px;}
 
+  /* pointer-events:none is deliberate and load-bearing: a toast is purely
+     informational and sits over the bottom of the screen, right where
+     action buttons like "Rip Another" live — without this, a toast that's
+     still fading out (up to ~2.2s) silently eats clicks meant for whatever
+     button is underneath it. A notification must never be able to block
+     the UI it's floating over. */
   .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel2);
     border:1px solid var(--line);padding:11px 20px;border-radius:12px;font-size:13px;font-weight:700;z-index:95;
-    box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .25s,transform .25s;}
+    box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;}
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
 
   @media(max-width:520px){
@@ -403,7 +442,7 @@
   <div class="brand"><div class="mark"><svg class="icon"><use href="#icon-logo"/></svg></div>ChaseBreak</div>
   <div class="nav">
     <button id="nav-packs" class="active" onclick="goto('packs')"><svg class="icon"><use href="#icon-layer-group"/></svg>Packs</button>
-    <button id="nav-collection" onclick="goto('collection')"><svg class="icon"><use href="#icon-table-cells"/></svg>Collection</button>
+    <button id="nav-collection" onclick="goto('collection')"><svg class="icon"><use href="#icon-lock"/></svg>Vault</button>
   </div>
   <div class="wallet">
     <div class="coins"><svg class="icon"><use href="#icon-coins"/></svg><span id="coin-count">$0</span></div>
@@ -479,6 +518,9 @@ function cardBackHTML(catKey){
       '<div class="cb-frame"></div>' +
       '<div class="cb-corner tl"></div><div class="cb-corner tr"></div>' +
       '<div class="cb-corner bl"></div><div class="cb-corner br"></div>' +
+      '<div class="cb-diamond n"></div><div class="cb-diamond s"></div>' +
+      '<div class="cb-diamond e"></div><div class="cb-diamond w"></div>' +
+      '<div class="cb-medallion"></div>' +
       '<div class="cb-badge">'+categoryIconHTML(catKey)+'</div>' +
       '<div class="cb-stamp">'+ICON("logo")+'</div>' +
       '<div class="cb-shine"></div>' +
@@ -500,18 +542,45 @@ function rarityTagHTML(rarity){
 // for every category. "luck" raises the ODDS FLOOR for every slot in the
 // pack (see slotWeightsFor) so pricier tiers are better across the whole
 // pack, not just a marginally-better final card.
+// each tier's value band is a PERCENTILE range (lo/hi, 0-1) into that
+// category's own sorted card values, not a fixed dollar figure — computed
+// per category in tierValueRange() below. This is what makes the range a
+// pack tile advertises actually match what you can pull from it: the same
+// $1 tile always means "roughly the cheapest slice of this category,"
+// whether that category's ceiling is a $400 Charizard or a $31k legendary
+// sports pull.
 var PACK_TIERS = [
-  {key:"t1",     cards:1, price:1,   luck:0.00, valNote:"$0.15 – $5"},
-  {key:"t2",     cards:2, price:5,   luck:0.12, valNote:"$0.60 – $10"},
-  {key:"t3",     cards:3, price:20,  luck:0.28, valNote:"$2 – $100"},
-  {key:"t4",     cards:4, price:45,  luck:0.45, valNote:"$5 – $800"},
-  {key:"t5",     cards:5, price:70,  luck:0.60, valNote:"$8 – $2.5k"},
-  {key:"t6",     cards:6, price:100, luck:0.75, valNote:"$12 – $6k"},
-  {key:"t6mega", cards:6, price:500, luck:0.95, valNote:"$60 – $31k"}
+  {key:"t1",     cards:1, price:1,   luck:0.00, band:[0.00, 0.18]},
+  {key:"t2",     cards:2, price:5,   luck:0.12, band:[0.00, 0.35]},
+  {key:"t3",     cards:3, price:20,  luck:0.28, band:[0.10, 0.55]},
+  {key:"t4",     cards:4, price:45,  luck:0.45, band:[0.25, 0.72]},
+  {key:"t5",     cards:5, price:70,  luck:0.60, band:[0.42, 0.86]},
+  {key:"t6",     cards:6, price:100, luck:0.75, band:[0.60, 0.96]},
+  {key:"t6mega", cards:6, price:500, luck:0.95, band:[0.90, 1.00]}
 ];
 window.SELECTED_TIER = "t2";
 function tierByKey(key){ return PACK_TIERS.filter(function(t){return t.key===key;})[0] || PACK_TIERS[1]; }
 function tierPrice(tier){ return tier.price; }
+
+var CATEGORY_VALUE_CACHE = {};
+function categoryValues(cat){
+  if(!CATEGORY_VALUE_CACHE[cat]){
+    CATEGORY_VALUE_CACHE[cat] = poolFor(cat).map(cardValue).sort(function(a,b){return a-b;});
+  }
+  return CATEGORY_VALUE_CACHE[cat];
+}
+function percentileValue(cat, p){
+  var vals = categoryValues(cat);
+  if(!vals.length) return 0;
+  var idx = Math.min(vals.length-1, Math.max(0, Math.round(p*(vals.length-1))));
+  return vals[idx];
+}
+// the actual [lo, hi] dollar range this tier can pull from, for this
+// specific category — this is what gets shown on the tier chip AND what
+// pack generation samples from, so the two can never disagree.
+function tierValueRange(cat, tier){
+  return [percentileValue(cat, tier.band[0]), percentileValue(cat, tier.band[1])];
+}
 
 // odds smoothly ramp from a common-heavy first slot to a guaranteed-good
 // last slot, interpolated by each slot's position in the pack; a tier's
@@ -575,27 +644,37 @@ function weightedRarity(weights){
   return "common";
 }
 
-function pickCard(cat, rarity){
+// range is an optional [lo, hi] dollar band — when given, the card is drawn
+// from within that value band first (so a pack's advertised price range is
+// actually what it pulls from), falling back to the nearest rarity within
+// that band, and only ignoring the band entirely as a last resort so a
+// narrow band can never make a pack fail to generate.
+function pickCard(cat, rarity, range){
   var pool = poolFor(cat);
-  var opts = byRarity(pool, rarity);
+  var scoped = pool;
+  if(range){
+    scoped = pool.filter(function(c){ var v=cardValue(c); return v>=range[0]-1e-9 && v<=range[1]+1e-9; });
+    if(!scoped.length) scoped = pool;
+  }
+  var opts = byRarity(scoped, rarity);
   if(!opts.length){
-    // fall back to nearest available rarity
+    // fall back to nearest available rarity, still inside the value band
     var idx = RARITIES.indexOf(rarity);
     for(var d=1; d<RARITIES.length; d++){
-      var down = byRarity(pool, RARITIES[Math.max(0,idx-d)]);
-      var up = byRarity(pool, RARITIES[Math.min(RARITIES.length-1,idx+d)]);
+      var down = byRarity(scoped, RARITIES[Math.max(0,idx-d)]);
+      var up = byRarity(scoped, RARITIES[Math.min(RARITIES.length-1,idx+d)]);
       if(down.length){ opts=down; break; }
       if(up.length){ opts=up; break; }
     }
   }
-  if(!opts.length) opts = pool;
+  if(!opts.length) opts = scoped.length? scoped : pool;
   return opts[Math.floor(Math.random()*opts.length)];
 }
 
-function generatePack(cat, count, luck){
+function generatePack(cat, count, luck, range){
   var n = count || 5;
   var out = [];
-  for(var i=0; i<n; i++){ out.push(pickCard(cat, weightedRarity(slotWeightsFor(n, i, luck)))); }
+  for(var i=0; i<n; i++){ out.push(pickCard(cat, weightedRarity(slotWeightsFor(n, i, luck)), range)); }
   return out;
 }
 
@@ -677,12 +756,14 @@ function tierRowHTML(cat){
     var active = window.SELECTED_TIER === t.key;
     var afford = STATE.coins >= price;
     var label = t.cards+" Card"+(t.cards>1?"s":"");
+    var range = tierValueRange(cat.key, t);
+    var valNote = formatMoney(range[0])+' – '+formatMoney(range[1]);
     return (
       '<button class="tier-chip'+(active?' active':'')+(afford?'':' unaffordable')+
-        '" onclick="selectTier(\''+t.key+'\',\''+cat.key+'\')" title="Card value range: '+t.valNote+'">' +
+        '" onclick="selectTier(\''+t.key+'\',\''+cat.key+'\')" title="Card value range: '+valNote+'">' +
         '<span class="tier-chip-label">'+label+'</span>' +
         '<span class="tier-chip-meta">$'+price+'</span>' +
-        '<span class="tier-chip-val">'+t.valNote+'</span>' +
+        '<span class="tier-chip-val">'+valNote+'</span>' +
       '</button>'
     );
   }).join("") + '</div>';
@@ -693,7 +774,7 @@ function leavePackOpen(){
   if(root) root.classList.remove("no-scroll");
   render();
 }
-function leaveToCollection(){
+function leaveToVault(){
   var root = document.getElementById("view-root");
   if(root) root.classList.remove("no-scroll");
   goto("collection");
@@ -736,7 +817,7 @@ function ripPack(catKey){
 
   STATE.coins -= price;
   STATE.packsOpened++;
-  var pulled = generatePack(catKey, tier.cards, tier.luck);
+  var pulled = generatePack(catKey, tier.cards, tier.luck, tierValueRange(catKey, tier));
   save();
   renderTop();
 
@@ -762,10 +843,11 @@ function showReveal(cat, pulled){
         '<div class="stack-tilt pack-media-size" id="stack-tilt"></div>' +
       '</div>' +
       '<div class="rip-hint" id="rip-hint">Tap the top card to flip it &middot; move/drag to tilt for foils</div>' +
+      '<div class="card-choice" id="card-choice" style="display:none"></div>' +
       '<div class="collected-strip" id="collected-strip"></div>' +
       '<div class="stage-actions" id="stage-actions" style="display:none">' +
         '<button class="btn primary" onclick="openStage(CAT_KEY_CURRENT)">'+ICON("box-open")+'Rip Another</button>' +
-        '<button class="btn" onclick="leaveToCollection()">'+ICON("table-cells")+'View Collection</button>' +
+        '<button class="btn" onclick="leaveToVault()">'+ICON("lock")+'View Vault</button>' +
       '</div>' +
     '</div>'
   );
@@ -825,11 +907,11 @@ function attachTilt(outerEl, tiltEl){
   var running = false;
 
   function loop(){
-    curRX += (targetRX - curRX) * 0.18;
-    curRY += (targetRY - curRY) * 0.18;
+    curRX += (targetRX - curRX) * 0.26;
+    curRY += (targetRY - curRY) * 0.26;
     tiltEl.style.transform = "rotateX("+curRX.toFixed(2)+"deg) rotateY("+curRY.toFixed(2)+"deg)";
-    tiltEl.style.setProperty("--tx", (curRY/26).toFixed(3));
-    tiltEl.style.setProperty("--ty", (-curRX/20).toFixed(3));
+    tiltEl.style.setProperty("--tx", (curRY/36).toFixed(3));
+    tiltEl.style.setProperty("--ty", (-curRX/28).toFixed(3));
     if(Math.abs(targetRX-curRX)>0.02 || Math.abs(targetRY-curRY)>0.02){
       requestAnimationFrame(loop);
     } else {
@@ -841,7 +923,7 @@ function attachTilt(outerEl, tiltEl){
     var r = outerEl.getBoundingClientRect();
     var px = (clientX - r.left)/r.width - 0.5;
     var py = (clientY - r.top)/r.height - 0.5;
-    targetRY = px*26; targetRX = -py*20;
+    targetRY = px*36; targetRX = -py*28;
     kick();
   }
   function reset(){ targetRX = 0; targetRY = 0; kick(); }
@@ -866,28 +948,102 @@ function flipTop(){
   topEl.classList.add("flipped");
   topEl.style.zIndex = 300;
 
-  var isNew = addToCollection(card);
-  save(); renderTop();
-
+  // NOTE: the card is NOT added to the Vault here anymore — the player
+  // decides Sell vs. Vault after seeing it (see showCardChoice below), so
+  // addToCollection() only runs if they actually choose to keep it.
   if(card.rarity==="legendary"){
     setTimeout(function(){
       burstAt(topEl, "#ffb020", true);
       legendaryMoment(topEl);
     }, 600);
   } else if(card.rarity==="epic"){
-    setTimeout(function(){ burstAt(topEl, "#c05cff"); }, 650);
-  }
-  if(isNew){
     setTimeout(function(){
-      var front = topEl.querySelector(".card-front");
-      var badge = document.createElement("div");
-      badge.className="new-badge"; badge.innerHTML=ICON("wand-magic-sparkles")+"NEW";
-      front.appendChild(badge);
-    }, 420);
+      burstAt(topEl, "#c05cff");
+      epicMoment(topEl);
+    }, 650);
+  } else if(card.rarity==="rare"){
+    setTimeout(function(){ rareMoment(topEl); }, 600);
   }
 
-  var holdTime = card.rarity==="legendary" ? 2200 : card.rarity==="epic" ? 1500 : 950;
-  setTimeout(function(){ settleToStrip(card); }, holdTime);
+  var holdTime = card.rarity==="legendary" ? 2200 : card.rarity==="epic" ? 1500 : card.rarity==="rare" ? 1100 : 700;
+  setTimeout(function(){ showCardChoice(card, topEl); }, holdTime);
+}
+
+/* the per-card decision point: instead of auto-advancing, the player picks
+   Sell (cash now, card never enters the Vault) or Vault (keep it, cash only
+   if/when they sell it later from the Vault screen) before the stack moves
+   on to the next card. */
+function showCardChoice(card, topEl){
+  window.PENDING_CARD = card;
+  window.PENDING_EL = topEl;
+  var hint = document.getElementById("rip-hint");
+  if(hint) hint.style.display = "none";
+  var box = document.getElementById("card-choice");
+  if(!box) return;
+  var already = STATE.collection[card.id]||0;
+  var vaultLabel = already ? "Vault it (+1 copy)" : "Vault it (NEW)";
+  box.innerHTML =
+    '<button class="btn gold" onclick="chooseSell()">'+ICON("coins")+'Sell for '+formatMoney(sellValue(card))+'</button>' +
+    '<button class="btn primary" onclick="chooseVault()">'+ICON("lock")+vaultLabel+'</button>';
+  box.style.display = "flex";
+}
+
+function chooseSell(){
+  var card = window.PENDING_CARD;
+  if(!card) return;
+  var gain = sellValue(card);
+  STATE.coins += gain;
+  save(); renderTop();
+  toast("Sold "+card.name+" for "+formatMoney(gain));
+  advanceCard(card, false);
+}
+
+function chooseVault(){
+  var card = window.PENDING_CARD;
+  if(!card) return;
+  var isNew = addToCollection(card);
+  save();
+  toast((isNew? "Vaulted new card: " : "Vaulted another copy: ")+card.name);
+  advanceCard(card, true);
+}
+
+function advanceCard(card, vaulted){
+  var box = document.getElementById("card-choice");
+  if(box) box.style.display = "none";
+  var hint = document.getElementById("rip-hint");
+  if(hint) hint.style.display = "";
+  window.PENDING_CARD = null; window.PENDING_EL = null;
+  settleToStrip(card, vaulted);
+}
+
+/* a light pulse for rare pulls — a single ring + a small burst, enough to
+   feel distinct from an ordinary common/uncommon without competing with
+   the bigger epic/legendary moments. */
+function rareMoment(cardEl){
+  var rect = cardEl.getBoundingClientRect();
+  var sx=(rect.left+rect.width/2)+"px", sy=(rect.top+rect.height/2)+"px";
+  var ring = document.createElement("div");
+  ring.className = "rare-ring";
+  ring.style.setProperty("--sx", sx); ring.style.setProperty("--sy", sy);
+  document.body.appendChild(ring);
+  setTimeout(function(){ ring.remove(); }, 700);
+  burstAt(cardEl, "#4da3ff");
+}
+
+/* a bit more than rare, a bit less than legendary — two rings and the
+   existing epic burst, no full-screen flash/scrim. */
+function epicMoment(cardEl){
+  var rect = cardEl.getBoundingClientRect();
+  var sx=(rect.left+rect.width/2)+"px", sy=(rect.top+rect.height/2)+"px";
+  [0, 140].forEach(function(delay){
+    setTimeout(function(){
+      var ring = document.createElement("div");
+      ring.className = "epic-ring";
+      ring.style.setProperty("--sx", sx); ring.style.setProperty("--sy", sy);
+      document.body.appendChild(ring);
+      setTimeout(function(){ ring.remove(); }, 850);
+    }, delay);
+  });
 }
 
 /* the "this is a huge pull" cinematic — a screen-wide flash, a spotlight
@@ -927,12 +1083,12 @@ function legendaryMoment(cardEl){
   });
 }
 
-function settleToStrip(card){
+function settleToStrip(card, vaulted){
   var strip = document.getElementById("collected-strip");
   if(strip){
     var el = document.createElement("div");
-    el.className = "strip-thumb r-"+card.rarity;
-    el.innerHTML = mediaHTML(card);
+    el.className = "strip-thumb r-"+card.rarity+(vaulted? "" : " sold");
+    el.innerHTML = mediaHTML(card) + (vaulted? "" : '<div class="sold-tag">'+ICON("coins")+'</div>');
     strip.appendChild(el);
   }
 
@@ -1014,8 +1170,8 @@ function collectionHTML(){
   }).join("");
 
   return (
-    '<h1 class="page-title">Collection</h1>' +
-    '<p class="page-sub">Everything you\'ve pulled lives here.</p>' +
+    '<h1 class="page-title">Vault</h1>' +
+    '<p class="page-sub">Cards you chose to keep instead of selling. Tap a card to sell it back for Cash.</p>' +
     '<div class="stat-row">' +
       '<div class="stat-box"><div class="stat-icon">'+ICON("layer-group")+'</div><div><div class="v">'+owned+' / '+total+'</div><div class="l">Unique Cards</div></div></div>' +
       '<div class="stat-box"><div class="stat-icon">'+ICON("circle-check")+'</div><div><div class="v">'+pct+'%</div><div class="l">Set Complete</div></div></div>' +
@@ -1030,7 +1186,10 @@ function collectionHTML(){
 function setFilter(key){ STATE.collFilter = key; render(); }
 
 // vault payout: 87% of estimated value, rounded down to the nearest dollar
-function sellValue(card){ return Math.floor(cardValue(card)*0.87); }
+// 87% of value, floored to the nearest dollar, minimum $1 — a floor-to-$0
+// result reads as "this card is worthless," which isn't true and isn't a
+// meaningful choice, so cheap commons still sell for at least a dollar.
+function sellValue(card){ return Math.max(1, Math.floor(cardValue(card)*0.87)); }
 
 function showModal(id){
   var card = CARD_DATA.filter(function(c){return c.id===id;})[0];
@@ -1051,29 +1210,28 @@ function showModal(id){
         '</div>' +
       '</div>' +
     '</div>' +
-    (count>1?
-      '<button class="btn gold modal-sell" onclick="sellCard(\''+card.id+'\')">'+ICON("coins")+'Vault 1 copy for '+formatMoney(sellValue(card))+'</button>'
-      : '<div class="modal-hint">Pull a duplicate to vault it for Cash</div>')
+    '<button class="btn gold modal-sell" onclick="sellCard(\''+card.id+'\')">'+ICON("coins")+
+      'Sell '+(count>1? '1 copy' : 'this card')+' for '+formatMoney(sellValue(card))+'</button>'
   );
   bg.id="modal-bg";
   document.body.appendChild(bg);
 }
 function closeModal(){ var m=document.getElementById("modal-bg"); if(m) m.remove(); }
 
-// "Vault" a duplicate — trades one extra copy of an owned card for simulated
-// Cash (never real money; this is a closed loop within the app's own mock
-// balance, same as the balance you top up with "Add Cash").
+// Sell a card out of the Vault (any copy, including the last one) for
+// simulated Cash — never real money; this is a closed loop within the
+// app's own mock balance, same as the balance you top up with "Add Cash".
 function sellCard(id){
   var card = CARD_DATA.filter(function(c){return c.id===id;})[0];
   if(!card) return;
   var count = STATE.collection[id]||0;
-  if(count<=1) return;
-  STATE.collection[id] = count-1;
+  if(count<=0) return;
+  if(count<=1){ delete STATE.collection[id]; } else { STATE.collection[id] = count-1; }
   var gain = sellValue(card);
   STATE.coins += gain;
   save(); renderTop();
   closeModal();
-  toast("Vaulted "+card.name+" for "+formatMoney(gain));
+  toast("Sold "+card.name+" for "+formatMoney(gain));
   render();
 }
 

@@ -4,7 +4,7 @@ from pathlib import Path
 import streamlit as st
 import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Sideline Rips", page_icon="🏆", layout="wide")
+st.set_page_config(page_title="ChaseBreak", page_icon="🎴", layout="wide")
 
 # Streamlit adds default padding/whitespace around the page; strip it so the
 # embedded app fills the frame like a real full-screen web app.
@@ -24,8 +24,14 @@ TEMPLATE_PATH = ROOT / "app" / "index.html"
 DATA_PATH = ROOT / "data" / "cards.json"
 
 
-@st.cache_data
 def load_html() -> str:
+    # Deliberately NOT cached: app/index.html and data/cards.json change far
+    # more often than streamlit_app.py itself, and st.cache_data only
+    # invalidates on this function's own source changing — it has no idea
+    # these files changed underneath it. A long-running `streamlit run`
+    # process would silently keep serving a stale build (old buttons, old
+    # card data) after every git pull otherwise. The read+replace below is
+    # cheap enough that caching it isn't worth that correctness risk.
     html = TEMPLATE_PATH.read_text(encoding="utf-8")
 
     cards = []
