@@ -6994,7 +6994,8 @@
     "subtitle": "Metal Raiders \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/76446915.jpg",
     "rarity": "common",
-    "meta": "ATK 1350 / DEF 1000"
+    "meta": "ATK 1350 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -7253,7 +7254,8 @@
     "subtitle": "Metal Raiders \u00b7 Zombie / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/29155212.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 2000"
+    "meta": "ATK 1800 / DEF 2000",
+    "realValue": 0.65
   },
   {
     "category": "yugioh",
@@ -8242,7 +8244,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/82003859.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -8821,7 +8824,8 @@
     "subtitle": "Spell Ruler \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/20228463.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 1850"
+    "meta": "ATK 0 / DEF 1850",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8830,7 +8834,8 @@
     "subtitle": "Spell Ruler \u00b7 Winged Beast / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/57617178.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1000"
+    "meta": "ATK 1400 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -8889,7 +8894,8 @@
     "subtitle": "Spell Ruler \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/45778932.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -8958,7 +8964,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/78423643.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 1400"
+    "meta": "ATK 1200 / DEF 1400",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -8977,7 +8984,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/86198326.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9006,7 +9014,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/35316708.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.59
   },
   {
     "category": "yugioh",
@@ -9025,7 +9034,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/98299011.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9034,7 +9044,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/34694160.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9063,7 +9074,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/23471572.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9072,7 +9084,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/60866277.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9081,7 +9094,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/96355986.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9100,7 +9114,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/73079365.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9109,7 +9124,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/473469.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9118,7 +9134,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/36868108.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9127,7 +9144,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/12253117.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9136,7 +9154,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/49251811.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9145,7 +9164,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/75646520.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9154,7 +9174,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/2130625.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9183,7 +9204,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/74701381.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 1.79
   },
   {
     "category": "yugioh",
@@ -9192,7 +9214,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/296499.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9211,7 +9234,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/9074847.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9230,7 +9254,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/62867251.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9239,7 +9264,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/8951260.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9298,7 +9324,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/16227556.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9327,7 +9354,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/42599677.jpg",
     "rarity": "common",
-    "meta": "ATK 1900 / DEF 1300"
+    "meta": "ATK 1900 / DEF 1300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9336,7 +9364,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/78984772.jpg",
     "rarity": "common",
-    "meta": "ATK 2200 / DEF 1700"
+    "meta": "ATK 2200 / DEF 1700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9345,7 +9374,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/5388481.jpg",
     "rarity": "common",
-    "meta": "ATK 1700 / DEF 1150"
+    "meta": "ATK 1700 / DEF 1150",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9354,7 +9384,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/31477025.jpg",
     "rarity": "common",
-    "meta": "ATK 2100 / DEF 1300"
+    "meta": "ATK 2100 / DEF 1300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9363,7 +9394,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Pyro / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/78861134.jpg",
     "rarity": "common",
-    "meta": "ATK 1700 / DEF 1100"
+    "meta": "ATK 1700 / DEF 1100",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9372,7 +9404,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fiend / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/4266839.jpg",
     "rarity": "common",
-    "meta": "ATK 300 / DEF 800"
+    "meta": "ATK 300 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9381,7 +9414,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/30655537.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1200"
+    "meta": "ATK 1400 / DEF 1200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9390,7 +9424,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/3134241.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 800"
+    "meta": "ATK 1500 / DEF 800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9399,7 +9434,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/30532390.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 600"
+    "meta": "ATK 1800 / DEF 600",
+    "realValue": 0.15
   },
   {
     "category": "yugioh",
@@ -9428,7 +9464,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/1918087.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9437,7 +9474,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/37313786.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9446,7 +9484,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/63689843.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9455,7 +9494,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/35346968.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9474,7 +9514,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Beast / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/6104968.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 600"
+    "meta": "ATK 900 / DEF 600",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9483,7 +9524,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Winged Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/67049542.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 1000"
+    "meta": "ATK 1000 / DEF 1000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9492,7 +9534,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/66927994.jpg",
     "rarity": "common",
-    "meta": "ATK 1400 / DEF 1700"
+    "meta": "ATK 1400 / DEF 1700",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9501,7 +9544,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/2311603.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1500"
+    "meta": "ATK 1600 / DEF 1500",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9510,7 +9554,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/24294108.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9519,7 +9564,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/60682203.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9548,7 +9594,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/66719324.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9577,7 +9624,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/96965364.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9596,7 +9644,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/90502999.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.59
   },
   {
     "category": "yugioh",
@@ -9615,7 +9664,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/54109233.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9634,7 +9684,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/21237481.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9643,7 +9694,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Trap",
     "image": "https://images.ygoprodeck.com/images/cards/58621589.jpg",
     "rarity": "common",
-    "meta": "Trap"
+    "meta": "Trap",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9662,7 +9714,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/51345461.jpg",
     "rarity": "common",
-    "meta": "ATK 2450 / DEF 1700"
+    "meta": "ATK 2450 / DEF 1700",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9671,7 +9724,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Insect / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/88733579.jpg",
     "rarity": "common",
-    "meta": "ATK 1100 / DEF 200"
+    "meta": "ATK 1100 / DEF 200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9680,7 +9734,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Warrior / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/24128274.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 1800"
+    "meta": "ATK 1600 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9689,7 +9744,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fiend / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/50122883.jpg",
     "rarity": "common",
-    "meta": "ATK 500 / DEF 300"
+    "meta": "ATK 500 / DEF 300",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9698,7 +9754,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/87511987.jpg",
     "rarity": "common",
-    "meta": "ATK 1800 / DEF 1700"
+    "meta": "ATK 1800 / DEF 1700",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -9707,7 +9764,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spellcaster / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/52675689.jpg",
     "rarity": "common",
-    "meta": "ATK 1500 / DEF 1800"
+    "meta": "ATK 1500 / DEF 1800",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9716,7 +9774,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spellcaster / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/27125110.jpg",
     "rarity": "common",
-    "meta": "ATK 0 / DEF 0"
+    "meta": "ATK 0 / DEF 0",
+    "realValue": 1.19
   },
   {
     "category": "yugioh",
@@ -9735,7 +9794,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Insect / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/84620194.jpg",
     "rarity": "common",
-    "meta": "ATK 1700 / DEF 1000"
+    "meta": "ATK 1700 / DEF 1000",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -9754,7 +9814,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Insect / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/57409948.jpg",
     "rarity": "common",
-    "meta": "ATK 400 / DEF 900"
+    "meta": "ATK 400 / DEF 900",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -9763,7 +9824,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Insect / Flip / Effect",
     "image": "https://images.ygoprodeck.com/images/cards/83994646.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 1200"
+    "meta": "ATK 800 / DEF 1200",
+    "realValue": 0.29
   },
   {
     "category": "yugioh",
@@ -9772,7 +9834,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Machine / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/10992251.jpg",
     "rarity": "common",
-    "meta": "ATK 1200 / DEF 800"
+    "meta": "ATK 1200 / DEF 800",
+    "realValue": 0.29
   },
   {
     "category": "yugioh",
@@ -9801,7 +9864,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/5265750.jpg",
     "rarity": "common",
-    "meta": "ATK 1600 / DEF 900"
+    "meta": "ATK 1600 / DEF 900",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9810,7 +9874,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Beast / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/32269855.jpg",
     "rarity": "common",
-    "meta": "ATK 1300 / DEF 500"
+    "meta": "ATK 1300 / DEF 500",
+    "realValue": 0.5
   },
   {
     "category": "yugioh",
@@ -9829,7 +9894,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Aqua / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/4042268.jpg",
     "rarity": "common",
-    "meta": "ATK 1100 / DEF 2000"
+    "meta": "ATK 1100 / DEF 2000",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9838,7 +9904,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fairy / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/31447217.jpg",
     "rarity": "common",
-    "meta": "ATK 2750 / DEF 2400"
+    "meta": "ATK 2750 / DEF 2400",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9847,7 +9914,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Warrior / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/67532912.jpg",
     "rarity": "common",
-    "meta": "ATK 800 / DEF 800"
+    "meta": "ATK 800 / DEF 800",
+    "realValue": 0.3
   },
   {
     "category": "yugioh",
@@ -9856,7 +9924,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/4920010.jpg",
     "rarity": "common",
-    "meta": "ATK 900 / DEF 200"
+    "meta": "ATK 900 / DEF 200",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
@@ -9865,7 +9934,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Fiend / Normal",
     "image": "https://images.ygoprodeck.com/images/cards/30325729.jpg",
     "rarity": "common",
-    "meta": "ATK 1000 / DEF 400"
+    "meta": "ATK 1000 / DEF 400",
+    "realValue": 0.49
   },
   {
     "category": "yugioh",
@@ -9894,7 +9964,8 @@
     "subtitle": "Pharaoh's Servant \u00b7 Spell",
     "image": "https://images.ygoprodeck.com/images/cards/23615409.jpg",
     "rarity": "common",
-    "meta": "Spell"
+    "meta": "Spell",
+    "realValue": 0.35
   },
   {
     "category": "yugioh",
