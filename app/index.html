@@ -196,6 +196,23 @@
   .sat-row .sat-fill.bad{background:var(--red);}
   .sat-row .sat-n{width:24px;text-align:right;}
 
+  .city-map-wrap{display:flex;justify-content:center;margin-bottom:12px;}
+  .city-map-svg{width:100%;max-width:480px;height:auto;}
+  .zone-road{stroke:#c9c2a0;stroke-width:10;stroke-dasharray:14 10;stroke-linecap:round;}
+  .zone-hub{fill:#a8925a;}
+  .city-zone{cursor:pointer;}
+  .city-zone .zone-circle{fill:#fff;stroke:#a8925a;stroke-width:3;}
+  .city-zone:hover .zone-circle{stroke:#e6a417;}
+  .city-zone.selected .zone-circle{fill:#fff3cf;stroke:#e6a417;stroke-width:5;}
+  .city-zone.locked .zone-circle{fill:#e2e2e2;opacity:.8;}
+  .zone-icon{font-size:30px;}
+  .zone-lock{font-size:16px;}
+  .zone-label{font-size:13px;font-weight:800;fill:#5a4022;}
+  .district-card{display:flex;gap:12px;align-items:center;background:#fff;border:2px solid var(--panel-border);border-radius:12px;padding:12px;margin-bottom:10px;}
+  .district-icon{font-size:34px;}
+  .district-name{font-weight:800;font-size:15px;}
+  .district-desc{font-size:12.5px;color:#7a5a2a;font-weight:700;}
+
   .upgrade-list{display:flex;flex-direction:column;gap:8px;}
   .upgrade-item{
     display:flex;align-items:center;gap:10px;background:#fff;border:2px solid var(--panel-border);
@@ -1855,35 +1872,69 @@ function openUpgradeShop(afterSummary){
   });
   $('closeUpgrades').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } else { updateRecipeUI(); updateStockUI(); } });
 }
-function openLocationPicker(afterSummary){
-  let list=LOCATIONS.map(l=>{
-    const unlocked=state.unlockedLocations.includes(l.id);
-    const here=state.location===l.id;
-    let btnLabel, btnClass, action;
-    if(here){ btnLabel='Here'; btnClass=' owned'; action='none'; }
-    else if(unlocked){ btnLabel='Move'; btnClass=''; action='move'; }
-    else { btnLabel=fmt$(l.cost); btnClass=''; action='unlock'; }
-    return '<div class="upgrade-item"><div class="u-icon">'+l.icon+'</div><div class="u-info"><div class="u-name">'+l.name+(here?' (current)':'')+'</div><div class="u-desc">'+l.desc+'</div></div>'+
-      '<button class="u-buy'+btnClass+'" data-loc="'+l.id+'" data-action="'+action+'" '+(action==='none'?'disabled':'')+'>'+btnLabel+'</button></div>';
-  }).join('');
+const CITY_ZONE_POS={maple:[120,240], park:[430,90], downtown:[130,90], beach:[430,240]};
+const CITY_ZONE_BG={maple:'#eadfc0', park:'#bfe3c3', downtown:'#cfd3d8', beach:'#f2e2ab'};
+function cityMapSVG(){
+  const hub=[280,160];
+  let svg='<rect width="560" height="320" rx="16" fill="#cfe8d6"/>';
+  // ambient backdrops per district, an ocean edge near the beach, a pond near the park
+  LOCATIONS.forEach(l=>{ const[x,y]=CITY_ZONE_POS[l.id]; svg+='<ellipse cx="'+x+'" cy="'+y+'" rx="110" ry="90" fill="'+CITY_ZONE_BG[l.id]+'" opacity="0.55"/>'; });
+  svg+='<ellipse cx="500" cy="300" rx="140" ry="55" fill="#8ec9e8" opacity="0.6"/>';
+  svg+='<circle cx="470" cy="55" r="20" fill="#8ec9e8" opacity="0.7"/>';
+  // roads connecting a central hub to each district
+  LOCATIONS.forEach(l=>{ const[x,y]=CITY_ZONE_POS[l.id]; svg+='<line x1="'+hub[0]+'" y1="'+hub[1]+'" x2="'+x+'" y2="'+y+'" class="zone-road"/>'; });
+  svg+='<circle cx="'+hub[0]+'" cy="'+hub[1]+'" r="10" class="zone-hub"/>';
+  // clickable district pins
+  LOCATIONS.forEach(l=>{
+    const[x,y]=CITY_ZONE_POS[l.id];
+    const locked=!state.unlockedLocations.includes(l.id);
+    const selected=state.location===l.id;
+    svg+='<g class="city-zone'+(locked?' locked':'')+(selected?' selected':'')+'" data-loc="'+l.id+'">'+
+      '<circle cx="'+x+'" cy="'+y+'" r="38" class="zone-circle"/>'+
+      '<text x="'+x+'" y="'+(y+10)+'" class="zone-icon" text-anchor="middle">'+l.icon+'</text>'+
+      (locked?'<text x="'+(x+27)+'" y="'+(y-23)+'" class="zone-lock" text-anchor="middle">🔒</text>':'')+
+      '<text x="'+x+'" y="'+(y+56)+'" class="zone-label" text-anchor="middle">'+l.name+'</text>'+
+    '</g>';
+  });
+  return '<svg viewBox="0 0 560 320" class="city-map-svg">'+svg+'</svg>';
+}
+function renderDistrictInfo(id, afterSummary){
+  const l=LOCATIONS.find(x=>x.id===id);
+  const unlocked=state.unlockedLocations.includes(id);
+  const here=state.location===id;
+  const btnHtml= here ? '<button class="big-btn" disabled style="opacity:.6">You\'re here</button>'
+    : '<button class="big-btn" id="districtActionBtn">'+(unlocked?'Move Here':'Unlock for '+fmt$(l.cost))+'</button>';
+  $('districtInfo').innerHTML=
+    '<div class="district-card"><div class="district-icon">'+l.icon+'</div>'+
+    '<div class="district-text"><div class="district-name">'+l.name+(here?' (current)':'')+'</div><div class="district-desc">'+l.desc+'</div></div></div>'+
+    btnHtml;
+  const btn=$('districtActionBtn');
+  if(btn) btn.addEventListener('click',()=>{
+    if(!unlocked){
+      if(state.cash<l.cost){ Audio_.complaintBlip(); return; }
+      state.cash-=l.cost; state.unlockedLocations.push(id); Audio_.coin();
+    } else { Audio_.click(); }
+    state.location=id; saveGame(); updateTopbar();
+    openCityMap(afterSummary);
+  });
+}
+function openCityMap(afterSummary){
   openModal(
-    '<div class="modal-head"><h2>📍 Move Location</h2><p>Cash: '+fmt$(state.cash)+'</p></div>'+
-    '<div class="modal-body"><div class="upgrade-list">'+list+'</div></div>'+
+    '<div class="modal-head"><h2>🗺️ City Map</h2><p>Cash: '+fmt$(state.cash)+'</p></div>'+
+    '<div class="modal-body"><div class="city-map-wrap">'+cityMapSVG()+'</div><div id="districtInfo"></div></div>'+
     '<div class="modal-foot"><button class="big-btn" id="closeLocations">Done</button></div>'
   );
-  document.querySelectorAll('[data-loc]').forEach(btn=>{
-    btn.addEventListener('click',()=>{
-      const id=btn.dataset.loc, action=btn.dataset.action, l=LOCATIONS.find(x=>x.id===id);
-      if(action==='unlock' && state.cash>=l.cost){
-        state.cash-=l.cost; state.unlockedLocations.push(id); state.location=id;
-        Audio_.coin(); saveGame(); updateTopbar(); openLocationPicker(afterSummary);
-      } else if(action==='move'){
-        state.location=id; Audio_.click(); saveGame(); updateTopbar(); openLocationPicker(afterSummary);
-      } else if(action==='unlock'){ Audio_.complaintBlip(); }
+  renderDistrictInfo(state.location, afterSummary);
+  document.querySelectorAll('.city-zone').forEach(z=>{
+    z.addEventListener('click',()=>{
+      document.querySelectorAll('.city-zone').forEach(x=>x.classList.remove('selected'));
+      z.classList.add('selected');
+      renderDistrictInfo(z.dataset.loc, afterSummary);
     });
   });
   $('closeLocations').addEventListener('click',()=>{ closeModal(); if(afterSummary){ enterPrep(); } });
 }
+function openLocationPicker(afterSummary){ openCityMap(afterSummary); }
 function openDaySummary(){
   const s=state.todayStats;
   const total=s.happy+Object.values(s.complaints).reduce((a,b)=>a+b,0);
