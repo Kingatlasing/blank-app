@@ -20,9 +20,10 @@ This is a self-contained HTML/CSS/JS game (`app/index.html`, DOM-rendered with p
 - **Win/lose states** — reach the end of the trail to win, or lose your whole party along the way.
 
 - **Shooting Range** — a carnival-style target range at every town, built from a real shooting-gallery CC0 kit (wooden stall backdrop, curtains, clouds, targets, ducks). Costs real ammo to play, pays out real cash based on score — available at any town alongside the General Store, Camp & Rest, and the (still-placeholder) saloon.
+- **Fishing** — a reflex minigame using a real fish sprite set: cast a line, wait for the bobber to dip, and click fast before the fish gets away. No ammo cost, available both on the open trail and at towns — a free (but time-limited) alternative to hunting.
+- **Trapping** — a lighter, passive activity: stake out a line of traps (costs a spare part, camps overnight) and check them the next morning for a random yield of food, occasionally a pelt worth cash. Available on the open trail.
 
 ### 🚧 Coming in the next milestones
-- **Fishing** and **trapping** minigames.
 - **A raft river-run** near the end of the trail (Columbia River) — dodge rocks and logs; wreck the raft and you finish the journey on foot.
 - **A dueling-pistols standoff** minigame.
 - **A saloon/casino** (Roulette, Blackjack, Baccarat, Coin Flip, Shell Game), offered as a side activity at towns and rest stops — ported and re-themed from this repo's own `claude/courtside-card-pack-mock-app-99fqki` branch (ChaseBreak), which already has these games fully built with real casino rules and animations.

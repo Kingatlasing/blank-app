@@ -703,10 +703,16 @@ SCREENS.hub = function(){
   } else {
     actions.appendChild(el('h3',{},['On the Trail']));
     actions.appendChild(paceRationControls());
-    actions.appendChild(el('div',{style:'margin-top:10px;'},[
-      el('button',{class:'btn gold', onclick:function(){ travelTick(); }},['Continue Trail →']),
-      el('button',{class:'btn secondary', onclick:function(){ openHunt(); }},['Hunt for '+ (S.mode==='zombie'?'Food':'Food') ]),
-    ]));
+    var actionRow = el('div',{style:'margin-top:10px;'});
+    actionRow.appendChild(el('button',{class:'btn gold', onclick:function(){ travelTick(); }},['Continue Trail →']));
+    actionRow.appendChild(el('button',{class:'btn secondary', onclick:function(){ openHunt(); }},['Hunt for Food']));
+    actionRow.appendChild(el('button',{class:'btn secondary', onclick:function(){ openFish(); }},['Go Fishing']));
+    if(S.flags.trapping){
+      actionRow.appendChild(el('button',{class:'btn good', onclick:function(){ checkTraps(); }},['Check Traps']));
+    } else {
+      actionRow.appendChild(el('button',{class:'btn secondary', disabled:S.parts<=0, onclick:function(){ setTraps(); }},['Set Traps (uses '+T('fuelWord')+')']));
+    }
+    actions.appendChild(actionRow);
   }
   wrap.appendChild(actions);
 
@@ -1004,6 +1010,7 @@ SCREENS.town = function(){
   var actions = el('div',{class:'panel',style:'text-align:center;'});
   actions.appendChild(el('button',{class:'btn gold', onclick:function(){ S.screen='store'; render(); }},[T('storeName')]));
   actions.appendChild(el('button',{class:'btn', onclick:function(){ openRange(); }},[T('rangeName')]));
+  actions.appendChild(el('button',{class:'btn', onclick:function(){ openFish(); }},['Go Fishing']));
   actions.appendChild(el('button',{class:'btn secondary', onclick:function(){ restHere(); }},[T('restName')+' (heal & advance a day)']));
   actions.appendChild(el('button',{class:'btn danger', onclick:function(){ S.screen='casino'; render(); }},[T('casinoName')]));
   wrap.appendChild(actions);
@@ -1021,6 +1028,37 @@ function restHere(){
   S.party.forEach(function(m){ if(m.health>0) m.health=clamp(m.health+ri(8,18),0,100); });
   addLog('You rested at '+ (LANDMARKS[S.lastLandmarkVisited]||{name:{}}).name[S.mode] +'. The '+T('partyWord')+' feels stronger.');
   S.screen='hub'; render();
+}
+
+/* --------------------------------- Trapping -------------------------------- */
+function setTraps(){
+  if(S.parts<=0){ addLog('No '+T('fuelWord')+' left to rig traps with.'); render(); return; }
+  S.parts--;
+  S.flags.trapping = {daySet: S.day};
+  S.day++;
+  S.party.forEach(function(m){ if(m.health>0) m.health=clamp(m.health+ri(2,6),0,100); });
+  addLog(S.mode==='zombie' ? 'You rigged a perimeter of snares and hunkered down for the night.' : 'You staked out a line of traps and made camp for the night.');
+  S.screen='hub'; render();
+}
+function checkTraps(){
+  var roll = Math.random();
+  if(roll<0.15){
+    addLog('The traps came up empty this morning.');
+  } else if(roll<0.85){
+    var y = ri(10,35); S.food += y;
+    addLog('Your traps caught small game overnight — '+y+' lbs of food.');
+  } else {
+    var y2 = ri(20,40), pelt = ri(5,20);
+    S.food += y2; S.money += pelt;
+    addLog('A fine catch! '+y2+' lbs of food, plus a pelt worth '+fmtMoney(pelt)+'.');
+  }
+  if(S.mode==='zombie' && Math.random()<0.12){
+    var m = pick(S.party.filter(function(p){return p.health>0;}));
+    if(m){ m.health = clamp(m.health-ri(5,12),0,100); addLog('Something got tangled in the wire overnight — '+m.name+' was hurt fending it off.'); }
+  }
+  delete S.flags.trapping;
+  S.screen='hub';
+  if(!checkPartyWiped()) render();
 }
 
 /* --------------------------------- Store screen -------------------------------- */
@@ -1455,6 +1493,191 @@ SCREENS.rangeResult = function(){
     el('p',{},['Winnings: '+T('currencySym')+payout])
   ]));
   wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ var back=Range.returnTo||'hub'; Range=null; S.screen=back; render(); }},['Back']));
+  return wrap;
+};
+
+
+/* =========================================================================
+   WESTWARD: THE TRAIL  —  Fishing minigame
+   A reflex/timing game: cast a line, wait for a bite, click fast to hook it.
+   No ammo cost — a free (but time-limited) alternative food source.
+   ========================================================================= */
+
+var FISH_TYPES = [
+  {key:'fish_fish_blue', food:6, weight:1},
+  {key:'fish_fish_brown', food:5, weight:1},
+  {key:'fish_fish_green', food:6, weight:1},
+  {key:'fish_fish_grey', food:4, weight:1.2},
+  {key:'fish_fish_orange', food:7, weight:0.8},
+  {key:'fish_fish_pink', food:5, weight:0.9},
+  {key:'fish_fish_red', food:8, weight:0.7},
+  {key:'fish_fish_grey_long_a', food:14, weight:0.35},
+  {key:'fish_fish_grey_long_b', food:16, weight:0.3}
+];
+function pickFish(){
+  var total = FISH_TYPES.reduce(function(s,f){return s+f.weight;},0);
+  var r = Math.random()*total;
+  for(var i=0;i<FISH_TYPES.length;i++){ r -= FISH_TYPES[i].weight; if(r<=0) return FISH_TYPES[i]; }
+  return FISH_TYPES[0];
+}
+
+var Fish = null;
+function openFish(){
+  Fish = {
+    time: 60, food: 0, catches: 0, misses: 0,
+    state:'idle', // idle -> waiting -> biting -> (hooked|missed) -> idle
+    stateT: 0, nextBiteAt: rnd(1.5,3.5), bobY: 0, lastCatch:null,
+    running:true, returnTo: S.screen==='town'?'town':'hub'
+  };
+  S.screen='fish';
+  render();
+}
+
+SCREENS.fish = function(){
+  var wrap = el('div',{});
+  wrap.appendChild(el('h1',{class:'headline',style:'text-align:center;'},['Fishing']));
+  wrap.appendChild(el('p',{class:'typewriter',style:'text-align:center;'},[
+    'Cast your line and wait. When the bobber dips, click fast — hesitate and it gets away.'
+  ]));
+  var mgWrap = el('div',{class:'minigame-wrap'});
+  var canvas = el('canvas',{width:800,height:360,id:'fish-canvas'});
+  mgWrap.appendChild(canvas);
+  var hud = el('div',{class:'minigame-hud'});
+  hud.appendChild(el('span',{id:'fish-hud-catches'},['Catches: '+Fish.catches]));
+  hud.appendChild(el('span',{id:'fish-hud-food'},['Food: '+Fish.food+' lbs']));
+  hud.appendChild(el('span',{id:'fish-hud-time'},['Time: '+Fish.time+'s']));
+  mgWrap.appendChild(hud);
+  wrap.appendChild(mgWrap);
+  wrap.appendChild(el('div',{style:'text-align:center;margin-top:10px;'},[
+    el('button',{class:'btn secondary', onclick:function(){ endFish(); }},['Pack Up & Leave'])
+  ]));
+  setTimeout(function(){ initFishLoop(canvas); }, 0);
+  return wrap;
+};
+
+function initFishLoop(canvas){
+  if(!canvas || !canvas.isConnected) return;
+  var ctx = canvas.getContext('2d');
+  var W = canvas.width, Hh = canvas.height;
+  var waterY = Hh*0.4;
+  var bobX = W*0.5;
+
+  var lastT = performance.now();
+  function frame(now){
+    if(!canvas.isConnected || !Fish || !Fish.running) return;
+    var dt = Math.min(0.05, (now-lastT)/1000); lastT = now;
+    Fish.time -= dt;
+    Fish.stateT += dt;
+
+    if(Fish.state==='idle'){
+      if(Fish.stateT>=Fish.nextBiteAt){ Fish.state='biting'; Fish.stateT=0; Fish.biteWindow = 0.85 - Math.min(0.35, S.day*0.002); }
+    } else if(Fish.state==='biting'){
+      if(Fish.stateT>=Fish.biteWindow){
+        Fish.state='missed'; Fish.stateT=0; Fish.misses++;
+      }
+    } else if(Fish.state==='missed' || Fish.state==='hooked'){
+      if(Fish.stateT>=1.1){ Fish.state='idle'; Fish.stateT=0; Fish.nextBiteAt=rnd(1.5,3.5); Fish.lastCatch=null; }
+    }
+
+    if(Fish.time<=0) endFish();
+
+    draw(now);
+    updateHud();
+    if(Fish && Fish.running) requestAnimationFrame(frame);
+  }
+
+  function drawBg(){
+    var sky = ctx.createLinearGradient(0,0,0,waterY);
+    sky.addColorStop(0, S.mode==='zombie'?'#3a4636':'#cfe6f5');
+    sky.addColorStop(1, S.mode==='zombie'?'#4c5a41':'#eaf6ff');
+    ctx.fillStyle = sky; ctx.fillRect(0,0,W,waterY);
+    var shoreDecor = S.mode==='zombie' ? ['grave_gravestoneFlat','grave_crossWood'] : ['range_tree_pine','range_tree_oak'];
+    [40, W-100].forEach(function(x,i){
+      var im = huntImg(shoreDecor[i%shoreDecor.length]);
+      if(im.complete && im.naturalWidth) ctx.drawImage(im, x, waterY-56, 56, 64);
+    });
+    var water = ctx.createLinearGradient(0,waterY,0,Hh);
+    water.addColorStop(0, S.mode==='zombie'?'#2f4a4a':'#3f8fc4');
+    water.addColorStop(1, S.mode==='zombie'?'#1e3030':'#1f5f8f');
+    ctx.fillStyle = water; ctx.fillRect(0,waterY,W,Hh-waterY);
+    ctx.strokeStyle='rgba(255,255,255,.25)'; ctx.lineWidth=2;
+    for(var i=0;i<6;i++){
+      var ly = waterY+20+i*22 + Math.sin(Date.now()/700+i)*3;
+      ctx.beginPath(); ctx.moveTo(0,ly); ctx.lineTo(W,ly); ctx.stroke();
+    }
+  }
+
+  function draw(now){
+    drawBg();
+    // fishing line
+    var lineTopX = W*0.82, lineTopY = 20;
+    var bob = Fish.state==='biting' ? 14 : Math.sin(now/500)*4;
+    var by = waterY - 6 + bob;
+    ctx.strokeStyle='rgba(255,255,255,.7)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(lineTopX, lineTopY); ctx.lineTo(bobX, by); ctx.stroke();
+    // bobber
+    ctx.beginPath(); ctx.arc(bobX, by, 9, 0, Math.PI*2);
+    ctx.fillStyle = Fish.state==='biting' ? '#e04b4b' : '#c0392b'; ctx.fill();
+    ctx.beginPath(); ctx.arc(bobX, by-4, 9, Math.PI, Math.PI*2);
+    ctx.fillStyle='#fff'; ctx.fill();
+    ctx.strokeStyle='#4a2a10'; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(bobX,by,9,0,Math.PI*2); ctx.stroke();
+
+    if(Fish.state==='biting'){
+      ctx.fillStyle='#fff'; ctx.font='bold 26px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('!', bobX, by-24);
+      // ripple
+      ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.beginPath(); ctx.arc(bobX, waterY+4, 18+Fish.stateT*30, 0, Math.PI*2); ctx.stroke();
+    }
+    if(Fish.state==='hooked' && Fish.lastCatch){
+      var im = huntImg(Fish.lastCatch.key);
+      if(im.complete && im.naturalWidth) ctx.drawImage(im, bobX-30, by-70, 60, 44);
+      ctx.fillStyle='#fff'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('+'+Fish.lastCatch.food+' lbs!', bobX, by-80);
+    }
+    if(Fish.state==='missed'){
+      ctx.fillStyle='#fff'; ctx.font='bold 16px sans-serif'; ctx.textAlign='center';
+      ctx.fillText('It got away...', bobX, by-30);
+    }
+  }
+  function updateHud(){
+    var c=document.getElementById('fish-hud-catches'); if(c) c.textContent='Catches: '+Fish.catches;
+    var f=document.getElementById('fish-hud-food'); if(f) f.textContent='Food: '+Fish.food+' lbs';
+    var t=document.getElementById('fish-hud-time'); if(t) t.textContent='Time: '+Math.max(0,Math.ceil(Fish.time))+'s';
+  }
+
+  canvas.addEventListener('click', function(){
+    if(!Fish || !Fish.running) return;
+    if(Fish.state==='biting'){
+      var f = pickFish();
+      Fish.food += f.food; Fish.catches++; Fish.lastCatch = f;
+      Fish.state='hooked'; Fish.stateT=0;
+      synthSplash(); sfx('snd_coin',0.4);
+    } else if(Fish.state==='idle'){
+      // clicked too early — small chance of spooking, mostly harmless
+    }
+  });
+
+  requestAnimationFrame(frame);
+}
+
+function endFish(){
+  if(!Fish || !Fish.running) return;
+  Fish.running = false;
+  S.food += Fish.food;
+  addLog('Fishing: caught '+Fish.catches+' fish for '+Fish.food+' lbs of food.');
+  S.screen='fishResult';
+  render();
+}
+
+SCREENS.fishResult = function(){
+  var wrap = el('div',{class:'title-screen'});
+  wrap.appendChild(el('h1',{class:'headline'},['Fishing Results']));
+  wrap.appendChild(el('div',{class:'panel',style:'max-width:420px;margin:0 auto;text-align:left;'},[
+    el('p',{},['Fish caught: '+Fish.catches]),
+    el('p',{},['Missed bites: '+Fish.misses]),
+    el('p',{},['Food gathered: '+Fish.food+' lbs'])
+  ]));
+  wrap.appendChild(el('button',{class:'btn gold', onclick:function(){ var back=Fish.returnTo||'hub'; Fish=null; S.screen=back; render(); }},['Back']));
   return wrap;
 };
 
