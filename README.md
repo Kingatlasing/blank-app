@@ -47,6 +47,10 @@ Two more presets show gates and wire driving a real mechanism instead of just li
 
 Not included yet: XOR/XNOR (composing them from the above needs signal routing this simple approach can't reach without more machinery) and anything relying on real feedback or timing — RS latches, clocks/pulsers — since this app computes a circuit's settled state once per interaction rather than simulating individual game ticks.
 
+### Farms & Automation
+
+Two presets — **Automatic Wheat Farm** and **Animal Breeding Pen** — the one deliberate place mobs/animals show up in this app; the general walk-around 3D view is otherwise intentionally mob-free. Neither farmland, water, wheat, fences, hoppers, chests, nor any mob/animal model exist in this app's texture atlas or decor set, so both presets are built from honestly-labeled stand-ins (spelled out in each preset's own description/notes): the wheat farm's water-flow harvest layout (crop rows flanking a central channel, collected by a hopper at the downstream end — real vanilla farmland stays tilled within 4 blocks of water, and a harvested crop floats to a collection point on flowing water) uses a chosen block for "farmland" and another for "water," and grass_tuft decor standing in for planted wheat; the hopper itself is real new procedural geometry (a basin over a spout, no texture existed for the real tapered shape either). The animal pen uses the existing iron_bars decor as a stand-in fence and a new simple low-poly cow model (a few coloured boxes) rather than a real (textured, animated) mob. Both show the correct real-world layout/mechanism, not a literal 1:1 reproduction of the missing art.
+
 ### Structure library
 
 Great Pyramid of Khufu, Pyramid of Khafre, Pyramid of Menkaure, Great Ziggurat of Ur, Big Ben, Leaning Tower of Pisa, the Colosseum, the Statue of Liberty, the Taj Mahal, the Burj Khalifa, the Eiffel Tower, a windmill, a lighthouse, a medieval castle keep, and a village house — each with real published dimensions.
@@ -67,7 +71,7 @@ This app ships with a curated library of real dimensions and a handful of geomet
 
 ### Not in this pass yet
 
-A guided freeform *generator* for whole categories (describe a fortress with traps, or a maze, and have it auto-built) is a natural next step, but it's a fundamentally different feature from the direct block-by-block Build mode this pass added — that one lets you build anything by hand right now. XOR/XNOR, repeaters/comparators, and real feedback-based latches/clocks are the natural next extensions to the gate library and propagation simulation above. Farm-style contraptions (crop farms, mob grinders) that would meaningfully show mobs/animals aren't built yet either — this app has no mob/animal geometry or farmland/water/hopper blocks at all yet, so a real one needs new assets first rather than being bolted onto the existing decor set.
+A guided freeform *generator* for whole categories (describe a fortress with traps, or a maze, and have it auto-built) is a natural next step, but it's a fundamentally different feature from the direct block-by-block Build mode this pass added — that one lets you build anything by hand right now. XOR/XNOR, repeaters/comparators, and real feedback-based latches/clocks are the natural next extensions to the gate library and propagation simulation above. A mob grinder/spawner-based farm is the natural next farm preset once there's a second mob model to justify it.
 
 ### How to run it on your own machine
 

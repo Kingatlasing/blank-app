@@ -1781,6 +1781,13 @@ const DECOR_TYPES = {
   activator_rail: { kind: 'rail', color: 0xff6a3c, offColor: 0x7a2f18, interactive: false },
   detector_rail: { kind: 'rail', color: 0xb0b0b0, dotColor: 0xdb3b2b, interactive: false },
   minecart: { kind: 'minecart', tile: 'iron_block', interactive: false },
+  // Farm-related blocks/mobs: no hopper, farmland, water, wheat, fence, or
+  // any mob/animal texture or model exists in this app's atlas or decor
+  // set — everything below is new procedural geometry using existing full-
+  // cube textures/plain colour as a stand-in, same approach as rails
+  // above, so the Farms & Automation presets can exist at all.
+  hopper: { kind: 'hopper', tile: 'iron_block', interactive: false },
+  cow: { kind: 'cow', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2469,6 +2476,51 @@ function buildPitfallTrapInterior(grid, silhouette, dims, exteriorMat, accentMat
   grid[idx(pitX, 0, cz, dims)] = 0; // open a pit through the floor right under the trapdoor
   decorOut.push({ type: 'trapdoor', x: pitX, y: 1, z: cz, facing: 'north', half: 'bottom', open: false });
 }
+// A real automatic wheat farm's layout: a water channel down the middle
+// (real vanilla farmland stays tilled within 4 blocks of water, and
+// harvested crops float on flowing water to a collection point) with crop
+// rows on both banks, collected by a hopper at the flow's downstream end.
+// This app has no farmland/water/wheat block or texture at all, so the
+// exterior material stands in for tilled soil and the accent material
+// (pick a blue block — the preset defaults to light blue stained glass)
+// stands in for the water; a grass_tuft decor stands in for planted wheat.
+function buildCropFarmInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  const cz = Math.floor(dims.sz / 2);
+  for (let z = 0; z < dims.sz; z++) {
+    for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = (z === cz) ? accentMat : exteriorMat;
+  }
+  if (!decorOut) return;
+  for (let z = 0; z < dims.sz; z++) {
+    if (z === cz) continue;
+    for (let x = 1; x < dims.sx; x++) decorOut.push({ type: 'grass_tuft', x, y: 1, z });
+  }
+  decorOut.push({ type: 'hopper', x: 0, y: 1, z: cz }); // collection point at the water's downstream end
+}
+// A fenced animal pen — no real fence texture/model exists in this app, so
+// the existing iron_bars panel decor stands in for the enclosure, and the
+// cows are the new low-poly stand-in model (see cowParts/DECOR_TYPES.cow),
+// not a real mob — this app has no mob geometry otherwise, and the general
+// walk-around view intentionally has none either (this preset is the one
+// deliberate exception, to actually show what an animal farm looks like).
+function buildAnimalPenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  for (let x = 0; x < dims.sx; x++) {
+    decorOut.push({ type: 'bars', x, y: 1, z: 0, axis: 'z' });
+    decorOut.push({ type: 'bars', x, y: 1, z: dims.sz - 1, axis: 'z' });
+  }
+  for (let z = 1; z < dims.sz - 1; z++) {
+    decorOut.push({ type: 'bars', x: 0, y: 1, z, axis: 'x' });
+    decorOut.push({ type: 'bars', x: dims.sx - 1, y: 1, z, axis: 'x' });
+  }
+  const midX = Math.floor(dims.sx / 2), midZ = Math.floor(dims.sz / 2);
+  const cowSpots = [[2, 2, 'south'], [dims.sx - 3, 2, 'north'], [midX, dims.sz - 3, 'east']];
+  for (const [x, z, facing] of cowSpots) {
+    if (x > 0 && x < dims.sx - 1 && z > 0 && z < dims.sz - 1) decorOut.push({ type: 'cow', x, y: 1, z, facing });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -2679,6 +2731,28 @@ const PRESETS = [
       'Walk onto the plate in Walk mode and watch the wire light up before the trapdoor drops — the delay you\'d see is exactly this app\'s falloff-based propagation, not a scripted cue.',
     ],
   },
+  {
+    id: 'crop-farm', name: 'Automatic Wheat Farm', shape: 'box', category: 'Farms & Automation',
+    real: { height: 2, baseX: 9, baseZ: 5 }, interiorMode: 'cropFarm',
+    blocks: { exterior: 'dirt', interior: 'stone', accent: 'light_blue_stained_glass' },
+    desc: 'A real water-flow harvest farm layout: crop rows on both banks of a central water channel. In real Minecraft, farmland stays tilled within 4 blocks of water, and a harvested crop\'s item drops onto flowing water, which carries it downstream to a single collection point — shown here as a hopper at one end.',
+    keywords: ['farm', 'crop', 'wheat', 'wheat farm', 'automatic farm', 'harvest', 'water'],
+    notes: [
+      'This app has no real farmland, water, wheat, or hopper texture/model at all — the exterior block (default dirt) stands in for tilled farmland, the accent block (default light blue stained glass) stands in for the water channel, and grass_tuft decor stands in for planted wheat. The hopper is real new geometry (a basin over a spout), textured with iron_block.',
+      'Real automatic wheat farms also need a way to actually harvest the crop (a player, or a redstone-triggered piston/observer setup) — this preset only shows the static layout, not a working harvest cycle.',
+    ],
+  },
+  {
+    id: 'animal-pen', name: 'Animal Breeding Pen', shape: 'box', category: 'Farms & Automation',
+    real: { height: 2, baseX: 7, baseZ: 7 }, interiorMode: 'animalPen',
+    blocks: { exterior: 'grass_block', interior: 'dirt', accent: 'oak_planks' },
+    desc: 'A fenced pen for breeding animals — the real vanilla loop is two of the same animal, each fed their breeding food, spawning a baby. Shown here with a few cows inside a fenced enclosure.',
+    keywords: ['farm', 'animal', 'cow', 'breeding', 'pen', 'pasture', 'mob farm'],
+    notes: [
+      'This app has no fence texture/model or any real mob model at all — the enclosure uses the existing iron_bars decor as a stand-in fence, and the cows are new simple low-poly geometry (a few coloured boxes), not a real (textured, animated) mob model.',
+      'This is the one preset in the whole app that shows an animal at all — the general walk-around 3D view is deliberately mob/animal-free otherwise.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -2733,7 +2807,7 @@ function populateMaterialSelect(select, defaultId) {
 // Presets are grouped by category (real-world structures vs. the redstone
 // contraption library) rather than one long flat list, and re-populated
 // live as the user types into the "describe what you want" search box.
-const PRESET_CATEGORY_ORDER = ['Real-World Structures', 'Redstone Logic Gates', 'Traps & Mechanisms'];
+const PRESET_CATEGORY_ORDER = ['Real-World Structures', 'Redstone Logic Gates', 'Traps & Mechanisms', 'Farms & Automation'];
 function populatePresetSelect(select, presets) {
   select.innerHTML = '';
   const byCat = new Map();
@@ -2844,6 +2918,8 @@ function updateInteriorAvailability() {
     hint.textContent = 'A real AND gate (see the AND Gate preset) wired straight into a door — both levers have to be on at once before the door is powered. Turn on "Interact mode" and try just one lever, then both.';
   } else if (mode === 'pitfallTrap') {
     hint.textContent = 'Step on the plate (Walk mode) and watch power actually travel down the wire run to the trapdoor — real propagation, not a hardcoded link. Widen the wire run to see the signal die out past 15 blocks.';
+  } else if (mode === 'cropFarm' || mode === 'animalPen') {
+    hint.textContent = 'This app has no real farmland/water/wheat/fence/mob assets — see the preset description for exactly which blocks stand in for what.';
   } else {
     hint.textContent = 'Hollows the interior and adds floor slabs with a stairwell gap at the spacing set below.';
   }
@@ -3023,6 +3099,10 @@ function generateModel() {
     buildTwoKeyDoorInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'pitfallTrap') {
     buildPitfallTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'cropFarm') {
+    buildCropFarmInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'animalPen') {
+    buildAnimalPenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3416,6 +3496,34 @@ function minecartParts(tileKey) {
   endB.translate(0, -0.5 + h / 2, -d / 2 + wallT / 2);
   return [bottom, sideL, sideR, endF, endB];
 }
+// A hopper has no exact real-model source here either (like the minecart,
+// its true shape — a tapered funnel — lives in Java model/entity code this
+// app doesn't have); approximated as a wide basin over a narrow spout,
+// self-contained in one cell, textured with iron_block for the right
+// metallic look.
+function hopperParts(tileKey) {
+  const basin = new THREE.BoxGeometry(0.8, 0.3, 0.8); remapUV(basin, tileKey);
+  basin.translate(0, 0.35, 0); // top flush with the cell's own top
+  const spout = new THREE.BoxGeometry(0.3, 0.4, 0.3); remapUV(spout, tileKey);
+  return [basin, spout]; // spout is already centered — meets the basin's underside
+}
+// A simple low-poly cow (no cow texture/model in this app at all) — body,
+// head, and 4 legs as plain coloured boxes, standing in for a real
+// (textured, jointed) mob model; used only in the Farms & Automation
+// presets to illustrate what an animal pen looks like, per the header
+// comment on DECOR_TYPES.cow.
+function cowParts() {
+  const body = new THREE.BoxGeometry(0.5, 0.5, 0.9);
+  body.translate(0, 0.15, 0);
+  const head = new THREE.BoxGeometry(0.32, 0.32, 0.3);
+  head.translate(0, 0.2, 0.6);
+  const legs = [[-0.18, -0.3], [0.18, -0.3], [-0.18, 0.3], [0.18, 0.3]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.4, 0.12);
+    g.translate(x, -0.3, z);
+    return g;
+  });
+  return { body, head, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -3682,6 +3790,21 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts) group.add(new THREE.Mesh(g, decorMaterial()));
     group.position.y = 3 * PX; // rests on top of the rail's tie height
     group.rotation.y = entry.axis === 'x' ? Math.PI / 2 : 0;
+    objs.push(group);
+  } else if (def.kind === 'hopper') {
+    const key = 'hopper:' + def.tile;
+    let parts = decorGeoCache.get(key);
+    if (!parts) { parts = hopperParts(def.tile); decorGeoCache.set(key, parts); }
+    for (const g of parts) objs.push(new THREE.Mesh(g, decorMaterial()));
+  } else if (def.kind === 'cow') {
+    let parts = decorGeoCache.get('cow');
+    if (!parts) { parts = cowParts(); decorGeoCache.set('cow', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x5c3d21), headMat = solidMaterial(0xd8cdb8);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, headMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = FACING_YAW[entry.facing || 'south'];
     objs.push(group);
   }
   return objs;
@@ -4407,6 +4530,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -4463,6 +4587,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
+    hopper: 'Hopper', cow: 'Cow',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -4541,6 +4666,8 @@ function renderCommands(model) {
       else if (d.type === 'detector_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:detector_rail[shape=${railShapeString(d)}]`);
       else if (d.type === 'activator_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:activator_rail[shape=${railShapeString(d)},powered=${!!(d.powered || d.on)}]`);
       else if (d.type === 'minecart') lines.push(`summon minecraft:minecart ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'hopper') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:hopper[facing=down]`);
+      else if (d.type === 'cow') lines.push(`summon minecraft:cow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
