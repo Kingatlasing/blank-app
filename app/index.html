@@ -2676,6 +2676,22 @@ function panelGeometry(tileKey, thinAxis) {
   remapUV(geo, tileKey);
   return geo;
 }
+// A trapdoor panel with its origin at the hinge edge (local y=0) instead of
+// its center, so a single rotation.x sweep naturally keeps that edge fixed
+// in place: at rotation.x=0 it stands upright from the hinge (open); at
+// rotation.x=PI/2 the same edge anchors it flat, spanning the full cell in
+// the swept direction (closed) — with no separate position offset needed
+// (a symmetric, center-origin box needs one, but that offset only matches
+// the panel's footprint in ONE of the two rotation states, leaving a gap
+// on one side and an overhang past the cell on the other in the state it
+// doesn't match). ceilingMount flips which way it stands open (down from a
+// ceiling instead of up from a floor).
+function trapdoorGeometry(tileKey, ceilingMount) {
+  const geo = new THREE.BoxGeometry(1, 1, PANEL_THIN);
+  geo.translate(0, ceilingMount ? -0.5 : 0.5, 0);
+  remapUV(geo, tileKey);
+  return geo;
+}
 // A thin standing rod (not a flat billboard) so torches read as real 3D
 // objects from every angle. Real torch: ~2x10x2px stick, base near the floor.
 function torchGeometry(tileKey) {
@@ -2795,6 +2811,17 @@ function buildDecorMeshesForEntry(entry) {
     // edges along the wide axis) so opening it is a real 90 degree swing,
     // not a texture swap. entry.y is the door's bottom cell; the top half
     // occupies the cell above it (each half a full 16x16x3px panel).
+    //
+    // The pivot itself (the group's own position) carries BOTH the hinge
+    // corner's wideAxis position AND its depth (axis) position — i.e. the
+    // exact vertical hinge line the door post sits on. The panel meshes are
+    // offset from that pivot only along wideAxis (their swing arm). Putting
+    // the depth offset on the pivot instead of on the panels matters once
+    // the door opens: a depth offset carried on the panel gets rotated
+    // along with the swing and ends up perpendicular to the hinge line,
+    // opening a visible gap between the door and the post it's hinged to;
+    // putting it on the pivot keeps the door flush against that post at
+    // every angle, open or closed.
     const hingeSign = entry.hinge === 'right' ? 1 : -1;
     const wideAxis = axis === 'z' ? 'x' : 'z';
     const group = new THREE.Group();
@@ -2803,27 +2830,36 @@ function buildDecorMeshesForEntry(entry) {
     const mb = new THREE.Mesh(gb, decorMaterial());
     const mt = new THREE.Mesh(gt, decorMaterial());
     mb.position[wideAxis] = -hingeSign * 0.5;
-    mb.position[axis] = -0.5 + PANEL_THIN / 2;
     mt.position.copy(mb.position); mt.position.y = 1;
     group.add(mb, mt);
     group.position[wideAxis] = hingeSign * 0.5;
+    group.position[axis] = -0.5 + PANEL_THIN / 2;
     group.userData.hingeSign = hingeSign;
     group.userData.axis = axis;
     registerInteractive(group, entry, 'door');
     objs.push(group);
   } else if (def.kind === 'trapdoor') {
-    // Pivoted at the edge on the "facing" side; closed it lies flat against
-    // the floor or ceiling, open it swings up/down to vertical.
+    // The swing group's own position IS the fixed hinge line — its Y sits
+    // at the floor/ceiling mount height, and its Z at the near edge of the
+    // cell (the "facing" wall reorients this via the outer group's yaw).
+    // Because the panel mesh's origin is that same hinge edge (see
+    // trapdoorGeometry), rotating the swing group from PI/2 (closed, flat,
+    // spanning the full cell) to 0 (open, standing) needs no compensating
+    // position change and never drifts off that edge.
     const facing = entry.facing || 'south';
     const half = entry.half || 'bottom';
-    const geo = cachedGeo('trapdoor:' + def.tile, () => panelGeometry(def.tile, 'z'));
+    const ceilingMount = half === 'top';
+    const geo = cachedGeo('trapdoor:' + def.tile + ':' + ceilingMount, () => trapdoorGeometry(def.tile, ceilingMount));
     const m = new THREE.Mesh(geo, decorMaterial());
-    m.rotation.x = Math.PI / 2; // lay the panel flat
-    m.position.y = half === 'top' ? 0.5 - PANEL_THIN / 2 : -0.5 + PANEL_THIN / 2;
-    m.position.z = -0.5 + PANEL_THIN / 2;
+    const swing = new THREE.Group();
+    swing.add(m);
+    swing.rotation.x = Math.PI / 2;
+    swing.position.y = ceilingMount ? 0.5 : -0.5;
+    swing.position.z = -0.5;
     const group = new THREE.Group();
-    group.add(m);
+    group.add(swing);
     group.rotation.y = FACING_YAW[facing];
+    group.userData.swing = swing;
     group.userData.half = half;
     registerInteractive(group, entry, 'trapdoor');
     objs.push(group);
@@ -2970,11 +3006,7 @@ function updateInteractiveAnimations(dt) {
       const sign = obj.userData.axis === 'z' ? 1 : -1;
       obj.rotation.y = -hingeSign * sign * (Math.PI / 2) * t;
     } else if (kind === 'trapdoor') {
-      const child = obj.children[0];
-      const half = obj.userData.half;
-      const closedY = half === 'top' ? 0.5 - PANEL_THIN / 2 : -0.5 + PANEL_THIN / 2;
-      child.rotation.x = THREE.MathUtils.lerp(Math.PI / 2, 0, t);
-      child.position.y = THREE.MathUtils.lerp(closedY, 0, t);
+      obj.userData.swing.rotation.x = THREE.MathUtils.lerp(Math.PI / 2, 0, t);
     } else if (kind === 'lever') {
       // +-45 degrees around the arm's bottom (see buildDecorMeshesForEntry),
       // matching vanilla's lever.json/lever_on.json rotation.
