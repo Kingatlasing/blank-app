@@ -1742,6 +1742,7 @@ const MATERIALS = [
   { id: 'yellow_wool', name: 'Yellow Wool', color: '#f8c527', category: 'Wool', faces: { all: 'yellow_wool' } },
 ];
 const MATERIAL_INDEX = Object.fromEntries(MATERIALS.map((m, i) => [m.id, i]));
+window.MATERIAL_INDEX = MATERIAL_INDEX; // exposed for debugging in the browser console, same as window.currentModel below
 const INTERIOR_VOID_COLOR = '#2a4a63';
 
 /* =========================================================================
@@ -4204,6 +4205,43 @@ const REDSTONE_HUGGABLE = new Set(['redstone_wire', 'lever', 'button', 'pressure
 // other call site wants the settled end state of an ordinary (non-clock,
 // non-latch) circuit instantly, so they call it with the default (enough
 // passes for any gate depth in this library to fully settle in one go).
+// Redstone lamp (a real full-cube grid material, not a decor entry) lights
+// up while powered exactly like a door/rail consumer does, swapping its
+// material index between the off and on textures. Its cell positions are
+// cached on the model (model._lampCells) since finding them means scanning
+// the whole grid — cheap once, but wasteful on every single interaction —
+// and are invalidated by attemptBuild whenever a Build-mode edit could have
+// added, removed, or buried one.
+function findLampCells(model) {
+  if (model._lampCells) return model._lampCells;
+  if (!model.grid || !model.dims) return []; // a synthetic test model with only `decor` and no real grid
+  const { grid, dims } = model;
+  const offIdx = MATERIAL_INDEX.redstone_lamp + 1, onIdx = MATERIAL_INDEX.redstone_lamp_on + 1;
+  const cells = [];
+  for (let i = 0; i < grid.length; i++) {
+    if (grid[i] === offIdx || grid[i] === onIdx) {
+      cells.push({ x: i % dims.sx, z: Math.floor(i / dims.sx) % dims.sz, y: Math.floor(i / (dims.sx * dims.sz)) });
+    }
+  }
+  model._lampCells = cells;
+  return cells;
+}
+const REDSTONE_LAMP_NEIGHBORS_3D = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
+function updateRedstoneLamps(model, poweredCells) {
+  const cells = findLampCells(model);
+  if (!cells.length) return;
+  const { grid, dims } = model;
+  const offIdx = MATERIAL_INDEX.redstone_lamp + 1, onIdx = MATERIAL_INDEX.redstone_lamp_on + 1;
+  for (const c of cells) {
+    let powered = poweredCells.has(cellKey(c.x, c.y, c.z));
+    if (!powered) {
+      for (const [dx, dy, dz] of REDSTONE_LAMP_NEIGHBORS_3D) {
+        if (poweredCells.has(cellKey(c.x + dx, c.y + dy, c.z + dz))) { powered = true; break; }
+      }
+    }
+    grid[idx(c.x, c.y, c.z, dims)] = powered ? onIdx : offIdx;
+  }
+}
 function computeRedstone(model, passes = 8) {
   if (!model) return;
   const decor = model.decor;
@@ -4304,6 +4342,7 @@ function computeRedstone(model, passes = 8) {
   for (const [k, e] of wiresByCell) if (e.on) poweredCells.add(k);
   for (const s of switches) if (s.on) poweredCells.add(cellKey(s.x, s.y, s.z));
   for (const t of torches) if (t.on !== false) poweredCells.add(cellKey(t.x, t.y, t.z));
+  updateRedstoneLamps(model, poweredCells);
   const REDSTONE_CONSUMERS = new Set(['door', 'trapdoor', 'powered_rail', 'activator_rail']);
   for (const e of decor) {
     if (!REDSTONE_CONSUMERS.has(e.type)) continue;
@@ -4480,6 +4519,49 @@ function attemptInteract(clientX, clientY, button) {
 // normal — a hair into the empty neighbor cell to place, a hair back into
 // the hit cell to remove — converted to grid coordinates with the exact
 // same world<->grid mapping isSolidAtWorld/updatePressurePlates use.
+// Real vanilla "affected by gravity" blocks: sand, red sand, gravel, and
+// every concrete powder color fall when there's nothing solid beneath them,
+// instead of just floating in place like every other block. (Real vanilla
+// also includes anvil, dragon egg, scaffolding, and pointed dripstone, but
+// none of those are in this app's block palette.) Scoped to Build mode
+// only — running this after preset generation too would collapse any
+// hollow structure a user happened to build out of sand, which is real
+// vanilla behavior for a live world but would silently wreck a scale model
+// nobody asked to be simulated brick by brick.
+const GRAVITY_MATERIAL_IDS = new Set([
+  'sand', 'red_sand', 'gravel',
+  'black_concrete_powder', 'blue_concrete_powder', 'brown_concrete_powder', 'cyan_concrete_powder',
+  'gray_concrete_powder', 'green_concrete_powder', 'light_blue_concrete_powder', 'light_gray_concrete_powder',
+  'lime_concrete_powder', 'magenta_concrete_powder', 'orange_concrete_powder', 'pink_concrete_powder',
+  'purple_concrete_powder', 'red_concrete_powder', 'white_concrete_powder', 'yellow_concrete_powder',
+]);
+const GRAVITY_MATERIAL_INDICES = new Set([...GRAVITY_MATERIAL_IDS].map(id => MATERIAL_INDEX[id] + 1));
+// Compacts every column so each gravity-affected block falls straight down
+// through any air beneath it and comes to rest on the first solid block (or
+// the floor) below, preserving the relative order of a stack — the same
+// settled end-state real vanilla's block-update-triggered falling reaches,
+// without needing to animate the fall itself.
+function settleGravityBlocks(model) {
+  const { grid, dims } = model;
+  let moved = false;
+  for (let x = 0; x < dims.sx; x++) {
+    for (let z = 0; z < dims.sz; z++) {
+      let writeY = 0;
+      for (let y = 0; y < dims.sy; y++) {
+        const i = idx(x, y, z, dims);
+        const v = grid[i];
+        if (v === 0) continue;
+        if (GRAVITY_MATERIAL_INDICES.has(v)) {
+          if (y !== writeY) { grid[idx(x, writeY, z, dims)] = v; grid[i] = 0; moved = true; }
+          writeY++;
+        } else {
+          writeY = y + 1; // a non-falling block is solid ground for anything above it
+        }
+      }
+    }
+  }
+  return moved;
+}
 function attemptBuild(clientX, clientY, removeMode) {
   if (!el('build-toggle').checked || !three || !currentModel) return;
   const rect = three.renderer.domElement.getBoundingClientRect();
@@ -4495,6 +4577,9 @@ function attemptBuild(clientX, clientY, removeMode) {
   const gx = Math.floor(p.x - offX), gy = Math.floor(p.y), gz = Math.floor(p.z - offZ);
   if (gx < 0 || gy < 0 || gz < 0 || gx >= dims.sx || gy >= dims.sy || gz >= dims.sz) return;
   currentModel.grid[idx(gx, gy, gz, dims)] = removeMode ? 0 : (MATERIAL_INDEX[el('build-block-select').value] + 1);
+  settleGravityBlocks(currentModel);
+  currentModel._lampCells = null; // grid changed — re-scan for redstone lamps next computeRedstone call
+  computeRedstone(currentModel);
   renderThree(currentModel, true);
   renderBlueprint(currentModel);
   renderCommands(currentModel);
