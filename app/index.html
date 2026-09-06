@@ -91,6 +91,10 @@
   .tabpanel { display: none; flex: 1 1 auto; min-height: 0; overflow: auto; padding: 14px; }
   .tabpanel.active { display: flex; flex-direction: column; }
 
+  #camera-toolbar { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; padding-bottom: 8px; flex-wrap: wrap; }
+  #camera-toolbar label { margin: 0; color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+  #camera-toolbar select { width: auto; }
+  #camera-toolbar input[type=range] { width: 120px; }
   #three-container { flex: 1 1 auto; min-height: 300px; border-radius: 8px; overflow: hidden; background: #0b1a24; position: relative; }
   #three-container canvas { display: block; }
   #render-note { position: absolute; bottom: 8px; left: 8px; font-size: 11px; color: #cdd6e3; background: rgba(0,0,0,.45); padding: 4px 8px; border-radius: 5px; max-width: 70%; }
@@ -250,6 +254,20 @@
       </div>
 
       <div class="tabpanel active" id="tab-3d">
+        <div id="camera-toolbar">
+          <label for="camera-mode">Camera</label>
+          <select id="camera-mode">
+            <option value="orbit">Orbit (mouse drag + scroll)</option>
+            <option value="fly">Free Fly (drag to look, WASD + Space/Ctrl)</option>
+            <option value="walk">Walk (first-person, drag to look, WASD + Space to jump)</option>
+          </select>
+          <span class="checkbox-row" style="margin:0;">
+            <input type="checkbox" id="cutaway-toggle" />
+            <label for="cutaway-toggle" style="margin:0;">Cutaway</label>
+          </span>
+          <input type="range" id="cutaway-slider" min="0" max="100" value="50" disabled />
+          <span id="camera-hint" class="hint" style="margin:0;"></span>
+        </div>
         <div id="three-container">
           <div id="empty-state">
             <h2>No model yet</h2>
@@ -1351,36 +1369,68 @@
 'use strict';
 
 /* =========================================================================
- * MATERIALS PALETTE
+ * REAL MINECRAFT TEXTURE ATLAS
+ * Tiles extracted from PrismarineJS/minecraft-assets (github.com/PrismarineJS/
+ * minecraft-assets, Minecraft 1.20.2) — actual in-game block textures, not
+ * redrawn artwork, per the request to look/feel exactly like vanilla
+ * Minecraft. These are Mojang's own texture art shipped inside the Minecraft
+ * client and re-published (unofficially) by that community project for use
+ * by Minecraft tooling; they are not independently, freely licensed the way
+ * the rest of this app's code is. That's an accepted, long-standing norm in
+ * the Minecraft tool ecosystem (mineflayer, prismarine-viewer, schematic
+ * viewers, etc.) but is worth knowing if this project is ever redistributed
+ * publicly rather than used personally.
+ * ==================================================================== */
+const ATLAS_B64 = 'data:image/png;base64,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44eiQojVT9ICwhXDeyYASNyhvD6p9qd+Kgn5dBHer55KPb5MDO9XTwFDUi8ARu7SPtETBAGpZLDk6wsiCxant7cYU8pPv2/B5auBPR7eNOlZPu8JEhh2dHhNgFCBJ4pECMP71UuyhBxG+9Xz7bwo5NgOTogCE3mGfe9NByNlkJjekEo+Th+gwJmWAvayqGfyhiFf4G4tZ3cev1eUQH5Gm6Y5pvLxzH9+fj5QEh49ehTVLS9V0H71LbsF2N4DCybpA/x+9fDzuYf/wdnexWhGkkQsCALEYR9uUoS7hw6wsqajst3cFwmc9Mh7UgIpSOhmkvcMAkTN9DAa8MZXDeT4ae9X761G6gK8DVxPBu4yhwoBJ4jDPlz/BglaJMJguOcDI55cXsTVmxt7KoFR2n/U4+7Zj0/fi2sBUbM+ihNQwNAY0gHGfOzrAPqOPlULYE++gMBmuuQLP4lBH30I3qIPUwGFMcdNsqsrm9N/UcT9//wTO6idd374/5v0GJvYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLbbYYosttthiiy222GKLLba97P8Cq1mGVeyg2lkAAAAASUVORK5CYII=';
+const ATLAS_W = 128, ATLAS_H = 128, ATLAS_TILE = 16;
+const ATLAS_UV = { andesite: {x:0, y:0}, black_concrete: {x:16, y:0}, bricks: {x:32, y:0}, cut_sandstone: {x:48, y:0}, dark_oak_log: {x:64, y:0}, dark_oak_log_top: {x:80, y:0}, deepslate_bricks: {x:96, y:0}, glass: {x:112, y:0}, glass_pane_top: {x:0, y:16}, gold_block: {x:16, y:16}, gray_concrete: {x:32, y:16}, iron_bars: {x:48, y:16}, iron_block: {x:64, y:16}, ladder: {x:80, y:16}, light_gray_concrete: {x:96, y:16}, mossy_stone_bricks: {x:112, y:16}, oak_door_bottom: {x:0, y:32}, oak_door_top: {x:16, y:32}, oak_log: {x:32, y:32}, oak_log_top: {x:48, y:32}, oak_planks: {x:64, y:32}, oak_trapdoor: {x:80, y:32}, oxidized_copper: {x:96, y:32}, polished_andesite: {x:112, y:32}, quartz_block_bottom: {x:0, y:48}, quartz_block_side: {x:16, y:48}, quartz_block_top: {x:32, y:48}, red_concrete: {x:48, y:48}, sandstone: {x:64, y:48}, sandstone_bottom: {x:80, y:48}, sandstone_top: {x:96, y:48}, spruce_planks: {x:112, y:48}, stone: {x:0, y:64}, stone_bricks: {x:16, y:64}, terracotta: {x:32, y:64}, torch: {x:48, y:64}, white_concrete: {x:64, y:64} };
+
+/* =========================================================================
+ * MATERIALS PALETTE — each cube material maps to real atlas tiles per face
+ * (top/bottom/side), falling back to a single tile for uniform blocks.
  * ==================================================================== */
 const MATERIALS = [
-  { id: 'quartz_block', name: 'Quartz Block', color: '#ece9e1' },
-  { id: 'smooth_sandstone', name: 'Smooth Sandstone', color: '#e0d3a8' },
-  { id: 'cut_sandstone', name: 'Cut Sandstone', color: '#dbc98a' },
-  { id: 'sandstone', name: 'Sandstone', color: '#d9c98f' },
-  { id: 'white_concrete', name: 'White Concrete', color: '#e9ecec' },
-  { id: 'light_gray_concrete', name: 'Light Gray Concrete', color: '#a9adad' },
-  { id: 'gray_concrete', name: 'Gray Concrete', color: '#37393b' },
-  { id: 'black_concrete', name: 'Black Concrete', color: '#191919' },
-  { id: 'red_concrete', name: 'Red Concrete', color: '#8b2b2b' },
-  { id: 'stone', name: 'Stone', color: '#7d7d7d' },
-  { id: 'stone_bricks', name: 'Stone Bricks', color: '#8d8d8d' },
-  { id: 'mossy_stone_bricks', name: 'Mossy Stone Bricks', color: '#7c8a6c' },
-  { id: 'andesite', name: 'Andesite', color: '#8d8f8f' },
-  { id: 'polished_andesite', name: 'Polished Andesite', color: '#9a9c9c' },
-  { id: 'deepslate_bricks', name: 'Deepslate Bricks', color: '#444548' },
-  { id: 'iron_block', name: 'Iron Block', color: '#dcdcdc' },
-  { id: 'gold_block', name: 'Gold Block', color: '#f9d94f' },
-  { id: 'oxidized_copper', name: 'Oxidized Copper', color: '#52a37c' },
-  { id: 'bricks', name: 'Bricks', color: '#976153' },
-  { id: 'terracotta', name: 'Terracotta', color: '#9c5133' },
-  { id: 'oak_planks', name: 'Oak Planks', color: '#b4874c' },
-  { id: 'spruce_planks', name: 'Spruce Planks', color: '#714c30' },
-  { id: 'dark_oak_log', name: 'Dark Oak Log', color: '#3f2e1c' },
-  { id: 'glass', name: 'Glass', color: '#dff6f5' },
+  { id: 'quartz_block', name: 'Quartz Block', color: '#ebe5de', faces: { top: 'quartz_block_top', bottom: 'quartz_block_bottom', side: 'quartz_block_side' } },
+  { id: 'smooth_sandstone', name: 'Smooth Sandstone', color: '#dfd6aa', faces: { all: 'sandstone_top' } },
+  { id: 'cut_sandstone', name: 'Cut Sandstone', color: '#d9ce9f', faces: { all: 'cut_sandstone' } },
+  { id: 'sandstone', name: 'Sandstone', color: '#d8cb9b', faces: { top: 'sandstone_top', bottom: 'sandstone_bottom', side: 'sandstone' } },
+  { id: 'white_concrete', name: 'White Concrete', color: '#cfd5d6', faces: { all: 'white_concrete' } },
+  { id: 'light_gray_concrete', name: 'Light Gray Concrete', color: '#7d7d73', faces: { all: 'light_gray_concrete' } },
+  { id: 'gray_concrete', name: 'Gray Concrete', color: '#36393d', faces: { all: 'gray_concrete' } },
+  { id: 'black_concrete', name: 'Black Concrete', color: '#080a0f', faces: { all: 'black_concrete' } },
+  { id: 'red_concrete', name: 'Red Concrete', color: '#8e2020', faces: { all: 'red_concrete' } },
+  { id: 'stone', name: 'Stone', color: '#7d7d7d', faces: { all: 'stone' } },
+  { id: 'stone_bricks', name: 'Stone Bricks', color: '#7a797a', faces: { all: 'stone_bricks' } },
+  { id: 'mossy_stone_bricks', name: 'Mossy Stone Bricks', color: '#737969', faces: { all: 'mossy_stone_bricks' } },
+  { id: 'andesite', name: 'Andesite', color: '#888888', faces: { all: 'andesite' } },
+  { id: 'polished_andesite', name: 'Polished Andesite', color: '#848685', faces: { all: 'polished_andesite' } },
+  { id: 'deepslate_bricks', name: 'Deepslate Bricks', color: '#464647', faces: { all: 'deepslate_bricks' } },
+  { id: 'iron_block', name: 'Iron Block', color: '#dcdcdc', faces: { all: 'iron_block' } },
+  { id: 'gold_block', name: 'Gold Block', color: '#f6d03d', faces: { all: 'gold_block' } },
+  { id: 'oxidized_copper', name: 'Oxidized Copper', color: '#52a284', faces: { all: 'oxidized_copper' } },
+  { id: 'bricks', name: 'Bricks', color: '#966153', faces: { all: 'bricks' } },
+  { id: 'terracotta', name: 'Terracotta', color: '#985e43', faces: { all: 'terracotta' } },
+  { id: 'oak_planks', name: 'Oak Planks', color: '#a2824e', faces: { all: 'oak_planks' } },
+  { id: 'spruce_planks', name: 'Spruce Planks', color: '#725430', faces: { all: 'spruce_planks' } },
+  { id: 'dark_oak_log', name: 'Dark Oak Log', color: '#3c2e1a', faces: { top: 'dark_oak_log_top', bottom: 'dark_oak_log_top', side: 'dark_oak_log' } },
+  { id: 'glass', name: 'Glass', color: '#afd5db', faces: { all: 'glass' } },
 ];
 const MATERIAL_INDEX = Object.fromEntries(MATERIALS.map((m, i) => [m.id, i]));
 const INTERIOR_VOID_COLOR = '#2a4a63';
+
+/* =========================================================================
+ * DECOR BLOCKS — non-cube in-game elements (doors, windows, torches,
+ * trapdoors, ladders) placed by the generators alongside the main grid.
+ * ==================================================================== */
+const DECOR_TYPES = {
+  torch: { kind: 'cross', tile: 'torch' },
+  door: { kind: 'door', tiles: { bottom: 'oak_door_bottom', top: 'oak_door_top' } },
+  trapdoor: { kind: 'trapdoor', tile: 'oak_trapdoor' },
+  window: { kind: 'panel', tile: 'glass_pane_top' },
+  ladder: { kind: 'panel', tile: 'ladder' },
+  bars: { kind: 'panel', tile: 'iron_bars' },
+};
+
 
 /* =========================================================================
  * SHAPE VOXELIZERS
@@ -1633,7 +1683,7 @@ const PYR = {
   passageFrac: 1.2 / 230.4,
 };
 
-function buildPyramidInterior(grid, silhouette, dims, accentMat) {
+function buildPyramidInterior(grid, silhouette, dims, accentMat, decorOut) {
   const base = Math.min(dims.sx, dims.sz);
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const cb = (v) => Math.max(1, Math.round(v));
@@ -1677,17 +1727,29 @@ function buildPyramidInterior(grid, silhouette, dims, accentMat) {
 
   const sx0 = Math.min(dims.sx - 1, Math.max(0, kingCx)), sz0 = Math.round(cz);
   grid[idx(sx0, Math.min(dims.sy - 1, kingY), sz0, dims)] = accentMat;
+
+  if (decorOut) {
+    const torch = (x, y, z) => decorOut.push({ type: 'torch', x: Math.min(dims.sx - 1, Math.max(0, Math.round(x))), y: Math.min(dims.sy - 1, Math.max(0, Math.round(y))), z: Math.min(dims.sz - 1, Math.max(0, Math.round(z))) });
+    torch(entranceX, entranceY, entranceZ + 1);
+    torch(descEnd[0], descEnd[1], descEnd[2]);
+    torch(branch[0], branch[1], branch[2]);
+    torch(junction[0], junction[1], junction[2]);
+    torch(kingCx - Math.floor(kingSizeX / 2) + 1, kingY, cz);
+    torch(kingCx + Math.ceil(kingSizeX / 2) - 1, kingY, cz);
+    torch(cx - Math.floor(queenSizeX / 2) + 1, queenY, cz);
+    torch(cx + Math.ceil(queenSizeX / 2) - 1, queenY, cz);
+  }
 }
 
 // Generic "floors" interior: hollows the shape to a 1-thick shell, then adds
 // solid floor slabs every `blocksPerFloor` blocks with one stairwell gap.
-function buildFloorsInterior(grid, silhouette, dims, blocksPerFloor, exteriorMat, accentMat) {
+function buildFloorsInterior(grid, silhouette, dims, blocksPerFloor, exteriorMat, accentMat, decorOut) {
   const shell = hollowCarve(silhouette, dims, 1);
   for (let i = 0; i < grid.length; i++) grid[i] = silhouette[i] ? (shell[i] ? exteriorMat : 0) : 0;
 
-  const cx = Math.floor(dims.sx / 2);
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   const stairX = Math.max(0, Math.min(dims.sx - 1, cx + Math.max(1, Math.floor(dims.sx * 0.25))));
-  const stairZ = Math.floor(dims.sz / 2);
+  const stairZ = cz;
   const bpf = Math.max(2, Math.round(blocksPerFloor));
   for (let y = bpf; y < dims.sy - 1; y += bpf) {
     for (let z = 0; z < dims.sz; z++) {
@@ -1698,6 +1760,32 @@ function buildFloorsInterior(grid, silhouette, dims, blocksPerFloor, exteriorMat
     }
     const stairI = idx(stairX, y, stairZ, dims);
     if (silhouette[stairI]) grid[stairI] = 0;
+  }
+
+  if (!decorOut) return;
+
+  // Ladder running the full height of the stairwell gap so it's clear how to get up.
+  if (silhouette[idx(stairX, 1, stairZ, dims)]) {
+    for (let y = 1; y < dims.sy - 1; y++) decorOut.push({ type: 'ladder', x: stairX, y, z: stairZ, axis: 'x' });
+  }
+
+  // Scan outward from center to find the real wall (handles tapering shapes like domes/towers).
+  const scanX = (y, z, dir) => { let x = cx, last = -1; while (x >= 0 && x < dims.sx) { if (silhouette[idx(x, y, z, dims)]) last = x; else if (last !== -1) break; x += dir; } return last; };
+  const scanZ = (x, y, dir) => { let z = cz, last = -1; while (z >= 0 && z < dims.sz) { if (silhouette[idx(x, y, z, dims)]) last = z; else if (last !== -1) break; z += dir; } return last; };
+
+  // Door: south wall at ground level, 2 blocks tall.
+  const doorZ = scanZ(cx, 1, 1);
+  if (doorZ !== -1 && grid[idx(cx, 1, doorZ, dims)] !== 0) {
+    grid[idx(cx, 1, doorZ, dims)] = 0;
+    if (dims.sy > 2) grid[idx(cx, 2, doorZ, dims)] = 0;
+    decorOut.push({ type: 'door', x: cx, y: 1, z: doorZ, axis: 'z' });
+  }
+
+  // Windows on the east/west walls at the middle of each floor.
+  for (let y = Math.max(1, Math.floor(bpf / 2)); y < dims.sy - 1; y += bpf) {
+    const wx0 = scanX(y, cz, -1), wx1 = scanX(y, cz, 1);
+    if (wx0 !== -1 && grid[idx(wx0, y, cz, dims)] !== 0) { grid[idx(wx0, y, cz, dims)] = 0; decorOut.push({ type: 'window', x: wx0, y, z: cz, axis: 'x' }); }
+    if (wx1 !== -1 && grid[idx(wx1, y, cz, dims)] !== 0) { grid[idx(wx1, y, cz, dims)] = 0; decorOut.push({ type: 'window', x: wx1, y, z: cz, axis: 'x' }); }
   }
 }
 
@@ -2038,19 +2126,20 @@ function generateModel() {
 
   const interiorMode = currentInteriorMode();
   const wantInterior = el('interior-toggle').checked && !el('interior-toggle').disabled;
+  const decor = [];
   if (wantInterior && interiorMode === 'pyramidChambers') {
-    buildPyramidInterior(grid, silhouette, dims, matAcc);
+    buildPyramidInterior(grid, silhouette, dims, matAcc, decor);
   } else if (wantInterior && interiorMode === 'floors') {
     const floorMeters = parseFloat(el('floor-height').value) || 3;
     const bpf = Math.max(2, Math.round(floorMeters * scale));
-    buildFloorsInterior(grid, silhouette, dims, bpf, matExt, matAcc);
+    buildFloorsInterior(grid, silhouette, dims, bpf, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
   const notes = isPresetMode() ? (currentPreset().notes || []) : [];
 
   currentModel = {
-    grid, silhouette, dims, scale, real, fillMode, wallThickness, wantInterior, interiorMode, label, notes,
+    grid, silhouette, dims, scale, real, fillMode, wallThickness, wantInterior, interiorMode, label, notes, decor,
     blockNames: { exterior: el('mat-exterior').value, interior: el('mat-interior').value, accent: el('mat-accent').value },
   };
   window.currentModel = currentModel; // exposed for debugging in the browser console
@@ -2064,14 +2153,162 @@ function generateModel() {
 el('generate-btn').addEventListener('click', generateModel);
 
 /* =========================================================================
- * THREE.JS 3D PREVIEW
+ * TEXTURED GEOMETRY HELPERS (atlas UVs baked onto cube/panel/cross meshes)
+ * ==================================================================== */
+let atlasTexture = null;
+function getAtlasTexture() {
+  if (atlasTexture) return atlasTexture;
+  atlasTexture = new THREE.TextureLoader().load(ATLAS_B64);
+  atlasTexture.magFilter = THREE.NearestFilter;
+  atlasTexture.minFilter = THREE.NearestFilter;
+  atlasTexture.generateMipmaps = false;
+  atlasTexture.flipY = false;
+  return atlasTexture;
+}
+
+function tileUV(tileKey) {
+  const t = ATLAS_UV[tileKey];
+  return { u0: t.x / ATLAS_W, v0: t.y / ATLAS_H, u1: (t.x + ATLAS_TILE) / ATLAS_W, v1: (t.y + ATLAS_TILE) / ATLAS_H };
+}
+
+// Remaps a fresh geometry's default [0,1] UVs into one atlas tile's rect.
+// Works for any geometry whose default UVs lie in [0,1] (Box/PlaneGeometry).
+function remapUV(geo, tileKey) {
+  const { u0, v0, u1, v1 } = tileUV(tileKey);
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+  }
+  uv.needsUpdate = true;
+}
+
+// three.js BoxGeometry face order: 0=+X,1=-X,2=+Y(top),3=-Y(bottom),4=+Z,5=-Z
+function paintFaceUV(geo, faceIndex, tileKey) {
+  const { u0, v0, u1, v1 } = tileUV(tileKey);
+  const uv = geo.attributes.uv;
+  for (let v = 0; v < 4; v++) {
+    const i = faceIndex * 4 + v;
+    uv.setXY(i, u0 + uv.getX(i) * (u1 - u0), v0 + uv.getY(i) * (v1 - v0));
+  }
+}
+
+function buildTexturedBoxGeometry(faces) {
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  const sideTile = faces.all || faces.side;
+  const topTile = faces.all || faces.top || sideTile;
+  const bottomTile = faces.all || faces.bottom || sideTile;
+  [sideTile, sideTile, topTile, bottomTile, sideTile, sideTile].forEach((tile, i) => paintFaceUV(geo, i, tile));
+  geo.attributes.uv.needsUpdate = true;
+  return geo;
+}
+
+const boxGeoCache = new Map(); // materialId (1-based) -> textured BoxGeometry
+function getBoxGeometry(materialId) {
+  if (!boxGeoCache.has(materialId)) boxGeoCache.set(materialId, buildTexturedBoxGeometry(MATERIALS[materialId - 1].faces));
+  return boxGeoCache.get(materialId);
+}
+
+let _cubeMaterial = null;
+function cubeMaterial() {
+  if (!_cubeMaterial) _cubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, metalness: 0.02, clippingPlanes: [cutawayPlane] });
+  return _cubeMaterial;
+}
+let _decorMaterial = null;
+function decorMaterial() {
+  if (!_decorMaterial) _decorMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, alphaTest: 0.4, side: THREE.DoubleSide, clippingPlanes: [cutawayPlane] });
+  return _decorMaterial;
+}
+
+const PANEL_THIN = 0.1875; // 3/16 block, matches vanilla door/trapdoor/pane thickness
+function panelGeometry(tileKey, thinAxis) {
+  const w = thinAxis === 'x' ? PANEL_THIN : 1, d = thinAxis === 'z' ? PANEL_THIN : 1;
+  const geo = new THREE.BoxGeometry(w, 1, d);
+  remapUV(geo, tileKey);
+  return geo;
+}
+function trapdoorGeometry(tileKey) {
+  const geo = new THREE.BoxGeometry(1, PANEL_THIN, 1);
+  remapUV(geo, tileKey);
+  return geo;
+}
+
+const decorGeoCache = new Map();
+function cachedGeo(key, builder) {
+  if (!decorGeoCache.has(key)) decorGeoCache.set(key, builder());
+  return decorGeoCache.get(key);
+}
+
+// Builds the (already-positioned-within-cell) meshes for one decor placement.
+function buildDecorMeshesForEntry(entry) {
+  const def = DECOR_TYPES[entry.type];
+  const axis = entry.axis || 'z';
+  const meshes = [];
+  if (def.kind === 'cross') {
+    const g1 = cachedGeo('cross1:' + def.tile, () => { const g = new THREE.PlaneGeometry(0.8, 0.75); remapUV(g, def.tile); return g; });
+    const g2 = cachedGeo('cross2:' + def.tile, () => { const g = new THREE.PlaneGeometry(0.8, 0.75); remapUV(g, def.tile); return g; });
+    const m1 = new THREE.Mesh(g1, decorMaterial()); m1.rotation.y = Math.PI / 4; m1.position.y = -0.5 + 0.375;
+    const m2 = new THREE.Mesh(g2, decorMaterial()); m2.rotation.y = -Math.PI / 4; m2.position.y = -0.5 + 0.375;
+    meshes.push(m1, m2);
+  } else if (def.kind === 'panel') {
+    const geo = cachedGeo('panel:' + def.tile + ':' + axis, () => panelGeometry(def.tile, axis));
+    meshes.push(new THREE.Mesh(geo, decorMaterial()));
+  } else if (def.kind === 'trapdoor') {
+    const geo = cachedGeo('trapdoor:' + def.tile, () => trapdoorGeometry(def.tile));
+    const m = new THREE.Mesh(geo, decorMaterial());
+    m.position.y = 0.5 - PANEL_THIN / 2;
+    meshes.push(m);
+  } else if (def.kind === 'door') {
+    // entry.y is the door's bottom cell; the top half occupies the cell above it.
+    const gb = cachedGeo('doorB:' + axis, () => panelGeometry(def.tiles.bottom, axis));
+    const gt = cachedGeo('doorT:' + axis, () => panelGeometry(def.tiles.top, axis));
+    const mb = new THREE.Mesh(gb, decorMaterial());
+    const mt = new THREE.Mesh(gt, decorMaterial()); mt.position.y = 1;
+    meshes.push(mb, mt);
+  }
+  return meshes;
+}
+
+/* =========================================================================
+ * THREE.JS 3D PREVIEW — orbit / free-fly / first-person walk cameras, plus
+ * an optional cutaway clipping plane to see inside any model.
  * ==================================================================== */
 let three = null;
+const cutawayPlane = new THREE.Plane(new THREE.Vector3(1, 0, 0), 1e6); // disabled (keeps everything) until enabled
+let cameraMode = 'orbit';
+const pressedKeys = new Set();
+const flyState = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, vy: 0, grounded: false };
+const dragLook = { active: false, lastX: 0, lastY: 0 };
+
+function dirFromYawPitch(yaw, pitch) {
+  const cp = Math.cos(pitch);
+  return new THREE.Vector3(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
+}
+function yawPitchFromDir(d) {
+  return { yaw: Math.atan2(-d.x, -d.z), pitch: Math.asin(THREE.MathUtils.clamp(d.y, -1, 1)) };
+}
+
+function isSolidAtWorld(wx, wy, wz) {
+  if (!currentModel) return false;
+  const m = currentModel;
+  const offX = -m.dims.sx / 2, offZ = -m.dims.sz / 2;
+  const gx = Math.floor(wx - offX), gy = Math.floor(wy), gz = Math.floor(wz - offZ);
+  if (gx < 0 || gy < 0 || gz < 0 || gx >= m.dims.sx || gy >= m.dims.sy || gz >= m.dims.sz) return false;
+  return m.grid[idx(gx, gy, gz, m.dims)] !== 0;
+}
+function playerCollides(fx, fy, fz) {
+  const r = 0.3, H = 1.7;
+  for (const x of [fx - r, fx + r]) for (const z of [fz - r, fz + r]) for (const y of [fy + 0.1, fy + H / 2, fy + H - 0.1]) {
+    if (isSolidAtWorld(x, y, z)) return true;
+  }
+  return false;
+}
+
 function initThree() {
   if (three) return three;
   const container = el('three-container');
   const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.localClippingEnabled = false;
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
@@ -2081,28 +2318,131 @@ function initThree() {
   const controls = new THREE.OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
 
-  scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
   const sun = new THREE.DirectionalLight(0xffffff, 0.8);
   sun.position.set(1, 1.4, 0.8);
   scene.add(sun);
-  const fill = new THREE.DirectionalLight(0x88aaff, 0.3);
-  fill.position.set(-1, 0.5, -0.6);
-  scene.add(fill);
+  const fillLight = new THREE.DirectionalLight(0x88aaff, 0.3);
+  fillLight.position.set(-1, 0.5, -0.6);
+  scene.add(fillLight);
 
   const group = new THREE.Group();
   scene.add(group);
 
+  const clock = new THREE.Clock();
   function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    const dt = Math.min(0.05, clock.getDelta());
+    if (cameraMode === 'orbit') {
+      controls.update();
+    } else {
+      updateFreeCamera(dt);
+    }
     renderer.render(scene, camera);
   }
   animate();
 
   three = { renderer, scene, camera, controls, group, container };
   window.addEventListener('resize', onResizeThree);
+  wireCameraInput(container);
   return three;
 }
+
+function wireCameraInput(container) {
+  container.addEventListener('pointerdown', (e) => {
+    if (cameraMode === 'orbit') return;
+    dragLook.active = true; dragLook.lastX = e.clientX; dragLook.lastY = e.clientY;
+  });
+  window.addEventListener('pointerup', () => { dragLook.active = false; });
+  window.addEventListener('pointermove', (e) => {
+    if (!dragLook.active || cameraMode === 'orbit') return;
+    const dx = e.clientX - dragLook.lastX, dy = e.clientY - dragLook.lastY;
+    dragLook.lastX = e.clientX; dragLook.lastY = e.clientY;
+    flyState.yaw -= dx * 0.006;
+    flyState.pitch = THREE.MathUtils.clamp(flyState.pitch - dy * 0.006, -1.5, 1.5);
+  });
+  window.addEventListener('keydown', (e) => {
+    if (['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+    pressedKeys.add(e.code);
+    if (cameraMode !== 'orbit' && ['Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+  });
+  window.addEventListener('keyup', (e) => pressedKeys.delete(e.code));
+}
+
+function updateFreeCamera(dt) {
+  const t = three;
+  const dir = dirFromYawPitch(flyState.yaw, flyState.pitch);
+  const forward = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize().negate();
+  const speed = (pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')) ? 14 : 6;
+  let mx = 0, mz = 0;
+  if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) { mx += forward.x; mz += forward.z; }
+  if (pressedKeys.has('KeyS') || pressedKeys.has('ArrowDown')) { mx -= forward.x; mz -= forward.z; }
+  if (pressedKeys.has('KeyD')) { mx += right.x; mz += right.z; }
+  if (pressedKeys.has('KeyA')) { mx -= right.x; mz -= right.z; }
+  const len = Math.hypot(mx, mz);
+  if (len > 0) { mx = mx / len * speed * dt; mz = mz / len * speed * dt; }
+
+  if (cameraMode === 'fly') {
+    flyState.pos.x += mx; flyState.pos.z += mz;
+    if (pressedKeys.has('Space')) flyState.pos.y += speed * dt;
+    if (pressedKeys.has('ControlLeft')) flyState.pos.y -= speed * dt;
+  } else if (cameraMode === 'walk') {
+    const p = flyState.pos;
+    if (mx !== 0 && !playerCollides(p.x + mx, p.y, p.z)) p.x += mx;
+    if (mz !== 0 && !playerCollides(p.x, p.y, p.z + mz)) p.z += mz;
+    flyState.vy -= 22 * dt;
+    const dy = flyState.vy * dt;
+    if (dy < 0) {
+      if (!playerCollides(p.x, p.y + dy, p.z)) { p.y += dy; flyState.grounded = false; }
+      else { flyState.vy = 0; p.y = Math.floor(p.y + 0.001); flyState.grounded = true; }
+    } else if (dy > 0) {
+      if (!playerCollides(p.x, p.y + dy, p.z)) p.y += dy; else flyState.vy = 0;
+    }
+    if (pressedKeys.has('Space') && flyState.grounded) { flyState.vy = 8; flyState.grounded = false; }
+    t.camera.position.set(p.x, p.y + 1.6, p.z);
+    t.camera.lookAt(p.x + dir.x, p.y + 1.6 + dir.y, p.z + dir.z);
+    return;
+  }
+  t.camera.position.copy(flyState.pos);
+  t.camera.lookAt(flyState.pos.clone().add(dir));
+}
+
+function setCameraMode(mode) {
+  cameraMode = mode;
+  const t = initThree();
+  t.controls.enabled = (mode === 'orbit');
+  const hint = el('camera-hint');
+  if (mode === 'orbit') {
+    hint.textContent = 'Drag to orbit, scroll to zoom.';
+  } else {
+    const dims = currentModel ? currentModel.dims : { sx: 10, sy: 10, sz: 10 };
+    if (mode === 'fly') {
+      const maxDim = Math.max(dims.sx, dims.sy, dims.sz);
+      flyState.pos.set(maxDim * 0.9, maxDim * 0.75, maxDim * 0.9);
+      const toCenter = new THREE.Vector3(0, dims.sy / 2, 0).sub(flyState.pos).normalize();
+      Object.assign(flyState, yawPitchFromDir(toCenter));
+      hint.textContent = 'Drag to look, WASD to move, Space/Ctrl for up/down, Shift to sprint.';
+    } else {
+      flyState.pos.set(0, dims.sy + 6, 0);
+      flyState.vy = 0; flyState.grounded = false; flyState.yaw = 0; flyState.pitch = -0.35;
+      hint.textContent = 'Drag to look, WASD to move, Space to jump — you\'ll fall in from above.';
+    }
+  }
+}
+el('camera-mode').addEventListener('change', (e) => setCameraMode(e.target.value));
+
+function updateCutaway() {
+  const enabled = el('cutaway-toggle').checked;
+  el('cutaway-slider').disabled = !enabled;
+  if (three) three.renderer.localClippingEnabled = enabled;
+  if (!currentModel) return;
+  const frac = parseInt(el('cutaway-slider').value, 10) / 100;
+  const worldMinX = -currentModel.dims.sx / 2;
+  cutawayPlane.constant = -(worldMinX + currentModel.dims.sx * frac);
+}
+el('cutaway-toggle').addEventListener('change', updateCutaway);
+el('cutaway-slider').addEventListener('input', updateCutaway);
 
 function onResizeThree() {
   if (!three) return;
@@ -2115,11 +2455,7 @@ function onResizeThree() {
 
 function renderThree(model) {
   const t = initThree();
-  while (t.group.children.length) {
-    const obj = t.group.children.pop();
-    obj.geometry && obj.geometry.dispose();
-    obj.material && obj.material.dispose();
-  }
+  while (t.group.children.length) t.group.remove(t.group.children[0]); // geometries/materials are cached & reused, not disposed
 
   const { dims, grid, silhouette } = model;
   let total = 0;
@@ -2150,13 +2486,10 @@ function renderThree(model) {
     }
   }
 
-  const geo = new THREE.BoxGeometry(1, 1, 1);
   const dummy = new THREE.Object3D();
   const offX = -dims.sx / 2, offY = 0, offZ = -dims.sz / 2;
   for (const [matVal, cells] of byMaterial) {
-    const mat = MATERIALS[matVal - 1];
-    const material = new THREE.MeshStandardMaterial({ color: mat.color, roughness: 0.9, metalness: 0.05 });
-    const mesh = new THREE.InstancedMesh(geo, material, cells.length);
+    const mesh = new THREE.InstancedMesh(getBoxGeometry(matVal), cubeMaterial(), cells.length);
     cells.forEach(([x, y, z], i) => {
       dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
       dummy.updateMatrix();
@@ -2165,12 +2498,23 @@ function renderThree(model) {
     t.group.add(mesh);
   }
 
+  for (const entry of model.decor || []) {
+    for (const mesh of buildDecorMeshesForEntry(entry)) {
+      mesh.position.x += entry.x + offX + 0.5;
+      mesh.position.y += entry.y + offY + 0.5;
+      mesh.position.z += entry.z + offZ + 0.5;
+      t.group.add(mesh);
+    }
+  }
+
   const maxDim = Math.max(dims.sx, dims.sy, dims.sz);
   t.camera.position.set(maxDim * 0.9, maxDim * 0.75, maxDim * 0.9);
   t.controls.target.set(0, dims.sy / 2, 0);
   t.camera.near = Math.max(0.1, maxDim / 500);
   t.camera.far = maxDim * 20;
   t.camera.updateProjectionMatrix();
+  updateCutaway();
+  setCameraMode(el('camera-mode').value);
   onResizeThree();
 }
 
@@ -2188,6 +2532,7 @@ function renderBlueprint(model) {
   canvas.width = dims.sx * CELL_PX;
   canvas.height = dims.sz * CELL_PX;
 
+  const DECOR_MARKER = { torch: ['#ffcc33', 'T'], door: ['#c98a4a', 'D'], window: ['#aad2d9', 'W'], ladder: ['#8a6a3a', 'L'], trapdoor: ['#8a6a3a', 'H'], bars: ['#c7c7c2', 'B'] };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -2202,6 +2547,18 @@ function renderBlueprint(model) {
         ctx.fillStyle = color;
         ctx.fillRect(x * CELL_PX, z * CELL_PX, CELL_PX - 1, CELL_PX - 1);
       }
+    }
+    for (const d of model.decor || []) {
+      const spansThisLayer = d.y === y || (d.type === 'door' && d.y + 1 === y);
+      if (!spansThisLayer) continue;
+      const [color, letter] = DECOR_MARKER[d.type] || ['#ffffff', '?'];
+      const cx2 = d.x * CELL_PX + CELL_PX / 2, cz2 = d.z * CELL_PX + CELL_PX / 2;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.arc(cx2, cz2, CELL_PX * 0.38, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#161a21';
+      ctx.font = `${Math.round(CELL_PX * 0.6)}px sans-serif`;
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(letter, cx2, cz2 + 1);
     }
     el('layer-info').textContent = `Layer Y=${y} of ${dims.sy - 1}  •  ${count} block${count === 1 ? '' : 's'}`;
   }
@@ -2221,6 +2578,14 @@ function renderBlueprint(model) {
   if (model.wantInterior) {
     const span = document.createElement('span');
     span.innerHTML = `<span class="swatch" style="background:${INTERIOR_VOID_COLOR}"></span>Interior space (leave empty)`;
+    legend.appendChild(span);
+  }
+  const usedDecor = new Set((model.decor || []).map(d => d.type));
+  const decorLabels = { torch: 'Torch', door: 'Door', window: 'Window', ladder: 'Ladder', trapdoor: 'Trapdoor', bars: 'Iron bars' };
+  for (const type of usedDecor) {
+    const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
+    const span = document.createElement('span');
+    span.innerHTML = `<span class="swatch" style="background:${color}; border-radius:50%;"></span>${letter} = ${decorLabels[type] || type}`;
     legend.appendChild(span);
   }
 }
@@ -2261,6 +2626,24 @@ function renderCommands(model) {
     lines.push('');
     lines.push(`# ... truncated at ${MAX_COMMANDS.toLocaleString()} commands. Reduce the scale, or build upper layers manually from the Layer Blueprint tab.`);
   }
+
+  if (model.decor && model.decor.length) {
+    lines.push('');
+    lines.push(`# --- Decor (doors, windows, torches, ladders) — ${model.decor.length} placements ---`);
+    lines.push(`# facing= is a placeholder based on which wall each item sits in; rotate to match your build's orientation.`);
+    for (const d of model.decor) {
+      const facing = d.axis === 'x' ? 'east' : 'south';
+      if (d.type === 'torch') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:torch`);
+      else if (d.type === 'window') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:glass_pane`);
+      else if (d.type === 'ladder') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:ladder[facing=${facing}]`);
+      else if (d.type === 'trapdoor') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_trapdoor[facing=${facing},half=top,open=false]`);
+      else if (d.type === 'door') {
+        lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
+        lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
+      }
+    }
+  }
+
   el('commands-output').value = lines.join('\n');
 }
 
