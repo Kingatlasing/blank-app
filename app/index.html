@@ -4060,6 +4060,18 @@ const MOB_KINDS = new Set(['cow']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
+// Real vanilla: "cows look at players within six blocks for two to four
+// seconds sometimes" (minecraft.wiki/w/Cow) — only while otherwise idle
+// (a real cow's look-at-player goal loses out to an active walk goal), and
+// only when there's an actual player position to look at, i.e. Walk or
+// Third-person camera mode (Orbit/Fly are editor viewpoints, not a player
+// standing in the world). Real vanilla drives this off a per-tick random
+// chance rather than a fixed cooldown; MOB_LOOK_CHANCE_PER_SEC approximates
+// that "sometimes" qualitatively rather than matching an exact vanilla rate,
+// since this app has no per-tick RNG model to match precisely.
+const MOB_LOOK_RANGE = 6;
+const MOB_LOOK_MIN = 2, MOB_LOOK_MAX = 4;
+const MOB_LOOK_CHANCE_PER_SEC = 0.15;
 function mobCellWalkable(model, x, y, z) {
   const dims = model.dims;
   if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz || y < 0 || y >= dims.sy) return false;
@@ -4088,17 +4100,32 @@ function updateMobs(dt) {
     if (entry._mobState === undefined) {
       entry._mobState = 'idle';
       entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+      entry._lookTimer = 0;
       entry._wx = entry.x + 0.5;
       entry._wz = entry.z + 0.5;
     }
     if (entry._mobState === 'idle') {
       entry._mobTimer -= dt;
+      if (entry._lookTimer > 0) {
+        entry._lookTimer -= dt;
+      } else if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+        const wx = entry._wx + offX, wz = entry._wz + offZ;
+        const distToPlayer = Math.hypot(flyState.pos.x - wx, flyState.pos.z - wz);
+        if (distToPlayer <= MOB_LOOK_RANGE && Math.random() < MOB_LOOK_CHANCE_PER_SEC * dt) {
+          entry._lookTimer = MOB_LOOK_MIN + Math.random() * (MOB_LOOK_MAX - MOB_LOOK_MIN);
+        }
+      }
+      if (entry._lookTimer > 0) {
+        const wx = entry._wx + offX, wz = entry._wz + offZ;
+        entry._mobYaw = Math.atan2(flyState.pos.x - wx, flyState.pos.z - wz);
+      }
       if (entry._mobTimer <= 0) {
         const target = pickWanderTarget(currentModel, entry);
         if (target) {
           entry._targetX = target.x + 0.5;
           entry._targetZ = target.z + 0.5;
           entry._mobState = 'walking';
+          entry._lookTimer = 0; // an active walk goal wins over looking at the player, same as real vanilla's goal priority
         } else {
           entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
         }
@@ -4500,6 +4527,12 @@ function materialIdAtWorld(wx, wy, wz) {
 // ~41.91% (source: minecraft.wiki/w/Soul_Sand) — this app has no boots or
 // enchantments, so it's unconditional, matching a player with none equipped.
 const SURFACE_SPEED_MULT = { soul_sand: 0.5809, soul_soil: 0.5809 };
+// Real vanilla per-block "slipperiness" values (source:
+// minecraft.wiki/w/Slipperiness) — normal ground is 0.6; ice variants are
+// all higher, which is what makes them slide. Used by updateFreeCamera to
+// scale how much horizontal momentum carries over frame to frame instead of
+// snapping straight to the input direction.
+const SURFACE_SLIPPERINESS = { default: 0.6, ice: 0.98, packed_ice: 0.95, blue_ice: 0.989 };
 // Real Minecraft player: 0.6 wide x 1.8 tall hitbox, 1.62 eye height, 70 deg
 // default FOV — matched here so first/third-person views feel like the game.
 const PLAYER_RADIUS = 0.3, PLAYER_HEIGHT = 1.8, PLAYER_EYE_HEIGHT = 1.62, GAME_FOV = 70;
@@ -4746,13 +4779,32 @@ function updateFreeCamera(dt) {
     if (pressedKeys.has('ControlLeft')) flyState.pos.y -= speed * dt;
   } else if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
     const p = flyState.pos;
-    // Real vanilla: the block underfoot can slow (or, for a real ice block,
-    // speed up the slide of) whoever's standing on it — see SURFACE_SPEED_MULT.
+    // Real vanilla: soul sand/soil slow you down (SURFACE_SPEED_MULT), and
+    // ice/packed ice/blue ice carry momentum instead of stopping or turning
+    // instantly (SURFACE_SLIPPERINESS, minecraft.wiki/w/Slipperiness). This
+    // app's baseline walk speed was never derived from vanilla's exact
+    // per-tick friction/acceleration formula (it's a flat blocks/second
+    // constant), so rather than bolt that formula on top of a different
+    // speed model, the slide strength here is a qualitative match — scaled
+    // by how much MORE slippery each ice variant is than normal ground —
+    // that reduces to the exact pre-existing instant movement on anything
+    // that isn't ice (carry=0), so normal ground behavior is unchanged.
     const groundMat = flyState.grounded ? materialIdAtWorld(p.x, p.y - 0.1, p.z) : null;
     const surfaceMult = SURFACE_SPEED_MULT[groundMat] || 1;
-    const wx = mx * surfaceMult, wz = mz * surfaceMult;
-    if (wx !== 0 && !playerCollides(p.x + wx, p.y, p.z)) p.x += wx;
-    if (wz !== 0 && !playerCollides(p.x, p.y, p.z + wz)) p.z += wz;
+    const slipperiness = SURFACE_SLIPPERINESS[groundMat] || SURFACE_SLIPPERINESS.default;
+    const carry = Math.max(0, (slipperiness - SURFACE_SLIPPERINESS.default) / (1 - SURFACE_SLIPPERINESS.default));
+    const targetVX = (len > 0 ? mx / dt : 0) * surfaceMult, targetVZ = (len > 0 ? mz / dt : 0) * surfaceMult;
+    if (flyState.hvx === undefined) { flyState.hvx = 0; flyState.hvz = 0; }
+    if (carry <= 0) {
+      flyState.hvx = targetVX; flyState.hvz = targetVZ; // normal ground: snap to the target every frame, exactly like before this feature existed
+    } else {
+      const rate = Math.min(1, (1 - carry) * dt * 60); // normalized so behavior at 60fps matches the tuning used before sliding existed
+      flyState.hvx += (targetVX - flyState.hvx) * rate;
+      flyState.hvz += (targetVZ - flyState.hvz) * rate;
+    }
+    const stepX = flyState.hvx * dt, stepZ = flyState.hvz * dt;
+    if (stepX !== 0 && !playerCollides(p.x + stepX, p.y, p.z)) p.x += stepX; else flyState.hvx = 0;
+    if (stepZ !== 0 && !playerCollides(p.x, p.y, p.z + stepZ)) p.z += stepZ; else flyState.hvz = 0;
     flyState.vy -= 22 * dt;
     const dy = flyState.vy * dt;
     if (dy < 0) {
@@ -4828,7 +4880,7 @@ function setCameraMode(mode) {
       hint.textContent = 'Drag to look, WASD to move, Space/Ctrl for up/down, Shift to sprint.';
     } else {
       flyState.pos.set(0, dims.sy + 6, 0);
-      flyState.vy = 0; flyState.grounded = false; flyState.yaw = 0; flyState.pitch = -0.35;
+      flyState.vy = 0; flyState.hvx = 0; flyState.hvz = 0; flyState.grounded = false; flyState.yaw = 0; flyState.pitch = -0.35;
       hint.textContent = (mode === 'thirdperson' ? 'Third-person: ' : 'First-person: ') +
         'drag to look, WASD to move, Space to jump — you\'ll fall in from above.' +
         (el('interact-toggle').checked ? ' Click a door/lever/button/plate to use it.' : '') +
