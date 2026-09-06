@@ -2403,6 +2403,69 @@ function gateAND(a, b) {
     w: 4, h: 4, d: 3, // the final wire's support block needs y=-1 locally, so this needs an extra row after the min-y shift
   };
 }
+// XOR(a,b) = AND(OR(a,b), NAND(a,b)) by the standard Boolean identity —
+// verified in xor-design-test2.js against every input combination before
+// being placed here. Reuses the OR gate's dust-merge and the NAND gate's
+// shared-torch-target trick on the SAME pair of input levers, then
+// combines those two intermediate signals with one more AND (invert both,
+// merge, invert again — same recipe as gateAND). The two intermediate
+// signals land at different heights (OR's merge naturally sits one level
+// below the levers once inverted; NAND's shared-target trick stays level
+// with the inputs), which real redstone would solve by physical routing;
+// here a wire run bridges them, using the fact that a block powered by a
+// switch or a lit torch's target also charges dust resting directly on it
+// (see computeRedstone) to move the NAND-derived signal from block-power
+// back into a same-height wire run alongside the OR-derived one.
+function gateXOR(a, b) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!a },
+      { type: 'lever', x: 0, y: 2, z: 4, face: 'floor', on: !!b },
+      { type: 'redstone_wire', x: 0, y: 2, z: 1 },
+      { type: 'redstone_wire', x: 0, y: 2, z: 2 }, // OR(a,b)
+      { type: 'redstone_wire', x: 0, y: 2, z: 3 },
+      { type: 'redstone_torch', x: 1, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_torch', x: 1, y: 1, z: 4, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 1, y: 1, z: 1 },
+      { type: 'redstone_wire', x: 1, y: 1, z: 2 }, // NAND(a,b)
+      { type: 'redstone_wire', x: 1, y: 1, z: 3 },
+      { type: 'redstone_torch', x: -1, y: 1, z: 2, face: 'wall', facing: 'east' }, // inverts OR -> NOR(a,b)
+      { type: 'redstone_wire', x: -2, y: 1, z: 2 },
+      { type: 'redstone_torch', x: 2, y: 0, z: 2, face: 'wall', facing: 'west' }, // inverts NAND -> AND(a,b)
+      { type: 'redstone_wire', x: 3, y: 1, z: 2 }, // AND(a,b), lifted back to y=1
+      // Bus: connects NOR(a,b) and AND(a,b) — routed well clear of the
+      // input torches (z=0/z=4) so nothing leaks in by accident.
+      { type: 'redstone_wire', x: -2, y: 1, z: 1 }, { type: 'redstone_wire', x: -2, y: 1, z: 0 },
+      { type: 'redstone_wire', x: -2, y: 1, z: -1 }, { type: 'redstone_wire', x: -2, y: 1, z: -2 },
+      { type: 'redstone_wire', x: -2, y: 1, z: -3 }, { type: 'redstone_wire', x: -2, y: 1, z: -4 },
+      { type: 'redstone_wire', x: -2, y: 1, z: -5 }, { type: 'redstone_wire', x: -2, y: 1, z: -6 },
+      { type: 'redstone_wire', x: -2, y: 1, z: -7 }, { type: 'redstone_wire', x: -2, y: 1, z: -8 },
+      { type: 'redstone_wire', x: -1, y: 1, z: -8 }, { type: 'redstone_wire', x: 0, y: 1, z: -8 },
+      { type: 'redstone_wire', x: 1, y: 1, z: -8 }, // bus tap
+      { type: 'redstone_wire', x: 2, y: 1, z: -8 }, { type: 'redstone_wire', x: 3, y: 1, z: -8 },
+      { type: 'redstone_wire', x: 3, y: 1, z: -7 }, { type: 'redstone_wire', x: 3, y: 1, z: -6 },
+      { type: 'redstone_wire', x: 3, y: 1, z: -5 }, { type: 'redstone_wire', x: 3, y: 1, z: -4 },
+      { type: 'redstone_wire', x: 3, y: 1, z: -3 }, { type: 'redstone_wire', x: 3, y: 1, z: -2 },
+      { type: 'redstone_wire', x: 3, y: 1, z: -1 }, { type: 'redstone_wire', x: 3, y: 1, z: 0 },
+      { type: 'redstone_wire', x: 3, y: 1, z: 1 },
+      // Final inversion: NOT(OR(NOR(a,b), AND(a,b))) = AND(OR(a,b), NAND(a,b)) = XOR(a,b).
+      { type: 'redstone_torch', x: 1, y: 0, z: -9, face: 'wall', facing: 'south' },
+      { type: 'redstone_wire', x: 1, y: 0, z: -10 }, // OUTPUT = XOR(a,b)
+    ],
+  };
+}
+// XNOR(a,b) = NOT(XOR(a,b)) — the XOR circuit above with one more
+// inversion, attached to the block below XOR's own output cell (not the
+// wire itself — a torch always inverts a *block*, never a wire directly).
+function gateXNOR(a, b) {
+  const gate = gateXOR(a, b);
+  gate.decor.pop(); // drop XOR's own output wire tap — XNOR reads the same underlying cell one stage further
+  gate.decor.push(
+    { type: 'redstone_torch', x: 2, y: 0, z: -10, face: 'wall', facing: 'west' },
+    { type: 'redstone_wire', x: 3, y: 0, z: -10 }, // OUTPUT = XNOR(a,b)
+  );
+  return gate;
+}
 const LOGIC_GATE_BUILDERS = {
   not: () => gateNOT(false),
   buffer: () => gateBUFFER(false),
@@ -2410,6 +2473,8 @@ const LOGIC_GATE_BUILDERS = {
   nand: () => gateNAND(false, false),
   nor: () => gateNOR(false, false),
   and: () => gateAND(false, false),
+  xor: () => gateXOR(false, false),
+  xnor: () => gateXNOR(false, false),
 };
 const LOGIC_GATE_MARGIN_XZ = 1;
 // Every solid cell a gate's decor list actually needs: each lever/button/
@@ -2431,8 +2496,10 @@ function logicGateSolidCells(decorList) {
 // isn't touching the model's outer edge, then fills every support block.
 function placeLogicGateDecor(grid, dims, exteriorMat, gate, decorOut) {
   const solidCells = logicGateSolidCells(gate.decor);
+  const minX = Math.min(...gate.decor.map(e => e.x), ...solidCells.map(c => c[0]));
   const minY = Math.min(...gate.decor.map(e => e.y), ...solidCells.map(c => c[1]));
-  const ox = LOGIC_GATE_MARGIN_XZ, oy = -minY, oz = LOGIC_GATE_MARGIN_XZ;
+  const minZ = Math.min(...gate.decor.map(e => e.z), ...solidCells.map(c => c[2]));
+  const ox = LOGIC_GATE_MARGIN_XZ - minX, oy = -minY, oz = LOGIC_GATE_MARGIN_XZ - minZ;
   const fill = (x, y, z) => {
     if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return;
     grid[idx(x, y, z, dims)] = exteriorMat;
@@ -2708,6 +2775,25 @@ const PRESETS = [
     desc: 'NOT(NAND(a,b)): the NAND gate\'s circuit with one more inverting torch on the end — three torches total, matching the compact 3-torch AND gate every redstone tutorial builds.',
     keywords: ['and', 'both', 'logic gate'],
     notes: ['Only lights up when BOTH levers are on — the classic minimal vanilla AND gate.'],
+  },
+  {
+    id: 'gate-xor', name: 'XOR Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 4, baseX: 8, baseZ: 17 }, interiorMode: 'logicGate', gateType: 'xor',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'AND(OR(a,b), NAND(a,b)) — the OR gate\'s dust merge and the NAND gate\'s shared-torch-target trick, both reading the same two levers, combined with one more AND stage. Noticeably bigger than the other gates because combining two already-composed signals takes real routing, exactly why XOR is the gate every redstone tutorial calls the hard one.',
+    keywords: ['xor', 'exclusive or', 'logic gate'],
+    notes: [
+      'Lit only when EXACTLY ONE lever is on — off when both match (both off or both on).',
+      'The long thin footprint is a real routing bus, not padding: the OR- and NAND-derived signals settle at different heights inside the circuit, and this run is what brings them back together before the final gate.',
+    ],
+  },
+  {
+    id: 'gate-xnor', name: 'XNOR Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 4, baseX: 8, baseZ: 17 }, interiorMode: 'logicGate', gateType: 'xnor',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'NOT(XOR(a,b)): the XOR gate\'s exact circuit with one more inverting torch on the very end.',
+    keywords: ['xnor', 'equivalence', 'logic gate'],
+    notes: ['Lit when both levers agree (both on or both off) — dark when they differ.'],
   },
   {
     id: 'two-key-door', name: 'Two-Key AND Door', shape: 'box', category: 'Traps & Mechanisms',
@@ -3987,7 +4073,7 @@ function computeRedstone(model) {
   const torches = decor.filter(e => e.type === 'redstone_torch');
   const switches = decor.filter(e => e.type === 'lever' || e.type === 'button' || e.type === 'pressure_plate');
 
-  let level, blockPowered;
+  let level, blockPowered = new Set(), blockPoweredExternal = new Set();
   // A torch's lit state can depend on another torch's lit state (a chain
   // of inverters — every gate in the Contraptions library is exactly
   // this), so this has to settle to a fixed point rather than compute
@@ -4013,6 +4099,18 @@ function computeRedstone(model) {
         if (nb && nb.sides[REDSTONE_OPPOSITE[dir]]) feed(s.x + dx, s.y, s.z + dz, 15);
       }
     }
+    // A block powered by a switch or a lit torch also charges any dust
+    // resting directly on top of it (real vanilla) — lets a signal move
+    // from block-power back into a same-height wire run, which is what
+    // makes the XOR/XNOR gates below possible without a literal same-cell
+    // collision between every stage. Deliberately excludes blocks that are
+    // powered only because a wire above them made them so (blockPowered
+    // proper, below) — feeding that same wire back from its own supporting
+    // block would be a self-sustaining loop with no real source, not a
+    // vanilla mechanic.
+    for (const [k, w] of wiresByCell) {
+      if (blockPoweredExternal.has(cellKey(w.x, w.y - 1, w.z))) feed(w.x, w.y, w.z, 15);
+    }
     while (queue.length) {
       const [x, y, z, lvl] = queue.shift();
       if (lvl <= 1) continue;
@@ -4026,9 +4124,10 @@ function computeRedstone(model) {
     for (const [k, e] of wiresByCell) { e.on = (level.get(k) || 0) > 0; e.powerLevel = level.get(k) || 0; }
 
     blockPowered = new Set();
+    blockPoweredExternal = new Set();
     for (const [k, e] of wiresByCell) if (e.on) blockPowered.add(cellKey(e.x, e.y - 1, e.z));
-    for (const s of switches) if (s.on) blockPowered.add(cellKey(...mountedAttachment(s)));
-    for (const t of torches) if (t.on !== false) blockPowered.add(cellKey(...torchTarget(t)));
+    for (const s of switches) if (s.on) { const k2 = cellKey(...mountedAttachment(s)); blockPowered.add(k2); blockPoweredExternal.add(k2); }
+    for (const t of torches) if (t.on !== false) { const k2 = cellKey(...torchTarget(t)); blockPowered.add(k2); blockPoweredExternal.add(k2); }
 
     for (const t of torches) t.on = !blockPowered.has(cellKey(...mountedAttachment(t)));
   }
