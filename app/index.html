@@ -147,6 +147,8 @@
         </div>
 
         <div id="preset-controls">
+          <label for="preset-search">Or describe what you want</label>
+          <input type="text" id="preset-search" placeholder="e.g. 'AND gate', 'hidden door trap', 'pyramid'..." />
           <label for="preset-select">Structure</label>
           <select id="preset-select"></select>
           <div class="hint" id="preset-desc"></div>
@@ -2301,6 +2303,174 @@ function buildRedstoneRailDemoInterior(grid, silhouette, dims, exteriorMat, acce
 }
 
 /* =========================================================================
+ * REDSTONE LOGIC GATE LIBRARY
+ *
+ * Every layout below is a real, physically-buildable vanilla circuit built
+ * from exactly two primitives (both genuine vanilla mechanics, computed by
+ * computeRedstone/mountedAttachment/torchTarget above — nothing here is
+ * hardcoded truth-table lookup):
+ *   - A torch inverts: it goes dark when the block it's stuck to is
+ *     powered, and a lit torch strongly powers the block on its far side.
+ *   - Redstone dust merges: a dust cell adjacent to two power sources is
+ *     powered if EITHER is on (free OR logic, no torch needed).
+ * Every gate here is one of those two primitives, or a small composition of
+ * them (De Morgan's laws: AND = NOT(NAND), NAND = OR(NOT a, NOT b),
+ * NOR = NOT(OR(a,b))) — verified against all 4 input combinations in
+ * gate-truth-tables.js before being wired in here. XOR/XNOR and the
+ * feedback-based latches/clocks from real redstone (which need signal
+ * routing this simple composition can't reach, or genuine tick-by-tick
+ * timing this app doesn't simulate) are intentionally not included yet —
+ * see the README.
+ *
+ * Each builder returns { decor, w, h, d } in LOCAL coordinates starting at
+ * (0,0,0) with every coordinate non-negative (so placeLogicGateDecor can
+ * shift the whole thing by a fixed margin and know the bounding box up
+ * front). `on` flags the input lever(s)' initial state.
+ * ==================================================================== */
+function gateNOT(on) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!on },
+      { type: 'redstone_torch', x: 1, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 2, y: 1, z: 0 },
+    ],
+    w: 3, h: 3, d: 1,
+  };
+}
+function gateBUFFER(on) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!on },
+      { type: 'redstone_torch', x: 1, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_torch', x: 3, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 4, y: 1, z: 0 },
+    ],
+    w: 5, h: 3, d: 1,
+  };
+}
+function gateOR(a, b) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!a },
+      { type: 'lever', x: 0, y: 2, z: 2, face: 'floor', on: !!b },
+      { type: 'redstone_wire', x: 0, y: 2, z: 1 },
+    ],
+    w: 1, h: 2, d: 3, // no cell needs y=0 here (lowest is the levers' attachment block at y=1)
+  };
+}
+function gateNAND(a, b) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!a },
+      { type: 'lever', x: 0, y: 2, z: 2, face: 'floor', on: !!b },
+      { type: 'redstone_torch', x: 1, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_torch', x: 1, y: 1, z: 2, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 1, y: 1, z: 1 },
+    ],
+    w: 2, h: 3, d: 3,
+  };
+}
+function gateNOR(a, b) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!a },
+      { type: 'lever', x: 0, y: 2, z: 2, face: 'floor', on: !!b },
+      { type: 'redstone_wire', x: 0, y: 2, z: 1 },
+      { type: 'redstone_torch', x: 1, y: 1, z: 1, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 2, y: 1, z: 1 },
+    ],
+    w: 3, h: 3, d: 3,
+  };
+}
+function gateAND(a, b) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!a },
+      { type: 'lever', x: 0, y: 2, z: 2, face: 'floor', on: !!b },
+      { type: 'redstone_torch', x: 1, y: 1, z: 0, face: 'wall', facing: 'west' },
+      { type: 'redstone_torch', x: 1, y: 1, z: 2, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 1, y: 1, z: 1 },
+      { type: 'redstone_torch', x: 2, y: 0, z: 1, face: 'wall', facing: 'west' },
+      { type: 'redstone_wire', x: 3, y: 0, z: 1 },
+    ],
+    w: 4, h: 4, d: 3, // the final wire's support block needs y=-1 locally, so this needs an extra row after the min-y shift
+  };
+}
+const LOGIC_GATE_BUILDERS = {
+  not: () => gateNOT(false),
+  buffer: () => gateBUFFER(false),
+  or: () => gateOR(false, false),
+  nand: () => gateNAND(false, false),
+  nor: () => gateNOR(false, false),
+  and: () => gateAND(false, false),
+};
+const LOGIC_GATE_MARGIN_XZ = 1;
+// Every solid cell a gate's decor list actually needs: each lever/button/
+// torch's mounted-on block, plus a support block under every dust cell
+// (real dust needs a floor to sit on) — computed with the exact same
+// mountedAttachment used to simulate the gate, so the model can never
+// visually disagree with how it's powered.
+function logicGateSolidCells(decorList) {
+  const cells = [];
+  for (const e of decorList) {
+    if (e.type === 'lever' || e.type === 'button' || e.type === 'redstone_torch') cells.push(mountedAttachment(e));
+    if (e.type === 'redstone_wire' || e.type === 'door' || e.type === 'trapdoor' || e.type === 'pressure_plate') cells.push([e.x, e.y - 1, e.z]);
+  }
+  return cells;
+}
+// Shifts a gate so its lowest solid cell sits at y=0 (flush on the model's
+// own auto-generated ground plane, exactly like every other preset in this
+// app — no separate foundation needed) and adds a small x/z margin so it
+// isn't touching the model's outer edge, then fills every support block.
+function placeLogicGateDecor(grid, dims, exteriorMat, gate, decorOut) {
+  const solidCells = logicGateSolidCells(gate.decor);
+  const minY = Math.min(...gate.decor.map(e => e.y), ...solidCells.map(c => c[1]));
+  const ox = LOGIC_GATE_MARGIN_XZ, oy = -minY, oz = LOGIC_GATE_MARGIN_XZ;
+  const fill = (x, y, z) => {
+    if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return;
+    grid[idx(x, y, z, dims)] = exteriorMat;
+  };
+  for (const [x, y, z] of solidCells) fill(x + ox, y + oy, z + oz);
+  for (const e of gate.decor) {
+    e.x += ox; e.y += oy; e.z += oz;
+    decorOut.push(e);
+  }
+}
+function buildLogicGateInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut, gateType) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  if (!decorOut) return;
+  const builder = LOGIC_GATE_BUILDERS[gateType] || LOGIC_GATE_BUILDERS.not;
+  placeLogicGateDecor(grid, dims, exteriorMat, builder(), decorOut);
+}
+// A real AND gate (see gateAND) with a door placed right where its final
+// output wire would be, so the door only opens once BOTH levers are on —
+// no wireTo link, no special-case code: computeRedstone's existing
+// "consumer adjacent to a powered cell" check does this automatically the
+// instant a door happens to sit next to the gate's real output.
+function buildTwoKeyDoorInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  if (!decorOut) return;
+  const gate = gateAND(false, false);
+  const out = gate.decor[gate.decor.length - 1]; // the AND gate's final output wire, in its own local coords
+  gate.decor.push({ type: 'door', x: out.x + 1, y: out.y, z: out.z, axis: 'x', hinge: 'left', open: false });
+  placeLogicGateDecor(grid, dims, exteriorMat, gate, decorOut);
+}
+// A classic hidden pitfall: a plate a few steps in front of a trapdoor pit,
+// connected by real redstone_wire (real 15-level falloff and everything)
+// rather than a hardcoded link — the same mechanism you'd wire yourself.
+function buildPitfallTrapInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  if (!decorOut) return;
+  const cz = Math.floor(dims.sz / 2);
+  for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, cz, dims)] = exteriorMat; // a walkway floor, one cell wide
+  const plateX = 1, pitX = dims.sx - 2;
+  decorOut.push({ type: 'pressure_plate', x: plateX, y: 1, z: cz, on: false });
+  for (let x = plateX + 1; x < pitX; x++) decorOut.push({ type: 'redstone_wire', x, y: 1, z: cz, axis: 'x' });
+  grid[idx(pitX, 0, cz, dims)] = 0; // open a pit through the floor right under the trapdoor
+  decorOut.push({ type: 'trapdoor', x: pitX, y: 1, z: cz, facing: 'north', half: 'bottom', open: false });
+}
+
+/* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
  * ==================================================================== */
 const PRESETS = [
@@ -2414,24 +2584,99 @@ const PRESETS = [
     notes: [],
   },
   {
-    id: 'mechanism-demo', name: "Redstone Mechanism Demo Room", shape: 'box',
+    id: 'mechanism-demo', name: "Redstone Mechanism Demo Room", shape: 'box', category: 'Traps & Mechanisms',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'mechanismDemo',
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'gold_block' },
     desc: 'A small room built to show mechanisms actually working: a lever wired to the entrance door, and a pressure plate wired to a floor trapdoor over a pit. Turn on Interact mode (3D tab) and click the lever, or walk onto the plate in Walk mode.',
+    keywords: ['mechanism', 'demo', 'door', 'trapdoor', 'trap', 'pit', 'lever'],
     notes: [
       'The lever-door and plate-trapdoor links are a simple 1:1 trigger for demonstration, not a simulated redstone-dust signal — real Minecraft wiring follows more detailed rules (signal strength, repeaters, block updates) that this app does not model.',
       'Best viewed at scale 1/1 (default) so the mechanisms are full-size and easy to click.',
     ],
   },
   {
-    id: 'redstone-rail-demo', name: "Redstone & Rails Workshop", shape: 'box',
+    id: 'redstone-rail-demo', name: "Redstone & Rails Workshop", shape: 'box', category: 'Traps & Mechanisms',
     real: { height: 5, baseX: 16, baseZ: 6 }, interiorMode: 'redstoneRailDemo',
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'iron_block' },
     desc: 'A real redstone-dust network (not a hardcoded link): a lever powers wire that opens a gate door based on actual signal propagation and falloff, plus a full rail line (straight, curve, powered, detector, activator, ascending) with a minecart, and a second torch-powered wire run.',
+    keywords: ['redstone', 'rail', 'minecart', 'workshop', 'wire'],
     notes: [
       'Power really propagates through computeRedstone: flip the lever (Interact mode, 3D tab) and watch the wire brighten and the door open — no per-object wiring table involved, same mechanism you\'d get wiring any two blocks yourself with redstone_wire.',
       'Curved rail is a stylized diagonal stand-in for vanilla\'s quarter-circle artwork; straight and ascending rail geometry (and the ascending 45-degree tilt) match vanilla\'s real block models. Rails and minecart use plain colored geometry, not a texture — this app\'s block atlas has no rail art to draw from.',
       'Best viewed at scale 1/1 (default) so the mechanisms are full-size and easy to click.',
+    ],
+  },
+  {
+    id: 'gate-not', name: 'NOT Gate (Inverter)', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 3, baseX: 5, baseZ: 3 }, interiorMode: 'logicGate', gateType: 'not',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'The building block every other gate here is made from: a torch stuck to a block goes dark when that block is powered, and lit again the instant it isn\'t. Output = NOT(input).',
+    keywords: ['not', 'inverter', 'invert', 'torch', 'basic', 'logic gate'],
+    notes: [
+      'Flip the lever (Interact mode, 3D tab): the torch beside it goes dark and the output wire loses power. Flip it back off and the torch relights.',
+      'This is a real vanilla mechanic (a torch inverts the power of whatever block it\'s mounted on), computed live by this app\'s redstone simulation — not a scripted animation.',
+    ],
+  },
+  {
+    id: 'gate-buffer', name: 'Signal Booster (Buffer)', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 3, baseX: 7, baseZ: 3 }, interiorMode: 'logicGate', gateType: 'buffer',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'Two NOT gates back to back: inverting twice returns the original signal, so this just re-confirms and re-transmits it further — the same trick a real redstone repeater is used for.',
+    keywords: ['buffer', 'repeater', 'booster', 'extend', 'double not', 'signal'],
+    notes: ['Output always matches the lever, one full circuit length further away — flip it and both torches update, but the output wire ends up back in phase with the input.'],
+  },
+  {
+    id: 'gate-or', name: 'OR Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 2, baseX: 3, baseZ: 5 }, interiorMode: 'logicGate', gateType: 'or',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'The cheapest gate in the game: no torches at all. Two levers each sit next to a shared dust cell, and dust is powered the instant EITHER neighbor is — that\'s already OR logic for free.',
+    keywords: ['or', 'either', 'logic gate'],
+    notes: ['Try each lever alone, then both together — the merge point lights up as soon as either one is on.'],
+  },
+  {
+    id: 'gate-nand', name: 'NAND Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 3, baseX: 3, baseZ: 5 }, interiorMode: 'logicGate', gateType: 'nand',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'OR(NOT a, NOT b) — invert both inputs first, then merge with dust exactly like the OR gate. By De Morgan\'s law that\'s the same as NOT(a AND b): only OFF when both inputs are ON.',
+    keywords: ['nand', 'logic gate'],
+    notes: ['Only goes dark when BOTH levers are on at once — every other combination lights the output.'],
+  },
+  {
+    id: 'gate-nor', name: 'NOR Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 3, baseX: 3, baseZ: 5 }, interiorMode: 'logicGate', gateType: 'nor',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'NOT(OR(a,b)): the same dust merge as the OR gate, but the merged signal powers a block with a single inverting torch on it instead of being read directly.',
+    keywords: ['nor', 'logic gate'],
+    notes: ['Only lit when BOTH levers are off — flipping either one on darkens the output immediately.'],
+  },
+  {
+    id: 'gate-and', name: 'AND Gate', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 4, baseX: 6, baseZ: 5 }, interiorMode: 'logicGate', gateType: 'and',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'NOT(NAND(a,b)): the NAND gate\'s circuit with one more inverting torch on the end — three torches total, matching the compact 3-torch AND gate every redstone tutorial builds.',
+    keywords: ['and', 'both', 'logic gate'],
+    notes: ['Only lights up when BOTH levers are on — the classic minimal vanilla AND gate.'],
+  },
+  {
+    id: 'two-key-door', name: 'Two-Key AND Door', shape: 'box', category: 'Traps & Mechanisms',
+    real: { height: 4, baseX: 7, baseZ: 5 }, interiorMode: 'twoKeyDoor',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'A real AND Gate (same circuit, same torches) wired straight into a door instead of an output wire — both levers have to be thrown before the door is powered. A working example of gates driving a real mechanism, not just lighting a wire.',
+    keywords: ['and door', 'two key', 'double lock', 'puzzle door', 'vault', 'combination lock'],
+    notes: [
+      'The door sits directly next to the AND gate\'s real output cell — computeRedstone\'s existing "door next to a powered cell" rule is what opens it, no special-cased link.',
+      'Try one lever alone (door stays shut), then both together.',
+    ],
+  },
+  {
+    id: 'pitfall-trap', name: 'Pitfall Trap', shape: 'box', category: 'Traps & Mechanisms',
+    real: { height: 3, baseX: 10, baseZ: 3 }, interiorMode: 'pitfallTrap',
+    blocks: { exterior: 'oak_planks', interior: 'stone', accent: 'iron_block' },
+    desc: 'The classic hidden pit: an innocent-looking pressure plate a few steps down a walkway, wired with real redstone_wire (real signal falloff and everything) to a trapdoor covering a pit further along.',
+    keywords: ['pitfall', 'trap', 'hidden', 'ambush', 'pit', 'dungeon'],
+    notes: [
+      'Disguise the plate by matching its surrounding floor material, and camouflage the trapdoor the same way, for the real "looks like solid floor" effect.',
+      'Walk onto the plate in Walk mode and watch the wire light up before the trapdoor drops — the delay you\'d see is exactly this app\'s falloff-based propagation, not a scripted cue.',
     ],
   },
 ];
@@ -2485,7 +2730,75 @@ function populateMaterialSelect(select, defaultId) {
   if (defaultId) select.value = defaultId;
 }
 
-populateSelect(el('preset-select'), PRESETS, p => p.id, p => p.name);
+// Presets are grouped by category (real-world structures vs. the redstone
+// contraption library) rather than one long flat list, and re-populated
+// live as the user types into the "describe what you want" search box.
+const PRESET_CATEGORY_ORDER = ['Real-World Structures', 'Redstone Logic Gates', 'Traps & Mechanisms'];
+function populatePresetSelect(select, presets) {
+  select.innerHTML = '';
+  const byCat = new Map();
+  for (const p of presets) {
+    const cat = p.category || 'Real-World Structures';
+    if (!byCat.has(cat)) byCat.set(cat, []);
+    byCat.get(cat).push(p);
+  }
+  const cats = [...byCat.keys()].sort((a, b) => {
+    const ia = PRESET_CATEGORY_ORDER.indexOf(a), ib = PRESET_CATEGORY_ORDER.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+  for (const cat of cats) {
+    const group = document.createElement('optgroup');
+    group.label = cat;
+    for (const p of byCat.get(cat)) {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.name;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+  }
+}
+// Scored rather than plain substring matching: gate names ARE common
+// English words (AND, OR, NOT...), which would otherwise false-positive
+// against ordinary prose in unrelated presets' descriptions (e.g. "...
+// falloff AND a minecart..."). A name/keyword hit counts far more than an
+// incidental word appearing in a description, so typing "and gate" lands
+// on the AND Gate preset first, not just whichever description happens to
+// contain the word "and".
+function presetSearchScore(preset, query) {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) return 1;
+  const name = preset.name.toLowerCase();
+  const keywords = (preset.keywords || []).map(k => k.toLowerCase());
+  const desc = (preset.desc || '').toLowerCase();
+  let score = 0;
+  for (const t of terms) {
+    if (name.includes(t)) score += name.startsWith(t) ? 12 : 6;
+    if (keywords.includes(t)) score += 10;
+    else if (keywords.some(k => k.includes(t))) score += 4;
+    if (desc.includes(t)) score += 1;
+  }
+  return score;
+}
+populatePresetSelect(el('preset-select'), PRESETS);
+el('preset-search').addEventListener('input', () => {
+  const query = el('preset-search').value;
+  const scored = PRESETS.map(p => ({ p, score: presetSearchScore(p, query) }))
+    .filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score);
+  const matches = scored.map(x => x.p);
+  const prevValue = el('preset-select').value;
+  const shown = matches.length ? matches : PRESETS;
+  populatePresetSelect(el('preset-select'), shown);
+  // While actively typing, always jump to the best match — a weak
+  // incidental match on whatever was already selected (e.g. "and" showing
+  // up in an unrelated preset's prose) shouldn't keep it pinned over a
+  // much stronger name match. Only preserve the prior selection once the
+  // box is cleared back to empty (plain browsing again).
+  const target = query.trim() ? shown[0].id : (shown.some(p => p.id === prevValue) ? prevValue : shown[0].id);
+  el('preset-select').value = target;
+  if (target !== prevValue) applyPresetDefaults();
+});
 populateMaterialSelect(el('mat-exterior'), 'quartz_block');
 populateMaterialSelect(el('mat-interior'), 'stone');
 populateMaterialSelect(el('mat-accent'), 'gold_block');
@@ -2525,6 +2838,12 @@ function updateInteriorAvailability() {
     hint.textContent = 'A working demo room: a lever opens the entrance door, a pressure plate opens a floor trapdoor trap. Turn on "Interact mode" in the 3D tab to click the lever, or walk onto the plate.';
   } else if (mode === 'redstoneRailDemo') {
     hint.textContent = 'A real redstone-network demo: a lever\'s power actually travels through redstone wire (with real 15-block falloff) to open a gate door — no hardcoded link — plus every rail type, a minecart, and a second wire run powering a golden/activator rail pair. Turn on "Interact mode" and click the lever.';
+  } else if (mode === 'logicGate') {
+    hint.textContent = 'A real, physically-buildable circuit — the torch(es) genuinely invert based on the block they\'re stuck to, computed live, not a scripted animation. Turn on "Interact mode" (3D tab) and flip the lever(s) to watch the output wire respond.';
+  } else if (mode === 'twoKeyDoor') {
+    hint.textContent = 'A real AND gate (see the AND Gate preset) wired straight into a door — both levers have to be on at once before the door is powered. Turn on "Interact mode" and try just one lever, then both.';
+  } else if (mode === 'pitfallTrap') {
+    hint.textContent = 'Step on the plate (Walk mode) and watch power actually travel down the wire run to the trapdoor — real propagation, not a hardcoded link. Widen the wire run to see the signal die out past 15 blocks.';
   } else {
     hint.textContent = 'Hollows the interior and adds floor slabs with a stairwell gap at the spacing set below.';
   }
@@ -2698,6 +3017,12 @@ function generateModel() {
     buildMechanismDemoInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'redstoneRailDemo') {
     buildRedstoneRailDemoInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'logicGate') {
+    buildLogicGateInterior(grid, silhouette, dims, matExt, matAcc, decor, currentPreset().gateType);
+  } else if (wantInterior && interiorMode === 'twoKeyDoor') {
+    buildTwoKeyDoorInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'pitfallTrap') {
+    buildPitfallTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -2998,15 +3323,27 @@ function pressurePlateGeometry(tileKey, depressed) {
   remapUV(geo, tileKey);
   return geo;
 }
-// Redstone dust: nearly flat on the floor; a short line segment (rotated per
-// axis) or an isolated dot when it has no run direction. Both dust
-// textures are a sparse near-white spark/noise pattern meant to be
-// multiplied by a runtime red tint (real Minecraft draws the wire's actual
-// red color that way, not from the sprite itself) — see solidMaterial's
-// comment. Plain untextured geometry; buildDecorMeshesForEntry tints it.
-function redstoneWireGeometry(isDot) {
-  return isDot ? new THREE.BoxGeometry(8 * PX, 0.25 * PX, 8 * PX) : new THREE.BoxGeometry(1, 0.25 * PX, 6 * PX);
+// Redstone dust: real vanilla dust is a central square plus one arm per
+// side it's actually connected to (auto-conforming to whatever's next to
+// it, and trimmable per-side — see cycleWireSide) — not a fixed dot/line,
+// which is what this app originally (incorrectly) drew. Both dust textures
+// are a sparse near-white spark/noise pattern meant to be multiplied by a
+// runtime red tint (real Minecraft draws the wire's actual red color that
+// way, not from the sprite itself) — see solidMaterial's comment. Plain
+// untextured geometry; buildDecorMeshesForEntry tints it.
+function redstoneWireDotGeometry() {
+  return new THREE.BoxGeometry(6 * PX, 0.25 * PX, 6 * PX);
 }
+// One arm, built pointing toward +z ("south") from the dot's edge out to
+// the cell's own edge; buildDecorMeshesForEntry rotates it for the other 3
+// directions.
+function redstoneWireArmGeometry() {
+  const len = 0.5 - 3 * PX;
+  const geo = new THREE.BoxGeometry(6 * PX, 0.25 * PX, len);
+  geo.translate(0, 0, 3 * PX + len / 2);
+  return geo;
+}
+const WIRE_ARM_YAW = { s: 0, n: Math.PI, e: Math.PI / 2, w: -Math.PI / 2 };
 // Real Minecraft stair silhouette: a full-footprint lower slab plus a
 // half-depth full-height back riser — used as a simple "chair".
 function stairParts(tileKey) {
@@ -3237,14 +3574,24 @@ function buildDecorMeshesForEntry(entry) {
     registerInteractive(m, entry, 'pressure_plate');
     objs.push(m);
   } else if (def.kind === 'redstone_wire') {
-    const isDot = !entry.axis;
-    const geo = cachedGeo('wire:' + (isDot ? 'dot' : 'line'), () => redstoneWireGeometry(isDot));
-    const m = new THREE.Mesh(geo, solidMaterial(entry.on === false ? 0x6b0f0a : 0xe8281a));
-    m.position.y = -0.5 + 0.125 * PX;
-    if (!isDot && entry.axis === 'x') m.rotation.y = Math.PI / 2;
-    m.userData.wireOn = !!entry.on;
-    registerInteractive(m, entry, 'redstone_wire');
-    objs.push(m);
+    const mat = solidMaterial(entry.on === false ? 0x6b0f0a : 0xe8281a);
+    const group = new THREE.Group();
+    const dot = new THREE.Mesh(cachedGeo('wireDot', redstoneWireDotGeometry), mat);
+    dot.userData.isWirePart = true;
+    group.add(dot);
+    const conns = entry.connections || { n: false, e: false, s: false, w: false };
+    const armGeo = cachedGeo('wireArm', redstoneWireArmGeometry);
+    for (const dir of ['n', 'e', 's', 'w']) {
+      if (!conns[dir]) continue;
+      const arm = new THREE.Mesh(armGeo, mat);
+      arm.rotation.y = WIRE_ARM_YAW[dir];
+      arm.userData.isWirePart = true;
+      group.add(arm);
+    }
+    group.position.y = -0.5 + 0.125 * PX;
+    group.userData.wireOn = !!entry.on;
+    registerInteractive(group, entry, 'redstone_wire');
+    objs.push(group);
   } else if (def.kind === 'tripwire_hook') {
     const geo = cachedGeo('tripwireHook:' + def.tile, () => tripwireHookGeometry(def.tile));
     const m = new THREE.Mesh(geo, decorMaterial());
@@ -3411,7 +3758,8 @@ function updateInteractiveAnimations(dt) {
     } else if (kind === 'redstone_wire') {
       const wantOn = !!entry.on;
       if (obj.userData.wireOn !== wantOn) {
-        obj.material = solidMaterial(wantOn ? 0xe8281a : 0x6b0f0a);
+        const mat = solidMaterial(wantOn ? 0xe8281a : 0x6b0f0a);
+        obj.children.forEach(c => { if (c.userData.isWirePart) c.material = mat; });
         obj.userData.wireOn = wantOn;
       }
     } else if (kind === 'rail') {
@@ -3452,50 +3800,130 @@ function toggleDecorEntry(entry) {
  * wireTo link gets powered open when it sits next to a powered wire or
  * source cell. Runs after every source toggle (setDecorState) and once
  * right after a model is generated.
+ *
+ * Torches also genuinely invert: a torch goes dark when the block it's
+ * physically stuck to is powered, and a lit torch strongly powers the
+ * solid block immediately on its far side (the direction it's NOT
+ * attached to) — no dust required for that one hop. This is the actual
+ * vanilla mechanic every logic gate in the Contraptions library is built
+ * from (see buildLogicGateInterior); it's computed as a fixed-point
+ * iteration since a chain of inverters means one torch's lit state can
+ * depend on another's.
  * ==================================================================== */
 function cellKey(x, y, z) { return x + ',' + y + ',' + z; }
 const REDSTONE_NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+// The solid block a mounted decor entry is physically stuck to. Floor/
+// ceiling mounts are unambiguous (straight up/down). Wall mounts are NOT
+// symmetric between decor kinds in this app: a lever/button's `facing` is
+// the direction it opens/points AWAY from its mount (mount = cell - normal,
+// verified against buildMechanismDemoInterior's known-correct lever/door
+// coordinates), while a torch's `facing` names the wall it's stuck ON
+// (mount = cell + normal) — see torchGeometry's wall-mount offset, which
+// pushes the mesh to the +normal edge of its own cell, i.e. flush against
+// whatever is adjacent in the +normal direction.
+// faceNormal's sin/cos aren't exactly -1/0/1 (floating-point noise, e.g.
+// cos(-PI/2) ~= 6e-17), which is invisible for rendering but breaks exact
+// cellKey matching here — round every component to a whole cell offset.
+function mountedAttachment(e) {
+  const face = e.face || 'floor';
+  if (face === 'floor') return [e.x, e.y - 1, e.z];
+  if (face === 'ceiling') return [e.x, e.y + 1, e.z];
+  const n = faceNormal('wall', e.facing);
+  const sign = e.type === 'redstone_torch' ? 1 : -1;
+  return [e.x + sign * Math.round(n.x), e.y, e.z + sign * Math.round(n.z)];
+}
+// The solid block a LIT torch strongly powers — the far side, opposite its
+// own mount (a floor torch powers the block above it; a wall torch powers
+// straight out from the wall it's stuck to).
+function torchTarget(t) {
+  const face = t.face || 'floor';
+  if (face === 'floor') return [t.x, t.y + 1, t.z];
+  if (face === 'ceiling') return [t.x, t.y - 1, t.z];
+  const n = faceNormal('wall', t.facing);
+  return [t.x - Math.round(n.x), t.y, t.z - Math.round(n.z)];
+}
+// Named horizontal directions (matching this app's north=-z/south=+z/
+// east=+x/west=-x convention) — used for both power routing and the wire's
+// own visual per-side connections, so a manually-trimmed side (see
+// cycleWireSide) blocks power the same way it visually disconnects.
+const REDSTONE_DIRS = [['e', 1, 0], ['w', -1, 0], ['s', 0, 1], ['n', 0, -1]];
+const REDSTONE_OPPOSITE = { e: 'w', w: 'e', s: 'n', n: 's' };
+const REDSTONE_HUGGABLE = new Set(['redstone_wire', 'lever', 'button', 'pressure_plate', 'redstone_torch']);
 function computeRedstone(model) {
   if (!model) return;
   const decor = model.decor;
   const wiresByCell = new Map();
+  const huggableByCell = new Map();
   for (const e of decor) {
-    if (e.type !== 'redstone_wire') continue;
-    wiresByCell.set(cellKey(e.x, e.y, e.z), e);
+    if (REDSTONE_HUGGABLE.has(e.type)) huggableByCell.set(cellKey(e.x, e.y, e.z), e.type);
+    if (e.type === 'redstone_wire') {
+      if (!e.sides) e.sides = { n: true, e: true, s: true, w: true }; // real vanilla default: open on every side until manually trimmed
+      wiresByCell.set(cellKey(e.x, e.y, e.z), e);
+    }
   }
-  const sourceCells = [];
-  for (const e of decor) {
-    if (e.type === 'lever' && e.on) sourceCells.push(e);
-    else if (e.type === 'button' && e.on) sourceCells.push(e);
-    else if (e.type === 'pressure_plate' && e.on) sourceCells.push(e);
-    else if (e.type === 'redstone_torch' && e.on !== false) sourceCells.push(e);
+  const torches = decor.filter(e => e.type === 'redstone_torch');
+  const switches = decor.filter(e => e.type === 'lever' || e.type === 'button' || e.type === 'pressure_plate');
+
+  let level, blockPowered;
+  // A torch's lit state can depend on another torch's lit state (a chain
+  // of inverters — every gate in the Contraptions library is exactly
+  // this), so this has to settle to a fixed point rather than compute
+  // once; 8 passes comfortably covers every gate depth built here.
+  for (let pass = 0; pass < 8; pass++) {
+    const sourceCells = [];
+    for (const e of switches) if (e.on) sourceCells.push(e);
+    for (const t of torches) if (t.on !== false) sourceCells.push(t);
+
+    level = new Map();
+    const queue = [];
+    const feed = (x, y, z, lvl) => {
+      const k = cellKey(x, y, z);
+      if (!wiresByCell.has(k)) return;
+      if ((level.get(k) || 0) >= lvl) return;
+      level.set(k, lvl);
+      queue.push([x, y, z, lvl]);
+    };
+    for (const s of sourceCells) {
+      feed(s.x, s.y, s.z, 15);
+      for (const [dir, dx, dz] of REDSTONE_DIRS) {
+        const nb = wiresByCell.get(cellKey(s.x + dx, s.y, s.z + dz));
+        if (nb && nb.sides[REDSTONE_OPPOSITE[dir]]) feed(s.x + dx, s.y, s.z + dz, 15);
+      }
+    }
+    while (queue.length) {
+      const [x, y, z, lvl] = queue.shift();
+      if (lvl <= 1) continue;
+      const w = wiresByCell.get(cellKey(x, y, z));
+      for (const [dir, dx, dz] of REDSTONE_DIRS) {
+        if (!w.sides[dir]) continue;
+        const nb = wiresByCell.get(cellKey(x + dx, y, z + dz));
+        if (nb && nb.sides[REDSTONE_OPPOSITE[dir]]) feed(x + dx, y, z + dz, lvl - 1);
+      }
+    }
+    for (const [k, e] of wiresByCell) { e.on = (level.get(k) || 0) > 0; e.powerLevel = level.get(k) || 0; }
+
+    blockPowered = new Set();
+    for (const [k, e] of wiresByCell) if (e.on) blockPowered.add(cellKey(e.x, e.y - 1, e.z));
+    for (const s of switches) if (s.on) blockPowered.add(cellKey(...mountedAttachment(s)));
+    for (const t of torches) if (t.on !== false) blockPowered.add(cellKey(...torchTarget(t)));
+
+    for (const t of torches) t.on = !blockPowered.has(cellKey(...mountedAttachment(t)));
   }
-  const level = new Map(); // cellKey -> power level 0-15
-  const queue = [];
-  const feed = (x, y, z, lvl) => {
-    const k = cellKey(x, y, z);
-    if (!wiresByCell.has(k)) return;
-    if ((level.get(k) || 0) >= lvl) return;
-    level.set(k, lvl);
-    queue.push([x, y, z, lvl]);
-  };
-  for (const s of sourceCells) {
-    feed(s.x, s.y, s.z, 15);
-    for (const [dx, dz] of REDSTONE_NEIGHBORS) feed(s.x + dx, s.y, s.z + dz, 15);
-  }
-  while (queue.length) {
-    const [x, y, z, lvl] = queue.shift();
-    if (lvl <= 1) continue;
-    for (const [dx, dz] of REDSTONE_NEIGHBORS) feed(x + dx, y, z + dz, lvl - 1);
-  }
+
+  // Purely visual: which sides actually grow an arm — enabled AND a real
+  // redstone component sits there, exactly what real dust auto-conforms to.
   for (const [k, e] of wiresByCell) {
-    const lvl = level.get(k) || 0;
-    e.on = lvl > 0;
-    e.powerLevel = lvl;
+    const conns = { n: false, e: false, s: false, w: false };
+    for (const [dir, dx, dz] of REDSTONE_DIRS) {
+      if (e.sides[dir] && huggableByCell.has(cellKey(e.x + dx, e.y, e.z + dz))) conns[dir] = true;
+    }
+    e.connections = conns;
   }
-  const poweredCells = new Set();
-  for (const s of sourceCells) poweredCells.add(cellKey(s.x, s.y, s.z));
-  for (const [k, lvl] of level) if (lvl > 0) poweredCells.add(k);
+
+  const poweredCells = new Set(blockPowered);
+  for (const [k, e] of wiresByCell) if (e.on) poweredCells.add(k);
+  for (const s of switches) if (s.on) poweredCells.add(cellKey(s.x, s.y, s.z));
+  for (const t of torches) if (t.on !== false) poweredCells.add(cellKey(t.x, t.y, t.z));
   const REDSTONE_CONSUMERS = new Set(['door', 'trapdoor', 'powered_rail', 'activator_rail']);
   for (const e of decor) {
     if (!REDSTONE_CONSUMERS.has(e.type)) continue;
@@ -3508,6 +3936,19 @@ function computeRedstone(model) {
     }
     e.powered = powered;
   }
+}
+// Right-click a wire to trim/restore one side at a time, in a fixed N/E/S/W
+// rotation — the real vanilla feature (added so two dust lines can run
+// parallel, one cell apart, without merging) simplified to "one side per
+// click" rather than requiring a precise click position on the model.
+const WIRE_CYCLE_ORDER = ['n', 'e', 's', 'w'];
+function cycleWireSide(entry) {
+  if (!entry.sides) entry.sides = { n: true, e: true, s: true, w: true };
+  entry._cycleIdx = (entry._cycleIdx || 0);
+  const dir = WIRE_CYCLE_ORDER[entry._cycleIdx % 4];
+  entry._cycleIdx++;
+  entry.sides[dir] = !entry.sides[dir];
+  computeRedstone(currentModel);
 }
 
 /* =========================================================================
@@ -3628,7 +4069,11 @@ function findInteractiveAncestor(obj) {
   while (o) { if (o.userData && o.userData.decorEntry) return o; o = o.parent; }
   return null;
 }
-function attemptInteract(clientX, clientY) {
+// button 0 (left-click) toggles a real switch (door/lever/button/plate);
+// button 2 (right-click) on a redstone_wire trims/restores one of its side
+// connections instead — real vanilla's own way of routing two lines past
+// each other without merging (see cycleWireSide).
+function attemptInteract(clientX, clientY, button) {
   if (!el('interact-toggle').checked || !three || !currentModel) return;
   const rect = three.renderer.domElement.getBoundingClientRect();
   const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
@@ -3637,8 +4082,13 @@ function attemptInteract(clientX, clientY) {
   for (const hit of hits) {
     const found = findInteractiveAncestor(hit.object);
     if (!found) continue;
-    const def = DECOR_TYPES[found.userData.decorEntry.type];
-    if (def && def.interactive) toggleDecorEntry(found.userData.decorEntry);
+    const entry = found.userData.decorEntry;
+    if (button === 2) {
+      if (entry.type === 'redstone_wire') { cycleWireSide(entry); renderThree(currentModel, true); }
+      return;
+    }
+    const def = DECOR_TYPES[entry.type];
+    if (def && def.interactive) toggleDecorEntry(entry);
     return;
   }
 }
@@ -3682,11 +4132,12 @@ function wireCameraInput(container) {
     dragLook.active = false;
     if (pointerDownPos && Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) < 5) {
       if (el('build-toggle').checked) { if (e.button === 0) attemptBuild(e.clientX, e.clientY, false); }
-      else attemptInteract(e.clientX, e.clientY);
+      else attemptInteract(e.clientX, e.clientY, e.button);
     }
     pointerDownPos = null;
   });
   container.addEventListener('contextmenu', (e) => {
+    if (el('interact-toggle').checked) { e.preventDefault(); return; } // handled on pointerup instead
     if (!el('build-toggle').checked) return;
     e.preventDefault();
     attemptBuild(e.clientX, e.clientY, true);
