@@ -20,7 +20,10 @@ kenney.nl, itch.io, or opengameart.org directly):
   across all three), Animal Pack Remastered, Fish Pack, Modular Characters,
   Shooting Gallery, Crosshair Pack, Playing Cards Pack, Board Game Pack,
   Board Game Icons, and several OpenGameArt.org CC0 items (cemetery/graveyard
-  art, "Two Pistols," "The Hooded One" portrait).
+  art, "Two Pistols," "The Hooded One" portrait, and the OSARE weapon icon
+  set's longbow/shortbow/greatbow sprites used for the Archery Range — their
+  opaque black backgrounds are chroma-keyed to transparent at runtime rather
+  than the art being redrawn).
 
 Fonts are loaded from Google Fonts at runtime (Rye, Special Elite, Nunito).
 
