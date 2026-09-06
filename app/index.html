@@ -2957,6 +2957,15 @@ function buildDecorMeshesForEntry(entry) {
     const arm = new THREE.Mesh(parts.arm, decorMaterial());
     pivot.add(arm);
     group.add(base, pivot);
+    // Three's default Euler order ('XYZ') applies Y before X when
+    // transforming a point, which makes the wall/ceiling tilt (X) use the
+    // *original* untouched coordinates regardless of yaw — so which side
+    // of the cell the base ends up flush against never changed with
+    // facing, leaving it pressed against the open interior face instead
+    // of the actual wall (looking like it floats there, backwards).
+    // 'YXZ' applies X first, then Y, so the facing yaw correctly
+    // determines which side it mounts flush against.
+    group.rotation.order = 'YXZ';
     if (face === 'wall') group.rotation.x = Math.PI / 2;
     else if (face === 'ceiling') group.rotation.x = Math.PI;
     group.rotation.y = FACING_YAW[entry.facing || 'south'];
@@ -3076,7 +3085,7 @@ function updateInteractiveAnimations(dt) {
       // +-45 degrees around the arm's bottom (see buildDecorMeshesForEntry),
       // matching vanilla's lever.json/lever_on.json rotation. t=0 (off)
       // leans the handle down; t=1 (on) flips it up.
-      obj.userData.armPivot.rotation.x = THREE.MathUtils.lerp(-Math.PI / 4, Math.PI / 4, t);
+      obj.userData.armPivot.rotation.x = THREE.MathUtils.lerp(Math.PI / 4, -Math.PI / 4, t);
     } else if (kind === 'button') {
       const inset = THREE.MathUtils.lerp(0.5 - PX, 0.5 - 0.25 * PX, t);
       orientToFace(obj, obj.userData.face, obj.userData.facing, inset);
