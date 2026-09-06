@@ -2753,8 +2753,20 @@ function tripwireGeometry(tileKey) {
 // opaque — rendering as a broken, "see-through" wireframe-looking handle
 // instead of a solid one. Mapped to vanilla's own UV rectangle instead.
 function leverParts(tileKey) {
-  const base = new THREE.BoxGeometry(6 * PX, 3 * PX, 8 * PX); remapUV(base, 'cobblestone');
+  // Both pieces are built in vanilla's own default local frame — a floor
+  // mount, facing north — with their origins placed exactly where vanilla
+  // puts them, so the caller can rotate the *whole* assembly onto any
+  // mount face/facing as one fixed transform (matching how a blockstate
+  // applies "x"/"y") without disturbing where each piece sits relative to
+  // the other. Base rests on the floor (y=-0.5); the arm's origin is its
+  // own bottom-center (translated up by half its height), matching
+  // vanilla's rotation origin [8,1,8] — so tilting it is a real hinge at
+  // its foot, not a spin around its middle.
+  const base = new THREE.BoxGeometry(6 * PX, 3 * PX, 8 * PX);
+  base.translate(0, -0.5 + 1.5 * PX, 0);
+  remapUV(base, 'cobblestone');
   const arm = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX);
+  arm.translate(0, 5 * PX, 0);
   [0, 4, 1, 5].forEach(f => paintFaceUVRect(arm, f, tileKey, 7, 6, 9, 16)); // sides
   paintFaceUVRect(arm, 2, tileKey, 7, 6, 9, 8); // top
   paintFaceUVRect(arm, 3, tileKey, 7, 6, 9, 8); // bottom (hidden against the base; vanilla omits it)
@@ -2909,30 +2921,29 @@ function buildDecorMeshesForEntry(entry) {
     registerInteractive(m, entry, 'button');
     objs.push(m);
   } else if (def.kind === 'lever') {
-    // Base keeps its original, visually-verified mount placement. The arm
-    // used to be a bare mesh rotated around its own geometric center, which
-    // swung half of it into the base/wall — real levers hinge at the arm's
-    // *bottom* (matching vanilla's lever.json, which rotates the arm cuboid
-    // around its own bottom-center). So the arm here is a child of a pivot
-    // group placed at that bottom point, offset up by half the arm's own
-    // length, which puts it at exactly the same resting spot as before but
-    // lets it swing from the correct hinge.
+    // Base and arm are built once in vanilla's own default local frame (a
+    // floor mount, facing north — see leverParts), then the *whole*
+    // assembly is rotated onto the real mount face/facing as a single
+    // fixed transform, exactly how a blockstate applies "x"/"y" to the
+    // lever model. The animated open/close tilt lives on a pivot *inside*
+    // that fixed frame, rotating on its own local X — the same axis
+    // vanilla's model itself rotates the arm cuboid on — so the swing
+    // always happens in the plane parallel to whatever surface it's
+    // mounted on (flipping the handle in place) instead of being thrown
+    // off at an angle that doesn't match the wall's own facing.
     const key = 'lever:' + def.tile;
     let parts = decorGeoCache.get(key);
     if (!parts) { parts = leverParts(def.tile); decorGeoCache.set(key, parts); }
     const group = new THREE.Group();
     const base = new THREE.Mesh(parts.base, decorMaterial());
-    orientToFace(base, face, entry.facing, 0.5 - 1.5 * PX);
-    const outward = faceNormal(face, entry.facing);
     const pivot = new THREE.Group();
-    pivot.position.copy(base.position);
-    pivot.position.addScaledVector(outward, 5 * PX);
-    pivot.position.y -= 5 * PX;
+    pivot.position.y = -0.5 + PX;
     const arm = new THREE.Mesh(parts.arm, decorMaterial());
-    arm.position.y = 5 * PX;
     pivot.add(arm);
-    pivot.userData.pivotAxis = face === 'floor' || face === 'ceiling' ? 'z' : 'x';
     group.add(base, pivot);
+    if (face === 'wall') group.rotation.x = Math.PI / 2;
+    else if (face === 'ceiling') group.rotation.x = Math.PI;
+    group.rotation.y = FACING_YAW[entry.facing || 'south'];
     group.userData.armPivot = pivot;
     registerInteractive(group, entry, 'lever');
     objs.push(group);
@@ -3047,10 +3058,9 @@ function updateInteractiveAnimations(dt) {
       obj.userData.swing.rotation.x = THREE.MathUtils.lerp(Math.PI / 2, 0, t);
     } else if (kind === 'lever') {
       // +-45 degrees around the arm's bottom (see buildDecorMeshesForEntry),
-      // matching vanilla's lever.json/lever_on.json rotation.
-      const pivot = obj.userData.armPivot;
-      const angle = THREE.MathUtils.lerp(-Math.PI / 4, Math.PI / 4, t);
-      if (pivot.userData.pivotAxis === 'z') pivot.rotation.z = angle; else pivot.rotation.x = angle;
+      // matching vanilla's lever.json/lever_on.json rotation. t=0 (off)
+      // leans the handle down; t=1 (on) flips it up.
+      obj.userData.armPivot.rotation.x = THREE.MathUtils.lerp(-Math.PI / 4, Math.PI / 4, t);
     } else if (kind === 'button') {
       const inset = THREE.MathUtils.lerp(0.5 - PX, 0.5 - 0.25 * PX, t);
       orientToFace(obj, obj.userData.face, obj.userData.facing, inset);
