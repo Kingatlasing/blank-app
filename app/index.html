@@ -3658,6 +3658,25 @@ function cubeMaterial() {
   if (!_cubeMaterial) _cubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, metalness: 0.02, clippingPlanes: [cutawayPlane] });
   return _cubeMaterial;
 }
+// Glass and every stained-glass color are real vanilla transparent blocks
+// (you see straight through them) — rendered with the plain cubeMaterial()
+// every opaque block uses, they read as solid opaque cubes instead, which
+// is exactly wrong for something like the Aquarium Chamber's tank walls.
+// The source atlas texture itself isn't a transparent PNG (vanilla renders
+// glass as opaque pixels on its own dedicated transparent render layer,
+// not via per-pixel alpha), so a flat material opacity is what actually
+// produces the see-through look here, not alphaTest. Real vanilla tinted
+// glass is the one deliberate exception — it "blocks all light" and
+// renders opaque — so it's excluded and still uses cubeMaterial().
+let _glassCubeMaterial = null;
+function glassCubeMaterial() {
+  if (!_glassCubeMaterial) _glassCubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.05, metalness: 0.02, transparent: true, opacity: 0.4, side: THREE.DoubleSide, clippingPlanes: [cutawayPlane] });
+  return _glassCubeMaterial;
+}
+function isTransparentGlassMaterial(matVal) {
+  const m = MATERIALS[matVal - 1];
+  return m.category === 'Glass' && m.id !== 'tinted_glass';
+}
 let _decorMaterial = null;
 function decorMaterial() {
   if (!_decorMaterial) _decorMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, alphaTest: 0.4, side: THREE.DoubleSide, clippingPlanes: [cutawayPlane] });
@@ -6058,7 +6077,8 @@ function renderThree(model, preserveCamera) {
   const dummy = new THREE.Object3D();
   const offX = -dims.sx / 2, offY = 0, offZ = -dims.sz / 2;
   for (const [matVal, cells] of byMaterial) {
-    const mesh = new THREE.InstancedMesh(getBoxGeometry(matVal), cubeMaterial(), cells.length);
+    const mat = isTransparentGlassMaterial(matVal) ? glassCubeMaterial() : cubeMaterial();
+    const mesh = new THREE.InstancedMesh(getBoxGeometry(matVal), mat, cells.length);
     cells.forEach(([x, y, z], i) => {
       dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
       dummy.updateMatrix();
