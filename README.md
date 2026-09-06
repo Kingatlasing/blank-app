@@ -53,12 +53,15 @@ Buttons now follow their real vanilla timing instead of behaving like a lever wi
 
 ### Block property rules
 
-Two full-cube materials now follow their real vanilla physics instead of behaving like inert stone, both scoped to **Build mode** specifically (see below for why):
+Three full-cube materials now follow their real vanilla physics instead of behaving like inert stone:
 
 - **Gravity-affected blocks** — sand, red sand, gravel, and every concrete powder color fall straight down through any air beneath them and settle on the first solid block (or the floor), exactly like real vanilla's falling-block update, whenever a Build-mode edit could have left one unsupported. A stack of several separated by gaps compacts down together in order, the same end-state real vanilla's block-by-block falling reaches. This intentionally only runs after a Build-mode edit, never after generating a preset or custom shape — a real Minecraft world would just as happily let a hollow sand pyramid collapse the moment it's placed, but that's the opposite of what a *scale model* generator is for, so presets and custom shapes are placed as designed rather than physically re-simulated.
 - **Redstone lamp** — lights up (swaps to its lit texture) the instant it's adjacent to a powered wire, switch, or torch target, and goes dark again the instant it isn't, using the same real signal propagation as every other consumer in this app (see "How the redstone simulation works" below), just checked in all 6 directions instead of the 4 a same-height wire uses, matching how a real redstone lamp can be lit from above or below too.
+- **Soul sand / soul soil** — slow the player down by ~41.91% while standing on top, matching real vanilla's actual figure for anyone not wearing Soul Speed boots (source: [minecraft.wiki/w/Soul_Sand](https://minecraft.wiki/w/Soul_Sand); this app has no boots or enchantments, so it's unconditional). This works in every camera mode that walks — Walk and Third-person — checked live against the real block directly under the player's feet each frame.
 
-Both were previously in the block palette (Build mode could already place either) but had no real behavior wired up — placing sand just left it floating, and a redstone lamp never lit no matter what was next to it.
+All three were previously in the block palette (Build mode could already place any of them) but had no real behavior wired up — placing sand just left it floating, a redstone lamp never lit no matter what was next to it, and soul sand was exactly as fast to cross as stone.
+
+Not yet covered: real ice/packed ice/blue ice slipperiness (sliding and carried momentum) would need an actual velocity/friction model added to player movement, which today moves the player directly from input with no persisted momentum at all — a bigger change than a simple per-surface multiplier, so it's a deliberate gap rather than an oversight. Slime block and honey block (bouncing, climbing, slowed fall) aren't in this app's block palette at all yet.
 
 ### Tick-based simulation
 

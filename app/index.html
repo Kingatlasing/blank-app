@@ -4487,6 +4487,19 @@ function isSolidAtWorld(wx, wy, wz) {
   if (gx < 0 || gy < 0 || gz < 0 || gx >= m.dims.sx || gy >= m.dims.sy || gz >= m.dims.sz) return false;
   return m.grid[idx(gx, gy, gz, m.dims)] !== 0;
 }
+function materialIdAtWorld(wx, wy, wz) {
+  if (!currentModel) return null;
+  const m = currentModel;
+  const offX = -m.dims.sx / 2, offZ = -m.dims.sz / 2;
+  const gx = Math.floor(wx - offX), gy = Math.floor(wy), gz = Math.floor(wz - offZ);
+  if (gx < 0 || gy < 0 || gz < 0 || gx >= m.dims.sx || gy >= m.dims.sy || gz >= m.dims.sz) return null;
+  const v = m.grid[idx(gx, gy, gz, m.dims)];
+  return v ? MATERIALS[v - 1].id : null;
+}
+// Real vanilla: soul sand/soil slow anyone not wearing Soul Speed boots by
+// ~41.91% (source: minecraft.wiki/w/Soul_Sand) — this app has no boots or
+// enchantments, so it's unconditional, matching a player with none equipped.
+const SURFACE_SPEED_MULT = { soul_sand: 0.5809, soul_soil: 0.5809 };
 // Real Minecraft player: 0.6 wide x 1.8 tall hitbox, 1.62 eye height, 70 deg
 // default FOV — matched here so first/third-person views feel like the game.
 const PLAYER_RADIUS = 0.3, PLAYER_HEIGHT = 1.8, PLAYER_EYE_HEIGHT = 1.62, GAME_FOV = 70;
@@ -4733,8 +4746,13 @@ function updateFreeCamera(dt) {
     if (pressedKeys.has('ControlLeft')) flyState.pos.y -= speed * dt;
   } else if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
     const p = flyState.pos;
-    if (mx !== 0 && !playerCollides(p.x + mx, p.y, p.z)) p.x += mx;
-    if (mz !== 0 && !playerCollides(p.x, p.y, p.z + mz)) p.z += mz;
+    // Real vanilla: the block underfoot can slow (or, for a real ice block,
+    // speed up the slide of) whoever's standing on it — see SURFACE_SPEED_MULT.
+    const groundMat = flyState.grounded ? materialIdAtWorld(p.x, p.y - 0.1, p.z) : null;
+    const surfaceMult = SURFACE_SPEED_MULT[groundMat] || 1;
+    const wx = mx * surfaceMult, wz = mz * surfaceMult;
+    if (wx !== 0 && !playerCollides(p.x + wx, p.y, p.z)) p.x += wx;
+    if (wz !== 0 && !playerCollides(p.x, p.y, p.z + wz)) p.z += wz;
     flyState.vy -= 22 * dt;
     const dy = flyState.vy * dt;
     if (dy < 0) {
