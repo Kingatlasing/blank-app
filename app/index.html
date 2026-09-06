@@ -1797,6 +1797,8 @@ const DECOR_TYPES = {
   enderman: { kind: 'enderman', interactive: false },
   spider: { kind: 'spider', interactive: false },
   ghast: { kind: 'ghast', interactive: false },
+  bee: { kind: 'bee', interactive: false },
+  beehive: { kind: 'beehive', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2730,6 +2732,28 @@ function buildNetherWastesInterior(grid, silhouette, dims, exteriorMat, accentMa
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'ghast', x: cx, y: Math.floor(dims.sy / 2), z: cz, facing: 'south' });
 }
+// An open grass meadow with a beehive and several real flowers scattered
+// around it — unlike every other mob preset here, the bee doesn't just
+// wander; it needs an actual beehive to call home and actual flowers to
+// path to and back from, so this preset is the first built specifically
+// to give a mob a real goal, not just an environment it can move through.
+function buildFlowerMeadowInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'beehive', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'bee', x: cx, y: 1, z: cz, facing: 'south' });
+  const spots = [
+    [1, 1], [dims.sx - 2, 1], [1, dims.sz - 2], [dims.sx - 2, dims.sz - 2],
+    [Math.max(1, cx - 3), cz], [Math.min(dims.sx - 2, cx + 3), cz],
+  ];
+  for (let i = 0; i < spots.length; i++) {
+    const [fx, fz] = spots[i];
+    if (fx === cx && fz === cz) continue;
+    decorOut.push({ type: i % 2 === 0 ? 'flower' : 'dandelion', x: fx, y: 1, z: fz });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3055,6 +3079,17 @@ const PRESETS = [
     notes: [
       'The ghast genuinely drifts through real 3D space to a new nearby spot every so often, then pauses, then drifts again — a real per-frame simulation, not an animation loop.',
       'No aggro/attack model exists in this app (no combat at all), so this ghast never shoots fireballs or reacts to a nearby player — real vanilla only does that as part of combat behavior this app doesn\'t simulate.',
+    ],
+  },
+  {
+    id: 'flower-meadow', name: 'Flower Meadow', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'flowerMeadow',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'oak_planks' },
+    desc: 'An open grass meadow with a beehive and scattered flowers — real vanilla bees "leave their hive... in search of flowers to pollinate" and fly back home afterward, this app\'s first mob that pathes to a genuine target instead of a random nearby point.',
+    keywords: ['bee', 'beehive', 'flower', 'pollinate', 'meadow', 'hive'],
+    notes: [
+      'Watch it fly from the hive to the nearest real flower, hover just above it for a while, then fly straight back to its exact hive position — a real repeating cycle driven by actual decor positions, not a canned animation.',
+      'No honey/honeycomb production or harvesting exists in this app, and there\'s no day/night cycle, so this bee never gets angry, never returns home "because night is falling," and never needs to shelter from rain — real vanilla ties several of its behaviors to systems this app doesn\'t simulate.',
     ],
   },
 ];
@@ -3417,6 +3452,8 @@ function generateModel() {
     buildSpiderNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'netherWastes') {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'flowerMeadow') {
+    buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3984,6 +4021,27 @@ function ghastParts() {
   });
   return { body, face, tentacles };
 }
+// A small rounded body (real vanilla bees are 0.7 x 0.6) with two flat wing
+// planes and a black stripe accent — see DECOR_TYPES.bee.
+function beeParts() {
+  const body = new THREE.BoxGeometry(0.32, 0.24, 0.4);
+  const stripe = new THREE.BoxGeometry(0.34, 0.08, 0.1);
+  const wings = [[-0.14, 0], [0.14, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.22, 0.03, 0.16);
+    g.translate(x, 0.14, z);
+    return g;
+  });
+  return { body, stripe, wings };
+}
+// A small box hive with a darker entrance hole — no real beehive
+// texture/model exists in this app, same "new procedural geometry as a
+// stand-in" approach as the hopper. See DECOR_TYPES.beehive.
+function beehiveParts() {
+  const body = new THREE.BoxGeometry(0.7, 0.5, 0.7);
+  const entrance = new THREE.BoxGeometry(0.16, 0.16, 0.04);
+  entrance.translate(0, -0.05, 0.37);
+  return { body, entrance };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4367,6 +4425,26 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'bee') {
+    let parts = decorGeoCache.get('bee');
+    if (!parts) { parts = beeParts(); decorGeoCache.set('bee', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xe8b923), stripeMat = solidMaterial(0x2a2216), wingMat = solidMaterial(0xd8e8ec);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.stripe, stripeMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, wingMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'beehive') {
+    let parts = decorGeoCache.get('beehive');
+    if (!parts) { parts = beehiveParts(); decorGeoCache.set('beehive', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xc99a4e), entranceMat = solidMaterial(0x2a2216);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.entrance, entranceMat));
+    group.rotation.y = FACING_YAW[entry.facing || 'south'];
+    objs.push(group);
   }
   return objs;
 }
@@ -4701,10 +4779,84 @@ function updateGhast(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla bees don't wander aimlessly the way every mob above does —
+// they fly out from a home hive specifically in search of a flower, hover
+// over it to pollinate for a while, then fly back home (source:
+// minecraft.wiki/w/Bee). This is this app's first genuinely goal-directed
+// mob movement: a real destination (the nearest flower/dandelion decor) and
+// a fixed home to return to, not a random nearby point.
+const BEE_FLY_SPEED = 1.4;
+const BEE_POLLINATE_MIN = 3, BEE_POLLINATE_MAX = 6;
+const BEE_HOME_PAUSE_MIN = 2, BEE_HOME_PAUSE_MAX = 5;
+function findNearestFlower(model, fx, fy, fz) {
+  let best = null, bestDist = Infinity;
+  for (const d of model.decor) {
+    if (d.type !== 'flower' && d.type !== 'dandelion') continue;
+    const dist = Math.hypot(d.x - fx, d.y - fy, d.z - fz);
+    if (dist < bestDist) { bestDist = dist; best = d; }
+  }
+  return best;
+}
+function updateBee(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'atHive';
+    entry._mobTimer = BEE_HOME_PAUSE_MIN + Math.random() * (BEE_HOME_PAUSE_MAX - BEE_HOME_PAUSE_MIN);
+    entry._homeX = entry.x + 0.5;
+    entry._homeY = entry.y;
+    entry._homeZ = entry.z + 0.5;
+    entry._wx = entry._homeX;
+    entry._wy = entry._homeY;
+    entry._wz = entry._homeZ;
+  }
+  const flyToward = (tx, ty, tz, nextState, onArrive) => {
+    const dx = tx - entry._wx, dy = ty - entry._wy, dz = tz - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = BEE_FLY_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = tx; entry._wy = ty; entry._wz = tz;
+      entry._mobState = nextState;
+      if (onArrive) onArrive();
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  };
+  if (entry._mobState === 'atHive') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const flower = findNearestFlower(currentModel, entry.x, entry.y, entry.z);
+      if (flower) {
+        entry._flowerTargetX = flower.x + 0.5;
+        entry._flowerTargetY = flower.y + 1; // real vanilla: pollinates from 1-2 blocks directly above the plant
+        entry._flowerTargetZ = flower.z + 0.5;
+        entry._mobState = 'toFlower';
+      } else {
+        entry._mobTimer = BEE_HOME_PAUSE_MIN; // no flower exists anywhere in this model — stay home and keep checking
+      }
+    }
+  } else if (entry._mobState === 'toFlower') {
+    flyToward(entry._flowerTargetX, entry._flowerTargetY, entry._flowerTargetZ, 'pollinating', () => {
+      entry._mobTimer = BEE_POLLINATE_MIN + Math.random() * (BEE_POLLINATE_MAX - BEE_POLLINATE_MIN);
+    });
+  } else if (entry._mobState === 'pollinating') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) entry._mobState = 'toHive';
+  } else { // toHive
+    flyToward(entry._homeX, entry._homeY, entry._homeZ, 'atHive', () => {
+      entry._mobTimer = BEE_HOME_PAUSE_MIN + Math.random() * (BEE_HOME_PAUSE_MAX - BEE_HOME_PAUSE_MIN);
+    });
+  }
+  obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
     if (!MOB_KINDS.has(entry.type)) continue;
@@ -5684,6 +5836,7 @@ function renderBlueprint(model) {
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
     hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
+    bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5741,6 +5894,7 @@ function renderBlueprint(model) {
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
     hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
+    bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5829,6 +5983,10 @@ function renderCommands(model) {
       else if (d.type === 'enderman') lines.push(`summon minecraft:enderman ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'spider') lines.push(`summon minecraft:spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ghast') lines.push(`summon minecraft:ghast ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'bee') lines.push(`summon minecraft:bee ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'beehive') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:beehive[facing=${d.facing || 'south'}]`);
+      else if (d.type === 'flower') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:poppy`);
+      else if (d.type === 'dandelion') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:dandelion`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
