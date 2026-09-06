@@ -2767,9 +2767,25 @@ function leverParts(tileKey) {
   remapUV(base, 'cobblestone');
   const arm = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX);
   arm.translate(0, 5 * PX, 0);
-  [0, 4, 1, 5].forEach(f => paintFaceUVRect(arm, f, tileKey, 7, 6, 9, 16)); // sides
-  paintFaceUVRect(arm, 2, tileKey, 7, 6, 9, 8); // top
-  paintFaceUVRect(arm, 3, tileKey, 7, 6, 9, 8); // bottom (hidden against the base; vanilla omits it)
+  // lever.png's rows 6-7 are a small plain-gray metal joint cap; rows 8-16
+  // are the longer wood-toned grip. The joint belongs at the pivot end
+  // (where the arm actually meets the base), not the free tip — mapping
+  // row 6 to the geometry's top (as a literal top-to-bottom copy would)
+  // put that gray cap at the tip instead, which read as a stray "hinge"
+  // partway up an otherwise plain wood shaft. Swapping the row range puts
+  // the cap at the pivot end and the wood grain running uninterrupted out
+  // to the tip. Columns 7 and 8 are also two different shades (a light/
+  // dark pseudo-3D highlight pair, meant to be seen only edge-on) — vanilla
+  // assigns each of the 4 side faces its own implicit orientation so they
+  // read as a continuous rounded shape, but that per-face convention isn't
+  // something a plain box-face UV copy reproduces, and copying both
+  // columns onto every face instead put two very differently-shaded
+  // columns on faces that don't agree with each other, showing up as a
+  // hard light/dark seam right where two faces meet. Sampling only column
+  // 7 keeps every face the same uniform wood tone.
+  [0, 4, 1, 5].forEach(f => paintFaceUVRect(arm, f, tileKey, 7, 16, 8, 6)); // sides
+  paintFaceUVRect(arm, 2, tileKey, 7, 6, 8, 8); // top (tip end cap)
+  paintFaceUVRect(arm, 3, tileKey, 7, 6, 8, 8); // bottom (hidden against the base; vanilla omits it)
   arm.attributes.uv.needsUpdate = true;
   return { base, arm };
 }
