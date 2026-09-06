@@ -1802,6 +1802,8 @@ const DECOR_TYPES = {
   slime: { kind: 'slime', interactive: false },
   water: { kind: 'water_block', interactive: false },
   squid: { kind: 'squid', interactive: false },
+  turtle: { kind: 'turtle', interactive: false },
+  turtle_egg: { kind: 'turtle_egg', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2791,6 +2793,22 @@ function buildAquariumInterior(grid, silhouette, dims, exteriorMat, accentMat, d
   const cx = Math.floor(dims.sx / 2), cy = Math.max(1, Math.floor(dims.sy / 2)), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'squid', x: cx, y: cy, z: cz, facing: 'south' });
 }
+// An open sand floor split into a dry beach half and a tagged-water
+// "shallows" half, exactly like a real shoreline — no walls, matching
+// every other single-mob flourish preset. The turtle's home is planted
+// on the dry sand side specifically so it has real beach to travel back
+// to and a real body of water to actually prefer wandering in.
+function buildSeaTurtleBeachInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const mid = Math.floor(dims.sx / 2);
+  for (let z = 0; z < dims.sz; z++) {
+    for (let x = mid; x < dims.sx; x++) decorOut.push({ type: 'water', x, y: 1, z });
+  }
+  const homeX = Math.max(0, mid - 2), homeZ = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'turtle', x: homeX, y: 1, z: homeZ, facing: 'east' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3150,6 +3168,18 @@ const PRESETS = [
       'This app has no real fluid simulation — no currents, no flow, nothing to drown in or swim out of onto land — so "water" here is a decor marker tagging which cells count as water, the same trick already used for a fence\'s iron bars, not a real liquid. The squid genuinely stays confined to those tagged cells the whole time, though: it will never wander into the glass or the air above the waterline.',
       'Real vanilla squid also "[hover] in place when first spawned into the world" before wandering — this one does the same on every regenerate, pausing briefly before its first swim instead of moving immediately.',
       'No aggro/attack model exists in this app (no combat at all) — real vanilla squid only produce ink and flee when attacked, so this one just drifts peacefully with nothing to react to.',
+    ],
+  },
+  {
+    id: 'sea-turtle-beach', name: 'Sea Turtle Beach', shape: 'box', category: 'Farms & Automation',
+    real: { height: 2, baseX: 12, baseZ: 8 }, interiorMode: 'seaTurtleBeach',
+    blocks: { exterior: 'sand', interior: 'sand', accent: 'sandstone' },
+    desc: 'A sandy shoreline split between dry beach and real shallow water, with a sea turtle wandering between them — real vanilla turtles remember the exact block they spawned on as a permanent home and always travel back to it to lay eggs, "no matter how far away" they\'ve wandered ([minecraft.wiki/w/Turtle](https://minecraft.wiki/w/Turtle)).',
+    keywords: ['turtle', 'sea turtle', 'beach', 'egg', 'sand', 'shore', 'ocean'],
+    notes: [
+      'Watch it wander the shallows and the dry sand alike, noticeably slower on land than in the water (real vanilla: "slow on land, but can swim quickly"), then eventually turn and head straight back to the exact sand block it started on, pause there to dig, and lay a real turtle_egg — the first mob in this app whose behavior actually adds something permanent to the model instead of just moving.',
+      'Real vanilla turtles only make that trip after breeding; this app has no breeding system for any animal, so this turtle heads home on its own timer instead, and only ever nests once per session rather than repeatedly — an honest simplification, not a claim about real vanilla\'s own trigger.',
+      'No aggro/predation model exists in this app (no combat at all) — real vanilla turtles are simply passive and this one has nothing to flee from or be attacked by.',
     ],
   },
 ];
@@ -3518,6 +3548,8 @@ function generateModel() {
     buildSlimeChunkInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'aquarium') {
     buildAquariumInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'seaTurtleBeach') {
+    buildSeaTurtleBeachInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4184,6 +4216,36 @@ function squidParts() {
   });
   return { mantle, eyes, tentacles };
 }
+// A flat wide shell, a small head, and four flipper stubs — real vanilla
+// turtles are noticeably wider than tall (1.2 x 1.2 footprint, only 0.4
+// tall); simplified here like every other low-poly stand-in mob in this
+// app. See DECOR_TYPES.turtle.
+function turtleParts() {
+  const shell = new THREE.BoxGeometry(0.6, 0.28, 0.6);
+  const head = new THREE.BoxGeometry(0.18, 0.16, 0.16);
+  head.translate(0, -0.02, 0.36);
+  const flipperOffsets = [[-0.34, -0.26], [0.34, -0.26], [-0.34, 0.26], [0.34, 0.26]];
+  const flippers = flipperOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.08, 0.2);
+    g.translate(x, -0.04, z);
+    return g;
+  });
+  return { shell, head, flippers };
+}
+// A small cluster of three overlapping speckled boxes standing in for the
+// real single-block egg cluster (1-4 eggs render as one block in real
+// vanilla) — no real turtle_egg texture/model exists in this app, same
+// "new procedural geometry as a stand-in" approach as the hopper and
+// beehive. See DECOR_TYPES.turtle_egg.
+function turtleEggParts() {
+  const eggOffsets = [[-0.08, -0.06], [0.09, -0.03], [0, 0.09]];
+  const eggs = eggOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+    g.translate(x, -0.42, z);
+    return g;
+  });
+  return { eggs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4614,6 +4676,24 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'turtle') {
+    let parts = decorGeoCache.get('turtle');
+    if (!parts) { parts = turtleParts(); decorGeoCache.set('turtle', parts); }
+    const group = new THREE.Group();
+    const shellMat = solidMaterial(0x4a7c3f), skinMat = solidMaterial(0x9bb86a);
+    group.add(new THREE.Mesh(parts.shell, shellMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.flippers) group.add(new THREE.Mesh(g, skinMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'turtle_egg') {
+    let parts = decorGeoCache.get('turtle_egg');
+    if (!parts) { parts = turtleEggParts(); decorGeoCache.set('turtle_egg', parts); }
+    const group = new THREE.Group();
+    const eggMat = solidMaterial(0xe8dfc0);
+    for (const g of parts.eggs) group.add(new THREE.Mesh(g, eggMat));
     objs.push(group);
   }
   return objs;
@@ -5165,10 +5245,119 @@ function updateSquid(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla sea turtles "[remember] the block on which [they] spawned
+// as [their] home position and always [attempt] to return to [it] to lay
+// [their] eggs after breeding, no matter how far away" — traveling until
+// within 9 blocks of it, then digging for a while before laying a cluster
+// of 1-4 eggs as one turtle_egg block, and are "slow on land, but can swim
+// quickly, so [they] generally prefer to be in the water" (source:
+// minecraft.wiki/w/Turtle). This app has no breeding system at all, so
+// this turtle heads home on its own timer instead of after breeding — a
+// deliberate deviation, spelled out in the preset's own notes rather than
+// pretended away. It's also the first mob whose behavior genuinely
+// mutates the world: laying an egg appends a real new decor entry (and a
+// real new mesh added straight into the live three.js scene) rather than
+// just moving an existing one.
+const TURTLE_SWIM_SPEED = 1.0, TURTLE_WALK_SPEED = 0.35; // real vanilla: slow on land, fast in water
+const TURTLE_WANDER_RADIUS = 3;
+const TURTLE_WANDER_MIN = 2, TURTLE_WANDER_MAX = 5;
+const TURTLE_NEST_TRIP_DELAY_MIN = 6, TURTLE_NEST_TRIP_DELAY_MAX = 10; // this app's stand-in for "after breeding" — no breeding exists here
+const TURTLE_NEST_PAUSE_MIN = 2, TURTLE_NEST_PAUSE_MAX = 4; // real vanilla: seconds to minutes of digging, compressed for a watchable demo
+function turtleCurrentSpeed(model, entry) {
+  return squidCellSwimmable(model, Math.floor(entry._wx), entry.y, Math.floor(entry._wz)) ? TURTLE_SWIM_SPEED : TURTLE_WALK_SPEED;
+}
+function pickTurtleWanderTarget(model, entry) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * TURTLE_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * TURTLE_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = entry.x + dx, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, entry.y, tz) || mobCellWalkable(model, tx, entry.y, tz)) return { x: tx, z: tz };
+  }
+  return null;
+}
+function layTurtleEgg(entry) {
+  if (!currentModel || !three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const eggEntry = { type: 'turtle_egg', x: entry._homeX, y: entry._homeY, z: entry._homeZ, facing: 'south' };
+  currentModel.decor.push(eggEntry);
+  for (const mesh of buildDecorMeshesForEntry(eggEntry)) {
+    mesh.position.x += eggEntry.x + offX + 0.5;
+    mesh.position.y += eggEntry.y + 0.5;
+    mesh.position.z += eggEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateTurtle(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'wandering';
+    entry._mobTimer = TURTLE_WANDER_MIN + Math.random() * (TURTLE_WANDER_MAX - TURTLE_WANDER_MIN);
+    entry._homeX = entry.x; entry._homeY = entry.y; entry._homeZ = entry.z; // remembered forever, however far it later wanders
+    entry._hasNested = false;
+    entry._nestTripTimer = TURTLE_NEST_TRIP_DELAY_MIN + Math.random() * (TURTLE_NEST_TRIP_DELAY_MAX - TURTLE_NEST_TRIP_DELAY_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (!entry._hasNested && entry._mobState !== 'travelingHome' && entry._mobState !== 'nesting') {
+    entry._nestTripTimer -= dt;
+    if (entry._nestTripTimer <= 0) {
+      entry._targetX = entry._homeX + 0.5;
+      entry._targetZ = entry._homeZ + 0.5;
+      entry._mobState = 'travelingHome';
+    }
+  }
+  if (entry._mobState === 'wandering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickTurtleWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = TURTLE_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'travelingHome') {
+    const speed = turtleCurrentSpeed(currentModel, entry);
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = speed * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'travelingHome') {
+        entry._mobState = 'nesting';
+        entry._mobTimer = TURTLE_NEST_PAUSE_MIN + Math.random() * (TURTLE_NEST_PAUSE_MAX - TURTLE_NEST_PAUSE_MIN);
+      } else {
+        entry._mobState = 'wandering';
+        entry._mobTimer = TURTLE_WANDER_MIN + Math.random() * (TURTLE_WANDER_MAX - TURTLE_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'nesting') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0 && !entry._hasNested) {
+      entry._hasNested = true;
+      layTurtleEgg(entry);
+      entry._mobState = 'wandering';
+      entry._mobTimer = TURTLE_WANDER_MIN + Math.random() * (TURTLE_WANDER_MAX - TURTLE_WANDER_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y + 0.15, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
     if (entry.type === 'squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
@@ -6154,6 +6343,7 @@ function renderBlueprint(model) {
     hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
+    turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -6213,6 +6403,7 @@ function renderBlueprint(model) {
     hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
     slime: 'Slime', water: 'Water', squid: 'Squid',
+    turtle: 'Turtle', turtle_egg: 'Turtle Egg',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -6308,6 +6499,8 @@ function renderCommands(model) {
       else if (d.type === 'slime') lines.push(`summon minecraft:slime ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Size:${(d.size || 2) - 1}}`);
       else if (d.type === 'water') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:water`);
       else if (d.type === 'squid') lines.push(`summon minecraft:squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
