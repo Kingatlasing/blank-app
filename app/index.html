@@ -2634,6 +2634,26 @@ function paintFaceUV(geo, faceIndex, tileKey) {
   }
 }
 
+// Some source textures (lever.png, and other small "item-style" sprites
+// used on 3D elements) don't fill their whole 16x16 tile — the actual
+// opaque art sits in one small sub-rectangle, with the rest fully
+// transparent padding. Mapping a geometry's full UV range across the
+// *whole* tile in that case samples mostly transparent pixels, making the
+// mesh look broken/see-through. This maps into just the given pixel
+// sub-rectangle (0-16 range, matching vanilla's own model UV coordinates)
+// instead of the full tile — same top-down V convention as remapUV/
+// paintFaceUV above.
+function paintFaceUVRect(geo, faceIndex, tileKey, px0, py0, px1, py1) {
+  const { u0, v0, u1, v1 } = tileUV(tileKey);
+  const su0 = u0 + (px0 / ATLAS_TILE) * (u1 - u0), su1 = u0 + (px1 / ATLAS_TILE) * (u1 - u0);
+  const sv0 = v0 + (py0 / ATLAS_TILE) * (v1 - v0), sv1 = v0 + (py1 / ATLAS_TILE) * (v1 - v0);
+  const uv = geo.attributes.uv;
+  for (let v = 0; v < 4; v++) {
+    const i = faceIndex * 4 + v;
+    uv.setXY(i, su0 + uv.getX(i) * (su1 - su0), sv1 - uv.getY(i) * (sv1 - sv0));
+  }
+}
+
 function buildTexturedBoxGeometry(faces) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const sideTile = faces.all || faces.side;
@@ -2693,10 +2713,18 @@ function trapdoorGeometry(tileKey, ceilingMount) {
   return geo;
 }
 // A thin standing rod (not a flat billboard) so torches read as real 3D
-// objects from every angle. Real torch: ~2x10x2px stick, base near the floor.
+// objects from every angle. Real torch: 2x10x2px stick, base near the
+// floor. torch.png is an item-style sprite (the lit stick+flame art sits
+// in one small sub-rectangle of its 16x16 tile, transparent elsewhere) —
+// stretching the whole tile across each box face would sample mostly that
+// transparent padding and render as a broken, mostly see-through stick, so
+// each face is mapped to vanilla's own template_torch.json UV rectangle.
 function torchGeometry(tileKey) {
   const geo = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX);
-  remapUV(geo, tileKey);
+  [0, 4, 1, 5].forEach(f => paintFaceUVRect(geo, f, tileKey, 7, 6, 9, 16)); // sides
+  paintFaceUVRect(geo, 2, tileKey, 7, 6, 9, 8); // top
+  paintFaceUVRect(geo, 3, tileKey, 7, 13, 9, 15); // bottom
+  geo.attributes.uv.needsUpdate = true;
   return geo;
 }
 // Real button: 6x2x4px unpressed; pressed sinks ~1px closer to its mount.
@@ -2718,9 +2746,19 @@ function tripwireGeometry(tileKey) {
 // Lever: 6x3x8px stone base plus a 2x10x2px arm — exact cuboids from
 // vanilla's own lever.json model (base [5,-0.02,4]-[11,2.98,12], arm
 // [7,1,7]-[9,11,9] pivoting +-45 degrees around its own bottom-center).
+// lever.png, like torch.png, is an item-style sprite: the actual opaque
+// handle art occupies only a narrow strip of its 16x16 tile, transparent
+// everywhere else. Stretching the whole tile across the arm's box faces
+// sampled mostly that transparent padding, leaving only a few edge pixels
+// opaque — rendering as a broken, "see-through" wireframe-looking handle
+// instead of a solid one. Mapped to vanilla's own UV rectangle instead.
 function leverParts(tileKey) {
   const base = new THREE.BoxGeometry(6 * PX, 3 * PX, 8 * PX); remapUV(base, 'cobblestone');
-  const arm = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX); remapUV(arm, tileKey);
+  const arm = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX);
+  [0, 4, 1, 5].forEach(f => paintFaceUVRect(arm, f, tileKey, 7, 6, 9, 16)); // sides
+  paintFaceUVRect(arm, 2, tileKey, 7, 6, 9, 8); // top
+  paintFaceUVRect(arm, 3, tileKey, 7, 6, 9, 8); // bottom (hidden against the base; vanilla omits it)
+  arm.attributes.uv.needsUpdate = true;
   return { base, arm };
 }
 // Pressure plate: 14x1x14px, inset 1px on every side from the full footprint;
