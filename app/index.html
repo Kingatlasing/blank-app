@@ -1800,6 +1800,8 @@ const DECOR_TYPES = {
   bee: { kind: 'bee', interactive: false },
   beehive: { kind: 'beehive', interactive: false },
   slime: { kind: 'slime', interactive: false },
+  water: { kind: 'water_block', interactive: false },
+  squid: { kind: 'squid', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2768,6 +2770,27 @@ function buildSlimeChunkInterior(grid, silhouette, dims, exteriorMat, accentMat,
   decorOut.push({ type: 'slime', x: 2, y: 1, z: 2, facing: 'south', size: 1 });
   decorOut.push({ type: 'slime', x: dims.sx - 3, y: 1, z: dims.sz - 3, facing: 'south', size: 4 });
 }
+// A fully-walled glass tank (floor + 4 walls, open top like a real fish
+// tank with no lid) with every interior cell tagged as real `water`
+// decor and a squid swimming inside it — the first mob preset where the
+// mob's own movement rule needs an actual substance to stay inside of,
+// not just an open room to move through.
+function buildAquariumInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  for (let y = 1; y <= dims.sy - 2; y++) {
+    for (let z = 1; z <= dims.sz - 2; z++) {
+      for (let x = 1; x <= dims.sx - 2; x++) decorOut.push({ type: 'water', x, y, z });
+    }
+  }
+  const cx = Math.floor(dims.sx / 2), cy = Math.max(1, Math.floor(dims.sy / 2)), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'squid', x: cx, y: cy, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3115,6 +3138,18 @@ const PRESETS = [
     notes: [
       'Real vanilla slimes always jump exactly 1 block high no matter their size, but jump distance scales with size — watch the small and big slime here rise to the same height every hop while covering very different ground per hop.',
       'No aggro/attack model exists in this app (no combat at all) — real vanilla slimes only ever target and chase a player or iron golem as part of combat, so both of these just keep hopping in a chosen direction and changing it every couple of seconds, exactly like a real slime with nothing nearby to chase.',
+    ],
+  },
+  {
+    id: 'aquarium', name: 'Aquarium Chamber', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'aquarium',
+    blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
+    desc: 'A glass tank filled with real water and a squid drifting around inside it — the first mob preset here where the mob\'s own movement rule is bounded by an actual substance, not just an open room: real vanilla squid "wander around aimlessly in three dimensions as long as they are in the water."',
+    keywords: ['squid', 'water', 'aquarium', 'fish tank', 'underwater', 'ocean'],
+    notes: [
+      'This app has no real fluid simulation — no currents, no flow, nothing to drown in or swim out of onto land — so "water" here is a decor marker tagging which cells count as water, the same trick already used for a fence\'s iron bars, not a real liquid. The squid genuinely stays confined to those tagged cells the whole time, though: it will never wander into the glass or the air above the waterline.',
+      'Real vanilla squid also "[hover] in place when first spawned into the world" before wandering — this one does the same on every regenerate, pausing briefly before its first swim instead of moving immediately.',
+      'No aggro/attack model exists in this app (no combat at all) — real vanilla squid only produce ink and flee when attacked, so this one just drifts peacefully with nothing to react to.',
     ],
   },
 ];
@@ -3481,6 +3516,8 @@ function generateModel() {
     buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'slimeChunk') {
     buildSlimeChunkInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'aquarium') {
+    buildAquariumInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3647,6 +3684,11 @@ let _slimeBodyMaterial = null;
 function slimeBodyMaterial() {
   if (!_slimeBodyMaterial) _slimeBodyMaterial = new THREE.MeshStandardMaterial({ color: 0x6cbf4a, roughness: 0.7, transparent: true, opacity: 0.55, clippingPlanes: [cutawayPlane] });
   return _slimeBodyMaterial;
+}
+let _waterMaterial = null;
+function waterMaterial() {
+  if (!_waterMaterial) _waterMaterial = new THREE.MeshStandardMaterial({ color: 0x3878c9, roughness: 0.3, transparent: true, opacity: 0.55, clippingPlanes: [cutawayPlane] });
+  return _waterMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4095,6 +4137,34 @@ function slimeParts() {
   });
   return { outer, inner, eyes };
 }
+// An almost-full-cell translucent cube — this app has no real fluid
+// simulation, so a "water" cell is a decor marker layered over an air
+// grid cell (the same trick used for a fence's `bars` decor), not a real
+// block-material entry, exactly big enough to read as a filled cell of
+// water without literally being solid geometry a mob or camera clips
+// through unexpectedly. See DECOR_TYPES.water.
+function waterBlockParts() {
+  return { box: new THREE.BoxGeometry(0.98, 0.98, 0.98) };
+}
+// An elongated mantle with two eyes and four short trailing tentacles —
+// real vanilla squid are 8-tentacled and taller than wide; simplified
+// here like every other low-poly stand-in mob in this app. See
+// DECOR_TYPES.squid.
+function squidParts() {
+  const mantle = new THREE.BoxGeometry(0.42, 0.7, 0.42);
+  const eyes = [[-0.12, 0.15], [0.12, 0.15]].map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.08, 0.04);
+    g.translate(x, y, 0.22);
+    return g;
+  });
+  const tentacleOffsets = [-0.14, -0.05, 0.05, 0.14];
+  const tentacles = tentacleOffsets.map((x) => {
+    const g = new THREE.BoxGeometry(0.07, 0.4, 0.07);
+    g.translate(x, -0.55, 0);
+    return g;
+  });
+  return { mantle, eyes, tentacles };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4507,6 +4577,23 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0x1a1a1a)));
     group.scale.setScalar(entry.size || 2);
     group.rotation.y = entry._yaw !== undefined ? entry._yaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'water_block') {
+    let parts = decorGeoCache.get('water_block');
+    if (!parts) { parts = waterBlockParts(); decorGeoCache.set('water_block', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.box, waterMaterial()));
+    objs.push(group);
+  } else if (def.kind === 'squid') {
+    let parts = decorGeoCache.get('squid');
+    if (!parts) { parts = squidParts(); decorGeoCache.set('squid', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x8f7bc9), eyeMat = solidMaterial(0x1a1a1a);
+    group.add(new THREE.Mesh(parts.mantle, bodyMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   }
@@ -4980,10 +5067,90 @@ function updateSlime(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y + halfHeight + entry._hopHeight, entry._wz + offZ);
   obj.rotation.y = entry._yaw;
 }
+// Real vanilla squid "wander around aimlessly in three dimensions as long
+// as they are in the water" and "[hover] in place when first spawned into
+// the world" (minecraft.wiki/w/Squid) — the first mob in this app whose
+// movement is bounded by a substance rather than open air: every other
+// flying/floating mob (bat, ghast) only needs empty space, but a squid
+// must stay inside actual `water` decor cells the whole time. Water has
+// no real fluid simulation in this app (no currents, no flow, no
+// swimming-out-onto-land damage) — it's a decor marker over an air grid
+// cell, exactly like a fence's `bars` decor, so this reuses that same
+// "tag an otherwise-air cell" trick rather than needing a real block
+// material.
+const SQUID_SWIM_SPEED = 0.7;
+const SQUID_HOVER_MIN = 1, SQUID_HOVER_MAX = 3;
+const SQUID_WANDER_RADIUS = 2;
+function squidCellSwimmable(model, x, y, z) {
+  const dims = model.dims;
+  if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return false;
+  if (!model._waterCells) {
+    model._waterCells = new Set();
+    for (const d of model.decor) if (d.type === 'water') model._waterCells.add(d.x + ',' + d.y + ',' + d.z);
+  }
+  return model._waterCells.has(x + ',' + y + ',' + z);
+}
+function pickSquidSwimTarget(model, entry) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    const dy = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+function updateSquid(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering'; // real vanilla: hovers in place when first spawned
+    entry._mobTimer = SQUID_HOVER_MIN + Math.random() * (SQUID_HOVER_MAX - SQUID_HOVER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickSquidSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = SQUID_HOVER_MIN;
+      }
+    }
+  } else { // swimming
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = SQUID_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = SQUID_HOVER_MIN + Math.random() * (SQUID_HOVER_MAX - SQUID_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
@@ -5966,7 +6133,7 @@ function renderBlueprint(model) {
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
     hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
-    slime: ['#6cbf4a', 'A'],
+    slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -6025,7 +6192,7 @@ function renderBlueprint(model) {
     activator_rail: 'Activator Rail', minecart: 'Minecart',
     hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
-    slime: 'Slime',
+    slime: 'Slime', water: 'Water', squid: 'Squid',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -6119,6 +6286,8 @@ function renderCommands(model) {
       else if (d.type === 'flower') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:poppy`);
       else if (d.type === 'dandelion') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:dandelion`);
       else if (d.type === 'slime') lines.push(`summon minecraft:slime ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Size:${(d.size || 2) - 1}}`);
+      else if (d.type === 'water') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:water`);
+      else if (d.type === 'squid') lines.push(`summon minecraft:squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
