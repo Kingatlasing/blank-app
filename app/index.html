@@ -2670,6 +2670,39 @@ function getBoxGeometry(materialId) {
   return boxGeoCache.get(materialId);
 }
 
+// grass_block_top.png is genuinely grayscale (needs a per-biome green tint
+// in real Minecraft — see tintedMaterial's comment), but the dirt sides/
+// bottom are already full-color and must NOT be tinted, so a single
+// material color multiply (fine for the tree's leaves, which are all one
+// texture) won't work here. Vertex colors let one material tint only the
+// top face's 4 vertices green while leaving the rest at white (i.e.
+// untinted), the ground layer's own dedicated geometry/material so this
+// never touches the shared cubeMaterial() every other block uses.
+let _grassGroundGeo = null;
+function getGrassGroundGeometry() {
+  if (_grassGroundGeo) return _grassGroundGeo;
+  const geo = buildTexturedBoxGeometry(MATERIALS[MATERIAL_INDEX['grass_block']].faces);
+  const count = geo.attributes.position.count;
+  const color = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) { color[i * 3] = 1; color[i * 3 + 1] = 1; color[i * 3 + 2] = 1; }
+  const topFaceIndex = 2; // BoxGeometry face order: 0=+X,1=-X,2=+Y(top),3=-Y(bottom),4=+Z,5=-Z
+  const tint = new THREE.Color(0x5da845);
+  for (let v = 0; v < 4; v++) {
+    const i = topFaceIndex * 4 + v;
+    color[i * 3] = tint.r; color[i * 3 + 1] = tint.g; color[i * 3 + 2] = tint.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  _grassGroundGeo = geo;
+  return geo;
+}
+let _grassGroundMaterial = null;
+function grassGroundMaterial() {
+  if (!_grassGroundMaterial) {
+    _grassGroundMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), vertexColors: true, roughness: 0.95, clippingPlanes: [cutawayPlane] });
+  }
+  return _grassGroundMaterial;
+}
+
 let _cubeMaterial = null;
 function cubeMaterial() {
   if (!_cubeMaterial) _cubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, metalness: 0.02, clippingPlanes: [cutawayPlane] });
@@ -2679,6 +2712,38 @@ let _decorMaterial = null;
 function decorMaterial() {
   if (!_decorMaterial) _decorMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, alphaTest: 0.4, side: THREE.DoubleSide, clippingPlanes: [cutawayPlane] });
   return _decorMaterial;
+}
+
+// Redstone dust and tripwire's own textures are drawn in near-white
+// grayscale and only get their real color from a runtime tint the game
+// engine applies (red for dust, a subtle tan for tripwire) — used
+// standalone they're just a sparse gray sprite, mostly transparent
+// (verified: 68-92% of the tile) with no solid color of their own to
+// sample a clean sub-rectangle from the way lever.png/torch.png had. A
+// flat tinted material reproduces the actual in-game look more faithfully
+// than any crop of the raw sprite would.
+const _solidMaterials = new Map();
+function solidMaterial(hex) {
+  if (!_solidMaterials.has(hex)) _solidMaterials.set(hex, new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9, clippingPlanes: [cutawayPlane] }));
+  return _solidMaterials.get(hex);
+}
+
+// grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
+// ALSO genuinely grayscale in the raw asset (verified: pure gray pixels,
+// no color channel difference) — Minecraft tints them per-biome at render
+// time (green in most biomes). Rendered with the plain atlas map they
+// come out gray/washed-out instead of green. A MeshStandardMaterial
+// multiplies its texture by `color`, so reusing the same grayscale map
+// with a green color gives the correct tinted look while keeping the
+// leaf-cluster/blade detail and transparency from the real texture.
+const _tintedMaterials = new Map();
+function tintedMaterial(hex) {
+  if (!_tintedMaterials.has(hex)) {
+    _tintedMaterials.set(hex, new THREE.MeshStandardMaterial({
+      map: getAtlasTexture(), color: hex, roughness: 0.9, alphaTest: 0.4, side: THREE.DoubleSide, clippingPlanes: [cutawayPlane],
+    }));
+  }
+  return _tintedMaterials.get(hex);
 }
 
 /* Real block measurements below are in 16ths of a block (px), matching
@@ -2733,15 +2798,22 @@ function buttonGeometry(tileKey, depth) {
   remapUV(geo, tileKey);
   return geo;
 }
+// tripwire_hook.png, like lever.png/torch.png, is mostly transparent
+// padding around a small icon (verified: ~82% of the 16x16 tile) — its
+// opaque hook+post art sits in a [5,3]-[11,16] sub-rectangle. Stretching
+// the full tile across a box would sample mostly that transparent
+// padding.
 function tripwireHookGeometry(tileKey) {
   const geo = new THREE.BoxGeometry(0.25, 0.25, 0.4);
-  remapUV(geo, tileKey);
+  for (let f = 0; f < 6; f++) paintFaceUVRect(geo, f, tileKey, 5, 3, 11, 16);
+  geo.attributes.uv.needsUpdate = true;
   return geo;
 }
-function tripwireGeometry(tileKey) {
-  const geo = new THREE.BoxGeometry(1, 0.0625, 0.1875);
-  remapUV(geo, tileKey);
-  return geo;
+// tripwire.png's actual string art is a sparse, near-white woven pattern
+// meant to be tinted — see solidMaterial's comment. Plain untextured
+// geometry here; buildDecorMeshesForEntry gives it a tinted material.
+function tripwireGeometry() {
+  return new THREE.BoxGeometry(1, 0.0625, 0.1875);
 }
 // Lever: 6x3x8px stone base plus a 2x10x2px arm — exact cuboids from
 // vanilla's own lever.json model (base [5,-0.02,4]-[11,2.98,12], arm
@@ -2797,11 +2869,13 @@ function pressurePlateGeometry(tileKey, depressed) {
   return geo;
 }
 // Redstone dust: nearly flat on the floor; a short line segment (rotated per
-// axis) or an isolated dot when it has no run direction.
-function redstoneWireGeometry(tileKey, isDot) {
-  const geo = isDot ? new THREE.BoxGeometry(8 * PX, 0.25 * PX, 8 * PX) : new THREE.BoxGeometry(1, 0.25 * PX, 6 * PX);
-  remapUV(geo, tileKey);
-  return geo;
+// axis) or an isolated dot when it has no run direction. Both dust
+// textures are a sparse near-white spark/noise pattern meant to be
+// multiplied by a runtime red tint (real Minecraft draws the wire's actual
+// red color that way, not from the sprite itself) — see solidMaterial's
+// comment. Plain untextured geometry; buildDecorMeshesForEntry tints it.
+function redstoneWireGeometry(isDot) {
+  return isDot ? new THREE.BoxGeometry(8 * PX, 0.25 * PX, 8 * PX) : new THREE.BoxGeometry(1, 0.25 * PX, 6 * PX);
 }
 // Real Minecraft stair silhouette: a full-footprint lower slab plus a
 // half-depth full-height back riser — used as a simple "chair".
@@ -2980,9 +3054,8 @@ function buildDecorMeshesForEntry(entry) {
     objs.push(m);
   } else if (def.kind === 'redstone_wire') {
     const isDot = !entry.axis;
-    const geo = cachedGeo('wire:' + (isDot ? def.dotTile : def.tile) + ':' + (isDot ? 'dot' : 'line'),
-      () => redstoneWireGeometry(isDot ? def.dotTile : def.tile, isDot));
-    const m = new THREE.Mesh(geo, decorMaterial());
+    const geo = cachedGeo('wire:' + (isDot ? 'dot' : 'line'), () => redstoneWireGeometry(isDot));
+    const m = new THREE.Mesh(geo, solidMaterial(entry.on === false ? 0x6b0f0a : 0xe8281a));
     m.position.y = -0.5 + 0.125 * PX;
     if (!isDot && entry.axis === 'x') m.rotation.y = Math.PI / 2;
     objs.push(m);
@@ -2993,8 +3066,8 @@ function buildDecorMeshesForEntry(entry) {
     if (axis === 'x') m.rotation.y = Math.PI / 2;
     objs.push(m);
   } else if (def.kind === 'tripwire') {
-    const geo = cachedGeo('tripwire:' + def.tile, () => tripwireGeometry(def.tile));
-    const m = new THREE.Mesh(geo, decorMaterial());
+    const geo = cachedGeo('tripwire', tripwireGeometry);
+    const m = new THREE.Mesh(geo, solidMaterial(0xcdbb8e));
     m.position.y = -0.5 + 0.03125;
     if (axis === 'x') m.rotation.y = Math.PI / 2;
     objs.push(m);
@@ -3020,7 +3093,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get(key);
     if (!parts) { parts = treeParts(def.trunkTile, def.leafTile); decorGeoCache.set(key, parts); }
     const trunk = new THREE.Mesh(parts.trunk, decorMaterial()); trunk.position.y = 1;
-    const leaves = new THREE.Mesh(parts.leaves, decorMaterial()); leaves.position.y = 2.6;
+    const leaves = new THREE.Mesh(parts.leaves, tintedMaterial(0x5da845)); leaves.position.y = 2.6;
     objs.push(trunk, leaves);
   }
   return objs;
@@ -3459,13 +3532,12 @@ function renderThree(model) {
   // A real grass-block ground layer one cell below the model, extending
   // past its footprint, so every model reads as sitting on solid ground
   // instead of floating in empty space.
-  const groundMat = MATERIAL_INDEX['grass_block'] + 1;
   const margin = Math.min(12, Math.max(4, Math.round(Math.max(dims.sx, dims.sz) * 0.3)));
   const groundCells = [];
   for (let z = -margin; z < dims.sz + margin; z++) {
     for (let x = -margin; x < dims.sx + margin; x++) groundCells.push([x, -1, z]);
   }
-  const groundMesh = new THREE.InstancedMesh(getBoxGeometry(groundMat), cubeMaterial(), groundCells.length);
+  const groundMesh = new THREE.InstancedMesh(getGrassGroundGeometry(), grassGroundMaterial(), groundCells.length);
   groundCells.forEach(([x, y, z], i) => {
     dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
     dummy.updateMatrix();
