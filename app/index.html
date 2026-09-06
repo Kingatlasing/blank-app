@@ -1805,6 +1805,7 @@ const DECOR_TYPES = {
   turtle: { kind: 'turtle', interactive: false },
   turtle_egg: { kind: 'turtle_egg', interactive: false },
   glow_squid: { kind: 'glow_squid', interactive: false },
+  dolphin: { kind: 'dolphin', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2851,6 +2852,25 @@ function buildGlowSquidCavernInterior(grid, silhouette, dims, exteriorMat, accen
   ];
   for (const [sx, sz] of spots) decorOut.push({ type: 'glow_squid', x: sx, y: cy, z: sz, facing: 'south' });
 }
+// An open sandy cove — no walls at all, matching every other single-mob
+// flourish preset — with a single water source resting on the floor.
+// Left open like this (rather than boxed in on all 4 sides), the source
+// only spreads at its own height instead of triggering the full-container
+// fill rule (see computeWaterFlow), so it naturally leaves real open air
+// above the waterline — exactly what a dolphin needs room to breach into.
+function buildDolphinCoveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: 1, z: cz, source: true });
+  // Real vanilla dolphins swim in pods of 3-5.
+  const spots = [[cx - 2, cz], [cx + 2, cz], [cx, cz - 2], [cx, cz + 2]];
+  for (const [sx, sz] of spots) {
+    const x = Math.max(1, Math.min(dims.sx - 2, sx)), z = Math.max(1, Math.min(dims.sz - 2, sz));
+    decorOut.push({ type: 'dolphin', x, y: 1, z, facing: 'south' });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3236,6 +3256,18 @@ const PRESETS = [
       'No aggro/attack model exists in this app (no combat at all) — real vanilla glow squid only stop glowing briefly when hurt, so with nothing here to hurt them, this school just glows and swims continuously.',
     ],
   },
+  {
+    id: 'dolphin-cove', name: 'Dolphin Pod Cove', shape: 'box', category: 'Farms & Automation',
+    real: { height: 4, baseX: 11, baseZ: 11 }, interiorMode: 'dolphinCove',
+    blocks: { exterior: 'sand', interior: 'sand', accent: 'prismarine' },
+    desc: 'An open sandy cove with a real pod of dolphins swimming beneath the surface — real vanilla dolphins "normally swim in pods, occasionally leaping out of the water to get air," and unlike every other water mob here, this one genuinely leaves the water as part of its normal cycle instead of staying confined to it.',
+    keywords: ['dolphin', 'pod', 'cove', 'ocean', 'jump', 'breach', 'sand'],
+    notes: [
+      'Watch a dolphin swim for a while, then arc up out of the water in a real parabola into the open air above the surface before diving back in — real vanilla dolphins are mammals and "require air to survive," surfacing periodically to breathe; this app has no real air-meter or drowning to force that trigger exactly, so it\'s a timed stand-in for the same real need, not a literal breath mechanic.',
+      'The cove is deliberately left open on every side (no walls) rather than boxed in — a fully enclosed tank would flood solid to its very top (see the Aquarium Chamber and "Water flow simulation" in the README), leaving nowhere for a dolphin to actually breach into. Left open, the water only spreads at its own height, the same way a real pond does, which is exactly what leaves real open air above the waterline here.',
+      'No combat, no Dolphin\'s Grace speed boost for a nearby swimming player, and no leading a player to nearby shipwrecks — none of those exist in this app (no player-buff system, no structure generation, no combat), so this pod just swims and breathes with nothing else to react to.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3606,6 +3638,8 @@ function generateModel() {
     buildSeaTurtleBeachInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'glowSquidCavern') {
     buildGlowSquidCavernInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'dolphinCove') {
+    buildDolphinCoveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4312,6 +4346,23 @@ function turtleEggParts() {
   });
   return { eggs };
 }
+// A streamlined body, a dorsal fin, a tail fluke, and two small pectoral
+// fins — real vanilla dolphins are noticeably longer than tall (0.9 x
+// 0.6); simplified here like every other low-poly stand-in mob in this
+// app. See DECOR_TYPES.dolphin.
+function dolphinParts() {
+  const body = new THREE.BoxGeometry(0.34, 0.3, 0.75);
+  const dorsalFin = new THREE.BoxGeometry(0.05, 0.18, 0.2);
+  dorsalFin.translate(0, 0.22, -0.05);
+  const tailFluke = new THREE.BoxGeometry(0.3, 0.05, 0.16);
+  tailFluke.translate(0, 0, -0.42);
+  const pectoralFins = [[-0.2, 0.15], [0.2, 0.15]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.05, 0.14);
+    g.translate(x, -0.05, z);
+    return g;
+  });
+  return { body, dorsalFin, tailFluke, pectoralFins };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4785,6 +4836,18 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const eggMat = solidMaterial(0xe8dfc0);
     for (const g of parts.eggs) group.add(new THREE.Mesh(g, eggMat));
+    objs.push(group);
+  } else if (def.kind === 'dolphin') {
+    let parts = decorGeoCache.get('dolphin');
+    if (!parts) { parts = dolphinParts(); decorGeoCache.set('dolphin', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x6e7f8a), finMat = solidMaterial(0x4d5a63);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.dorsalFin, finMat));
+    group.add(new THREE.Mesh(parts.tailFluke, finMat));
+    for (const g of parts.pectoralFins) group.add(new THREE.Mesh(g, finMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   }
   return objs;
@@ -5585,10 +5648,110 @@ function updateTurtle(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy + 0.15, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla dolphins swim underwater like a squid, but "[dolphins]
+// normally swim in pods, occasionally leaping out of the water to get
+// air" — being mammals, they genuinely need it, surfacing periodically to
+// breathe (source: minecraft.wiki/w/Dolphin). This is the first mob here
+// that leaves its home medium as part of its normal cycle rather than
+// fleeing something: a real parabolic breach up out of the water into
+// open air, then back down, on its own breathing timer.
+const DOLPHIN_SWIM_SPEED = 1.3;
+const DOLPHIN_WANDER_RADIUS = 3;
+const DOLPHIN_SWIM_PAUSE_MIN = 1, DOLPHIN_SWIM_PAUSE_MAX = 2;
+const DOLPHIN_BREATHE_MIN = 8, DOLPHIN_BREATHE_MAX = 14; // this app has no real drowning/air-meter to force the exact real trigger, so this is a timed stand-in for "needs air periodically"
+const DOLPHIN_LEAP_HEIGHT = 1.4;
+const DOLPHIN_LEAP_DURATION = 1.0;
+function findWaterSurfaceY(model, x, z) {
+  for (let y = model.dims.sy - 1; y >= 0; y--) {
+    if (squidCellSwimmable(model, x, y, z)) return y;
+  }
+  return null;
+}
+function pickDolphinSwimTarget(model, entry) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * DOLPHIN_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * DOLPHIN_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = entry.x + dx, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, entry.y, tz)) return { x: tx, z: tz };
+  }
+  return null;
+}
+function updateDolphin(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'swimming';
+    entry._mobTimer = DOLPHIN_SWIM_PAUSE_MIN + Math.random() * (DOLPHIN_SWIM_PAUSE_MAX - DOLPHIN_SWIM_PAUSE_MIN);
+    entry._breatheTimer = DOLPHIN_BREATHE_MIN + Math.random() * (DOLPHIN_BREATHE_MAX - DOLPHIN_BREATHE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'swimming') {
+    entry._breatheTimer -= dt;
+    if (entry._breatheTimer <= 0) {
+      const surfaceX = Math.floor(entry._wx), surfaceZ = Math.floor(entry._wz);
+      const surfaceY = findWaterSurfaceY(currentModel, surfaceX, surfaceZ);
+      // Real open air directly above the water's surface — not more water
+      // (findWaterSurfaceY already found the topmost wet cell) and not a
+      // solid ceiling, which a sealed tank would have instead.
+      const hasAirAbove = surfaceY !== null && surfaceY + 1 < dims.sy
+        && currentModel.grid[idx(surfaceX, surfaceY + 1, surfaceZ, dims)] === 0;
+      if (hasAirAbove) {
+        entry._leapBaseY = surfaceY + 0.5;
+        entry._leapElapsed = 0;
+        entry._mobState = 'leaping';
+      } else {
+        entry._breatheTimer = 2; // sealed in with no real surface to breathe at — try again shortly rather than breaching through a ceiling
+      }
+    } else {
+      entry._mobTimer -= dt;
+      if (entry._mobTimer <= 0) {
+        const target = pickDolphinSwimTarget(currentModel, entry);
+        if (target) {
+          entry._targetX = target.x + 0.5;
+          entry._targetZ = target.z + 0.5;
+          entry._mobState = 'toTarget';
+        } else {
+          entry._mobTimer = DOLPHIN_SWIM_PAUSE_MIN;
+        }
+      }
+    }
+  } else if (entry._mobState === 'toTarget') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = DOLPHIN_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'swimming';
+      entry._mobTimer = DOLPHIN_SWIM_PAUSE_MIN + Math.random() * (DOLPHIN_SWIM_PAUSE_MAX - DOLPHIN_SWIM_PAUSE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'leaping') {
+    entry._leapElapsed += dt;
+    const t = Math.min(1, entry._leapElapsed / DOLPHIN_LEAP_DURATION);
+    entry._wy = entry._leapBaseY + Math.sin(t * Math.PI) * DOLPHIN_LEAP_HEIGHT;
+    if (t >= 1) {
+      entry._wy = entry._leapBaseY;
+      entry._mobState = 'swimming';
+      entry._breatheTimer = DOLPHIN_BREATHE_MIN + Math.random() * (DOLPHIN_BREATHE_MAX - DOLPHIN_BREATHE_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  obj.rotation.x = entry._mobState === 'leaping' ? -Math.sin((entry._leapElapsed / DOLPHIN_LEAP_DURATION) * Math.PI) * 0.5 : 0;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
     if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
@@ -6600,7 +6763,7 @@ function renderBlueprint(model) {
     hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
-    turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'],
+    turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -6660,7 +6823,7 @@ function renderBlueprint(model) {
     hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
     slime: 'Slime', water: 'Water', squid: 'Squid',
-    turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid',
+    turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -6757,6 +6920,7 @@ function renderCommands(model) {
       else if (d.type === 'water') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:water`);
       else if (d.type === 'squid') lines.push(`summon minecraft:squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'glow_squid') lines.push(`summon minecraft:glow_squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'dolphin') lines.push(`summon minecraft:dolphin ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
