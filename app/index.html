@@ -1806,6 +1806,8 @@ const DECOR_TYPES = {
   turtle_egg: { kind: 'turtle_egg', interactive: false },
   glow_squid: { kind: 'glow_squid', interactive: false },
   dolphin: { kind: 'dolphin', interactive: false },
+  lava: { kind: 'lava_block', interactive: false },
+  strider: { kind: 'strider', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2871,6 +2873,21 @@ function buildDolphinCoveInterior(grid, silhouette, dims, exteriorMat, accentMat
     decorOut.push({ type: 'dolphin', x, y: 1, z, facing: 'south' });
   }
 }
+// A single open netherrack floor with one real lava source (unenclosed,
+// so it spreads only its own real ~4-block radius rather than flooding
+// the whole floor) — leaving most of the floor genuinely dry, real solid
+// ground right alongside the lava lake, exactly the two surfaces a
+// strider needs to show the real speed/color contrast between them.
+function buildStriderLavaCrossingInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const lavaX = Math.max(1, Math.floor(dims.sx * 0.25)), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'lava', x: lavaX, y: 1, z: cz, source: true });
+  decorOut.push({ type: 'strider', x: lavaX, y: 2, z: cz, facing: 'south' }); // standing in the open cell directly above the lava's surface, not inside the lava itself
+  const dryX = Math.min(dims.sx - 2, Math.floor(dims.sx * 0.85));
+  decorOut.push({ type: 'strider', x: dryX, y: 1, z: cz, facing: 'south' }); // far dry ground — real vanilla: shivers, walks slower, turns purple here
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3268,6 +3285,18 @@ const PRESETS = [
       'No combat, no Dolphin\'s Grace speed boost for a nearby swimming player, and no leading a player to nearby shipwrecks — none of those exist in this app (no player-buff system, no structure generation, no combat), so this pod just swims and breathes with nothing else to react to.',
     ],
   },
+  {
+    id: 'strider-lava-crossing', name: 'Strider Lava Crossing', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 13, baseZ: 9 }, interiorMode: 'striderLavaCrossing',
+    blocks: { exterior: 'netherrack', interior: 'netherrack', accent: 'basalt' },
+    desc: 'An open netherrack floor with a real lava lake on one side and two striders — one walking calmly right on top of the lava, the other stranded on the dry ground beyond it — real vanilla striders "walk on top of [lava] without sinking" and "roam faster when striding on lava than walking on land."',
+    keywords: ['strider', 'lava', 'nether', 'netherrack', 'crossing'],
+    notes: [
+      'The lava itself is a real simulated flow, using the exact same computeFluidFlow engine as every other body of water in this app (see "Water flow simulation" in the README) — just with its own real spread distance (~4 blocks, versus water\'s 7) and, crucially, none of water\'s "infinite spring" behavior: real vanilla lava never converts into a fresh source the way two flowing water blocks can, so a lava lake in even a fully walled pit still stays a limited puddle. That difference is reproduced here directly, not just described.',
+      'Watch the two striders side by side: the one on the lava roams at its real full speed, while the one stuck on dry ground genuinely "turn[s] purple, shiver[s] a lot, and walk[s] a lot slower" — a live, per-frame check of what it\'s actually standing on, not a static skin choice.',
+      'Real vanilla striders are also immune to fire and lava damage, but take damage from water and rain — none of that is modeled, since this app has no damage or weather system at all, so the striders here are never in any real danger either way.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3640,6 +3669,8 @@ function generateModel() {
     buildGlowSquidCavernInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'dolphinCove') {
     buildDolphinCoveInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'striderLavaCrossing') {
+    buildStriderLavaCrossingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3652,6 +3683,7 @@ function generateModel() {
   window.currentModel = currentModel; // exposed for debugging in the browser console
 
   computeWaterFlow(currentModel);
+  computeLavaFlow(currentModel);
   computeRedstone(currentModel);
   el('empty-state').style.display = 'none';
   renderThree(currentModel);
@@ -3840,6 +3872,25 @@ let _glowSquidMaterial = null;
 function glowSquidMaterial() {
   if (!_glowSquidMaterial) _glowSquidMaterial = new THREE.MeshStandardMaterial({ color: 0x4dd0c4, emissive: 0x2fa89d, emissiveIntensity: 0.8, roughness: 0.6, clippingPlanes: [cutawayPlane] });
   return _glowSquidMaterial;
+}
+// Real vanilla lava is fully opaque, unlike water — a glowing, emissive
+// opaque surface rather than a see-through one.
+let _lavaMaterial = null;
+function lavaMaterial() {
+  if (!_lavaMaterial) _lavaMaterial = new THREE.MeshStandardMaterial({ color: 0xd9531e, emissive: 0xb33a10, emissiveIntensity: 0.9, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  return _lavaMaterial;
+}
+// Real vanilla striders "turn purple, shiver a lot" whenever they aren't
+// actually on lava — a genuine, live, testable color change, not just
+// flavor text. See updateStrider.
+let _striderWarmMaterial = null, _striderColdMaterial = null;
+function striderWarmMaterial() {
+  if (!_striderWarmMaterial) _striderWarmMaterial = new THREE.MeshStandardMaterial({ color: 0xc97a5a, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  return _striderWarmMaterial;
+}
+function striderColdMaterial() {
+  if (!_striderColdMaterial) _striderColdMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5c9e, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  return _striderColdMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4363,6 +4414,30 @@ function dolphinParts() {
   });
   return { body, dorsalFin, tailFluke, pectoralFins };
 }
+// An almost-full-cell opaque box standing in for real lava — unlike
+// water, real vanilla lava is fully opaque, not translucent, so this
+// deliberately reuses waterBlockParts' box shape but never its material.
+// See DECOR_TYPES.lava.
+function lavaBlockParts() {
+  return { box: new THREE.BoxGeometry(0.98, 0.98, 0.98) };
+}
+// A tall round body on three long, thin, outward-angled legs — real
+// vanilla striders are unusually tall and stand on exactly 3 legs, unlike
+// every 2- or 4-legged mob in this app so far. See DECOR_TYPES.strider.
+function striderParts() {
+  const body = new THREE.BoxGeometry(0.5, 0.6, 0.5);
+  body.translate(0, 0.35, 0);
+  const legAngles = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
+  const legs = legAngles.map((angle) => {
+    const g = new THREE.BoxGeometry(0.1, 0.55, 0.1);
+    g.translate(0, -0.28, 0);
+    g.rotateX(0.35);
+    g.rotateY(angle);
+    g.translate(Math.sin(angle) * 0.18, 0.35, Math.cos(angle) * 0.18);
+    return g;
+  });
+  return { body, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4846,6 +4921,28 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.dorsalFin, finMat));
     group.add(new THREE.Mesh(parts.tailFluke, finMat));
     for (const g of parts.pectoralFins) group.add(new THREE.Mesh(g, finMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'lava_block') {
+    let parts = decorGeoCache.get('lava_block');
+    if (!parts) { parts = lavaBlockParts(); decorGeoCache.set('lava_block', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.box, lavaMaterial()));
+    registerWaterAnim(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'strider') {
+    let parts = decorGeoCache.get('strider');
+    if (!parts) { parts = striderParts(); decorGeoCache.set('strider', parts); }
+    const group = new THREE.Group();
+    const bodyMesh = new THREE.Mesh(parts.body, striderWarmMaterial());
+    bodyMesh.userData.isStriderSkin = true;
+    group.add(bodyMesh);
+    for (const g of parts.legs) {
+      const legMesh = new THREE.Mesh(g, striderWarmMaterial());
+      legMesh.userData.isStriderSkin = true;
+      group.add(legMesh);
+    }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -5369,29 +5466,40 @@ function enclosedWaterPocket(model, sx, sy, sz) {
   }
   return seen; // never touched a horizontal edge — genuinely enclosed on all 4 sides
 }
-function computeWaterFlow(model) {
+// Shared by both fluids this app simulates — water and lava genuinely
+// differ in exactly two ways: how far an unenclosed source spreads before
+// thinning to nothing (maxLevel), and whether a source in a genuinely
+// walled-in container fills the whole thing (allowEnclosedFill). Real
+// vanilla lava has no equivalent of water's "spring" mechanic — two
+// flowing lava blocks never combine into a fresh source — so a lava lake
+// in a big walled pit stays a limited puddle even where water would fill
+// the entire thing; that distinction is the one deliberate parameter
+// difference between computeWaterFlow and computeLavaFlow below.
+function computeFluidFlow(model, fluidType, maxLevel, allowEnclosedFill) {
   const { dims, grid } = model;
-  const sources = model.decor.filter((d) => d.type === 'water' && d.source);
-  // Drop any previously-computed (non-source) water so re-running this on
+  const sources = model.decor.filter((d) => d.type === fluidType && d.source);
+  // Drop any previously-computed (non-source) fluid so re-running this on
   // a regenerate never accumulates stale flow from an earlier grid shape.
-  model.decor = model.decor.filter((d) => !(d.type === 'water' && !d.source));
+  model.decor = model.decor.filter((d) => !(d.type === fluidType && !d.source));
   if (sources.length === 0) return;
   const inBounds = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < dims.sx && y < dims.sy && z < dims.sz;
   const isOpen = (x, y, z) => inBounds(x, y, z) && grid[idx(x, y, z, dims)] === 0;
   const key = (x, y, z) => x + ',' + y + ',' + z;
-  const score = (level, falling) => (falling ? WATER_MAX_LEVEL + 1 : level); // falling always beats any resting spread
+  const score = (level, falling) => (falling ? maxLevel + 1 : level); // falling always beats any resting spread
   const best = new Map(); // "x,y,z" -> { level, falling }
   const enclosed = new Set(); // cells already fully resolved by the walled-container rule below
 
-  for (const s of sources) {
-    const k0 = key(s.x, s.y, s.z);
-    if (enclosed.has(k0)) continue;
-    const pocket = enclosedWaterPocket(model, s.x, s.y, s.z);
-    if (!pocket) continue;
-    for (const k of pocket) {
-      enclosed.add(k);
-      const [x, y, z] = k.split(',').map(Number);
-      best.set(k, { level: WATER_MAX_LEVEL, falling: false });
+  if (allowEnclosedFill) {
+    for (const s of sources) {
+      const k0 = key(s.x, s.y, s.z);
+      if (enclosed.has(k0)) continue;
+      const pocket = enclosedWaterPocket(model, s.x, s.y, s.z);
+      if (!pocket) continue;
+      for (const k of pocket) {
+        enclosed.add(k);
+        const [x, y, z] = k.split(',').map(Number);
+        best.set(k, { level: maxLevel, falling: false });
+      }
     }
   }
 
@@ -5405,17 +5513,17 @@ function computeWaterFlow(model) {
     queue.push({ x, y, z, level, falling });
   };
   for (const s of sources) {
-    if (!enclosed.has(key(s.x, s.y, s.z))) offer(s.x, s.y, s.z, WATER_MAX_LEVEL, false);
+    if (!enclosed.has(key(s.x, s.y, s.z))) offer(s.x, s.y, s.z, maxLevel, false);
   }
   for (let qi = 0; qi < queue.length; qi++) {
     const cell = queue[qi];
     const restingOnFloor = !isOpen(cell.x, cell.y - 1, cell.z) || enclosed.has(key(cell.x, cell.y - 1, cell.z));
     if (!restingOnFloor) {
-      offer(cell.x, cell.y - 1, cell.z, WATER_MAX_LEVEL, true); // falls straight down through open air, full strength the whole way
+      offer(cell.x, cell.y - 1, cell.z, maxLevel, true); // falls straight down through open air, full strength the whole way
       continue; // real vanilla: a falling column doesn't also spread sideways mid-air
     }
     if (cell.level > 0) {
-      const nextLevel = cell.falling ? WATER_MAX_LEVEL - 1 : cell.level - 1; // a fall that just landed starts a fresh full-strength spread, like a real splash pool
+      const nextLevel = cell.falling ? maxLevel - 1 : cell.level - 1; // a fall that just landed starts a fresh full-strength spread, like a real splash pool
       offer(cell.x + 1, cell.y, cell.z, nextLevel, false);
       offer(cell.x - 1, cell.y, cell.z, nextLevel, false);
       offer(cell.x, cell.y, cell.z + 1, nextLevel, false);
@@ -5425,8 +5533,15 @@ function computeWaterFlow(model) {
   for (const s of sources) best.delete(key(s.x, s.y, s.z)); // already real decor entries, don't duplicate
   for (const [k, v] of best) {
     const [x, y, z] = k.split(',').map(Number);
-    model.decor.push({ type: 'water', x, y, z, level: v.level, falling: v.falling });
+    model.decor.push({ type: fluidType, x, y, z, level: v.level, falling: v.falling });
   }
+}
+function computeWaterFlow(model) {
+  computeFluidFlow(model, 'water', WATER_MAX_LEVEL, true);
+}
+const LAVA_MAX_LEVEL = 4; // real vanilla: nether lava spreads roughly 4 blocks before thinning to nothing — noticeably less far than water's 7
+function computeLavaFlow(model) {
+  computeFluidFlow(model, 'lava', LAVA_MAX_LEVEL, false); // no enclosed-container fill: real vanilla lava has no "spring"/new-source mechanic the way water does
 }
 // Real vanilla squid "wander around aimlessly in three dimensions as long
 // as they are in the water" and "[hover] in place when first spawned into
@@ -5747,10 +5862,108 @@ function updateDolphin(entry, obj, dt) {
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
   obj.rotation.x = entry._mobState === 'leaping' ? -Math.sin((entry._leapElapsed / DOLPHIN_LEAP_DURATION) * Math.PI) * 0.5 : 0;
 }
+function isLavaCell(model, x, y, z) {
+  const dims = model.dims;
+  if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return false;
+  if (!model._lavaCells) {
+    model._lavaCells = new Set();
+    for (const d of model.decor) if (d.type === 'lava') model._lavaCells.add(d.x + ',' + d.y + ',' + d.z);
+  }
+  return model._lavaCells.has(x + ',' + y + ',' + z);
+}
+// Real vanilla striders "walk on top of [lava] without sinking" — the
+// first mob here that treats a fluid as solid ground to stand ON, rather
+// than a substance to swim through (squid/turtle/dolphin) or a floor to
+// stand behind a wall of. It can also just as happily stand on regular
+// solid ground, which real striders never spawn on but can certainly end
+// up on, so both are valid surfaces.
+function striderCellSurface(model, x, y, z) {
+  const dims = model.dims;
+  if (x < 0 || y <= 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return false;
+  if (model.grid[idx(x, y, z, dims)] !== 0) return false;
+  return model.grid[idx(x, y - 1, z, dims)] !== 0 || isLavaCell(model, x, y - 1, z);
+}
+function striderSurfaceYAt(model, x, z) {
+  const dims = model.dims;
+  if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) return null;
+  for (let y = 1; y < dims.sy; y++) {
+    if (striderCellSurface(model, x, y, z)) return y;
+  }
+  return null;
+}
+function pickStriderWanderTarget(model, entry) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * STRIDER_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * STRIDER_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = entry.x + dx, tz = entry.z + dz;
+    const ty = striderSurfaceYAt(model, tx, tz);
+    if (ty !== null) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+function striderIsOnLava(model, entry) {
+  return isLavaCell(model, Math.floor(entry._wx), Math.round(entry._wy) - 1, Math.floor(entry._wz));
+}
+const STRIDER_LAVA_SPEED = 1.0, STRIDER_COLD_SPEED = 0.4; // real vanilla: "roam faster when striding on lava than walking on land"
+const STRIDER_WANDER_RADIUS = 3;
+const STRIDER_WANDER_MIN = 2, STRIDER_WANDER_MAX = 5;
+function updateStrider(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'wandering';
+    entry._mobTimer = STRIDER_WANDER_MIN + Math.random() * (STRIDER_WANDER_MAX - STRIDER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'wandering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickStriderWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = STRIDER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const speed = striderIsOnLava(currentModel, entry) ? STRIDER_LAVA_SPEED : STRIDER_COLD_SPEED;
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = speed * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = entry._targetY;
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'wandering';
+      entry._mobTimer = STRIDER_WANDER_MIN + Math.random() * (STRIDER_WANDER_MAX - STRIDER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy + 0.3, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  // Real vanilla: "turn purple, shiver a lot" whenever off lava — a live,
+  // per-frame check, so a strider that wanders off a shrinking lava lake
+  // visibly changes right when it actually leaves it.
+  const skinMat = striderIsOnLava(currentModel, entry) ? striderWarmMaterial() : striderColdMaterial();
+  for (const c of obj.children) if (c.userData.isStriderSkin) c.material = skinMat;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
     if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
     if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
@@ -6764,6 +6977,7 @@ function renderBlueprint(model) {
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
+    lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -6824,6 +7038,7 @@ function renderBlueprint(model) {
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
+    lava: 'Lava', strider: 'Strider',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -6921,6 +7136,8 @@ function renderCommands(model) {
       else if (d.type === 'squid') lines.push(`summon minecraft:squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'glow_squid') lines.push(`summon minecraft:glow_squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'dolphin') lines.push(`summon minecraft:dolphin ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'lava') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:lava`);
+      else if (d.type === 'strider') lines.push(`summon minecraft:strider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
