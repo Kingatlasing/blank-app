@@ -166,6 +166,7 @@
             <option value="tower">Tower (square shaft + peaked roof)</option>
             <option value="domebuilding">Domed building (box + dome roof)</option>
             <option value="ring">Ring / arena wall (hollow annulus)</option>
+            <option value="freeform">Freeform (blank canvas — build anything, block by block)</option>
           </select>
           <div class="hint">Don't see it in the library? Look up its real height &amp; footprint and approximate it with the closest primitive shape here — that's how you can build a scale model of literally anything.</div>
           <div class="row">
@@ -271,6 +272,11 @@
             <input type="checkbox" id="interact-toggle" />
             <label for="interact-toggle" style="margin:0;" title="Click doors, trapdoors, levers, buttons, and pressure plates to toggle them">Interact mode</label>
           </span>
+          <span class="checkbox-row" style="margin:0;">
+            <input type="checkbox" id="build-toggle" />
+            <label for="build-toggle" style="margin:0;" title="Left-click a face to place a block there; right-click (or shift-click) a block to remove it — build anything, block by block">Build mode</label>
+          </span>
+          <select id="build-block-select" disabled title="Block placed by Build mode"></select>
           <span id="camera-hint" class="hint" style="margin:0;"></span>
         </div>
         <div id="three-container">
@@ -1761,7 +1767,23 @@ const DECOR_TYPES = {
   grass_tuft: { kind: 'cross_plant', tile: 'grass', interactive: false },
   fire: { kind: 'cross_plant', tile: 'fire', interactive: false, fullHeight: true },
   tree: { kind: 'tree', trunkTile: 'oak_log', leafTile: 'oak_leaves', interactive: false },
+  // Rails and minecarts have no usable texture in this app's atlas (rail
+  // art isn't part of the ~320-block palette extracted earlier), so — same
+  // approach as tripwire/redstone dust — they're built as plain solid-
+  // colour procedural geometry instead of a textured sprite. Real vanilla
+  // colour cues carry over: iron-grey rail, gold powered rail (dims when
+  // unpowered), red-orange activator rail (dims when unpowered), and a red
+  // accent dot on an otherwise iron-grey detector rail.
+  rail: { kind: 'rail', color: 0xb0b0b0, interactive: false },
+  powered_rail: { kind: 'rail', color: 0xf2c94c, offColor: 0x8a6d1f, interactive: false },
+  activator_rail: { kind: 'rail', color: 0xff6a3c, offColor: 0x7a2f18, interactive: false },
+  detector_rail: { kind: 'rail', color: 0xb0b0b0, dotColor: 0xdb3b2b, interactive: false },
+  minecart: { kind: 'minecart', tile: 'iron_block', interactive: false },
 };
+// Real vanilla north_east/north_west/south_east/south_west curved-rail
+// y-rotations (blockstates/rail.json) — which two of the cell's four edges
+// the curve connects.
+const CURVE_YAW = { south_east: 0, south_west: Math.PI / 2, north_west: Math.PI, north_east: -Math.PI / 2 };
 
 
 /* =========================================================================
@@ -1852,16 +1874,22 @@ function ringSolid(x, y, z, dims, params) {
   return (inx * inx + inz * inz) > 1.0;
 }
 
+// A single flat floor slab and nothing else — a blank canvas for Build mode
+// (see attemptBuild) rather than an auto-generated silhouette, so the user
+// places every block themselves and can make literally anything: a
+// character, a vehicle, a building with no real-world reference, whatever.
+function freeformSolid(x, y, z, dims) { return y === 0; }
+
 const SHAPES = {
   box: boxSolid, pyramid: pyramidSolid, cylinder: cylinderSolid, cone: coneSolid,
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
-  domebuilding: domebuildingSolid, ring: ringSolid,
+  domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
-  cone: null, ring: null,
+  cone: null, ring: null, freeform: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -2188,6 +2216,90 @@ function buildMechanismDemoInterior(grid, silhouette, dims, exteriorMat, accentM
   if (grid[idx(dims.sx - 2, 1, dims.sz - 2, dims)] === 0) decorOut.push({ type: 'dandelion', x: dims.sx - 2, y: 1, z: dims.sz - 2 });
 }
 
+// A long single-row workshop demonstrating the *real* redstone/rail systems
+// (computeRedstone's actual dust-network propagation, not the simplified
+// 1:1 wireTo trigger the older Mechanism Demo Room uses) plus every rail
+// variant and a minecart. Hardcoded to the preset's own real dims (see the
+// 'redstone-rail-demo' preset below) but every coordinate is clamped into
+// whatever interior actually got carved, so it degrades gracefully rather
+// than throwing if the user rescales it drastically.
+function buildRedstoneRailDemoInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  const shell = hollowCarve(silhouette, dims, 1);
+  for (let i = 0; i < grid.length; i++) grid[i] = silhouette[i] ? (shell[i] ? exteriorMat : 0) : 0;
+  if (!decorOut) return;
+
+  const ix0 = 1, ix1 = dims.sx - 2, y = 1;
+  const zA = Math.min(dims.sz - 2, 2); // the lever/wire/door corridor row
+  const zB = Math.max(1, zA - 1);      // the torch/wire row powering the rails
+  if (ix1 < ix0 || dims.sy < 3) return; // too small to carve this layout at all
+  const cx = (x) => Math.max(ix0, Math.min(ix1, x));
+  const open = (x, yy, z) => grid[idx(x, yy, z, dims)] === 0;
+
+  // Lever -> a run of wire cells reaching all the way to the gate -> a real
+  // wall with a door in it. No wireTo link at all — computeRedstone is what
+  // actually opens this door, so the wire has to physically reach it (real
+  // 15-level falloff and all) exactly like it would in the real game.
+  const leverX = cx(1), gateX = cx(5);
+  if (open(leverX, y, zA)) decorOut.push({ type: 'lever', x: leverX, y, z: zA, face: 'floor', on: false });
+  for (let x = leverX + 1; x < gateX; x++) {
+    if (open(x, y, zA)) decorOut.push({ type: 'redstone_wire', x, y, z: zA, axis: 'x' });
+  }
+  if (gateX > leverX + 1 && gateX < ix1) {
+    // A real partition wall spanning the room's interior width, with a
+    // door-sized gap — so the door reads as an actual gate, not a panel
+    // floating in open air.
+    for (let z = 1; z < dims.sz - 1; z++) {
+      for (let yy = 1; yy < dims.sy - 1; yy++) {
+        if (z === zA && (yy === 1 || yy === 2)) continue; // the doorway
+        if (silhouette[idx(gateX, yy, z, dims)]) grid[idx(gateX, yy, z, dims)] = exteriorMat;
+      }
+    }
+    decorOut.push({ type: 'door', x: gateX, y: 1, z: zA, axis: 'x', hinge: 'left', open: false });
+  }
+
+  // A short demonstration rail line just past the gate: straight -> curve
+  // -> powered -> detector -> activator -> ascending, with a minecart
+  // parked on the first straight segment.
+  const railStart = gateX + 1;
+  const railTypes = [
+    ['rail', { shape: 'straight', axis: 'x' }],
+    ['rail', { shape: 'curve', axis: 'x', corner: 'south_east' }],
+    ['powered_rail', { shape: 'straight', axis: 'x' }],
+    ['detector_rail', { shape: 'straight', axis: 'x' }],
+    ['activator_rail', { shape: 'straight', axis: 'x' }],
+    ['rail', { shape: 'ascending', facing: 'east' }],
+  ];
+  let firstRailX = -1;
+  railTypes.forEach(([type, extra], i) => {
+    const x = cx(railStart + i);
+    if (x <= gateX || x >= ix1 || !open(x, y, zA)) return;
+    if (firstRailX === -1) firstRailX = x;
+    decorOut.push(Object.assign({ type, x, y, z: zA }, extra));
+    if (type === 'rail' && extra.shape === 'ascending') {
+      // Raise the floor of the next cell by one block so the ascending
+      // rail's high end actually meets a step, matching how it's used in
+      // real vanilla track.
+      const nx = Math.min(ix1, x + 1);
+      if (nx > x && silhouette[idx(nx, y, zA, dims)]) grid[idx(nx, y, zA, dims)] = exteriorMat;
+    }
+  });
+  if (firstRailX !== -1) decorOut.push({ type: 'minecart', x: firstRailX, y, z: zA, axis: 'x' });
+
+  // A second, independent power source (a lit redstone torch) feeding the
+  // powered rail and activator rail through their own short wire run one
+  // row over — shows a source powering more than one kind of consumer at
+  // once, and that separate networks really are separate (this one has no
+  // connection back to the lever's).
+  const torchX = cx(railStart + 2);
+  if (open(torchX, y, zB) && torchX !== leverX) {
+    decorOut.push({ type: 'redstone_torch', x: torchX, y, z: zB, face: 'floor', on: true });
+    for (let dx = 1; dx <= 2; dx++) {
+      const x = cx(torchX + dx);
+      if (x > torchX && open(x, y, zB)) decorOut.push({ type: 'redstone_wire', x, y, z: zB, axis: 'x' });
+    }
+  }
+}
+
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
  * ==================================================================== */
@@ -2311,11 +2423,23 @@ const PRESETS = [
       'Best viewed at scale 1/1 (default) so the mechanisms are full-size and easy to click.',
     ],
   },
+  {
+    id: 'redstone-rail-demo', name: "Redstone & Rails Workshop", shape: 'box',
+    real: { height: 5, baseX: 16, baseZ: 6 }, interiorMode: 'redstoneRailDemo',
+    blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'iron_block' },
+    desc: 'A real redstone-dust network (not a hardcoded link): a lever powers wire that opens a gate door based on actual signal propagation and falloff, plus a full rail line (straight, curve, powered, detector, activator, ascending) with a minecart, and a second torch-powered wire run.',
+    notes: [
+      'Power really propagates through computeRedstone: flip the lever (Interact mode, 3D tab) and watch the wire brighten and the door open — no per-object wiring table involved, same mechanism you\'d get wiring any two blocks yourself with redstone_wire.',
+      'Curved rail is a stylized diagonal stand-in for vanilla\'s quarter-circle artwork; straight and ascending rail geometry (and the ascending 45-degree tilt) match vanilla\'s real block models. Rails and minecart use plain colored geometry, not a texture — this app\'s block atlas has no rail art to draw from.',
+      'Best viewed at scale 1/1 (default) so the mechanisms are full-size and easy to click.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
   box: 'Box', pyramid: 'Custom Pyramid', cylinder: 'Cylinder', cone: 'Cone', dome: 'Dome',
   ziggurat: 'Ziggurat', tower: 'Tower', domebuilding: 'Domed Building', ring: 'Ring / Arena Wall',
+  freeform: 'Freeform Build',
 };
 
 /* =========================================================================
@@ -2365,6 +2489,7 @@ populateSelect(el('preset-select'), PRESETS, p => p.id, p => p.name);
 populateMaterialSelect(el('mat-exterior'), 'quartz_block');
 populateMaterialSelect(el('mat-interior'), 'stone');
 populateMaterialSelect(el('mat-accent'), 'gold_block');
+populateMaterialSelect(el('build-block-select'), 'oak_planks');
 
 function currentPreset() { return PRESETS.find(p => p.id === el('preset-select').value); }
 function isPresetMode() { return document.querySelector('input[name=mode]:checked').value === 'preset'; }
@@ -2398,6 +2523,8 @@ function updateInteriorAvailability() {
     hint.textContent = 'Adds a scaled entrance, descending/ascending passages, Grand Gallery, and King\'s/Queen\'s Chambers. Most meaningful in Filled mode.';
   } else if (mode === 'mechanismDemo') {
     hint.textContent = 'A working demo room: a lever opens the entrance door, a pressure plate opens a floor trapdoor trap. Turn on "Interact mode" in the 3D tab to click the lever, or walk onto the plate.';
+  } else if (mode === 'redstoneRailDemo') {
+    hint.textContent = 'A real redstone-network demo: a lever\'s power actually travels through redstone wire (with real 15-block falloff) to open a gate door — no hardcoded link — plus every rail type, a minecart, and a second wire run powering a golden/activator rail pair. Turn on "Interact mode" and click the lever.';
   } else {
     hint.textContent = 'Hollows the interior and adds floor slabs with a stairwell gap at the spacing set below.';
   }
@@ -2569,6 +2696,8 @@ function generateModel() {
     buildFloorsInterior(grid, silhouette, dims, bpf, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'mechanismDemo') {
     buildMechanismDemoInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'redstoneRailDemo') {
+    buildRedstoneRailDemoInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -2580,6 +2709,7 @@ function generateModel() {
   };
   window.currentModel = currentModel; // exposed for debugging in the browser console
 
+  computeRedstone(currentModel);
   el('empty-state').style.display = 'none';
   renderThree(currentModel);
   renderBlueprint(currentModel);
@@ -2895,6 +3025,60 @@ function treeParts(trunkTile, leafTile) {
   const leaves = new THREE.BoxGeometry(2.2, 1.8, 2.2); remapUV(leaves, leafTile);
   return { trunk, leaves };
 }
+// Straight/curved track: two rail strips + three cross ties, resting just
+// above the floor (matches real vanilla's flat rail plane at y=1/16).
+// Reused as-is for curves (rotated onto the diagonal — see buildDecorMeshesForEntry).
+function railFlatParts() {
+  const rails = [-0.28, 0.28].map(x => {
+    const g = new THREE.BoxGeometry(0.09, 0.03, 0.92);
+    g.translate(x, -0.5 + PX + 0.015, 0);
+    return g;
+  });
+  const ties = [-0.32, 0, 0.32].map(z => {
+    const g = new THREE.BoxGeometry(0.72, 0.025, 0.12);
+    g.translate(0, -0.5 + PX - 0.0125, z);
+    return g;
+  });
+  return { rails, ties };
+}
+// Ascending track: the same two rails + ties, but authored centered on the
+// cell's own origin (not resting on the floor) so that tilting the whole
+// assembly 45 degrees about local X — real vanilla's exact
+// rail_raised_ne/_sw rotation — lands its low end at this cell's floor and
+// its high end flush with the floor of the block one higher next to it,
+// spanning the full block corner-to-corner exactly like the real model.
+function railAscendingParts() {
+  const rails = [-0.28, 0.28].map(x => {
+    const g = new THREE.BoxGeometry(0.09, 0.03, 1.32);
+    g.translate(x, 0, 0);
+    return g;
+  });
+  const ties = [-0.4, 0, 0.4].map(z => {
+    const g = new THREE.BoxGeometry(0.72, 0.025, 0.12);
+    g.translate(0, 0, z);
+    return g;
+  });
+  return { rails, ties };
+}
+// A simple open-top hull (bottom + 4 walls) standing in for the real
+// minecart entity — minecart geometry lives in Java entity-renderer code,
+// not a block/item model JSON, so there's no vanilla data file to match
+// exactly; this approximates its real in-game footprint (~1 block wide,
+// waist-high open box) using the iron_block texture for a metal look.
+function minecartParts(tileKey) {
+  const w = 0.98, d = 0.7, h = 0.5, wallT = 0.08;
+  const bottom = new THREE.BoxGeometry(w, wallT, d); remapUV(bottom, tileKey);
+  bottom.translate(0, -0.5 + wallT / 2, 0);
+  const sideL = new THREE.BoxGeometry(wallT, h, d); remapUV(sideL, tileKey);
+  sideL.translate(-w / 2 + wallT / 2, -0.5 + h / 2, 0);
+  const sideR = new THREE.BoxGeometry(wallT, h, d); remapUV(sideR, tileKey);
+  sideR.translate(w / 2 - wallT / 2, -0.5 + h / 2, 0);
+  const endF = new THREE.BoxGeometry(w, h, wallT); remapUV(endF, tileKey);
+  endF.translate(0, -0.5 + h / 2, d / 2 - wallT / 2);
+  const endB = new THREE.BoxGeometry(w, h, wallT); remapUV(endB, tileKey);
+  endB.translate(0, -0.5 + h / 2, -d / 2 + wallT / 2);
+  return [bottom, sideL, sideR, endF, endB];
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -3058,6 +3242,8 @@ function buildDecorMeshesForEntry(entry) {
     const m = new THREE.Mesh(geo, solidMaterial(entry.on === false ? 0x6b0f0a : 0xe8281a));
     m.position.y = -0.5 + 0.125 * PX;
     if (!isDot && entry.axis === 'x') m.rotation.y = Math.PI / 2;
+    m.userData.wireOn = !!entry.on;
+    registerInteractive(m, entry, 'redstone_wire');
     objs.push(m);
   } else if (def.kind === 'tripwire_hook') {
     const geo = cachedGeo('tripwireHook:' + def.tile, () => tripwireHookGeometry(def.tile));
@@ -3095,6 +3281,61 @@ function buildDecorMeshesForEntry(entry) {
     const trunk = new THREE.Mesh(parts.trunk, decorMaterial()); trunk.position.y = 1;
     const leaves = new THREE.Mesh(parts.leaves, tintedMaterial(0x5da845)); leaves.position.y = 2.6;
     objs.push(trunk, leaves);
+  } else if (def.kind === 'rail') {
+    const shape = entry.shape || 'straight';
+    const powered = !!(entry.powered || entry.on);
+    const railColor = def.offColor !== undefined ? (powered ? def.color : def.offColor) : def.color;
+    const railMat = solidMaterial(railColor);
+    const tieMat = solidMaterial(0x6b4a2f);
+    const group = new THREE.Group();
+    if (shape === 'ascending') {
+      let parts = decorGeoCache.get('railAsc');
+      if (!parts) { parts = railAscendingParts(); decorGeoCache.set('railAsc', parts); }
+      for (const g of parts.rails) { const m = new THREE.Mesh(g, railMat); m.userData.isRailStrip = true; group.add(m); }
+      for (const g of parts.ties) group.add(new THREE.Mesh(g, tieMat));
+      // Climbs toward -z (north) before the outer yaw below points that
+      // climb at whichever compass direction entry.facing names — same
+      // "tilt first, then yaw" order as the lever's wall-mount fix (three's
+      // default XYZ order would apply yaw before tilt and make facing do
+      // nothing).
+      group.rotation.order = 'YXZ';
+      group.rotation.x = -Math.PI / 4;
+      group.rotation.y = FACING_YAW[entry.facing || 'north'];
+    } else {
+      let parts = decorGeoCache.get('railFlat');
+      if (!parts) { parts = railFlatParts(); decorGeoCache.set('railFlat', parts); }
+      for (const g of parts.rails) { const m = new THREE.Mesh(g, railMat); m.userData.isRailStrip = true; group.add(m); }
+      for (const g of parts.ties) group.add(new THREE.Mesh(g, tieMat));
+      if (def.dotColor) {
+        const dotGeo = cachedGeo('railDot', () => new THREE.BoxGeometry(0.12, 0.02, 0.12));
+        const dot = new THREE.Mesh(dotGeo, solidMaterial(def.dotColor));
+        dot.position.y = -0.5 + PX + 0.045;
+        group.add(dot);
+      }
+      if (shape === 'curve') {
+        // Stylized diagonal stand-in for vanilla's quarter-circle curve
+        // artwork (a literal curved model isn't worth the added complexity
+        // for a static scale-model designer) — still visibly reads as
+        // track connecting the two open edges named by entry.corner.
+        group.rotation.y = Math.PI / 4 + (CURVE_YAW[entry.corner || 'south_east'] || 0);
+      } else {
+        group.rotation.y = entry.axis === 'x' ? Math.PI / 2 : 0;
+      }
+    }
+    if (def.offColor !== undefined) {
+      group.userData.railOn = powered;
+      registerInteractive(group, entry, 'rail');
+    }
+    objs.push(group);
+  } else if (def.kind === 'minecart') {
+    const mcKey = 'minecart:' + def.tile;
+    let parts = decorGeoCache.get(mcKey);
+    if (!parts) { parts = minecartParts(def.tile); decorGeoCache.set(mcKey, parts); }
+    const group = new THREE.Group();
+    for (const g of parts) group.add(new THREE.Mesh(g, decorMaterial()));
+    group.position.y = 3 * PX; // rests on top of the rail's tie height
+    group.rotation.y = entry.axis === 'x' ? Math.PI / 2 : 0;
+    objs.push(group);
   }
   return objs;
 }
@@ -3167,22 +3408,106 @@ function updateInteractiveAnimations(dt) {
     } else if (kind === 'redstone_torch') {
       const onOff = entry.on === false ? DECOR_TYPES.redstone_torch.offTile : DECOR_TYPES.redstone_torch.tile;
       obj.geometry = cachedGeo('torch:' + onOff, () => torchGeometry(onOff));
+    } else if (kind === 'redstone_wire') {
+      const wantOn = !!entry.on;
+      if (obj.userData.wireOn !== wantOn) {
+        obj.material = solidMaterial(wantOn ? 0xe8281a : 0x6b0f0a);
+        obj.userData.wireOn = wantOn;
+      }
+    } else if (kind === 'rail') {
+      const wantOn = !!(entry.powered || entry.on);
+      if (obj.userData.railOn !== wantOn) {
+        const def = DECOR_TYPES[entry.type];
+        const mat = solidMaterial(wantOn ? def.color : def.offColor);
+        obj.children.forEach(c => { if (c.userData.isRailStrip) c.material = mat; });
+        obj.userData.railOn = wantOn;
+      }
     }
   }
 }
 
 // Sets one decor entry's state and, if it names a link, whatever it's wired
-// to — a deliberately simple 1:1 trigger, not real redstone-dust signal
-// propagation, but enough to demonstrate "this switch opens that door."
+// to — a simple direct 1:1 trigger for presets that hardcode a switch/target
+// pair. Real redstone-dust signal propagation (computeRedstone, below) runs
+// on top of this for anything actually connected by redstone_wire.
 function setDecorState(entry, value) {
   if (entry.type === 'door' || entry.type === 'trapdoor') entry.open = value; else entry.on = value;
   if (entry.wireTo !== undefined && currentModel) {
     const target = currentModel.decor[entry.wireTo];
     if (target) { if (target.type === 'door' || target.type === 'trapdoor') target.open = value; else target.on = value; }
   }
+  computeRedstone(currentModel);
 }
 function toggleDecorEntry(entry) {
   setDecorState(entry, !isEntryActive(entry));
+}
+
+/* =========================================================================
+ * REDSTONE POWER SIMULATION — real vanilla-style propagation, not just a
+ * hardcoded switch/target pair. Levers, buttons, pressure plates (while on)
+ * and lit redstone torches are power sources; redstone_wire carries a signal
+ * outward from any source cell it touches, losing 1 power level per block
+ * exactly like real redstone dust (source level 15, dies out after 15
+ * blocks); any door/trapdoor that isn't already driven by an explicit
+ * wireTo link gets powered open when it sits next to a powered wire or
+ * source cell. Runs after every source toggle (setDecorState) and once
+ * right after a model is generated.
+ * ==================================================================== */
+function cellKey(x, y, z) { return x + ',' + y + ',' + z; }
+const REDSTONE_NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+function computeRedstone(model) {
+  if (!model) return;
+  const decor = model.decor;
+  const wiresByCell = new Map();
+  for (const e of decor) {
+    if (e.type !== 'redstone_wire') continue;
+    wiresByCell.set(cellKey(e.x, e.y, e.z), e);
+  }
+  const sourceCells = [];
+  for (const e of decor) {
+    if (e.type === 'lever' && e.on) sourceCells.push(e);
+    else if (e.type === 'button' && e.on) sourceCells.push(e);
+    else if (e.type === 'pressure_plate' && e.on) sourceCells.push(e);
+    else if (e.type === 'redstone_torch' && e.on !== false) sourceCells.push(e);
+  }
+  const level = new Map(); // cellKey -> power level 0-15
+  const queue = [];
+  const feed = (x, y, z, lvl) => {
+    const k = cellKey(x, y, z);
+    if (!wiresByCell.has(k)) return;
+    if ((level.get(k) || 0) >= lvl) return;
+    level.set(k, lvl);
+    queue.push([x, y, z, lvl]);
+  };
+  for (const s of sourceCells) {
+    feed(s.x, s.y, s.z, 15);
+    for (const [dx, dz] of REDSTONE_NEIGHBORS) feed(s.x + dx, s.y, s.z + dz, 15);
+  }
+  while (queue.length) {
+    const [x, y, z, lvl] = queue.shift();
+    if (lvl <= 1) continue;
+    for (const [dx, dz] of REDSTONE_NEIGHBORS) feed(x + dx, y, z + dz, lvl - 1);
+  }
+  for (const [k, e] of wiresByCell) {
+    const lvl = level.get(k) || 0;
+    e.on = lvl > 0;
+    e.powerLevel = lvl;
+  }
+  const poweredCells = new Set();
+  for (const s of sourceCells) poweredCells.add(cellKey(s.x, s.y, s.z));
+  for (const [k, lvl] of level) if (lvl > 0) poweredCells.add(k);
+  const REDSTONE_CONSUMERS = new Set(['door', 'trapdoor', 'powered_rail', 'activator_rail']);
+  for (const e of decor) {
+    if (!REDSTONE_CONSUMERS.has(e.type)) continue;
+    if (e.wireTo !== undefined) continue; // driven directly by its own switch instead
+    let powered = poweredCells.has(cellKey(e.x, e.y, e.z));
+    if (!powered) {
+      for (const [dx, dz] of REDSTONE_NEIGHBORS) {
+        if (poweredCells.has(cellKey(e.x + dx, e.y, e.z + dz))) { powered = true; break; }
+      }
+    }
+    e.powered = powered;
+  }
 }
 
 /* =========================================================================
@@ -3311,8 +3636,39 @@ function attemptInteract(clientX, clientY) {
   const hits = interactRaycaster.intersectObjects(three.group.children, true);
   for (const hit of hits) {
     const found = findInteractiveAncestor(hit.object);
-    if (found) { toggleDecorEntry(found.userData.decorEntry); return; }
+    if (!found) continue;
+    const def = DECOR_TYPES[found.userData.decorEntry.type];
+    if (def && def.interactive) toggleDecorEntry(found.userData.decorEntry);
+    return;
   }
+}
+
+// Build mode: left-click a face to place the selected block flush against
+// it (like Minecraft creative placement), right-click a block to remove it.
+// Raycasts against everything currently in the scene (grid instances,
+// decor, ground) and uses the hit point nudged along the hit face's world
+// normal — a hair into the empty neighbor cell to place, a hair back into
+// the hit cell to remove — converted to grid coordinates with the exact
+// same world<->grid mapping isSolidAtWorld/updatePressurePlates use.
+function attemptBuild(clientX, clientY, removeMode) {
+  if (!el('build-toggle').checked || !three || !currentModel) return;
+  const rect = three.renderer.domElement.getBoundingClientRect();
+  const ndc = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+  interactRaycaster.setFromCamera(ndc, three.camera);
+  const hits = interactRaycaster.intersectObjects(three.group.children, true);
+  const hit = hits.find(h => h.face);
+  if (!hit) return;
+  const nrm = hit.face.normal.clone().transformDirection(hit.object.matrixWorld).normalize();
+  const eps = 0.01;
+  const p = hit.point.clone().addScaledVector(nrm, removeMode ? -eps : eps);
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const gx = Math.floor(p.x - offX), gy = Math.floor(p.y), gz = Math.floor(p.z - offZ);
+  if (gx < 0 || gy < 0 || gz < 0 || gx >= dims.sx || gy >= dims.sy || gz >= dims.sz) return;
+  currentModel.grid[idx(gx, gy, gz, dims)] = removeMode ? 0 : (MATERIAL_INDEX[el('build-block-select').value] + 1);
+  renderThree(currentModel, true);
+  renderBlueprint(currentModel);
+  renderCommands(currentModel);
+  renderStats(currentModel);
 }
 
 let pointerDownPos = null;
@@ -3325,9 +3681,15 @@ function wireCameraInput(container) {
   window.addEventListener('pointerup', (e) => {
     dragLook.active = false;
     if (pointerDownPos && Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) < 5) {
-      attemptInteract(e.clientX, e.clientY);
+      if (el('build-toggle').checked) { if (e.button === 0) attemptBuild(e.clientX, e.clientY, false); }
+      else attemptInteract(e.clientX, e.clientY);
     }
     pointerDownPos = null;
+  });
+  container.addEventListener('contextmenu', (e) => {
+    if (!el('build-toggle').checked) return;
+    e.preventDefault();
+    attemptBuild(e.clientX, e.clientY, true);
   });
   window.addEventListener('pointermove', (e) => {
     if (!dragLook.active || cameraMode === 'orbit') return;
@@ -3429,7 +3791,8 @@ function setCameraMode(mode) {
   if (three.playerMarker) three.playerMarker.visible = (mode === 'thirdperson');
   const hint = el('camera-hint');
   if (mode === 'orbit') {
-    hint.textContent = 'Drag to orbit, scroll to zoom.';
+    hint.textContent = 'Drag to orbit, scroll to zoom.' +
+      (el('build-toggle').checked ? ' Left-click a face to place a block, right-click a block to remove it.' : '');
   } else {
     const dims = currentModel ? currentModel.dims : { sx: 10, sy: 10, sz: 10 };
     if (mode === 'fly') {
@@ -3443,7 +3806,8 @@ function setCameraMode(mode) {
       flyState.vy = 0; flyState.grounded = false; flyState.yaw = 0; flyState.pitch = -0.35;
       hint.textContent = (mode === 'thirdperson' ? 'Third-person: ' : 'First-person: ') +
         'drag to look, WASD to move, Space to jump — you\'ll fall in from above.' +
-        (el('interact-toggle').checked ? ' Click a door/lever/button/plate to use it.' : '');
+        (el('interact-toggle').checked ? ' Click a door/lever/button/plate to use it.' : '') +
+        (el('build-toggle').checked ? ' Left-click a face to place a block, right-click a block to remove it.' : '');
     }
   }
 }
@@ -3461,7 +3825,15 @@ function updateCutaway() {
 el('cutaway-toggle').addEventListener('change', updateCutaway);
 el('cutaway-slider').addEventListener('input', updateCutaway);
 el('interact-toggle').addEventListener('change', () => {
+  if (el('interact-toggle').checked && el('build-toggle').checked) { el('build-toggle').checked = false; el('build-toggle').dispatchEvent(new Event('change')); }
   el('three-container').style.cursor = el('interact-toggle').checked ? 'pointer' : '';
+  setCameraMode(cameraMode); // refresh the hint text
+});
+el('build-toggle').addEventListener('change', () => {
+  const on = el('build-toggle').checked;
+  if (on && el('interact-toggle').checked) { el('interact-toggle').checked = false; el('interact-toggle').dispatchEvent(new Event('change')); }
+  el('build-block-select').disabled = !on;
+  el('three-container').style.cursor = on ? 'crosshair' : '';
   setCameraMode(cameraMode); // refresh the hint text
 });
 
@@ -3474,7 +3846,7 @@ function onResizeThree() {
   three.camera.updateProjectionMatrix();
 }
 
-function renderThree(model) {
+function renderThree(model, preserveCamera) {
   const t = initThree();
   while (t.group.children.length) t.group.remove(t.group.children[0]); // geometries/materials are cached & reused, not disposed
   interactiveObjects = [];
@@ -3545,14 +3917,20 @@ function renderThree(model) {
   });
   t.group.add(groundMesh);
 
-  const maxDim = Math.max(dims.sx, dims.sy, dims.sz);
-  t.camera.position.set(maxDim * 0.9, maxDim * 0.75, maxDim * 0.9);
-  t.controls.target.set(0, dims.sy / 2, 0);
-  t.camera.near = Math.max(0.1, maxDim / 500);
-  t.camera.far = maxDim * 20;
-  t.camera.updateProjectionMatrix();
+  if (!preserveCamera) {
+    // Build-mode edits call this with preserveCamera=true so placing or
+    // removing one block doesn't yank the camera back to the default
+    // framing on every click — everything else (a fresh Generate, a
+    // preset/shape switch) still wants the normal auto-framed view.
+    const maxDim = Math.max(dims.sx, dims.sy, dims.sz);
+    t.camera.position.set(maxDim * 0.9, maxDim * 0.75, maxDim * 0.9);
+    t.controls.target.set(0, dims.sy / 2, 0);
+    t.camera.near = Math.max(0.1, maxDim / 500);
+    t.camera.far = maxDim * 20;
+    t.camera.updateProjectionMatrix();
+    setCameraMode(el('camera-mode').value);
+  }
   updateCutaway();
-  setCameraMode(el('camera-mode').value);
   onResizeThree();
 }
 
@@ -3575,6 +3953,9 @@ function renderBlueprint(model) {
     door: ['#c98a4a', 'D'], window: ['#aad2d9', 'W'], ladder: ['#8a6a3a', 'L'], trapdoor: ['#8a6a3a', 'H'],
     bars: ['#c7c7c2', 'B'], lever: ['#9a9a9a', 'V'], button: ['#b4874c', 'N'],
     tripwire_hook: ['#8a8a3a', 'K'], tripwire: ['#8a8a3a', '-'], chair: ['#b4874c', 'C'],
+    pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
+    rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
+    activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -3628,6 +4009,9 @@ function renderBlueprint(model) {
     torch: 'Torch', soul_torch: 'Soul Torch', redstone_torch: 'Redstone Torch',
     door: 'Door', window: 'Window', ladder: 'Ladder', trapdoor: 'Trapdoor', bars: 'Iron bars',
     lever: 'Lever', button: 'Button', tripwire_hook: 'Tripwire Hook', tripwire: 'Tripwire', chair: 'Chair',
+    pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
+    rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
+    activator_rail: 'Activator Rail', minecart: 'Minecart',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -3640,6 +4024,14 @@ function renderBlueprint(model) {
 /* =========================================================================
  * BUILD COMMANDS (/fill, rectangle-merged per layer & material)
  * ==================================================================== */
+// Real vanilla rail `shape` blockstate value for one decor entry — straight
+// rail is north_south/east_west by axis, curves use the corner named
+// directly (already vanilla's own naming), ascending is ascending_<facing>.
+function railShapeString(d) {
+  if (d.shape === 'ascending') return 'ascending_' + (d.facing || 'north');
+  if (d.shape === 'curve') return d.corner || 'south_east';
+  return d.axis === 'x' ? 'east_west' : 'north_south';
+}
 function renderCommands(model) {
   const { dims, grid } = model;
   let total = 0;
@@ -3690,7 +4082,14 @@ function renderCommands(model) {
       else if (d.type === 'button') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_button[face=floor,facing=${facing}]`);
       else if (d.type === 'tripwire_hook') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:tripwire_hook[facing=${facing}]`);
       else if (d.type === 'tripwire') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:tripwire`);
+      else if (d.type === 'pressure_plate') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_pressure_plate`);
+      else if (d.type === 'redstone_wire') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:redstone_wire`);
       else if (d.type === 'chair') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_stairs[facing=${d.facing || 'north'}]`);
+      else if (d.type === 'rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:rail[shape=${railShapeString(d)}]`);
+      else if (d.type === 'powered_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:powered_rail[shape=${railShapeString(d)},powered=${!!(d.powered || d.on)}]`);
+      else if (d.type === 'detector_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:detector_rail[shape=${railShapeString(d)}]`);
+      else if (d.type === 'activator_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:activator_rail[shape=${railShapeString(d)},powered=${!!(d.powered || d.on)}]`);
+      else if (d.type === 'minecart') lines.push(`summon minecraft:minecart ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
