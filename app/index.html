@@ -2159,7 +2159,11 @@ function buildMechanismDemoInterior(grid, silhouette, dims, exteriorMat, accentM
     if (dims.sy > 2) grid[idx(cx, 2, doorZ, dims)] = 0;
     doorIdx = decorOut.length;
     decorOut.push({ type: 'door', x: cx, y: 1, z: doorZ, axis: 'z', hinge: 'left', open: false });
-    decorOut.push({ type: 'lever', x: Math.max(0, cx - 2), y: 1, z: doorZ, face: 'wall', facing: 'south', on: false, wireTo: doorIdx });
+    // The lever mounts on the same wall as the door, but must live in the
+    // open interior cell in front of that wall (z - 1), not the wall's own
+    // solid cell (z) — that cell was never carved, so the lever would
+    // otherwise render half-buried inside solid wall geometry.
+    decorOut.push({ type: 'lever', x: Math.max(0, cx - 2), y: 1, z: doorZ - 1, face: 'wall', facing: 'north', on: false, wireTo: doorIdx });
   }
 
   // A pressure plate a few steps in, wired to a trapdoor over a pit — step
@@ -2695,10 +2699,11 @@ function tripwireGeometry(tileKey) {
   remapUV(geo, tileKey);
   return geo;
 }
-// Lever: ~6x3x5px stone base plus a ~2x10x2px arm, pivoting near the base's
-// outer edge so it visibly swings between an "up" and "down" resting angle.
+// Lever: 6x3x8px stone base plus a 2x10x2px arm — exact cuboids from
+// vanilla's own lever.json model (base [5,-0.02,4]-[11,2.98,12], arm
+// [7,1,7]-[9,11,9] pivoting +-45 degrees around its own bottom-center).
 function leverParts(tileKey) {
-  const base = new THREE.BoxGeometry(6 * PX, 3 * PX, 5 * PX); remapUV(base, 'cobblestone');
+  const base = new THREE.BoxGeometry(6 * PX, 3 * PX, 8 * PX); remapUV(base, 'cobblestone');
   const arm = new THREE.BoxGeometry(2 * PX, 10 * PX, 2 * PX); remapUV(arm, tileKey);
   return { base, arm };
 }
@@ -2830,20 +2835,31 @@ function buildDecorMeshesForEntry(entry) {
     registerInteractive(m, entry, 'button');
     objs.push(m);
   } else if (def.kind === 'lever') {
+    // Base keeps its original, visually-verified mount placement. The arm
+    // used to be a bare mesh rotated around its own geometric center, which
+    // swung half of it into the base/wall — real levers hinge at the arm's
+    // *bottom* (matching vanilla's lever.json, which rotates the arm cuboid
+    // around its own bottom-center). So the arm here is a child of a pivot
+    // group placed at that bottom point, offset up by half the arm's own
+    // length, which puts it at exactly the same resting spot as before but
+    // lets it swing from the correct hinge.
     const key = 'lever:' + def.tile;
     let parts = decorGeoCache.get(key);
     if (!parts) { parts = leverParts(def.tile); decorGeoCache.set(key, parts); }
     const group = new THREE.Group();
     const base = new THREE.Mesh(parts.base, decorMaterial());
     orientToFace(base, face, entry.facing, 0.5 - 1.5 * PX);
-    const arm = new THREE.Mesh(parts.arm, decorMaterial());
-    arm.position.copy(base.position);
     const outward = faceNormal(face, entry.facing);
-    arm.position.addScaledVector(outward, 5 * PX);
-    arm.userData.pivotAxis = face === 'floor' || face === 'ceiling' ? 'z' : 'x';
-    group.add(base, arm);
-    group.userData.arm = arm;
-    group.userData.face = face;
+    const pivot = new THREE.Group();
+    pivot.position.copy(base.position);
+    pivot.position.addScaledVector(outward, 5 * PX);
+    pivot.position.y -= 5 * PX;
+    const arm = new THREE.Mesh(parts.arm, decorMaterial());
+    arm.position.y = 5 * PX;
+    pivot.add(arm);
+    pivot.userData.pivotAxis = face === 'floor' || face === 'ceiling' ? 'z' : 'x';
+    group.add(base, pivot);
+    group.userData.armPivot = pivot;
     registerInteractive(group, entry, 'lever');
     objs.push(group);
   } else if (def.kind === 'pressure_plate') {
@@ -2946,9 +2962,13 @@ function updateInteractiveAnimations(dt) {
     const t = entry._animT;
 
     if (kind === 'door') {
+      // Swing toward the cell's low-axis side (the side the panel's face sits
+      // flush against — see buildDecorMeshesForEntry) so an open door reads
+      // as swung *into* the room it's attached to, not floating in open air
+      // beyond the wall.
       const hingeSign = obj.userData.hingeSign;
       const sign = obj.userData.axis === 'z' ? 1 : -1;
-      obj.rotation.y = hingeSign * sign * (Math.PI / 2) * t;
+      obj.rotation.y = -hingeSign * sign * (Math.PI / 2) * t;
     } else if (kind === 'trapdoor') {
       const child = obj.children[0];
       const half = obj.userData.half;
@@ -2956,9 +2976,11 @@ function updateInteractiveAnimations(dt) {
       child.rotation.x = THREE.MathUtils.lerp(Math.PI / 2, 0, t);
       child.position.y = THREE.MathUtils.lerp(closedY, 0, t);
     } else if (kind === 'lever') {
-      const arm = obj.userData.arm;
-      const angle = THREE.MathUtils.lerp(-0.5, 0.5, t);
-      if (arm.userData.pivotAxis === 'z') arm.rotation.z = angle; else arm.rotation.x = angle;
+      // +-45 degrees around the arm's bottom (see buildDecorMeshesForEntry),
+      // matching vanilla's lever.json/lever_on.json rotation.
+      const pivot = obj.userData.armPivot;
+      const angle = THREE.MathUtils.lerp(-Math.PI / 4, Math.PI / 4, t);
+      if (pivot.userData.pivotAxis === 'z') pivot.rotation.z = angle; else pivot.rotation.x = angle;
     } else if (kind === 'button') {
       const inset = THREE.MathUtils.lerp(0.5 - PX, 0.5 - 0.25 * PX, t);
       orientToFace(obj, obj.userData.face, obj.userData.facing, inset);
@@ -3328,6 +3350,23 @@ function renderThree(model) {
       t.group.add(mesh);
     }
   }
+
+  // A real grass-block ground layer one cell below the model, extending
+  // past its footprint, so every model reads as sitting on solid ground
+  // instead of floating in empty space.
+  const groundMat = MATERIAL_INDEX['grass_block'] + 1;
+  const margin = Math.min(12, Math.max(4, Math.round(Math.max(dims.sx, dims.sz) * 0.3)));
+  const groundCells = [];
+  for (let z = -margin; z < dims.sz + margin; z++) {
+    for (let x = -margin; x < dims.sx + margin; x++) groundCells.push([x, -1, z]);
+  }
+  const groundMesh = new THREE.InstancedMesh(getBoxGeometry(groundMat), cubeMaterial(), groundCells.length);
+  groundCells.forEach(([x, y, z], i) => {
+    dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
+    dummy.updateMatrix();
+    groundMesh.setMatrixAt(i, dummy.matrix);
+  });
+  t.group.add(groundMesh);
 
   const maxDim = Math.max(dims.sx, dims.sy, dims.sz);
   t.camera.position.set(maxDim * 0.9, maxDim * 0.75, maxDim * 0.9);
