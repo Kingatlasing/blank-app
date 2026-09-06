@@ -2596,6 +2596,23 @@ function buildPitfallTrapInterior(grid, silhouette, dims, exteriorMat, accentMat
   grid[idx(pitX, 0, cz, dims)] = 0; // open a pit through the floor right under the trapdoor
   decorOut.push({ type: 'trapdoor', x: pitX, y: 1, z: cz, facing: 'north', half: 'bottom', open: false });
 }
+// A wooden button wired straight to a door through a real redstone_wire run
+// (no wireTo link) — pressing it opens the door immediately, and the door
+// swings shut on its own once the button's real 1.5-second timer runs out
+// and releases (see pressButton/BUTTON_RELEASE_MS), with no second click
+// needed to close it. This is the button's only real showcase in the app —
+// every other preset uses levers or plates instead.
+function buildButtonDoorInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  if (!decorOut) return;
+  const cz = Math.floor(dims.sz / 2);
+  for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, cz, dims)] = exteriorMat; // a walkway floor, one cell wide
+  const buttonX = 1, doorX = dims.sx - 2;
+  if (doorX <= buttonX + 1) return; // too small to carve this layout at all
+  decorOut.push({ type: 'button', x: buttonX, y: 1, z: cz, face: 'floor', tile: 'oak_planks', on: false });
+  for (let x = buttonX + 1; x < doorX; x++) decorOut.push({ type: 'redstone_wire', x, y: 1, z: cz, axis: 'x' });
+  decorOut.push({ type: 'door', x: doorX, y: 1, z: cz, axis: 'x', hinge: 'left', open: false });
+}
 // A real automatic wheat farm's layout: a water channel down the middle
 // (real vanilla farmland stays tilled within 4 blocks of water, and
 // harvested crops float on flowing water to a collection point) with crop
@@ -2887,6 +2904,18 @@ const PRESETS = [
     notes: [
       'Disguise the plate by matching its surrounding floor material, and camouflage the trapdoor the same way, for the real "looks like solid floor" effect.',
       'Walk onto the plate in Walk mode and watch the wire light up before the trapdoor drops — the delay you\'d see is exactly this app\'s falloff-based propagation, not a scripted cue.',
+    ],
+  },
+  {
+    id: 'button-timer-door', name: 'Timed Button Door', shape: 'box', category: 'Traps & Mechanisms',
+    real: { height: 3, baseX: 12, baseZ: 3 }, interiorMode: 'buttonDoor',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'A wooden button wired straight to a door through a real redstone_wire run. This is the button\'s only real showcase in the app — every other preset uses a lever or a pressure plate instead — because it\'s the one that needs a real vanilla mechanic none of those have: a button can\'t be switched back off by clicking it again. It auto-releases on its own after a fixed real delay.',
+    keywords: ['button', 'timed door', 'auto close', 'self closing door', 'timer'],
+    notes: [
+      'Click the button once (Interact mode): the door opens immediately and the button stays visibly pressed. 1.5 real seconds later — a wooden button\'s actual vanilla release time (15 redstone ticks) — it pops back up on its own and the door swings shut, with no second click.',
+      'Clicking the button again while it\'s still pressed does nothing, matching real vanilla: a button can only be released by its own timer (or, for a wooden one, a fired arrow, which this app doesn\'t simulate) — never by another click.',
+      'A stone button (not used here) releases faster — 1 real second (10 redstone ticks) instead of 1.5 — since real Minecraft gives stone buttons a shorter timer than wooden ones.',
     ],
   },
   {
@@ -3257,6 +3286,8 @@ function generateModel() {
     buildTwoKeyDoorInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'pitfallTrap') {
     buildPitfallTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'buttonDoor') {
+    buildButtonDoorInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'cropFarm') {
     buildCropFarmInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'animalPen') {
@@ -4068,7 +4099,41 @@ function setDecorState(entry, value) {
   computeRedstone(currentModel);
 }
 function toggleDecorEntry(entry) {
+  if (entry.type === 'button') { pressButton(entry); return; }
   setDecorState(entry, !isEntryActive(entry));
+}
+// Real vanilla button timing: a wooden button (any *_planks tile) stays
+// pressed for 15 redstone ticks (1.5s), a stone-family button (stone,
+// polished blackstone) for 10 redstone ticks (1s) — 1 redstone tick =
+// 100ms. Source: minecraft.wiki/w/Button. Buttons can't be manually
+// un-pressed by clicking again either way — real vanilla only releases a
+// button via this timer (or, for wooden ones, a fired arrow, which this
+// app doesn't simulate) — and re-clicking one that's already pressed does
+// nothing, matching vanilla's own button code (it no-ops while POWERED).
+const BUTTON_RELEASE_MS = { wood: 1500, stone: 1000 };
+function isWoodButtonTile(tile) {
+  return !!tile && (tile.includes('planks') || tile === 'bamboo_planks');
+}
+// The real vanilla block id for a button of this material — used by the
+// exported /setblock commands, so a button's command output actually
+// matches the wood/stone family its own timing behavior (see pressButton)
+// is based on, instead of always saying oak_button.
+function buttonBlockId(tile) {
+  if (!tile) return 'oak_button';
+  if (isWoodButtonTile(tile)) return tile.replace('_planks', '_button');
+  if (tile === 'polished_blackstone') return 'polished_blackstone_button';
+  return 'stone_button';
+}
+function pressButton(entry) {
+  if (entry.on) return;
+  setDecorState(entry, true);
+  const releaseMs = isWoodButtonTile(entry.tile || DECOR_TYPES.button.tile) ? BUTTON_RELEASE_MS.wood : BUTTON_RELEASE_MS.stone;
+  const modelAtPress = currentModel;
+  clearTimeout(entry._releaseTimer);
+  entry._releaseTimer = setTimeout(() => {
+    if (currentModel !== modelAtPress) return; // model was regenerated since the press; this button no longer exists in it
+    setDecorState(entry, false);
+  }, releaseMs);
 }
 
 /* =========================================================================
@@ -4847,7 +4912,7 @@ function renderCommands(model) {
       else if (d.type === 'ladder') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:ladder[facing=${facing}]`);
       else if (d.type === 'trapdoor') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_trapdoor[facing=${facing},half=top,open=false]`);
       else if (d.type === 'lever') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:lever[face=floor,facing=${facing}]`);
-      else if (d.type === 'button') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_button[face=floor,facing=${facing}]`);
+      else if (d.type === 'button') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:${buttonBlockId(d.tile)}[face=floor,facing=${facing}]`);
       else if (d.type === 'tripwire_hook') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:tripwire_hook[facing=${facing}]`);
       else if (d.type === 'tripwire') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:tripwire`);
       else if (d.type === 'pressure_plate') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_pressure_plate`);
