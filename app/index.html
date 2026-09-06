@@ -1795,6 +1795,7 @@ const DECOR_TYPES = {
   rabbit: { kind: 'rabbit', interactive: false },
   bat: { kind: 'bat', interactive: false },
   enderman: { kind: 'enderman', interactive: false },
+  spider: { kind: 'spider', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2703,6 +2704,20 @@ function buildEndIslandsInterior(grid, silhouette, dims, exteriorMat, accentMat,
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'enderman', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A small fully-walled stone room, unlike every other mob preset's open
+// sides — the spider specifically needs a real vertical wall to climb,
+// which an open-sided enclosure (the animal pen's fence, the bat cave's
+// floor-and-ceiling-only slab) doesn't have.
+function buildSpiderNestInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  decorOut.push({ type: 'spider', x: 1, y: 1, z: 1, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3006,6 +3021,17 @@ const PRESETS = [
     notes: [
       'Real endermen "wander and/or teleport around randomly" — roughly a coin flip between the two every time it picks somewhere new to go, rather than always walking or always teleporting. Watch it long enough and you\'ll see both.',
       'No aggro/attack model exists in this app (no combat at all), so this enderman is calm and never hostile — real vanilla endermen only turn hostile if a player looks directly at them, which this app has no way to detect (it only knows camera position, not the direction it\'s actually facing).',
+    ],
+  },
+  {
+    id: 'spider-nest', name: 'Spider Nest', shape: 'box', category: 'Farms & Automation',
+    real: { height: 4, baseX: 7, baseZ: 7 }, interiorMode: 'spiderNest',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'mossy_cobblestone' },
+    desc: 'A small fully-enclosed stone room, built specifically to give a spider real walls to climb — real vanilla spiders "can climb up on the sides of solid blocks," unique among mobs, even just while wandering randomly, not only while chasing something.',
+    keywords: ['spider', 'wall climbing', 'nest', 'dungeon', 'cave', 'arachnid'],
+    notes: [
+      'Watch it wander the floor like the other animals, then occasionally turn and climb straight up a wall a few blocks before coming back down — a real, distinct movement mode, not the same walk cycle every other mob here shares.',
+      'No aggro/attack model exists in this app (no combat at all) — real vanilla spiders turn hostile in low light and neutral in bright light, but that only affects whether they attack, not whether they wander or climb, so it isn\'t modeled here.',
     ],
   },
 ];
@@ -3364,6 +3390,8 @@ function generateModel() {
     buildBatCaveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'endIslands') {
     buildEndIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'spiderNest') {
+    buildSpiderNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3891,6 +3919,28 @@ function endermanParts() {
   });
   return { body, head, eyes, arms, legs };
 }
+// A wide, low two-segment body (abdomen + smaller thorax) with 6 thin
+// splayed legs — real vanilla spiders are 8-legged and noticeably wider
+// than tall (1.4 x 0.9), simplified here the same way every other low-poly
+// stand-in mob in this app is. See DECOR_TYPES.spider.
+function spiderParts() {
+  const abdomen = new THREE.BoxGeometry(0.5, 0.3, 0.4);
+  abdomen.translate(0, 0.15, -0.15);
+  const thorax = new THREE.BoxGeometry(0.32, 0.24, 0.24);
+  thorax.translate(0, 0.14, 0.25);
+  const legPositions = [
+    [-0.35, -0.15, -Math.PI / 5], [0.35, -0.15, Math.PI / 5],
+    [-0.38, 0.05, -Math.PI / 2.2], [0.38, 0.05, Math.PI / 2.2],
+    [-0.32, 0.22, -Math.PI / 1.6], [0.32, 0.22, Math.PI / 1.6],
+  ];
+  const legs = legPositions.map(([x, z, yaw]) => {
+    const g = new THREE.BoxGeometry(0.36, 0.06, 0.06);
+    g.rotateY(yaw);
+    g.translate(x, 0.1, z);
+    return g;
+  });
+  return { abdomen, thorax, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4251,6 +4301,18 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'spider') {
+    let parts = decorGeoCache.get('spider');
+    if (!parts) { parts = spiderParts(); decorGeoCache.set('spider', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x1c1a1d);
+    group.add(new THREE.Mesh(parts.abdomen, bodyMat));
+    group.add(new THREE.Mesh(parts.thorax, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0; // pitched flat against the wall while climbing
+    registerMob(group, entry);
+    objs.push(group);
   }
   return objs;
 }
@@ -4307,7 +4369,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman']);
+const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -4349,6 +4411,37 @@ const MOB_NO_LOOK_KINDS = new Set(['enderman']);
 // instead of by walking there.
 const MOB_TELEPORT_KINDS = new Set(['enderman']);
 const MOB_TELEPORT_CHANCE = 0.5;
+// Real vanilla: spiders "can climb up on the sides of solid blocks" even
+// while just wandering randomly, not only while chasing something —
+// "unique to spiders" among mobs (minecraft.wiki/w/Spider). No aggro/attack
+// model exists in this app (no combat at all), so only the wandering half
+// of that is implemented: a spider touching a wall may climb it a few
+// blocks instead of picking a normal floor destination.
+const MOB_CLIMB_KINDS = new Set(['spider']);
+const MOB_CLIMB_CHANCE = 0.4;
+const SPIDER_CLIMB_RADIUS = 3;
+function hasAdjacentWall(model, x, y, z) {
+  const dims = model.dims;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const nx = x + dx, nz = z + dz;
+    if (nx < 0 || nz < 0 || nx >= dims.sx || nz >= dims.sz) continue;
+    if (model.grid[idx(nx, y, nz, dims)] !== 0) return true;
+  }
+  return false;
+}
+function pickSpiderClimbTarget(model, entry) {
+  if (!hasAdjacentWall(model, entry.x, entry.y, entry.z)) return null; // real vanilla: has to actually be touching a wall to climb it
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const dy = Math.round((Math.random() * 2 - 1) * SPIDER_CLIMB_RADIUS);
+    if (dy === 0) continue;
+    const ty = entry.y + dy;
+    if (ty < 0 || ty >= model.dims.sy) continue;
+    if (model.grid[idx(entry.x, ty, entry.z, model.dims)] !== 0) continue; // must be open to occupy
+    if (!hasAdjacentWall(model, entry.x, ty, entry.z)) continue;
+    return { y: ty };
+  }
+  return null;
+}
 function mobCellWalkable(model, x, y, z) {
   const dims = model.dims;
   if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz || y < 0 || y >= dims.sy) return false;
@@ -4493,6 +4586,7 @@ function updateMobs(dt) {
       entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
       entry._lookTimer = 0;
       entry._wx = entry.x + 0.5;
+      entry._wy = entry.y;
       entry._wz = entry.z + 0.5;
     }
     if (entry._mobState === 'idle') {
@@ -4511,27 +4605,39 @@ function updateMobs(dt) {
         entry._mobYaw = Math.atan2(flyState.pos.x - wx, flyState.pos.z - wz);
       }
       if (entry._mobTimer <= 0) {
-        const target = pickWanderTarget(currentModel, entry);
-        if (target) {
-          if (MOB_TELEPORT_KINDS.has(entry.type) && Math.random() < MOB_TELEPORT_CHANCE) {
-            // Real vanilla: this is an instant relocation, not a walk — skip
-            // the walking state entirely and arrive already idle again.
-            entry.x = target.x;
-            entry.z = target.z;
-            entry._wx = target.x + 0.5;
-            entry._wz = target.z + 0.5;
-            entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
-          } else {
-            entry._targetX = target.x + 0.5;
-            entry._targetZ = target.z + 0.5;
-            entry._mobState = 'walking';
-            entry._lookTimer = 0; // an active walk goal wins over looking at the player, same as real vanilla's goal priority
+        let handled = false;
+        if (MOB_CLIMB_KINDS.has(entry.type) && Math.random() < MOB_CLIMB_CHANCE) {
+          const climb = pickSpiderClimbTarget(currentModel, entry);
+          if (climb) {
+            entry._targetY = climb.y;
+            entry._mobState = 'climbing';
+            entry._lookTimer = 0;
+            handled = true;
           }
-        } else {
-          entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+        }
+        if (!handled) {
+          const target = pickWanderTarget(currentModel, entry);
+          if (target) {
+            if (MOB_TELEPORT_KINDS.has(entry.type) && Math.random() < MOB_TELEPORT_CHANCE) {
+              // Real vanilla: this is an instant relocation, not a walk — skip
+              // the walking state entirely and arrive already idle again.
+              entry.x = target.x;
+              entry.z = target.z;
+              entry._wx = target.x + 0.5;
+              entry._wz = target.z + 0.5;
+              entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+            } else {
+              entry._targetX = target.x + 0.5;
+              entry._targetZ = target.z + 0.5;
+              entry._mobState = 'walking';
+              entry._lookTimer = 0; // an active walk goal wins over looking at the player, same as real vanilla's goal priority
+            }
+          } else {
+            entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+          }
         }
       }
-    } else {
+    } else if (entry._mobState === 'walking') {
       const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
       const dist = Math.hypot(dx, dz);
       const step = MOB_WALK_SPEED * (MOB_SPEED_MULT[entry.type] || 1) * dt;
@@ -4549,10 +4655,22 @@ function updateMobs(dt) {
         entry._mobYaw = Math.atan2(dx, dz); // face the direction of travel, like a real mob turning to walk somewhere
         if (MOB_HOP_KINDS.has(entry.type)) entry._hopPhase = (entry._hopPhase || 0) + dt * MOB_HOP_RATE;
       }
+    } else { // climbing — real vanilla: horizontal position stays pinned to the wall, only height changes
+      const dy = entry._targetY - entry._wy;
+      const step = MOB_WALK_SPEED * dt;
+      if (Math.abs(dy) <= step) {
+        entry._wy = entry._targetY;
+        entry.y = Math.round(entry._wy);
+        entry._mobState = 'idle';
+        entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+      } else {
+        entry._wy += Math.sign(dy) * step;
+      }
     }
     const hopBounce = (MOB_HOP_KINDS.has(entry.type) && entry._mobState === 'walking') ? Math.abs(Math.sin(entry._hopPhase || 0)) * MOB_HOP_HEIGHT : 0;
-    obj.position.set(entry._wx + offX, entry.y + 0.5 + hopBounce, entry._wz + offZ);
+    obj.position.set(entry._wx + offX, entry._wy + 0.5 + hopBounce, entry._wz + offZ);
     if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    if (MOB_CLIMB_KINDS.has(entry.type)) obj.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0;
   }
 }
 
@@ -5438,7 +5556,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
-    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5495,7 +5613,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
-    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman',
+    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5582,6 +5700,7 @@ function renderCommands(model) {
       else if (d.type === 'rabbit') lines.push(`summon minecraft:rabbit ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'bat') lines.push(`summon minecraft:bat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'enderman') lines.push(`summon minecraft:enderman ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'spider') lines.push(`summon minecraft:spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
