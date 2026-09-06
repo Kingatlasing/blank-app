@@ -2476,6 +2476,47 @@ function gateXNOR(a, b) {
   );
   return gate;
 }
+// RS NOR latch: Qp = NOT(S OR Q), Q = NOT(R OR Qp) — two NOR gates (see
+// gateNOR) cross-coupled so each one's output feeds the other's input.
+// Real dust only merges with a same-height neighbor, but each NOR's own
+// output naturally sits one level below its input-merge dust (see gateNOR),
+// so the feedback has to be lifted one level before it can be routed back —
+// the block-charges-wire-on-top mechanic in computeRedstone already does
+// exactly that (it's the same trick gateXOR uses to bridge levels). Needs
+// real per-tick state to work at all (a torch's output depends on the OTHER
+// torch's output from the previous settle, forever) — this only holds
+// because computeRedstone persists blockPoweredExternal on the model across
+// calls, not just across passes within one call. Verified via
+// latch-design-test3.js / latch-realistic-usage-test.js: SET (S pulse)
+// forces Q=true/Qp=false and holds after release, RESET (R pulse) forces
+// Q=false/Qp=true and holds after release, and a lever click's normal
+// computeRedstone(model) call (passes=8) settles it correctly — no live
+// tick loop required for this gate specifically, only for a circuit that
+// oscillates on its own (a clock).
+function gateRSNORLatch(sOn, rOn) {
+  const N = 6; // gap between the two NOR gates' merges; must stay well under the 14-hop signal-decay budget
+  return {
+    decor: [
+      // NOR-A: Qp = NOT(S OR Q-feedback).
+      { type: 'lever', x: 0, y: 2, z: 0, face: 'floor', on: !!sOn }, // S
+      { type: 'redstone_wire', x: 0, y: 2, z: 1 }, // merge_A: S + (lifted Q)
+      { type: 'redstone_torch', x: 1, y: 1, z: 1, face: 'wall', facing: 'west' }, // attach=(0,1,1); target=(2,1,1)=Qp
+      { type: 'redstone_wire', x: 2, y: 2, z: 1 }, // lift_Qp (charged externally when torch_A is lit)
+      ...Array.from({ length: N - 2 }, (_, i) => ({ type: 'redstone_wire', x: 2, y: 2, z: 2 + i })), // z=2..N-1
+      { type: 'redstone_wire', x: 2, y: 2, z: N },
+      { type: 'redstone_wire', x: 1, y: 2, z: N }, // bend, adjacent to merge_B
+
+      // NOR-B: Q = NOT(R OR Qp-feedback).
+      { type: 'lever', x: 0, y: 2, z: N + 1, face: 'floor', on: !!rOn }, // R
+      { type: 'redstone_wire', x: 0, y: 2, z: N }, // merge_B: R + (lifted Qp)
+      { type: 'redstone_torch', x: -1, y: 1, z: N, face: 'wall', facing: 'east' }, // attach=(0,1,N); target=(-2,1,N)=Q
+      { type: 'redstone_wire', x: -2, y: 2, z: N }, // lift_Q
+      ...Array.from({ length: N - 2 }, (_, i) => ({ type: 'redstone_wire', x: -2, y: 2, z: N - 1 - i })), // z=N-1..2
+      { type: 'redstone_wire', x: -2, y: 2, z: 1 },
+      { type: 'redstone_wire', x: -1, y: 2, z: 1 }, // bend, adjacent to merge_A
+    ],
+  };
+}
 const LOGIC_GATE_BUILDERS = {
   io: () => gateIO(false),
   not: () => gateNOT(false),
@@ -2486,6 +2527,7 @@ const LOGIC_GATE_BUILDERS = {
   and: () => gateAND(false, false),
   xor: () => gateXOR(false, false),
   xnor: () => gateXNOR(false, false),
+  rsnorlatch: () => gateRSNORLatch(false, false),
 };
 const LOGIC_GATE_MARGIN_XZ = 1;
 // Every solid cell a gate's decor list actually needs: each lever/button/
@@ -2813,6 +2855,17 @@ const PRESETS = [
     desc: 'NOT(XOR(a,b)): the XOR gate\'s exact circuit with one more inverting torch on the very end.',
     keywords: ['xnor', 'equivalence', 'logic gate'],
     notes: ['Lit when both levers agree (both on or both off) — dark when they differ.'],
+  },
+  {
+    id: 'gate-rsnorlatch', name: 'RS NOR Latch', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 2, baseX: 7, baseZ: 10 }, interiorMode: 'logicGate', gateType: 'rsnorlatch',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'Two NOR gates cross-coupled so each one\'s output feeds the other\'s input: Qp = NOT(S OR Q), Q = NOT(R OR Qp). Unlike every other gate here, this one has real memory — it needs a genuine tick-based simulation to work at all, since each side\'s output depends on the OTHER side\'s output from a moment ago, forever.',
+    keywords: ['rs latch', 'nor latch', 'flip flop', 'memory', 'set reset', 'sr latch', 'logic gate'],
+    notes: [
+      'S (Set) and R (Reset) are the two levers. Pulse S on then off: Q stays lit. Pulse R on then off: Q stays dark. Whichever you pulsed last is what it remembers, even with both levers back off.',
+      'This is the first gate in the library that actually holds state — every other gate here is a pure function of its current inputs, but this one remembers its last SET or RESET forever, exactly like a real Minecraft RS NOR latch.',
+    ],
   },
   {
     id: 'two-key-door', name: 'Two-Key AND Door', shape: 'box', category: 'Traps & Mechanisms',
@@ -4077,7 +4130,16 @@ function torchTarget(t) {
 const REDSTONE_DIRS = [['e', 1, 0], ['w', -1, 0], ['s', 0, 1], ['n', 0, -1]];
 const REDSTONE_OPPOSITE = { e: 'w', w: 'e', s: 'n', n: 's' };
 const REDSTONE_HUGGABLE = new Set(['redstone_wire', 'lever', 'button', 'pressure_plate', 'redstone_torch']);
-function computeRedstone(model) {
+// passes=1 is a single real redstone tick (torches react to exactly one
+// step of their neighbors' previous state, same as real vanilla) — the
+// live tick loop below calls it that way, continuously, which is what
+// lets a self-referencing loop of torches actually oscillate (a clock)
+// and a cross-coupled pair actually hold whichever state it was last set
+// to (a latch) instead of being recomputed from scratch every call. Every
+// other call site wants the settled end state of an ordinary (non-clock,
+// non-latch) circuit instantly, so they call it with the default (enough
+// passes for any gate depth in this library to fully settle in one go).
+function computeRedstone(model, passes = 8) {
   if (!model) return;
   const decor = model.decor;
   const wiresByCell = new Map();
@@ -4092,12 +4154,20 @@ function computeRedstone(model) {
   const torches = decor.filter(e => e.type === 'redstone_torch');
   const switches = decor.filter(e => e.type === 'lever' || e.type === 'button' || e.type === 'pressure_plate');
 
-  let level, blockPowered = new Set(), blockPoweredExternal = new Set();
+  // blockPoweredExternal has to survive across separate calls, not just
+  // across passes within one call — the live tick loop drives this with
+  // ONE pass per call (see `passes` above), and a latch or clock's
+  // feedback (the block-charges-wire-on-top mechanic) only works if this
+  // tick's read sees what LAST tick's torches actually settled on, not an
+  // empty Set every time. Stashed on the model itself for exactly that.
+  let level, blockPowered = new Set();
+  let blockPoweredExternal = model._blockPoweredExternal || new Set();
   // A torch's lit state can depend on another torch's lit state (a chain
   // of inverters — every gate in the Contraptions library is exactly
-  // this), so this has to settle to a fixed point rather than compute
-  // once; 8 passes comfortably covers every gate depth built here.
-  for (let pass = 0; pass < 8; pass++) {
+  // this), so a settling circuit needs several passes in one call; a
+  // live clock/latch instead wants exactly one real tick per call (see
+  // the `passes` parameter above).
+  for (let pass = 0; pass < passes; pass++) {
     const sourceCells = [];
     for (const e of switches) if (e.on) sourceCells.push(e);
     for (const t of torches) if (t.on !== false) sourceCells.push(t);
@@ -4150,6 +4220,10 @@ function computeRedstone(model) {
 
     for (const t of torches) t.on = !blockPowered.has(cellKey(...mountedAttachment(t)));
   }
+  // Persist for the NEXT separate computeRedstone() call (see the read at
+  // the top) — required for tick-driven latches/clocks, where each real
+  // tick is its own call rather than another pass in this same loop.
+  model._blockPoweredExternal = blockPoweredExternal;
 
   // Purely visual: which sides actually grow an arm — enabled AND a real
   // redstone component sits there, exactly what real dust auto-conforms to.
