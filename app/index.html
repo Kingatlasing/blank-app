@@ -3178,11 +3178,11 @@ const PRESETS = [
     id: 'aquarium', name: 'Aquarium Chamber', shape: 'box', category: 'Farms & Automation',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'aquarium',
     blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
-    desc: 'A glass tank with a real waterfall feeding a real pool, and a squid drifting through both — the first mob preset here where the mob\'s own movement rule is bounded by an actual substance, not just an open room: real vanilla squid "wander around aimlessly in three dimensions as long as they are in the water."',
-    keywords: ['squid', 'water', 'aquarium', 'fish tank', 'underwater', 'ocean', 'waterfall'],
+    desc: 'A glass tank genuinely filled with real water from a single source, with a squid swimming through it — the first mob preset here where the mob\'s own movement rule is bounded by an actual substance, not just an open room: real vanilla squid "wander around aimlessly in three dimensions as long as they are in the water."',
+    keywords: ['squid', 'water', 'aquarium', 'fish tank', 'underwater', 'ocean'],
     notes: [
-      'The water itself is a real simulated flow, not hand-painted: a single source near the top genuinely falls straight down through the open tank, then spreads out into a pool once it lands, using the same rule real vanilla water follows — it can only ever exist as an unbroken path from a real source, either falling or resting within a limited spread of one. That\'s also why the tank isn\'t magically full to the brim: real vanilla water doesn\'t rise on its own to fill a container, so only the bottom pool and the falling column above it are actually wet — filling every layer of a real aquarium takes a source at each height, exactly like it would in the real game.',
-      'The squid genuinely stays confined to those real water cells the whole time — it will never wander into the glass, the dry air above the waterline, or the empty space beside the falling column — and real vanilla squid also "[hover] in place when first spawned into the world" before wandering, which this one does too, pausing briefly before its first swim.',
+      'The water itself is a real simulated flow, not hand-painted: it genuinely falls from a single source and spreads outward, following the same rule real vanilla water follows — it can only ever exist as an unbroken path from a real source, either falling or resting within a limited spread of one. A hole boxed in on all 4 sides is the one real exception to that limited spread, though: real vanilla water in a fully enclosed container doesn\'t stay a short puddle (two flowing blocks meeting next to a source convert into a fresh source themselves — the real "spring" mechanic, which is how a player actually fills a whole tank from just one or two buckets), and this tank\'s glass walls genuinely qualify, so the one source here fills the entire enclosed tank rather than a limited radius.',
+      'The squid genuinely stays confined to those real water cells the whole time — it will never wander into the glass or the dry air above the waterline — and real vanilla squid also "[hover] in place when first spawned into the world" before wandering, which this one does too, pausing briefly before its first swim.',
       'No aggro/attack model exists in this app (no combat at all) — real vanilla squid only produce ink and flee when attacked, so this one just drifts peacefully with nothing to react to.',
     ],
   },
@@ -5209,7 +5209,40 @@ function updateSlime(entry, obj, dt) {
 // full tank or pond places a handful of real sources, the same way a
 // player fills one with water buckets, rather than hand-painting every
 // cell as water directly.
-const WATER_MAX_LEVEL = 7; // real vanilla: a source spreads up to 7 blocks before thinning to nothing
+//
+// That 7-block cutoff only applies to water that's open on some side,
+// though — a real vanilla container walled in on all 4 horizontal sides
+// (an open top is fine; that's just the container's rim) doesn't stay
+// limited to a short puddle. Two flowing water blocks that meet next to
+// an existing source convert into a fresh source themselves — the real
+// "spring" mechanic — which is how a player actually fills a whole tank
+// from just one or two buckets rather than one source magically reaching
+// every corner. This app doesn't replicate that exact adjacent-source
+// trigger, but reproduces the real *outcome*: a source sitting in a
+// pocket of open air that's genuinely enclosed on the x/z sides fills
+// that entire pocket, not just a limited spread radius.
+const WATER_MAX_LEVEL = 7; // real vanilla: an unenclosed source spreads up to 7 blocks before thinning to nothing
+const WATER_POCKET_CAP = 4000; // a pocket larger than this isn't "a small contained tank" anymore — fall back to the normal limited spread instead of flood-filling something huge
+function enclosedWaterPocket(model, sx, sy, sz) {
+  const dims = model.dims, grid = model.grid;
+  const isOpen = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < dims.sx && y < dims.sy && z < dims.sz && grid[idx(x, y, z, dims)] === 0;
+  const seen = new Set([sx + ',' + sy + ',' + sz]);
+  const stack = [[sx, sy, sz]];
+  while (stack.length) {
+    const [x, y, z] = stack.pop();
+    if (x === 0 || x === dims.sx - 1 || z === 0 || z === dims.sz - 1) return null; // reaches the model's horizontal edge while still open — not walled in on all 4 sides
+    if (seen.size > WATER_POCKET_CAP) return null;
+    for (const [dx, dy, dz] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) {
+      const nx = x + dx, ny = y + dy, nz = z + dz;
+      if (!isOpen(nx, ny, nz)) continue;
+      const k = nx + ',' + ny + ',' + nz;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      stack.push([nx, ny, nz]);
+    }
+  }
+  return seen; // never touched a horizontal edge — genuinely enclosed on all 4 sides
+}
 function computeWaterFlow(model) {
   const { dims, grid } = model;
   const sources = model.decor.filter((d) => d.type === 'water' && d.source);
@@ -5222,19 +5255,35 @@ function computeWaterFlow(model) {
   const key = (x, y, z) => x + ',' + y + ',' + z;
   const score = (level, falling) => (falling ? WATER_MAX_LEVEL + 1 : level); // falling always beats any resting spread
   const best = new Map(); // "x,y,z" -> { level, falling }
+  const enclosed = new Set(); // cells already fully resolved by the walled-container rule below
+
+  for (const s of sources) {
+    const k0 = key(s.x, s.y, s.z);
+    if (enclosed.has(k0)) continue;
+    const pocket = enclosedWaterPocket(model, s.x, s.y, s.z);
+    if (!pocket) continue;
+    for (const k of pocket) {
+      enclosed.add(k);
+      const [x, y, z] = k.split(',').map(Number);
+      best.set(k, { level: WATER_MAX_LEVEL, falling: false });
+    }
+  }
+
   const queue = [];
   const offer = (x, y, z, level, falling) => {
-    if (!isOpen(x, y, z)) return;
+    if (!isOpen(x, y, z) || enclosed.has(key(x, y, z))) return;
     const k = key(x, y, z);
     const cur = best.get(k);
     if (cur && score(cur.level, cur.falling) >= score(level, falling)) return;
     best.set(k, { level, falling });
     queue.push({ x, y, z, level, falling });
   };
-  for (const s of sources) offer(s.x, s.y, s.z, WATER_MAX_LEVEL, false);
+  for (const s of sources) {
+    if (!enclosed.has(key(s.x, s.y, s.z))) offer(s.x, s.y, s.z, WATER_MAX_LEVEL, false);
+  }
   for (let qi = 0; qi < queue.length; qi++) {
     const cell = queue[qi];
-    const restingOnFloor = !isOpen(cell.x, cell.y - 1, cell.z);
+    const restingOnFloor = !isOpen(cell.x, cell.y - 1, cell.z) || enclosed.has(key(cell.x, cell.y - 1, cell.z));
     if (!restingOnFloor) {
       offer(cell.x, cell.y - 1, cell.z, WATER_MAX_LEVEL, true); // falls straight down through open air, full strength the whole way
       continue; // real vanilla: a falling column doesn't also spread sideways mid-air
