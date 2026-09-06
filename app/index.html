@@ -1789,6 +1789,9 @@ const DECOR_TYPES = {
   // above, so the Farms & Automation presets can exist at all.
   hopper: { kind: 'hopper', tile: 'iron_block', interactive: false },
   cow: { kind: 'cow', interactive: false },
+  pig: { kind: 'pig', interactive: false },
+  sheep: { kind: 'sheep', interactive: false },
+  chicken: { kind: 'chicken', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2637,10 +2640,11 @@ function buildCropFarmInterior(grid, silhouette, dims, exteriorMat, accentMat, d
 }
 // A fenced animal pen — no real fence texture/model exists in this app, so
 // the existing iron_bars panel decor stands in for the enclosure, and the
-// cows are the new low-poly stand-in model (see cowParts/DECOR_TYPES.cow),
-// not a real mob — this app has no mob geometry otherwise, and the general
-// walk-around view intentionally has none either (this preset is the one
-// deliberate exception, to actually show what an animal farm looks like).
+// animals are new low-poly stand-in models (see cowParts/pigParts/
+// sheepParts/chickenParts and their DECOR_TYPES entries), not real mobs —
+// this app has no mob geometry otherwise, and the general walk-around view
+// intentionally has none either (this preset is the one deliberate
+// exception, to actually show what an animal farm looks like).
 function buildAnimalPenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
   for (let i = 0; i < grid.length; i++) grid[i] = 0;
   for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
@@ -2654,9 +2658,16 @@ function buildAnimalPenInterior(grid, silhouette, dims, exteriorMat, accentMat, 
     decorOut.push({ type: 'bars', x: dims.sx - 1, y: 1, z, axis: 'x' });
   }
   const midX = Math.floor(dims.sx / 2), midZ = Math.floor(dims.sz / 2);
-  const cowSpots = [[2, 2, 'south'], [dims.sx - 3, 2, 'north'], [midX, dims.sz - 3, 'east']];
-  for (const [x, z, facing] of cowSpots) {
-    if (x > 0 && x < dims.sx - 1 && z > 0 && z < dims.sz - 1) decorOut.push({ type: 'cow', x, y: 1, z, facing });
+  // One of each of this app's four mobs — a real mixed-species pen, not
+  // just several of the same animal.
+  const animalSpots = [
+    ['cow', 2, 2, 'south'],
+    ['pig', dims.sx - 3, 2, 'north'],
+    ['sheep', midX, dims.sz - 3, 'east'],
+    ['chicken', 2, dims.sz - 3, 'west'],
+  ];
+  for (const [type, x, z, facing] of animalSpots) {
+    if (x > 0 && x < dims.sx - 1 && z > 0 && z < dims.sz - 1) decorOut.push({ type, x, y: 1, z, facing });
   }
 }
 
@@ -2934,10 +2945,11 @@ const PRESETS = [
     id: 'animal-pen', name: 'Animal Breeding Pen', shape: 'box', category: 'Farms & Automation',
     real: { height: 2, baseX: 7, baseZ: 7 }, interiorMode: 'animalPen',
     blocks: { exterior: 'grass_block', interior: 'dirt', accent: 'oak_planks' },
-    desc: 'A fenced pen for breeding animals — the real vanilla loop is two of the same animal, each fed their breeding food, spawning a baby. Shown here with a few cows inside a fenced enclosure.',
-    keywords: ['farm', 'animal', 'cow', 'breeding', 'pen', 'pasture', 'mob farm'],
+    desc: 'A fenced pen for breeding animals — the real vanilla loop is two of the same animal, each fed their breeding food, spawning a baby. Shown here with one each of a cow, pig, sheep, and chicken inside a fenced enclosure.',
+    keywords: ['farm', 'animal', 'cow', 'pig', 'sheep', 'chicken', 'breeding', 'pen', 'pasture', 'mob farm'],
     notes: [
-      'This app has no fence texture/model or any real mob model at all — the enclosure uses the existing iron_bars decor as a stand-in fence, and the cows are new simple low-poly geometry (a few coloured boxes), not a real (textured, animated) mob model.',
+      'This app has no fence texture/model or any real mob model at all — the enclosure uses the existing iron_bars decor as a stand-in fence, and the animals are new simple low-poly geometry (a few coloured boxes each), not real (textured, animated) mob models.',
+      'Every animal here genuinely wanders and occasionally looks toward you (real vanilla cow/pig/sheep/chicken behavior) — this is not a static diorama.',
       'This is the one preset in the whole app that shows an animal at all — the general walk-around 3D view is deliberately mob/animal-free otherwise.',
     ],
   },
@@ -3714,6 +3726,55 @@ function cowParts() {
   });
   return { body, head, legs };
 }
+// Same low-poly recipe as the cow (body/head/4 legs, plain coloured boxes,
+// no texture/model exists in this app for it either) — see DECOR_TYPES.pig.
+function pigParts() {
+  const body = new THREE.BoxGeometry(0.45, 0.4, 0.65);
+  body.translate(0, 0.1, 0);
+  const head = new THREE.BoxGeometry(0.28, 0.26, 0.22);
+  head.translate(0, 0.12, 0.42);
+  const legs = [[-0.15, -0.22], [0.15, -0.22], [-0.15, 0.22], [0.15, 0.22]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.11, 0.28, 0.11);
+    g.translate(x, -0.24, z);
+    return g;
+  });
+  return { body, head, legs };
+}
+// Same recipe again, bulkier (the wool) with a darker separate head — see
+// DECOR_TYPES.sheep.
+function sheepParts() {
+  const body = new THREE.BoxGeometry(0.55, 0.55, 0.75);
+  body.translate(0, 0.2, 0);
+  const head = new THREE.BoxGeometry(0.28, 0.28, 0.24);
+  head.translate(0, 0.18, 0.5);
+  const legs = [[-0.17, -0.28], [0.17, -0.28], [-0.17, 0.28], [0.17, 0.28]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.11, 0.38, 0.11);
+    g.translate(x, -0.32, z);
+    return g;
+  });
+  return { body, head, legs };
+}
+// A much smaller two-legged build with a comb and a pair of wing boxes
+// instead of the cow/pig/sheep's 4-leg body plan — see DECOR_TYPES.chicken.
+function chickenParts() {
+  const body = new THREE.BoxGeometry(0.3, 0.32, 0.38);
+  body.translate(0, 0.05, 0);
+  const head = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+  head.translate(0, 0.22, 0.24);
+  const comb = new THREE.BoxGeometry(0.06, 0.06, 0.08);
+  comb.translate(0, 0.32, 0.24);
+  const legs = [[-0.07, 0], [0.07, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+    g.translate(x, -0.22, z);
+    return g;
+  });
+  const wings = [[-0.17, 0], [0.17, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.2, 0.28);
+    g.translate(x, 0.05, z);
+    return g;
+  });
+  return { body, head, comb, legs, wings };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4003,6 +4064,41 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'pig') {
+    let parts = decorGeoCache.get('pig');
+    if (!parts) { parts = pigParts(); decorGeoCache.set('pig', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xf0a9b8), snoutMat = solidMaterial(0xd88a9c);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, snoutMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'sheep') {
+    let parts = decorGeoCache.get('sheep');
+    if (!parts) { parts = sheepParts(); decorGeoCache.set('sheep', parts); }
+    const group = new THREE.Group();
+    const woolMat = solidMaterial(0xe8e4d8), headMat = solidMaterial(0x4a4642);
+    group.add(new THREE.Mesh(parts.body, woolMat));
+    group.add(new THREE.Mesh(parts.head, headMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, headMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'chicken') {
+    let parts = decorGeoCache.get('chicken');
+    if (!parts) { parts = chickenParts(); decorGeoCache.set('chicken', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xf5f0e6), combMat = solidMaterial(0xc4362d), legMat = solidMaterial(0xd7a53a);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.comb, combMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, legMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
   return objs;
 }
@@ -4043,32 +4139,40 @@ function isEntryActive(entry) {
 }
 
 /* =========================================================================
- * MOB WANDER AI — a real cow (minecraft.wiki/w/Cow) wanders aimlessly with
- * long idle pauses in between rather than continuously pathfinding, and
- * never steps off a ledge or through an obstacle. Approximated here as a
- * short random walk that only ever steps onto solid, unobstructed, in-
- * bounds ground — the cow is the only mob this app has any geometry for
- * (see cowParts/DECOR_TYPES.cow), so it's the only one with real behavior
- * wired up; a future mob would register itself the same way (registerMob)
- * and pick up this same wander loop for free by opting into MOB_KINDS.
- * Not modeled: breeding, following a player holding wheat, fleeing when
- * hurt, or avoiding water — none of those have a foothold in this app yet
- * (no inventory/held-item concept, no "hurt" concept, no water fluid), so
+ * MOB WANDER AI — real cows, pigs, sheep, and chickens (minecraft.wiki) all
+ * document the same base behavior: wander aimlessly with long idle pauses in
+ * between rather than continuously pathfinding, and never step off a ledge
+ * or through an obstacle. Approximated here as one shared random-walk loop
+ * that only ever steps onto solid, unobstructed, in-bounds ground — these
+ * four are the only mobs this app has any geometry for (see cowParts/
+ * pigParts/sheepParts/chickenParts and their DECOR_TYPES entries), so
+ * they're the only ones with real behavior wired up; a future mob would
+ * register itself the same way (registerMob) and pick up this same wander
+ * loop for free by opting into MOB_KINDS.
+ * Not modeled for any of them: breeding, being attracted to a player
+ * holding their specific food (wheat/carrots/seeds), fleeing when hurt, or
+ * avoiding water — none of those have a foothold in this app yet (no
+ * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow']);
+const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
 // Real vanilla: "cows look at players within six blocks for two to four
-// seconds sometimes" (minecraft.wiki/w/Cow) — only while otherwise idle
-// (a real cow's look-at-player goal loses out to an active walk goal), and
-// only when there's an actual player position to look at, i.e. Walk or
-// Third-person camera mode (Orbit/Fly are editor viewpoints, not a player
-// standing in the world). Real vanilla drives this off a per-tick random
-// chance rather than a fixed cooldown; MOB_LOOK_CHANCE_PER_SEC approximates
-// that "sometimes" qualitatively rather than matching an exact vanilla rate,
-// since this app has no per-tick RNG model to match precisely.
+// seconds sometimes" (minecraft.wiki/w/Cow) — the same LookAtPlayerGoal is
+// a generic, widely shared AI goal across most vanilla mobs including pigs,
+// sheep, and chickens, so it's applied here to all four rather than cow
+// only; the exact 2-4 second duration is confirmed specifically for cows
+// and extended to the others by reasonable analogy, not independently
+// sourced per species. Only fires while otherwise idle (a real look goal
+// loses out to an active walk goal), and only when there's an actual
+// player position to look at, i.e. Walk or Third-person camera mode
+// (Orbit/Fly are editor viewpoints, not a player standing in the world).
+// Real vanilla drives this off a per-tick random chance rather than a
+// fixed cooldown; MOB_LOOK_CHANCE_PER_SEC approximates that "sometimes"
+// qualitatively rather than matching an exact vanilla rate, since this app
+// has no per-tick RNG model to match precisely.
 const MOB_LOOK_RANGE = 6;
 const MOB_LOOK_MIN = 2, MOB_LOOK_MAX = 4;
 const MOB_LOOK_CHANCE_PER_SEC = 0.15;
@@ -5034,7 +5138,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
-    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5091,7 +5195,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
-    hopper: 'Hopper', cow: 'Cow',
+    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5172,6 +5276,9 @@ function renderCommands(model) {
       else if (d.type === 'minecart') lines.push(`summon minecraft:minecart ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'hopper') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:hopper[facing=down]`);
       else if (d.type === 'cow') lines.push(`summon minecraft:cow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'pig') lines.push(`summon minecraft:pig ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'sheep') lines.push(`summon minecraft:sheep ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'chicken') lines.push(`summon minecraft:chicken ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
