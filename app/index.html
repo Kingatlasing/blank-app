@@ -2785,29 +2785,45 @@ function buildAquariumInterior(grid, silhouette, dims, exteriorMat, accentMat, d
     for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
   }
   if (!decorOut) return;
-  for (let y = 1; y <= dims.sy - 2; y++) {
-    for (let z = 1; z <= dims.sz - 2; z++) {
-      for (let x = 1; x <= dims.sx - 2; x++) decorOut.push({ type: 'water', x, y, z });
-    }
-  }
-  const cx = Math.floor(dims.sx / 2), cy = Math.max(1, Math.floor(dims.sy / 2)), cz = Math.floor(dims.sz / 2);
-  decorOut.push({ type: 'squid', x: cx, y: cy, z: cz, facing: 'south' });
+  // A single real water source near the top of the tank — real vanilla
+  // water doesn't rise to fill a container on its own; it falls straight
+  // down as a genuine waterfall, then spreads out once it lands, so this
+  // tank ends up with an actual falling column feeding a real pool across
+  // the floor, rather than a magically full box. (Filling every layer of
+  // a real aquarium takes a source at each height — a deliberate honest
+  // limit of this one-source setup, not an oversight.)
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'squid', x: cx, y: 1, z: cz, facing: 'south' });
 }
-// An open sand floor split into a dry beach half and a tagged-water
-// "shallows" half, exactly like a real shoreline — no walls, matching
-// every other single-mob flourish preset. The turtle's home is planted
-// on the dry sand side specifically so it has real beach to travel back
-// to and a real body of water to actually prefer wandering in.
+// A sand floor with a real elevation step between the two halves — the
+// dry beach sits a genuine block higher than the ocean floor, exactly
+// like a real shoreline slopes down into the shallows — rather than one
+// flat plane with an invisible line separating "wet" from "dry". That
+// step is what actually keeps the water contained to the ocean half now
+// that computeWaterFlow is a real flood-fill: water placed on a single
+// flat, unobstructed floor would just spread across the whole thing
+// (correctly — that's what real vanilla water does too), so the height
+// difference is the real container, not a rule about which half is which.
 function buildSeaTurtleBeachInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
   for (let i = 0; i < grid.length; i++) grid[i] = 0;
-  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
-  if (!decorOut) return;
   const mid = Math.floor(dims.sx / 2);
   for (let z = 0; z < dims.sz; z++) {
-    for (let x = mid; x < dims.sx; x++) decorOut.push({ type: 'water', x, y: 1, z });
+    for (let x = 0; x < dims.sx; x++) {
+      grid[idx(x, 0, z, dims)] = exteriorMat; // sand floor everywhere
+      if (x < mid) grid[idx(x, 1, z, dims)] = exteriorMat; // the beach half is one real block higher than the ocean floor
+    }
   }
+  if (!decorOut) return;
+  // A couple of real water sources out in the shallows, spaced to cover
+  // the ocean half by spreading (and falling, should the floor ever dip),
+  // rather than the ocean being hand-painted water outright.
+  const oceanCx = mid + Math.floor((dims.sx - mid) / 2);
+  decorOut.push({ type: 'water', x: oceanCx, y: 1, z: Math.max(0, Math.floor(dims.sz * 0.25)), source: true });
+  decorOut.push({ type: 'water', x: oceanCx, y: 1, z: Math.min(dims.sz - 1, Math.floor(dims.sz * 0.75)), source: true });
   const homeX = Math.max(0, mid - 2), homeZ = Math.floor(dims.sz / 2);
-  decorOut.push({ type: 'turtle', x: homeX, y: 1, z: homeZ, facing: 'east' });
+  decorOut.push({ type: 'turtle', x: homeX, y: 2, z: homeZ, facing: 'east' });
 }
 
 /* =========================================================================
@@ -3162,17 +3178,17 @@ const PRESETS = [
     id: 'aquarium', name: 'Aquarium Chamber', shape: 'box', category: 'Farms & Automation',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'aquarium',
     blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
-    desc: 'A glass tank filled with real water and a squid drifting around inside it — the first mob preset here where the mob\'s own movement rule is bounded by an actual substance, not just an open room: real vanilla squid "wander around aimlessly in three dimensions as long as they are in the water."',
-    keywords: ['squid', 'water', 'aquarium', 'fish tank', 'underwater', 'ocean'],
+    desc: 'A glass tank with a real waterfall feeding a real pool, and a squid drifting through both — the first mob preset here where the mob\'s own movement rule is bounded by an actual substance, not just an open room: real vanilla squid "wander around aimlessly in three dimensions as long as they are in the water."',
+    keywords: ['squid', 'water', 'aquarium', 'fish tank', 'underwater', 'ocean', 'waterfall'],
     notes: [
-      'This app has no real fluid simulation — no currents, no flow, nothing to drown in or swim out of onto land — so "water" here is a decor marker tagging which cells count as water, the same trick already used for a fence\'s iron bars, not a real liquid. The squid genuinely stays confined to those tagged cells the whole time, though: it will never wander into the glass or the air above the waterline.',
-      'Real vanilla squid also "[hover] in place when first spawned into the world" before wandering — this one does the same on every regenerate, pausing briefly before its first swim instead of moving immediately.',
+      'The water itself is a real simulated flow, not hand-painted: a single source near the top genuinely falls straight down through the open tank, then spreads out into a pool once it lands, using the same rule real vanilla water follows — it can only ever exist as an unbroken path from a real source, either falling or resting within a limited spread of one. That\'s also why the tank isn\'t magically full to the brim: real vanilla water doesn\'t rise on its own to fill a container, so only the bottom pool and the falling column above it are actually wet — filling every layer of a real aquarium takes a source at each height, exactly like it would in the real game.',
+      'The squid genuinely stays confined to those real water cells the whole time — it will never wander into the glass, the dry air above the waterline, or the empty space beside the falling column — and real vanilla squid also "[hover] in place when first spawned into the world" before wandering, which this one does too, pausing briefly before its first swim.',
       'No aggro/attack model exists in this app (no combat at all) — real vanilla squid only produce ink and flee when attacked, so this one just drifts peacefully with nothing to react to.',
     ],
   },
   {
     id: 'sea-turtle-beach', name: 'Sea Turtle Beach', shape: 'box', category: 'Farms & Automation',
-    real: { height: 2, baseX: 12, baseZ: 8 }, interiorMode: 'seaTurtleBeach',
+    real: { height: 3, baseX: 12, baseZ: 8 }, interiorMode: 'seaTurtleBeach',
     blocks: { exterior: 'sand', interior: 'sand', accent: 'sandstone' },
     desc: 'A sandy shoreline split between dry beach and real shallow water, with a sea turtle wandering between them — real vanilla turtles remember the exact block they spawned on as a permanent home and always travel back to it to lay eggs, "no matter how far away" they\'ve wandered ([minecraft.wiki/w/Turtle](https://minecraft.wiki/w/Turtle)).',
     keywords: ['turtle', 'sea turtle', 'beach', 'egg', 'sand', 'shore', 'ocean'],
@@ -3561,6 +3577,7 @@ function generateModel() {
   };
   window.currentModel = currentModel; // exposed for debugging in the browser console
 
+  computeWaterFlow(currentModel);
   computeRedstone(currentModel);
   el('empty-state').style.display = 'none';
   renderThree(currentModel);
@@ -4273,6 +4290,16 @@ let mobObjects = [];
 function registerMob(obj, entry) {
   mobObjects.push({ obj, entry });
 }
+// Water gets its own small per-frame animation loop, separate from mobs —
+// it isn't AI-driven, but real vanilla water is never actually still
+// (flowing water visibly scrolls, and even a resting source has a subtle
+// animated surface), so a perfectly static translucent box would read as
+// obviously wrong next to everything else in this app that moves for a
+// reason. See updateWaterAnimations.
+let waterAnimObjects = [];
+function registerWaterAnim(obj, entry) {
+  waterAnimObjects.push({ obj, entry });
+}
 
 // Builds the (already-positioned-within-cell) Object3Ds for one decor
 // placement — plain Meshes for rigid/static pieces, or a Group pivoted at
@@ -4665,6 +4692,7 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = waterBlockParts(); decorGeoCache.set('water_block', parts); }
     const group = new THREE.Group();
     group.add(new THREE.Mesh(parts.box, waterMaterial()));
+    registerWaterAnim(group, entry);
     objs.push(group);
   } else if (def.kind === 'squid') {
     let parts = decorGeoCache.get('squid');
@@ -5166,17 +5194,73 @@ function updateSlime(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y + halfHeight + entry._hopHeight, entry._wz + offZ);
   obj.rotation.y = entry._yaw;
 }
+// Real vanilla water either falls straight down through open air from a
+// source, or spreads outward from a source (or from wherever a fall
+// lands) up to a limited distance — thinning by one "level" each block —
+// as long as it's actually resting on something solid; it can never just
+// float disconnected in open air (source: minecraft.wiki/w/Water — a
+// source spreads "up to seven blocks" and otherwise "flows downward").
+// This app doesn't replicate vanilla's exact per-tick spread order or its
+// real level-encoding bits, but it enforces the same *shape* of rule:
+// every water cell in a model is reached by a real flood-fill from an
+// explicit source (`type: 'water', source: true`), either as part of an
+// unbroken falling column or as a resting spread within WATER_MAX_LEVEL
+// steps of a source or a fall's landing point — so a preset that wants a
+// full tank or pond places a handful of real sources, the same way a
+// player fills one with water buckets, rather than hand-painting every
+// cell as water directly.
+const WATER_MAX_LEVEL = 7; // real vanilla: a source spreads up to 7 blocks before thinning to nothing
+function computeWaterFlow(model) {
+  const { dims, grid } = model;
+  const sources = model.decor.filter((d) => d.type === 'water' && d.source);
+  // Drop any previously-computed (non-source) water so re-running this on
+  // a regenerate never accumulates stale flow from an earlier grid shape.
+  model.decor = model.decor.filter((d) => !(d.type === 'water' && !d.source));
+  if (sources.length === 0) return;
+  const inBounds = (x, y, z) => x >= 0 && y >= 0 && z >= 0 && x < dims.sx && y < dims.sy && z < dims.sz;
+  const isOpen = (x, y, z) => inBounds(x, y, z) && grid[idx(x, y, z, dims)] === 0;
+  const key = (x, y, z) => x + ',' + y + ',' + z;
+  const score = (level, falling) => (falling ? WATER_MAX_LEVEL + 1 : level); // falling always beats any resting spread
+  const best = new Map(); // "x,y,z" -> { level, falling }
+  const queue = [];
+  const offer = (x, y, z, level, falling) => {
+    if (!isOpen(x, y, z)) return;
+    const k = key(x, y, z);
+    const cur = best.get(k);
+    if (cur && score(cur.level, cur.falling) >= score(level, falling)) return;
+    best.set(k, { level, falling });
+    queue.push({ x, y, z, level, falling });
+  };
+  for (const s of sources) offer(s.x, s.y, s.z, WATER_MAX_LEVEL, false);
+  for (let qi = 0; qi < queue.length; qi++) {
+    const cell = queue[qi];
+    const restingOnFloor = !isOpen(cell.x, cell.y - 1, cell.z);
+    if (!restingOnFloor) {
+      offer(cell.x, cell.y - 1, cell.z, WATER_MAX_LEVEL, true); // falls straight down through open air, full strength the whole way
+      continue; // real vanilla: a falling column doesn't also spread sideways mid-air
+    }
+    if (cell.level > 0) {
+      const nextLevel = cell.falling ? WATER_MAX_LEVEL - 1 : cell.level - 1; // a fall that just landed starts a fresh full-strength spread, like a real splash pool
+      offer(cell.x + 1, cell.y, cell.z, nextLevel, false);
+      offer(cell.x - 1, cell.y, cell.z, nextLevel, false);
+      offer(cell.x, cell.y, cell.z + 1, nextLevel, false);
+      offer(cell.x, cell.y, cell.z - 1, nextLevel, false);
+    }
+  }
+  for (const s of sources) best.delete(key(s.x, s.y, s.z)); // already real decor entries, don't duplicate
+  for (const [k, v] of best) {
+    const [x, y, z] = k.split(',').map(Number);
+    model.decor.push({ type: 'water', x, y, z, level: v.level, falling: v.falling });
+  }
+}
 // Real vanilla squid "wander around aimlessly in three dimensions as long
 // as they are in the water" and "[hover] in place when first spawned into
 // the world" (minecraft.wiki/w/Squid) — the first mob in this app whose
 // movement is bounded by a substance rather than open air: every other
 // flying/floating mob (bat, ghast) only needs empty space, but a squid
-// must stay inside actual `water` decor cells the whole time. Water has
-// no real fluid simulation in this app (no currents, no flow, no
-// swimming-out-onto-land damage) — it's a decor marker over an air grid
-// cell, exactly like a fence's `bars` decor, so this reuses that same
-// "tag an otherwise-air cell" trick rather than needing a real block
-// material.
+// must stay inside actual `water` decor cells the whole time — cells now
+// genuinely reachable by computeWaterFlow's flood-fill above, not just a
+// decor marker painted anywhere.
 const SQUID_SWIM_SPEED = 0.7;
 const SQUID_HOVER_MIN = 1, SQUID_HOVER_MAX = 3;
 const SQUID_WANDER_RADIUS = 2;
@@ -5190,10 +5274,22 @@ function squidCellSwimmable(model, x, y, z) {
   return model._waterCells.has(x + ',' + y + ',' + z);
 }
 function pickSquidSwimTarget(model, entry) {
+  // Water is no longer always a solid filled cube (a real flow can be a
+  // thin pool with only a narrow falling column reaching up out of it),
+  // so a genuinely diagonal 3D move could in principle cut straight
+  // through a dry corner between two individually-valid endpoints. Moving
+  // along only one axis at a time — sideways within the current layer, or
+  // straight up/down in place — keeps every point along the path inside
+  // the same validated row or column instead of gambling on a shortcut.
   for (let attempt = 0; attempt < 10; attempt++) {
-    const dx = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
-    const dy = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
-    const dz = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    const vertical = Math.random() < 0.3;
+    let dx = 0, dy = 0, dz = 0;
+    if (vertical) {
+      dy = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    } else {
+      dx = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+      dz = Math.round((Math.random() * 2 - 1) * SQUID_WANDER_RADIUS);
+    }
     if (dx === 0 && dy === 0 && dz === 0) continue;
     const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
     if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
@@ -5263,8 +5359,24 @@ const TURTLE_WANDER_RADIUS = 3;
 const TURTLE_WANDER_MIN = 2, TURTLE_WANDER_MAX = 5;
 const TURTLE_NEST_TRIP_DELAY_MIN = 6, TURTLE_NEST_TRIP_DELAY_MAX = 10; // this app's stand-in for "after breeding" — no breeding exists here
 const TURTLE_NEST_PAUSE_MIN = 2, TURTLE_NEST_PAUSE_MAX = 4; // real vanilla: seconds to minutes of digging, compressed for a watchable demo
+// A real sandy shoreline is a genuine elevation change, not a flat plane
+// with an invisible "dry" line drawn on it — with computeWaterFlow now a
+// real flood-fill, water placed on a perfectly flat floor would just
+// spread across the *entire* thing (correctly — that's what real vanilla
+// water does on flat ground too), so the beach preset actually raises the
+// dry sand a real block above the ocean floor. That means the turtle can
+// no longer assume a fixed y like every other ground mob here: this finds
+// the real walkable surface at a given x/z, whatever height it's at.
+function surfaceYAt(model, x, z) {
+  const dims = model.dims;
+  if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) return null;
+  for (let y = 1; y < dims.sy; y++) {
+    if (model.grid[idx(x, y, z, dims)] === 0 && model.grid[idx(x, y - 1, z, dims)] !== 0) return y;
+  }
+  return null;
+}
 function turtleCurrentSpeed(model, entry) {
-  return squidCellSwimmable(model, Math.floor(entry._wx), entry.y, Math.floor(entry._wz)) ? TURTLE_SWIM_SPEED : TURTLE_WALK_SPEED;
+  return squidCellSwimmable(model, Math.floor(entry._wx), Math.round(entry._wy), Math.floor(entry._wz)) ? TURTLE_SWIM_SPEED : TURTLE_WALK_SPEED;
 }
 function pickTurtleWanderTarget(model, entry) {
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -5272,7 +5384,9 @@ function pickTurtleWanderTarget(model, entry) {
     const dz = Math.round((Math.random() * 2 - 1) * TURTLE_WANDER_RADIUS);
     if (dx === 0 && dz === 0) continue;
     const tx = entry.x + dx, tz = entry.z + dz;
-    if (squidCellSwimmable(model, tx, entry.y, tz) || mobCellWalkable(model, tx, entry.y, tz)) return { x: tx, z: tz };
+    const ty = surfaceYAt(model, tx, tz);
+    if (ty === null) continue;
+    if (squidCellSwimmable(model, tx, ty, tz) || mobCellWalkable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
   }
   return null;
 }
@@ -5297,12 +5411,14 @@ function updateTurtle(entry, obj, dt) {
     entry._hasNested = false;
     entry._nestTripTimer = TURTLE_NEST_TRIP_DELAY_MIN + Math.random() * (TURTLE_NEST_TRIP_DELAY_MAX - TURTLE_NEST_TRIP_DELAY_MIN);
     entry._wx = entry.x + 0.5;
+    entry._wy = entry.y;
     entry._wz = entry.z + 0.5;
   }
   if (!entry._hasNested && entry._mobState !== 'travelingHome' && entry._mobState !== 'nesting') {
     entry._nestTripTimer -= dt;
     if (entry._nestTripTimer <= 0) {
       entry._targetX = entry._homeX + 0.5;
+      entry._targetY = entry._homeY;
       entry._targetZ = entry._homeZ + 0.5;
       entry._mobState = 'travelingHome';
     }
@@ -5313,6 +5429,7 @@ function updateTurtle(entry, obj, dt) {
       const target = pickTurtleWanderTarget(currentModel, entry);
       if (target) {
         entry._targetX = target.x + 0.5;
+        entry._targetY = target.y;
         entry._targetZ = target.z + 0.5;
         entry._mobState = 'walking';
       } else {
@@ -5321,13 +5438,15 @@ function updateTurtle(entry, obj, dt) {
     }
   } else if (entry._mobState === 'walking' || entry._mobState === 'travelingHome') {
     const speed = turtleCurrentSpeed(currentModel, entry);
-    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
-    const dist = Math.hypot(dx, dz);
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
     const step = speed * dt;
     if (dist <= step) {
       entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
       entry._wz = entry._targetZ;
       entry.x = Math.floor(entry._wx);
+      entry.y = entry._targetY;
       entry.z = Math.floor(entry._wz);
       if (entry._mobState === 'travelingHome') {
         entry._mobState = 'nesting';
@@ -5338,6 +5457,7 @@ function updateTurtle(entry, obj, dt) {
       }
     } else {
       entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
       entry._wz += (dz / dist) * step;
       entry._mobYaw = Math.atan2(dx, dz);
     }
@@ -5350,7 +5470,7 @@ function updateTurtle(entry, obj, dt) {
       entry._mobTimer = TURTLE_WANDER_MIN + Math.random() * (TURTLE_WANDER_MAX - TURTLE_WANDER_MIN);
     }
   }
-  obj.position.set(entry._wx + offX, entry.y + 0.15, entry._wz + offZ);
+  obj.position.set(entry._wx + offX, entry._wy + 0.15, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
 function updateMobs(dt) {
@@ -5505,6 +5625,29 @@ function updateInteractiveAnimations(dt) {
         obj.children.forEach(c => { if (c.userData.isRailStrip) c.material = mat; });
         obj.userData.railOn = wantOn;
       }
+    }
+  }
+}
+
+// Real vanilla falling water visibly scrolls downward (the classic
+// waterfall texture animation), while a resting source or spread just has
+// a subtle animated ripple rather than a hard flow direction. This app
+// has no scrolling-texture support, so a looping vertical sweep is the
+// closest visual stand-in for the falling case, and a small sine bob
+// stands in for the ripple on everything else — motion that actually
+// reads as "falling" vs. "sitting still," not just decoration.
+const WATER_FALL_CYCLE = 0.6; // seconds per downward sweep loop
+const WATER_FALL_SWEEP = 0.9; // how much of the cell height the sweep covers
+const WATER_BOB_RATE = 1.5, WATER_BOB_HEIGHT = 0.02;
+function updateWaterAnimations(dt) {
+  for (const { obj, entry } of waterAnimObjects) {
+    if (entry._baseY === undefined) entry._baseY = obj.position.y; // captured once, after renderThree's own initial y offset is already applied
+    entry._flowPhase = (entry._flowPhase || 0) + dt;
+    if (entry.falling) {
+      const t = (entry._flowPhase % WATER_FALL_CYCLE) / WATER_FALL_CYCLE;
+      obj.position.y = entry._baseY - t * WATER_FALL_SWEEP;
+    } else {
+      obj.position.y = entry._baseY + Math.sin(entry._flowPhase * WATER_BOB_RATE) * WATER_BOB_HEIGHT;
     }
   }
 }
@@ -5914,6 +6057,7 @@ function initThree() {
     }
     updateInteractiveAnimations(dt);
     updateMobs(dt);
+    updateWaterAnimations(dt);
     renderer.render(scene, camera);
   }
   animate();
@@ -6233,6 +6377,7 @@ function renderThree(model, preserveCamera) {
   while (t.group.children.length) t.group.remove(t.group.children[0]); // geometries/materials are cached & reused, not disposed
   interactiveObjects = [];
   mobObjects = [];
+  waterAnimObjects = [];
 
   const { dims, grid, silhouette } = model;
   let total = 0;
