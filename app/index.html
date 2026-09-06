@@ -1794,6 +1794,7 @@ const DECOR_TYPES = {
   chicken: { kind: 'chicken', interactive: false },
   rabbit: { kind: 'rabbit', interactive: false },
   bat: { kind: 'bat', interactive: false },
+  enderman: { kind: 'enderman', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2691,6 +2692,17 @@ function buildBatCaveInterior(grid, silhouette, dims, exteriorMat, accentMat, de
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'bat', x: cx, y: dims.sy - 2, z: cz, facing: 'south' });
 }
+// A small floating end-stone platform, open on every side (the same
+// flourish-not-diorama style as the animal pen and bat cave) — real
+// vanilla endermen are the signature mob of The End, so this gives one a
+// real home instead of placing it somewhere arbitrary.
+function buildEndIslandsInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'enderman', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -2983,6 +2995,17 @@ const PRESETS = [
     notes: [
       'The bat genuinely flies and roosts in real time — watch it hang from the ceiling, then fly off to a new spot on its own timer, or the moment you (in Walk/Third-person mode) get close enough to flush it, matching real vanilla behavior.',
       'This is a bare floor-and-ceiling slab, not a full cave system — this app has no cave/cavern generator, and every other mob preset here uses the same open-sided, flourish-not-diorama style (see the Animal Breeding Pen\'s fence).',
+    ],
+  },
+  {
+    id: 'end-islands', name: 'End Islands Flourish', shape: 'box', category: 'Farms & Automation',
+    real: { height: 2, baseX: 8, baseZ: 8 }, interiorMode: 'endIslands',
+    blocks: { exterior: 'end_stone', interior: 'end_stone', accent: 'purpur_block' },
+    desc: 'A small floating end-stone platform with an enderman on it — real vanilla\'s signature mob of The End, wandering and occasionally teleporting exactly like the real thing.',
+    keywords: ['enderman', 'the end', 'end stone', 'purpur', 'teleport', 'ender'],
+    notes: [
+      'Real endermen "wander and/or teleport around randomly" — roughly a coin flip between the two every time it picks somewhere new to go, rather than always walking or always teleporting. Watch it long enough and you\'ll see both.',
+      'No aggro/attack model exists in this app (no combat at all), so this enderman is calm and never hostile — real vanilla endermen only turn hostile if a player looks directly at them, which this app has no way to detect (it only knows camera position, not the direction it\'s actually facing).',
     ],
   },
 ];
@@ -3339,6 +3362,8 @@ function generateModel() {
     buildAnimalPenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'batCave') {
     buildBatCaveInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'endIslands') {
+    buildEndIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3840,6 +3865,32 @@ function batParts() {
   });
   return { body, wings };
 }
+// A tall, thin, dark humanoid build (real vanilla endermen stand a genuine
+// ~2.9 blocks) with a pair of small glowing-purple eye boxes on the head —
+// see DECOR_TYPES.enderman. No aggro/attack model exists in this app (no
+// combat at all), so this is calm geometry only, not a "staring" pose.
+function endermanParts() {
+  const body = new THREE.BoxGeometry(0.35, 1.05, 0.2);
+  body.translate(0, 0.55, 0);
+  const head = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  head.translate(0, 1.25, 0);
+  const eyes = [[-0.08, 0], [0.08, 0]].map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.05, 0.02);
+    g.translate(x, 1.28 + y, 0.15);
+    return g;
+  });
+  const arms = [[-0.22, 0], [0.22, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 1.0, 0.08);
+    g.translate(x, 0.55, z);
+    return g;
+  });
+  const legs = [[-0.09, 0], [0.09, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.09, 0.55, 0.09);
+    g.translate(x, -0.28, z);
+    return g;
+  });
+  return { body, head, eyes, arms, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4187,6 +4238,19 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.z = entry._batState === 'roosting' || entry._batState === undefined ? Math.PI : 0; // real vanilla: hangs upside down while idle
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'enderman') {
+    let parts = decorGeoCache.get('enderman');
+    if (!parts) { parts = endermanParts(); decorGeoCache.set('enderman', parts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0x17151c), eyeMat = solidMaterial(0xc26bf5);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
   return objs;
 }
@@ -4243,7 +4307,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit']);
+const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -4271,6 +4335,20 @@ const MOB_HOP_HEIGHT = 0.25, MOB_HOP_RATE = 6; // radians/second of the bounce p
 const MOB_LOOK_RANGE = 6;
 const MOB_LOOK_MIN = 2, MOB_LOOK_MAX = 4;
 const MOB_LOOK_CHANCE_PER_SEC = 0.15;
+// Enderman is excluded from LookAtPlayerGoal above deliberately, not by
+// omission: real vanilla has this backwards for endermen — the PLAYER
+// looking at IT is what triggers aggression, not the other way around —
+// and this app can't detect where the camera is actually pointed (only
+// its position), so faking that trigger would be guessing, not a rule.
+const MOB_NO_LOOK_KINDS = new Set(['enderman']);
+// Real vanilla: "endermen wander and/or teleport around randomly" — a coin
+// flip between the two for every wander decision, not "teleport only" or
+// "walk only" (source: minecraft.wiki/w/Enderman). Reuses the exact same
+// idle/pick-a-spot ground logic as every walking mob above; the only
+// difference is that a chosen destination sometimes gets reached instantly
+// instead of by walking there.
+const MOB_TELEPORT_KINDS = new Set(['enderman']);
+const MOB_TELEPORT_CHANCE = 0.5;
 function mobCellWalkable(model, x, y, z) {
   const dims = model.dims;
   if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz || y < 0 || y >= dims.sy) return false;
@@ -4421,7 +4499,7 @@ function updateMobs(dt) {
       entry._mobTimer -= dt;
       if (entry._lookTimer > 0) {
         entry._lookTimer -= dt;
-      } else if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+      } else if (!MOB_NO_LOOK_KINDS.has(entry.type) && (cameraMode === 'walk' || cameraMode === 'thirdperson')) {
         const wx = entry._wx + offX, wz = entry._wz + offZ;
         const distToPlayer = Math.hypot(flyState.pos.x - wx, flyState.pos.z - wz);
         if (distToPlayer <= MOB_LOOK_RANGE && Math.random() < MOB_LOOK_CHANCE_PER_SEC * dt) {
@@ -4435,10 +4513,20 @@ function updateMobs(dt) {
       if (entry._mobTimer <= 0) {
         const target = pickWanderTarget(currentModel, entry);
         if (target) {
-          entry._targetX = target.x + 0.5;
-          entry._targetZ = target.z + 0.5;
-          entry._mobState = 'walking';
-          entry._lookTimer = 0; // an active walk goal wins over looking at the player, same as real vanilla's goal priority
+          if (MOB_TELEPORT_KINDS.has(entry.type) && Math.random() < MOB_TELEPORT_CHANCE) {
+            // Real vanilla: this is an instant relocation, not a walk — skip
+            // the walking state entirely and arrive already idle again.
+            entry.x = target.x;
+            entry.z = target.z;
+            entry._wx = target.x + 0.5;
+            entry._wz = target.z + 0.5;
+            entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+          } else {
+            entry._targetX = target.x + 0.5;
+            entry._targetZ = target.z + 0.5;
+            entry._mobState = 'walking';
+            entry._lookTimer = 0; // an active walk goal wins over looking at the player, same as real vanilla's goal priority
+          }
         } else {
           entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
         }
@@ -5350,7 +5438,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
-    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5407,7 +5495,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
-    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat',
+    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5493,6 +5581,7 @@ function renderCommands(model) {
       else if (d.type === 'chicken') lines.push(`summon minecraft:chicken ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'rabbit') lines.push(`summon minecraft:rabbit ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'bat') lines.push(`summon minecraft:bat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'enderman') lines.push(`summon minecraft:enderman ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
