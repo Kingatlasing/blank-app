@@ -2334,6 +2334,16 @@ function buildRedstoneRailDemoInterior(grid, silhouette, dims, exteriorMat, acce
  * shift the whole thing by a fixed margin and know the bounding box up
  * front). `on` flags the input lever(s)' initial state.
  * ==================================================================== */
+// The trivial case every other gate builds on: a lever directly powers
+// adjacent dust with no torch at all — output just IS the input.
+function gateIO(on) {
+  return {
+    decor: [
+      { type: 'lever', x: 0, y: 1, z: 0, face: 'floor', on: !!on },
+      { type: 'redstone_wire', x: 1, y: 1, z: 0 },
+    ],
+  };
+}
 function gateNOT(on) {
   return {
     decor: [
@@ -2467,6 +2477,7 @@ function gateXNOR(a, b) {
   return gate;
 }
 const LOGIC_GATE_BUILDERS = {
+  io: () => gateIO(false),
   not: () => gateNOT(false),
   buffer: () => gateBUFFER(false),
   or: () => gateOR(false, false),
@@ -2724,6 +2735,14 @@ const PRESETS = [
       'Curved rail is a stylized diagonal stand-in for vanilla\'s quarter-circle artwork; straight and ascending rail geometry (and the ascending 45-degree tilt) match vanilla\'s real block models. Rails and minecart use plain colored geometry, not a texture — this app\'s block atlas has no rail art to draw from.',
       'Best viewed at scale 1/1 (default) so the mechanisms are full-size and easy to click.',
     ],
+  },
+  {
+    id: 'gate-io', name: 'Input/Output (Pass-Through)', shape: 'box', category: 'Redstone Logic Gates',
+    real: { height: 2, baseX: 3, baseZ: 1 }, interiorMode: 'logicGate', gateType: 'io',
+    blocks: { exterior: 'cobblestone', interior: 'stone', accent: 'redstone_block' },
+    desc: 'The trivial case every other gate here builds on: a lever powers adjacent dust directly, no torch involved. Output just IS the input.',
+    keywords: ['input', 'output', 'pass through', 'basic', 'logic gate'],
+    notes: ['Not really a "gate" — this is the baseline every other circuit in this library inverts, merges, or routes.'],
   },
   {
     id: 'gate-not', name: 'NOT Gate (Inverter)', shape: 'box', category: 'Redstone Logic Gates',
