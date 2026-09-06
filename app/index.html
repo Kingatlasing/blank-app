@@ -3735,6 +3735,12 @@ function registerInteractive(obj, entry, kind) {
   obj.userData.decorKind = kind;
   interactiveObjects.push(obj);
 }
+// Live mob objects — rebuilt fresh on every render like interactiveObjects
+// above, but driven by updateMobs' wander AI instead of click state.
+let mobObjects = [];
+function registerMob(obj, entry) {
+  mobObjects.push({ obj, entry });
+}
 
 // Builds the (already-positioned-within-cell) Object3Ds for one decor
 // placement — plain Meshes for rigid/static pieces, or a Group pivoted at
@@ -3994,7 +4000,8 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, headMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
-    group.rotation.y = FACING_YAW[entry.facing || 'south'];
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   }
   return objs;
@@ -4033,6 +4040,89 @@ const ANIM_SPEED = 3.5; // full swing/press in ~0.3s
 
 function isEntryActive(entry) {
   return !!(entry.open || entry.on || entry.powered);
+}
+
+/* =========================================================================
+ * MOB WANDER AI — a real cow (minecraft.wiki/w/Cow) wanders aimlessly with
+ * long idle pauses in between rather than continuously pathfinding, and
+ * never steps off a ledge or through an obstacle. Approximated here as a
+ * short random walk that only ever steps onto solid, unobstructed, in-
+ * bounds ground — the cow is the only mob this app has any geometry for
+ * (see cowParts/DECOR_TYPES.cow), so it's the only one with real behavior
+ * wired up; a future mob would register itself the same way (registerMob)
+ * and pick up this same wander loop for free by opting into MOB_KINDS.
+ * Not modeled: breeding, following a player holding wheat, fleeing when
+ * hurt, or avoiding water — none of those have a foothold in this app yet
+ * (no inventory/held-item concept, no "hurt" concept, no water fluid), so
+ * faking them would just be cosmetic rather than a real simulated rule.
+ * ========================================================================= */
+const MOB_KINDS = new Set(['cow']);
+const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
+const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
+const MOB_WANDER_RADIUS = 3;
+function mobCellWalkable(model, x, y, z) {
+  const dims = model.dims;
+  if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz || y < 0 || y >= dims.sy) return false;
+  if (model.grid[idx(x, y, z, dims)] !== 0) return false; // something solid already occupies the cell
+  if (y > 0 && model.grid[idx(x, y - 1, z, dims)] === 0) return false; // nothing to stand on — real vanilla mobs avoid falls
+  for (const d of model.decor) {
+    if (d.type === 'bars' && d.x === x && d.y === y && d.z === z) return false; // a real fence blocks mob movement too
+  }
+  return true;
+}
+function pickWanderTarget(model, entry) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * MOB_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * MOB_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = entry.x + dx, tz = entry.z + dz;
+    if (mobCellWalkable(model, tx, entry.y, tz)) return { x: tx, z: tz };
+  }
+  return null; // nowhere free nearby right now — stay put and try again next idle cycle
+}
+function updateMobs(dt) {
+  if (!currentModel) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const { obj, entry } of mobObjects) {
+    if (!MOB_KINDS.has(entry.type)) continue;
+    if (entry._mobState === undefined) {
+      entry._mobState = 'idle';
+      entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+      entry._wx = entry.x + 0.5;
+      entry._wz = entry.z + 0.5;
+    }
+    if (entry._mobState === 'idle') {
+      entry._mobTimer -= dt;
+      if (entry._mobTimer <= 0) {
+        const target = pickWanderTarget(currentModel, entry);
+        if (target) {
+          entry._targetX = target.x + 0.5;
+          entry._targetZ = target.z + 0.5;
+          entry._mobState = 'walking';
+        } else {
+          entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+        }
+      }
+    } else {
+      const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+      const dist = Math.hypot(dx, dz);
+      const step = MOB_WALK_SPEED * dt;
+      if (dist <= step) {
+        entry._wx = entry._targetX;
+        entry._wz = entry._targetZ;
+        entry.x = Math.floor(entry._wx);
+        entry.z = Math.floor(entry._wz);
+        entry._mobState = 'idle';
+        entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+      } else {
+        entry._wx += (dx / dist) * step;
+        entry._wz += (dz / dist) * step;
+        entry._mobYaw = Math.atan2(dx, dz); // face the direction of travel, like a real mob turning to walk somewhere
+      }
+    }
+    obj.position.set(entry._wx + offX, entry.y + 0.5, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  }
 }
 
 function updateInteractiveAnimations(dt) {
@@ -4472,6 +4562,7 @@ function initThree() {
       updateFreeCamera(dt);
     }
     updateInteractiveAnimations(dt);
+    updateMobs(dt);
     renderer.render(scene, camera);
   }
   animate();
@@ -4766,6 +4857,7 @@ function renderThree(model, preserveCamera) {
   const t = initThree();
   while (t.group.children.length) t.group.remove(t.group.children[0]); // geometries/materials are cached & reused, not disposed
   interactiveObjects = [];
+  mobObjects = [];
 
   const { dims, grid, silhouette } = model;
   let total = 0;
