@@ -1792,6 +1792,7 @@ const DECOR_TYPES = {
   pig: { kind: 'pig', interactive: false },
   sheep: { kind: 'sheep', interactive: false },
   chicken: { kind: 'chicken', interactive: false },
+  rabbit: { kind: 'rabbit', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2665,6 +2666,7 @@ function buildAnimalPenInterior(grid, silhouette, dims, exteriorMat, accentMat, 
     ['pig', dims.sx - 3, 2, 'north'],
     ['sheep', midX, dims.sz - 3, 'east'],
     ['chicken', 2, dims.sz - 3, 'west'],
+    ['rabbit', dims.sx - 3, dims.sz - 3, 'north'],
   ];
   for (const [type, x, z, facing] of animalSpots) {
     if (x > 0 && x < dims.sx - 1 && z > 0 && z < dims.sz - 1) decorOut.push({ type, x, y: 1, z, facing });
@@ -2945,11 +2947,11 @@ const PRESETS = [
     id: 'animal-pen', name: 'Animal Breeding Pen', shape: 'box', category: 'Farms & Automation',
     real: { height: 2, baseX: 7, baseZ: 7 }, interiorMode: 'animalPen',
     blocks: { exterior: 'grass_block', interior: 'dirt', accent: 'oak_planks' },
-    desc: 'A fenced pen for breeding animals — the real vanilla loop is two of the same animal, each fed their breeding food, spawning a baby. Shown here with one each of a cow, pig, sheep, and chicken inside a fenced enclosure.',
-    keywords: ['farm', 'animal', 'cow', 'pig', 'sheep', 'chicken', 'breeding', 'pen', 'pasture', 'mob farm'],
+    desc: 'A fenced pen for breeding animals — the real vanilla loop is two of the same animal, each fed their breeding food, spawning a baby. Shown here with one each of a cow, pig, sheep, chicken, and rabbit inside a fenced enclosure.',
+    keywords: ['farm', 'animal', 'cow', 'pig', 'sheep', 'chicken', 'rabbit', 'breeding', 'pen', 'pasture', 'mob farm'],
     notes: [
       'This app has no fence texture/model or any real mob model at all — the enclosure uses the existing iron_bars decor as a stand-in fence, and the animals are new simple low-poly geometry (a few coloured boxes each), not real (textured, animated) mob models.',
-      'Every animal here genuinely wanders and occasionally looks toward you (real vanilla cow/pig/sheep/chicken behavior) — this is not a static diorama.',
+      'Every animal here genuinely wanders and occasionally looks toward you (real vanilla behavior) — this is not a static diorama. The rabbit hops instead of gliding smoothly, matching its own distinct real movement.',
       'This is the one preset in the whole app that shows an animal at all — the general walk-around 3D view is deliberately mob/animal-free otherwise.',
     ],
   },
@@ -3775,6 +3777,24 @@ function chickenParts() {
   });
   return { body, head, comb, legs, wings };
 }
+// A small body/head/ears/tail build, no separate leg boxes (real rabbits
+// crouch low between hops) — see DECOR_TYPES.rabbit. Its hop, rather than a
+// smooth walk, comes from updateMobs' bounce animation (MOB_HOP_KINDS), not
+// from anything in this geometry.
+function rabbitParts() {
+  const body = new THREE.BoxGeometry(0.3, 0.24, 0.4);
+  body.translate(0, -0.08, 0);
+  const head = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+  head.translate(0, 0.02, 0.22);
+  const ears = [[-0.05, 0], [0.05, 0]].map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+    g.translate(x, 0.22, z + 0.2);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+  tail.translate(0, -0.06, -0.22);
+  return { body, head, ears, tail };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4099,6 +4119,18 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'rabbit') {
+    let parts = decorGeoCache.get('rabbit');
+    if (!parts) { parts = rabbitParts(); decorGeoCache.set('rabbit', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0xc9a876), tailMat = solidMaterial(0xf2ede0);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
+    group.add(new THREE.Mesh(parts.tail, tailMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
   return objs;
 }
@@ -4155,10 +4187,17 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken']);
+const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
+// Real vanilla: rabbits "hop around aimlessly instead of walking" — the
+// same idle/pick-a-spot/walk/idle loop every mob above uses, but rendered
+// as a bouncing hop rather than a smooth glide, and covering ground faster
+// per real vanilla's quicker hop bursts. Source: minecraft.wiki/w/Rabbit.
+const MOB_HOP_KINDS = new Set(['rabbit']);
+const MOB_SPEED_MULT = { rabbit: 1.5 };
+const MOB_HOP_HEIGHT = 0.25, MOB_HOP_RATE = 6; // radians/second of the bounce phase
 // Real vanilla: "cows look at players within six blocks for two to four
 // seconds sometimes" (minecraft.wiki/w/Cow) — the same LookAtPlayerGoal is
 // a generic, widely shared AI goal across most vanilla mobs including pigs,
@@ -4237,7 +4276,7 @@ function updateMobs(dt) {
     } else {
       const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
       const dist = Math.hypot(dx, dz);
-      const step = MOB_WALK_SPEED * dt;
+      const step = MOB_WALK_SPEED * (MOB_SPEED_MULT[entry.type] || 1) * dt;
       if (dist <= step) {
         entry._wx = entry._targetX;
         entry._wz = entry._targetZ;
@@ -4245,13 +4284,16 @@ function updateMobs(dt) {
         entry.z = Math.floor(entry._wz);
         entry._mobState = 'idle';
         entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+        entry._hopPhase = 0;
       } else {
         entry._wx += (dx / dist) * step;
         entry._wz += (dz / dist) * step;
         entry._mobYaw = Math.atan2(dx, dz); // face the direction of travel, like a real mob turning to walk somewhere
+        if (MOB_HOP_KINDS.has(entry.type)) entry._hopPhase = (entry._hopPhase || 0) + dt * MOB_HOP_RATE;
       }
     }
-    obj.position.set(entry._wx + offX, entry.y + 0.5, entry._wz + offZ);
+    const hopBounce = (MOB_HOP_KINDS.has(entry.type) && entry._mobState === 'walking') ? Math.abs(Math.sin(entry._hopPhase || 0)) * MOB_HOP_HEIGHT : 0;
+    obj.position.set(entry._wx + offX, entry.y + 0.5 + hopBounce, entry._wz + offZ);
     if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
   }
 }
@@ -5138,7 +5180,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
-    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5195,7 +5237,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
-    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken',
+    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5279,6 +5321,7 @@ function renderCommands(model) {
       else if (d.type === 'pig') lines.push(`summon minecraft:pig ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'sheep') lines.push(`summon minecraft:sheep ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'chicken') lines.push(`summon minecraft:chicken ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'rabbit') lines.push(`summon minecraft:rabbit ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
