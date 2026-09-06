@@ -1799,6 +1799,7 @@ const DECOR_TYPES = {
   ghast: { kind: 'ghast', interactive: false },
   bee: { kind: 'bee', interactive: false },
   beehive: { kind: 'beehive', interactive: false },
+  slime: { kind: 'slime', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2754,6 +2755,19 @@ function buildFlowerMeadowInterior(grid, silhouette, dims, exteriorMat, accentMa
     decorOut.push({ type: i % 2 === 0 ? 'flower' : 'dandelion', x: fx, y: 1, z: fz });
   }
 }
+// A single open stone floor, no walls — real vanilla slimes spawn either
+// underground in "slime chunks" below Y=40 or in swamps, neither of which
+// needs anything more than open room to hop around in. Placed with a
+// small (size 1) and a big (size 4) slime well apart from each other, so
+// the real size rule — same 1-block jump height, different jump distance
+// — is something you can actually watch happen side by side.
+function buildSlimeChunkInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  decorOut.push({ type: 'slime', x: 2, y: 1, z: 2, facing: 'south', size: 1 });
+  decorOut.push({ type: 'slime', x: dims.sx - 3, y: 1, z: dims.sz - 3, facing: 'south', size: 4 });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3090,6 +3104,17 @@ const PRESETS = [
     notes: [
       'Watch it fly from the hive to the nearest real flower, hover just above it for a while, then fly straight back to its exact hive position — a real repeating cycle driven by actual decor positions, not a canned animation.',
       'No honey/honeycomb production or harvesting exists in this app, and there\'s no day/night cycle, so this bee never gets angry, never returns home "because night is falling," and never needs to shelter from rain — real vanilla ties several of its behaviors to systems this app doesn\'t simulate.',
+    ],
+  },
+  {
+    id: 'slime-chunk', name: 'Slime Chunk Cavern', shape: 'box', category: 'Farms & Automation',
+    real: { height: 5, baseX: 12, baseZ: 12 }, interiorMode: 'slimeChunk',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'deepslate' },
+    desc: 'An open underground stone floor with a small slime and a big slime hopping around it — real vanilla slimes spawn in dark "slime chunks" below Y=40 (or in swamps) and, unlike every other mob here, never really stop moving even with nothing nearby.',
+    keywords: ['slime', 'slime chunk', 'hop', 'jelly', 'cave', 'underground'],
+    notes: [
+      'Real vanilla slimes always jump exactly 1 block high no matter their size, but jump distance scales with size — watch the small and big slime here rise to the same height every hop while covering very different ground per hop.',
+      'No aggro/attack model exists in this app (no combat at all) — real vanilla slimes only ever target and chase a player or iron golem as part of combat, so both of these just keep hopping in a chosen direction and changing it every couple of seconds, exactly like a real slime with nothing nearby to chase.',
     ],
   },
 ];
@@ -3454,6 +3479,8 @@ function generateModel() {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
     buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'slimeChunk') {
+    buildSlimeChunkInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3612,6 +3639,14 @@ const _solidMaterials = new Map();
 function solidMaterial(hex) {
   if (!_solidMaterials.has(hex)) _solidMaterials.set(hex, new THREE.MeshStandardMaterial({ color: hex, roughness: 0.9, clippingPlanes: [cutawayPlane] }));
   return _solidMaterials.get(hex);
+}
+// Real vanilla slimes render as a translucent jelly-like cube (the darker
+// inner cube and eyes show through it) — a plain opaque solidMaterial()
+// would lose that entirely, so this is its own cached material.
+let _slimeBodyMaterial = null;
+function slimeBodyMaterial() {
+  if (!_slimeBodyMaterial) _slimeBodyMaterial = new THREE.MeshStandardMaterial({ color: 0x6cbf4a, roughness: 0.7, transparent: true, opacity: 0.55, clippingPlanes: [cutawayPlane] });
+  return _slimeBodyMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4042,6 +4077,24 @@ function beehiveParts() {
   entrance.translate(0, -0.05, 0.37);
   return { body, entrance };
 }
+// A translucent outer cube around a smaller opaque inner cube plus two dark
+// eye cubes — real vanilla slimes render as exactly that jelly-like
+// silhouette. Geometry is built at real vanilla's own size-1 dimensions
+// (0.51 blocks/side); the group is then uniformly scaled by the slime's
+// actual `size` (1/2/4) at render time, since "its dimensions are 0.51
+// blocks times its size in each dimension" (minecraft.wiki/w/Slime). See
+// DECOR_TYPES.slime.
+function slimeParts() {
+  const outer = new THREE.BoxGeometry(0.51, 0.51, 0.51);
+  const inner = new THREE.BoxGeometry(0.32, 0.32, 0.32);
+  inner.translate(0, -0.04, 0.02);
+  const eyes = [[-0.09, 0.06], [0.09, 0.06]].map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.07, 0.02);
+    g.translate(x, y, 0.26);
+    return g;
+  });
+  return { outer, inner, eyes };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4444,6 +4497,17 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.entrance, entranceMat));
     group.rotation.y = FACING_YAW[entry.facing || 'south'];
+    objs.push(group);
+  } else if (def.kind === 'slime') {
+    let parts = decorGeoCache.get('slime');
+    if (!parts) { parts = slimeParts(); decorGeoCache.set('slime', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.outer, slimeBodyMaterial()));
+    group.add(new THREE.Mesh(parts.inner, solidMaterial(0x3f7a30)));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0x1a1a1a)));
+    group.scale.setScalar(entry.size || 2);
+    group.rotation.y = entry._yaw !== undefined ? entry._yaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   }
   return objs;
@@ -4852,10 +4916,75 @@ function updateBee(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla slimes are the one mob here that never really goes idle:
+// "unlike other mobs, slimes continue moving when no players are nearby,"
+// hopping every 10-30 ticks (0.5-1.5s) and changing direction randomly
+// every 40-100 ticks (2-5s) — two independent timers, not the shared
+// idle/walk cycle every ground animal above uses (source:
+// minecraft.wiki/w/Slime). Real vanilla also documents a genuine
+// size rule worth simulating on its own: "a slime jumps a distance
+// slightly farther than its length [...] however, slimes will always,
+// regardless of size, jump 1 block high" — so jump height here is a
+// fixed constant while jump distance scales with entry.size.
+const SLIME_HOP_WAIT_MIN = 0.5, SLIME_HOP_WAIT_MAX = 1.5; // 10-30 ticks
+const SLIME_DIR_CHANGE_MIN = 2, SLIME_DIR_CHANGE_MAX = 5; // 40-100 ticks
+const SLIME_JUMP_HEIGHT = 1; // real vanilla: always exactly 1 block, regardless of size
+const SLIME_HOP_DURATION = 0.4; // real vanilla air-time isn't a published figure — this is only an animation-smoothing choice, not a sourced fact
+function updateSlime(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const size = entry.size || 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'grounded';
+    entry._hopTimer = SLIME_HOP_WAIT_MIN + Math.random() * (SLIME_HOP_WAIT_MAX - SLIME_HOP_WAIT_MIN);
+    entry._dirTimer = SLIME_DIR_CHANGE_MIN + Math.random() * (SLIME_DIR_CHANGE_MAX - SLIME_DIR_CHANGE_MIN);
+    entry._yaw = Math.random() * Math.PI * 2;
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._hopHeight = 0;
+  }
+  entry._dirTimer -= dt;
+  if (entry._dirTimer <= 0) {
+    entry._yaw = Math.random() * Math.PI * 2; // direction changes on its own real timer, independent of the hop cycle
+    entry._dirTimer = SLIME_DIR_CHANGE_MIN + Math.random() * (SLIME_DIR_CHANGE_MAX - SLIME_DIR_CHANGE_MIN);
+  }
+  if (entry._mobState === 'grounded') {
+    entry._hopHeight = 0;
+    entry._hopTimer -= dt;
+    if (entry._hopTimer <= 0) {
+      const dist = 0.51 * size * 1.15; // "slightly farther than its length" (length = 0.51 * size)
+      const tx = entry._wx + Math.sin(entry._yaw) * dist;
+      const tz = entry._wz + Math.cos(entry._yaw) * dist;
+      if (mobCellWalkable(currentModel, Math.floor(tx), entry.y, Math.floor(tz))) {
+        entry._hopStartX = entry._wx; entry._hopStartZ = entry._wz;
+        entry._hopTargetX = tx; entry._hopTargetZ = tz;
+        entry._hopElapsed = 0;
+        entry._mobState = 'hopping';
+      } else {
+        entry._yaw = Math.random() * Math.PI * 2; // wall/ledge ahead — pick a new direction and try again next cycle
+        entry._hopTimer = SLIME_HOP_WAIT_MIN + Math.random() * (SLIME_HOP_WAIT_MAX - SLIME_HOP_WAIT_MIN);
+      }
+    }
+  } else { // hopping
+    entry._hopElapsed += dt;
+    const t = Math.min(1, entry._hopElapsed / SLIME_HOP_DURATION);
+    entry._wx = entry._hopStartX + (entry._hopTargetX - entry._hopStartX) * t;
+    entry._wz = entry._hopStartZ + (entry._hopTargetZ - entry._hopStartZ) * t;
+    entry._hopHeight = Math.sin(t * Math.PI) * SLIME_JUMP_HEIGHT; // always the same 1-block arc, independent of size
+    if (t >= 1) {
+      entry._mobState = 'grounded';
+      entry._hopHeight = 0;
+      entry._hopTimer = SLIME_HOP_WAIT_MIN + Math.random() * (SLIME_HOP_WAIT_MAX - SLIME_HOP_WAIT_MIN);
+    }
+  }
+  const halfHeight = size * 0.255; // half of 0.51 * size — sits flush on the floor at any size
+  obj.position.set(entry._wx + offX, entry.y + halfHeight + entry._hopHeight, entry._wz + offZ);
+  obj.rotation.y = entry._yaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
@@ -5837,6 +5966,7 @@ function renderBlueprint(model) {
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
     hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
+    slime: ['#6cbf4a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5895,6 +6025,7 @@ function renderBlueprint(model) {
     activator_rail: 'Activator Rail', minecart: 'Minecart',
     hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
+    slime: 'Slime',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5987,6 +6118,7 @@ function renderCommands(model) {
       else if (d.type === 'beehive') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:beehive[facing=${d.facing || 'south'}]`);
       else if (d.type === 'flower') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:poppy`);
       else if (d.type === 'dandelion') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:dandelion`);
+      else if (d.type === 'slime') lines.push(`summon minecraft:slime ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Size:${(d.size || 2) - 1}}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
