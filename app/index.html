@@ -1796,6 +1796,7 @@ const DECOR_TYPES = {
   bat: { kind: 'bat', interactive: false },
   enderman: { kind: 'enderman', interactive: false },
   spider: { kind: 'spider', interactive: false },
+  ghast: { kind: 'ghast', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2718,6 +2719,17 @@ function buildSpiderNestInterior(grid, silhouette, dims, exteriorMat, accentMat,
   if (!decorOut) return;
   decorOut.push({ type: 'spider', x: 1, y: 1, z: 1, facing: 'south' });
 }
+// A floating netherrack platform, open on every side and with plenty of
+// open air above it — real vanilla ghasts "float around randomly" through
+// open space and need neither a floor immediately below them nor a
+// ceiling above, unlike every other mob preset here.
+function buildNetherWastesInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'ghast', x: cx, y: Math.floor(dims.sy / 2), z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3032,6 +3044,17 @@ const PRESETS = [
     notes: [
       'Watch it wander the floor like the other animals, then occasionally turn and climb straight up a wall a few blocks before coming back down — a real, distinct movement mode, not the same walk cycle every other mob here shares.',
       'No aggro/attack model exists in this app (no combat at all) — real vanilla spiders turn hostile in low light and neutral in bright light, but that only affects whether they attack, not whether they wander or climb, so it isn\'t modeled here.',
+    ],
+  },
+  {
+    id: 'nether-wastes', name: 'Nether Wastes Flourish', shape: 'box', category: 'Farms & Automation',
+    real: { height: 8, baseX: 10, baseZ: 10 }, interiorMode: 'netherWastes',
+    blocks: { exterior: 'netherrack', interior: 'netherrack', accent: 'basalt' },
+    desc: 'A floating netherrack platform with a ghast drifting above it — real vanilla ghasts "float around randomly" through open air, needing neither a floor immediately below nor a ceiling above, unlike every other mob preset in this app.',
+    keywords: ['ghast', 'nether', 'netherrack', 'floating', 'fireball'],
+    notes: [
+      'The ghast genuinely drifts through real 3D space to a new nearby spot every so often, then pauses, then drifts again — a real per-frame simulation, not an animation loop.',
+      'No aggro/attack model exists in this app (no combat at all), so this ghast never shoots fireballs or reacts to a nearby player — real vanilla only does that as part of combat behavior this app doesn\'t simulate.',
     ],
   },
 ];
@@ -3392,6 +3415,8 @@ function generateModel() {
     buildEndIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'spiderNest') {
     buildSpiderNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'netherWastes') {
+    buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -3941,6 +3966,24 @@ function spiderParts() {
   });
   return { abdomen, thorax, legs };
 }
+// A large cube body (real vanilla ghasts are a genuine 4x4x4) with a
+// handful of thin hanging tentacle boxes below — real vanilla has nine;
+// simplified here like every other low-poly stand-in mob in this app. See
+// DECOR_TYPES.ghast.
+function ghastParts() {
+  const body = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+  body.translate(0, 0.4, 0);
+  const face = new THREE.BoxGeometry(0.9, 0.5, 0.05);
+  face.translate(0, 0.55, 0.81);
+  const tentacleOffsets = [-0.6, -0.36, -0.12, 0.12, 0.36, 0.6];
+  const tentacles = tentacleOffsets.map((x, i) => {
+    const len = 0.9 + (i % 2) * 0.3;
+    const g = new THREE.BoxGeometry(0.12, len, 0.12);
+    g.translate(x, -0.4 - len / 2, 0);
+    return g;
+  });
+  return { body, face, tentacles };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4313,6 +4356,17 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0; // pitched flat against the wall while climbing
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'ghast') {
+    let parts = decorGeoCache.get('ghast');
+    if (!parts) { parts = ghastParts(); decorGeoCache.set('ghast', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xe9e9e9), faceMat = solidMaterial(0x3a3a3a);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.face, faceMat));
+    for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
   return objs;
 }
@@ -4575,10 +4629,83 @@ function updateBat(entry, obj, dt) {
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
   obj.rotation.z = entry._batState === 'roosting' ? Math.PI : 0; // real vanilla: hangs upside down only while idle
 }
+// Real vanilla: ghasts "float around [...] randomly" through open air —
+// unlike every other mob in this app, they never need a floor or a
+// ceiling, just open space to drift through (source: minecraft.wiki/w/
+// Ghast). Real vanilla also has them gain altitude and strafe while
+// attacking a nearby player, but that's part of the fireball-combat
+// behavior this app doesn't model at all (no combat system), so this
+// ghast only ever does the peaceful half: drifting to a new nearby open
+// spot, pausing, and drifting again.
+const GHAST_FLOAT_SPEED = 1.0;
+const GHAST_IDLE_MIN = 2, GHAST_IDLE_MAX = 5;
+const GHAST_WANDER_RADIUS = 3;
+function ghastCellFloatable(model, x, y, z) {
+  const dims = model.dims;
+  if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return false;
+  return model.grid[idx(x, y, z, dims)] === 0;
+}
+function pickGhastFloatTarget(model, entry) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * GHAST_WANDER_RADIUS);
+    const dy = Math.round((Math.random() * 2 - 1) * GHAST_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * GHAST_WANDER_RADIUS);
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
+    if (ghastCellFloatable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+function updateGhast(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = GHAST_IDLE_MIN + Math.random() * (GHAST_IDLE_MAX - GHAST_IDLE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickGhastFloatTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'floating';
+      } else {
+        entry._mobTimer = GHAST_IDLE_MIN;
+      }
+    }
+  } else {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = GHAST_FLOAT_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = entry._targetY;
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = GHAST_IDLE_MIN + Math.random() * (GHAST_IDLE_MAX - GHAST_IDLE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
     if (!MOB_KINDS.has(entry.type)) continue;
     if (entry._mobState === undefined) {
@@ -5556,7 +5683,7 @@ function renderBlueprint(model) {
     pressure_plate: ['#b4874c', 'P'], redstone_wire: ['#c93b2c', '~'],
     rail: ['#b0b0b0', 'R'], powered_rail: ['#f2c94c', 'R'], detector_rail: ['#db3b2b', 'R'],
     activator_rail: ['#ff6a3c', 'R'], minecart: ['#8a8a8a', 'M'],
-    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'],
+    hopper: ['#8a8a8a', 'O'], cow: ['#5c3d21', 'A'], pig: ['#f0a9b8', 'A'], sheep: ['#e8e4d8', 'A'], chicken: ['#f5f0e6', 'A'], rabbit: ['#c9a876', 'A'], bat: ['#3b3a3e', 'A'], enderman: ['#17151c', 'A'], spider: ['#1c1a1d', 'A'], ghast: ['#e9e9e9', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -5613,7 +5740,7 @@ function renderBlueprint(model) {
     pressure_plate: 'Pressure Plate', redstone_wire: 'Redstone Wire',
     rail: 'Rail', powered_rail: 'Powered Rail', detector_rail: 'Detector Rail',
     activator_rail: 'Activator Rail', minecart: 'Minecart',
-    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider',
+    hopper: 'Hopper', cow: 'Cow', pig: 'Pig', sheep: 'Sheep', chicken: 'Chicken', rabbit: 'Rabbit', bat: 'Bat', enderman: 'Enderman', spider: 'Spider', ghast: 'Ghast',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -5701,6 +5828,7 @@ function renderCommands(model) {
       else if (d.type === 'bat') lines.push(`summon minecraft:bat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'enderman') lines.push(`summon minecraft:enderman ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'spider') lines.push(`summon minecraft:spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'ghast') lines.push(`summon minecraft:ghast ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'door') {
         lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`);
         lines.push(`setblock ~${d.x} ~${d.y + 1} ~${d.z} minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`);
