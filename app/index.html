@@ -3854,7 +3854,7 @@ const PRESETS = [
     keywords: ['llama', 'caravan', 'train', 'follow', 'leash'],
     notes: [
       'Watch the leader wander on its own; each follower genuinely traces the leader\'s (or the llama ahead of it\'s) own recent path — not its live position. Every llama records its own recent positions as a real trail; a follower\'s target is a point farther back in that trail, the same way a real train of vehicles follows the road the one ahead already drove rather than beelining toward wherever it currently is. This is a genuinely new class of mechanic for this app: the wolf\'s own pack cohesion (the closest prior parallel) chases the OTHER wolf\'s live position directly, cutting corners, while a llama chases a recorded PAST point instead, tracing the real path. Verified directly by a unit test confirming a follower\'s target is genuinely a past trail point and not the leader\'s current position, and an end-to-end test that runs the real AI and confirms the whole chain keeps a real, roughly consistent single-file spacing as the leader moves.',
-      'This app has no leash item or caravan-forming interaction at all, so the 3 llamas here are simply pre-linked at spawn — an honest, spelled-out shortcut, the same kind already taken for the fox/piglin starting with pre-decided cosmetics rather than requiring a player action this app can\'t represent. The geometry reuses the same 4-corner leg placement already proven on the wolf/ocelot, scaled up with a distinctive long angled neck — the single most recognizable real llama silhouette cue.',
+      'This app has no leash item or caravan-forming interaction at all, so the 3 llamas here are simply pre-linked at spawn — an honest, spelled-out shortcut, the same kind already taken for the fox/piglin starting with pre-decided cosmetics rather than requiring a player action this app can\'t represent. The geometry reuses the same 4-corner leg placement already proven on the wolf/ocelot, scaled up with a distinctive long, straight upright neck — the single most recognizable real llama silhouette cue.',
       'Not modeled: real llama wool colour variation (white/brown/gray/creamy — this app always uses one colour), spitting at hostile mobs, actually requiring a player to leash each llama by hand, and carrying inventory in a chest — this app has no combat, player-interaction, or inventory system at all, so these llamas only ever wander and trail each other.',
     ],
   },
@@ -5818,13 +5818,15 @@ function ocelotParts() {
 }
 // Reuses the same 4-corner leg placement already proven on the wolf/
 // ocelot (legs kept inside the body's own footprint), scaled up to a
-// taller, longer-bodied build, plus a distinctive long angled neck
-// carrying the head — the single most recognizable real vanilla llama
-// silhouette cue (minecraft.wiki/w/Llama). The neck+head assembly follows
-// the same "position each part relative to the assembly's own local
-// origin, then rotate every part together" technique already used for the
-// piglin's sword, so the neck and head stay correctly joined at their
-// real angle.
+// taller, longer-bodied build, plus a distinctive long, straight
+// upright neck carrying the head — the single most recognizable real
+// vanilla llama silhouette cue (minecraft.wiki/w/Llama). The neck+head
+// assembly follows the same "position each part relative to the
+// assembly's own local origin, then rotate every part together"
+// technique already used for the piglin's sword — neckAngle is 0 (a
+// vertical neck) but kept as a named constant so every part still moves
+// together if that ever changes, rather than each part hardcoding its
+// own transform.
 function llamaParts() {
   const body = new THREE.BoxGeometry(0.42, 0.5, 0.75);
   body.translate(0, 0.55, 0);
@@ -5834,7 +5836,7 @@ function llamaParts() {
     g.translate(x, 0.25, z);
     return g;
   });
-  const neckAngle = -0.55, neckX = 0, neckY = 0.82, neckZ = 0.32;
+  const neckAngle = 0, neckX = 0, neckY = 0.82, neckZ = 0.32;
   const neck = new THREE.BoxGeometry(0.2, 0.55, 0.2);
   neck.rotateX(neckAngle);
   neck.translate(neckX, neckY, neckZ);
@@ -5886,7 +5888,7 @@ function camelParts() {
   });
   const hump = new THREE.BoxGeometry(0.3, 0.26, 0.4);
   hump.translate(0, 1.28, -0.05);
-  const neckAngle = -0.75, neckX = 0, neckY = 1.05, neckZ = 0.42;
+  const neckAngle = 0, neckX = 0, neckY = 1.05, neckZ = 0.42;
   const neck = new THREE.BoxGeometry(0.22, 0.55, 0.22);
   neck.rotateX(neckAngle);
   neck.translate(neckX, neckY, neckZ);
