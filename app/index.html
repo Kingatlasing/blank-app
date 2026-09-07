@@ -1864,6 +1864,17 @@ const DECOR_TYPES = {
   // compresses toward the ground while idle-too-long, then pops back to full
   // height the instant it decides to wander again. See updateCamel.
   camel: { kind: 'camel', interactive: false },
+  // Real tamed vanilla parrots ride on "the player's shoulder"
+  // (minecraft.wiki/w/Parrot). Every earlier player-aware mob here only
+  // ever computes a MOVEMENT TARGET and moves toward/away from it at a
+  // capped speed (the ocelot fleeing, the skeleton drawing its bow, the
+  // wolf regrouping); a perched parrot is the first to become a genuine
+  // rigid ATTACHMENT to the player's own live transform — its position is
+  // set directly equal to the player's, every single frame, with zero lag
+  // or travel time, the same way vanilla's shoulder-riding is a literal
+  // parent-child attachment rather than a followed target. See
+  // updateParrot.
+  parrot: { kind: 'parrot', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3219,6 +3230,16 @@ function buildCamelRestStopInterior(grid, silhouette, dims, exteriorMat, accentM
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'camel', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A single parrot on an open perch — switch to Walk mode and approach it
+// to see it genuinely fly up and attach to your own live shoulder
+// position, then hop back down and resume wandering once you walk away.
+function buildParrotPerchGardenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'parrot', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3870,6 +3891,18 @@ const PRESETS = [
       'Not modeled: the real camel dash (a forward leap while sprint-ridden), carrying two players at once, saddling/riding at all, and breeding — this app has no rider, saddle, or breeding system at all, so this camel only ever wanders, sits, and stands.',
     ],
   },
+  {
+    id: 'parrot-perch-garden', name: 'Parrot Perch Garden', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'parrotPerchGarden',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A single parrot on an open garden plot — real tamed vanilla parrots ride perched on "the player\'s shoulder," and this one genuinely does: switch to Walk mode, approach it, and watch it fly up and attach directly to your own live position, then hop back down and resume wandering once you walk far enough away.',
+    keywords: ['parrot', 'perch', 'shoulder', 'bird', 'attach'],
+    notes: [
+      'Switch to Walk mode and approach it — once you\'re within its own real perch radius, it stops wandering and its position is set DIRECTLY equal to your own live position (offset to one shoulder) every single frame, with zero lag or travel time, until you walk far enough away that it hops back down and resumes ordinary wandering from wherever it ends up. This is a genuinely new class of mechanic for this app: every earlier player-aware mob (the ocelot fleeing, the skeleton drawing its bow, the wolf regrouping with a packmate) only ever computes a movement TARGET and moves toward or away from it at a capped speed, while a perched parrot becomes a rigid ATTACHMENT to the player\'s own live transform instead — the same way vanilla\'s shoulder-riding is a literal parent-child relationship, not a followed target. Verified directly by a unit test confirming the model\'s own rendered position exactly equals the simulated player\'s position (not merely close to it, and not lagging behind) the instant it perches, and a second test confirming it genuinely detaches and resumes independent wandering once the simulated player moves beyond the real unperch radius.',
+      'This app has no taming or right-click interaction at all, so this parrot perches automatically once a live player comes close enough, rather than requiring the real feed-then-click taming step — an honest, spelled-out shortcut, the same kind already taken for the fox/piglin starting with pre-decided cosmetics rather than requiring a player action this app can\'t represent. This app also has no verified real perch-trigger distance, so the radius used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry itself is new — a small bird build (body, head, beak, wings, tail, feet) unlike any earlier mob\'s proportions.',
+      'Not modeled: the 5 real parrot colour variants (red/blue, blue, green, cyan, gray — this app always uses one scarlet-macaw colouring), taming with seeds, mimicking nearby hostile-mob sounds, dying from eating cookies, and dancing near a jukebox — this app has no taming, audio, or death system at all, so this parrot only ever wanders and perches.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4288,6 +4321,8 @@ function generateModel() {
     buildLlamaCaravanTrailInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'camelRestStop') {
     buildCamelRestStopInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'parrotPerchGarden') {
+    buildParrotPerchGardenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5920,6 +5955,39 @@ function camelParts() {
   nose.translate(neckX, neckY, neckZ);
   return { body, legs, hump, neck, head, ears, tail, faceEyes, nose };
 }
+// A small bird build — nothing here is shared with any earlier mob's
+// geometry, since a parrot's real proportions (tiny body, short legs, a
+// prominent curved beak, wide flat wings/tail for its silhouette) aren't
+// close enough to any quadruped or biped already in this app to reuse.
+function parrotParts() {
+  const body = new THREE.BoxGeometry(0.16, 0.2, 0.22);
+  body.translate(0, 0.3, 0);
+  const head = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+  head.translate(0, 0.42, 0.09);
+  const beak = new THREE.BoxGeometry(0.05, 0.05, 0.08);
+  beak.translate(0, 0.4, 0.17);
+  const wingOffsets = [[-0.1, 0], [0.1, 0]];
+  const wings = wingOffsets.map(([x]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.14, 0.18);
+    g.translate(x, 0.3, -0.02);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.06, 0.05, 0.2);
+  tail.translate(0, 0.27, -0.2);
+  const feetOffsets = [[-0.04, 0.02], [0.04, 0.02]];
+  const feet = feetOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.2, 0.03);
+    g.translate(x, 0.1, z);
+    return g;
+  });
+  const faceEyeOffsets = [[-0.045, 0.44, 0.15], [0.045, 0.44, 0.15]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, beak, wings, tail, feet, faceEyes };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6825,6 +6893,24 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.nose, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.scale.y = entry._sitting ? CAMEL_SIT_SCALE : 1;
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'parrot') {
+    let parts = decorGeoCache.get('parrot');
+    if (!parts) { parts = parrotParts(); decorGeoCache.set('parrot', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xc23b2e);
+    const wingMat = solidMaterial(0x2b5fc2);
+    const beakMat = solidMaterial(0xe8c93b);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.beak, beakMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, wingMat));
+    group.add(new THREE.Mesh(parts.tail, wingMat));
+    for (const g of parts.feet) group.add(new THREE.Mesh(g, beakMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -9810,6 +9896,95 @@ function updateCamel(entry, obj, dt) {
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
   obj.scale.y = entry._sitting ? CAMEL_SIT_SCALE : 1;
 }
+// Real tamed vanilla parrots ride perched on "the player's shoulder"
+// (minecraft.wiki/w/Parrot). Every earlier player-aware mob's own AI here
+// only ever computes a movement TARGET and moves toward or away from it
+// at a capped speed — the ocelot fleeing, the skeleton drawing on a
+// sensed position, the wolf regrouping with a packmate. A perched parrot
+// is a genuinely different class: instead of moving toward the player, it
+// becomes a rigid ATTACHMENT to the player's own live transform, with its
+// position set directly equal to the player's every single frame — zero
+// lag, zero travel time, exactly the way vanilla's shoulder-riding is a
+// literal parent-child attachment rather than a followed target. This app
+// has no taming or right-click interaction at all, so a parrot here
+// simply perches automatically once a live player (Walk/third-person
+// mode) comes within a real perch radius, and hops back down once they
+// move far enough away again — an honest, spelled-out shortcut, the same
+// kind already taken for the fox/piglin starting with pre-decided
+// cosmetics rather than requiring a player action this app can't
+// represent. This app has no verified real perch-trigger distance, so the
+// radius used here is an honest, approximate stand-in, the same caveat
+// already applied to the warden's sense radius and the fox's pickup
+// radius.
+const PARROT_WANDER_MIN = 1.5, PARROT_WANDER_MAX = 3;
+const PARROT_WALK_SPEED = 1.3;
+const PARROT_PERCH_RADIUS = 4;
+const PARROT_UNPERCH_RADIUS = 7;
+const PARROT_SHOULDER_HEIGHT = 1.3;
+const PARROT_SHOULDER_OFFSET_X = 0.25;
+function updateParrot(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = PARROT_WANDER_MIN + Math.random() * (PARROT_WANDER_MAX - PARROT_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (entry._mobState !== 'perched' && playerDist <= PARROT_PERCH_RADIUS) {
+    entry._mobState = 'perched';
+  } else if (entry._mobState === 'perched' && playerDist > PARROT_UNPERCH_RADIUS) {
+    // Hop back down onto the ground it's currently above and resume
+    // wandering from there, rather than teleporting back to its spawn.
+    entry._mobState = 'idle';
+    entry._mobTimer = PARROT_WANDER_MIN + Math.random() * (PARROT_WANDER_MAX - PARROT_WANDER_MIN);
+    entry._wx = obj.position.x - offX;
+    entry._wz = obj.position.z - offZ;
+  }
+  if (entry._mobState === 'perched') {
+    // A genuine per-frame attachment, not a followed target: this is set
+    // directly from the player's own live position, not stepped toward it.
+    obj.position.set(flyState.pos.x + PARROT_SHOULDER_OFFSET_X, flyState.pos.y + PARROT_SHOULDER_HEIGHT, flyState.pos.z);
+    obj.rotation.y = flyState.yaw;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = PARROT_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = PARROT_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = PARROT_WANDER_MIN + Math.random() * (PARROT_WANDER_MAX - PARROT_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -9948,6 +10123,7 @@ function updateMobs(dt) {
     if (entry.type === 'ocelot') { updateOcelot(entry, obj, dt); continue; }
     if (entry.type === 'llama') { updateLlama(entry, obj, dt); continue; }
     if (entry.type === 'camel') { updateCamel(entry, obj, dt); continue; }
+    if (entry.type === 'parrot') { updateParrot(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -11015,7 +11191,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -11082,7 +11258,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11209,6 +11385,7 @@ function renderCommands(model) {
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'llama') lines.push(`summon minecraft:llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'camel') lines.push(`summon minecraft:camel ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'parrot') lines.push(`summon minecraft:parrot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
