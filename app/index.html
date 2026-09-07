@@ -1812,6 +1812,7 @@ const DECOR_TYPES = {
   torchflower_seed: { kind: 'torchflower_seed', interactive: false },
   panda: { kind: 'panda', interactive: false },
   slimeball: { kind: 'slimeball', interactive: false },
+  frog: { kind: 'frog', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2919,6 +2920,20 @@ function buildPandaGroveInterior(grid, silhouette, dims, exteriorMat, accentMat,
   decorOut.push({ type: 'panda', x: Math.max(0, cx - 3), y: 1, z: cz, facing: 'south', personality: 'lazy' });
   decorOut.push({ type: 'panda', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'north', personality: 'playful' });
 }
+// A muddy swamp clearing — no walls, matching every other single-mob
+// flourish preset — with a real small water pool (real frogs are found
+// "in and around swamps"), a frog, and a small slime placed within the
+// frog's real tongue-scan range so the eat-the-small-slime mechanic is
+// directly observable rather than left to chance.
+function buildSwampFrogPondInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: 1, y: 1, z: 1, source: true });
+  decorOut.push({ type: 'frog', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'slime', x: Math.min(dims.sx - 2, cx + 2), y: 1, z: cz, size: 1 });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3352,6 +3367,18 @@ const PRESETS = [
       'Real vanilla also gives a sneezing baby panda a small chance to drop a slimeball; this app has no baby/adult distinction, so that same chance is honestly applied to every panda\'s sneeze here instead of being silently generalized without comment.',
     ],
   },
+  {
+    id: 'swamp-frog-pond', name: 'Swamp Frog Pond', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 9 }, interiorMode: 'swampFrogPond',
+    blocks: { exterior: 'mud', interior: 'mud', accent: 'mangrove_planks' },
+    desc: 'A muddy swamp clearing with a real pond, a frog, and a small slime placed within real striking range of each other — real vanilla frogs "eat small slimes and magma cubes," and this one genuinely hunts, tongue-licks, and removes the slime from the model when it catches it.',
+    keywords: ['frog', 'slime', 'eat', 'tongue', 'swamp', 'predation', 'mud'],
+    notes: [
+      'This is the first genuine predator/prey relationship in this app: every earlier world-mutation mob (turtle egg, torchflower seed, panda\'s slimeball) only ever ADDS a new decor entry and mesh, while this frog catching its prey genuinely REMOVES a live mob\'s decor entry, scene mesh, and mob registration — the same as a real vanilla frog actually killing and eating it, not the slime simply despawning.',
+      'Watch the frog hop over on its own, once it notices the small slime within its real scan range, close the last real distance, play a real tongue-lick animation, and then the slime is genuinely gone from the model. Every other slime in this app is left completely alone by frogs — only the small size is ever eaten, matching real vanilla exactly.',
+      'This app has no magma cube mob at all, so only the small-slime half of real vanilla\'s "eats small slimes and magma cubes" diet is modeled — an honest gap, not a silently generalized rule. No aggro/predation exists in the other direction either: a real frog has nothing to fear here, since this app has no combat system at all.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3730,6 +3757,8 @@ function generateModel() {
     buildSnifferMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'pandaGrove') {
     buildPandaGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'swampFrogPond') {
+    buildSwampFrogPondInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4567,6 +4596,37 @@ function slimeballParts() {
   ball.translate(0, -0.35, 0);
   return { ball };
 }
+// A rounded body, 2 bulging top-facing eyes, a tongue (retracted flat
+// against the mouth normally, only stretched out during the real tongue-
+// lick eating animation), and 4 legs with the back pair noticeably bigger
+// — real frogs' oversized back legs are what let them hop. Real vanilla
+// frogs come in 3 biome-tinted variants (temperate/green, warm/white, cold/
+// gray); only the temperate green is modeled here. See DECOR_TYPES.frog.
+function frogParts() {
+  const body = new THREE.BoxGeometry(0.5, 0.28, 0.6);
+  body.translate(0, 0.2, 0);
+  const eyeOffsets = [[-0.14, 0.36, 0.2], [0.14, 0.36, 0.2]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+    g.translate(x, y, z);
+    return g;
+  });
+  const tongue = new THREE.BoxGeometry(0.08, 0.04, 0.05);
+  tongue.translate(0, 0.16, 0.32);
+  const frontLegOffsets = [[-0.2, 0.22], [0.2, 0.22]];
+  const frontLegs = frontLegOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+    g.translate(x, 0.07, z);
+    return g;
+  });
+  const backLegOffsets = [[-0.22, -0.2], [0.22, -0.2]];
+  const backLegs = backLegOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.18, 0.16, 0.24);
+    g.translate(x, 0.08, z);
+    return g;
+  });
+  return { body, eyes, tongue, frontLegs, backLegs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5108,6 +5168,22 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = slimeballParts(); decorGeoCache.set('slimeball', parts); }
     const group = new THREE.Group();
     group.add(new THREE.Mesh(parts.ball, solidMaterial(0x9fc94f)));
+    objs.push(group);
+  } else if (def.kind === 'frog') {
+    let parts = decorGeoCache.get('frog');
+    if (!parts) { parts = frogParts(); decorGeoCache.set('frog', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x9bbf3f), eyeMat = solidMaterial(0x1c1a1d);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    const tongueMesh = new THREE.Mesh(parts.tongue, solidMaterial(0xc65a6a));
+    tongueMesh.userData.isFrogTongue = true;
+    tongueMesh.scale.z = 0.01;
+    group.add(tongueMesh);
+    for (const g of parts.frontLegs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.backLegs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   }
   return objs;
@@ -6373,10 +6449,142 @@ function updatePanda(entry, obj, dt) {
     obj.position.y = entry.y + Math.sin((entry._jumpElapsed / PANDA_JUMP_DURATION) * Math.PI) * 0.5;
   }
 }
+// Real vanilla frogs (minecraft.wiki/w/Frog) "eat small slimes and magma
+// cubes" — a real predator/prey relationship, and the first genuine
+// predation modeled anywhere in this app. Every world-mutation mob so far
+// (turtle egg, torchflower seed, panda's slimeball) only ever ADDS a new
+// decor entry and mesh; a frog catching a slime does the reverse — it
+// genuinely REMOVES a live mob's decor entry, scene mesh, and mobObjects
+// registration, the same as real vanilla actually killing and consuming
+// it. This app has no magma cube mob at all, so only the small-slime half
+// of that real diet is modeled — an honest gap, not a silent one. Frogs
+// also move by hopping rather than walking, same spirit as the rabbit's
+// own real hop, just with its own timing and, when prey is in range, a
+// destination that's a live moving target instead of a fixed point.
+const FROG_HOP_DURATION = 0.35;
+const FROG_HOP_HEIGHT = 0.35;
+const FROG_IDLE_MIN = 1.5, FROG_IDLE_MAX = 4; // real frogs hop frequently — shorter than the shared ground-mob idle window
+const FROG_TONGUE_SCAN_RADIUS = 4; // how far a frog looks for real prey before deciding to hunt
+const FROG_EAT_RANGE = 1.6; // real tongue-lick strike range, close enough to land a hit
+const FROG_EAT_DURATION = 0.6;
+function findNearestSmallSlime(model, entry) {
+  let best = null, bestDist = Infinity;
+  for (const d of model.decor) {
+    if (d.type !== 'slime' || (d.size || 2) !== 1) continue; // real vanilla: only the small size is ever eaten
+    const dist = Math.hypot(d.x - entry.x, d.z - entry.z);
+    if (dist <= FROG_TONGUE_SCAN_RADIUS && dist < bestDist) { best = d; bestDist = dist; }
+  }
+  return best;
+}
+function startFrogHopToward(entry, tx, tz) {
+  entry._hopStartX = entry._wx;
+  entry._hopStartZ = entry._wz;
+  entry._hopTargetX = tx;
+  entry._hopTargetZ = tz;
+  entry._hopElapsed = 0;
+}
+function advanceFrogHop(entry, dt) {
+  entry._hopElapsed += dt;
+  const t = Math.min(1, entry._hopElapsed / FROG_HOP_DURATION);
+  entry._wx = entry._hopStartX + (entry._hopTargetX - entry._hopStartX) * t;
+  entry._wz = entry._hopStartZ + (entry._hopTargetZ - entry._hopStartZ) * t;
+  entry._hopHeight = Math.sin(t * Math.PI) * FROG_HOP_HEIGHT;
+  const dx = entry._hopTargetX - entry._hopStartX, dz = entry._hopTargetZ - entry._hopStartZ;
+  if (Math.hypot(dx, dz) > 0.001) entry._mobYaw = Math.atan2(dx, dz);
+  if (t >= 1) {
+    entry.x = Math.floor(entry._wx);
+    entry.z = Math.floor(entry._wz);
+    entry._hopHeight = 0;
+    return true;
+  }
+  return false;
+}
+// The reverse of every other world-mutation mob so far: genuinely removes
+// a live mob's decor entry, scene mesh, and mobObjects registration — a
+// real predator eating real prey, not a mob simply vanishing.
+function eatSlime(slimeEntry) {
+  if (!currentModel) return;
+  const decorIdx = currentModel.decor.indexOf(slimeEntry);
+  if (decorIdx !== -1) currentModel.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === slimeEntry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function updateFrog(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = FROG_IDLE_MIN + Math.random() * (FROG_IDLE_MAX - FROG_IDLE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._hopHeight = 0;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const prey = findNearestSmallSlime(currentModel, entry);
+      if (prey) {
+        entry._preyEntry = prey;
+        entry._mobState = 'approaching';
+        startFrogHopToward(entry, prey._wx !== undefined ? prey._wx : prey.x + 0.5, prey._wz !== undefined ? prey._wz : prey.z + 0.5);
+      } else {
+        const target = pickWanderTarget(currentModel, entry);
+        if (target) {
+          entry._mobState = 'wandering';
+          startFrogHopToward(entry, target.x + 0.5, target.z + 0.5);
+        } else {
+          entry._mobTimer = FROG_IDLE_MIN;
+        }
+      }
+    }
+  } else if (entry._mobState === 'wandering') {
+    if (advanceFrogHop(entry, dt)) {
+      entry._mobState = 'idle';
+      entry._mobTimer = FROG_IDLE_MIN + Math.random() * (FROG_IDLE_MAX - FROG_IDLE_MIN);
+    }
+  } else if (entry._mobState === 'approaching') {
+    const prey = entry._preyEntry;
+    if (!prey || !currentModel.decor.includes(prey)) {
+      // Prey vanished before the frog got there — nothing else in this app
+      // removes a slime, so this is a defensive fallback, not a real case.
+      entry._preyEntry = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = FROG_IDLE_MIN;
+    } else if (advanceFrogHop(entry, dt)) {
+      const preyX = prey._wx !== undefined ? prey._wx : prey.x + 0.5;
+      const preyZ = prey._wz !== undefined ? prey._wz : prey.z + 0.5;
+      const dist = Math.hypot(preyX - entry._wx, preyZ - entry._wz);
+      if (dist <= FROG_EAT_RANGE) {
+        entry._mobState = 'eating';
+        entry._eatElapsed = 0;
+        entry._mobYaw = Math.atan2(preyX - entry._wx, preyZ - entry._wz);
+      } else {
+        startFrogHopToward(entry, preyX, preyZ); // keep closing in, tracking the slime's own live position
+      }
+    }
+  } else if (entry._mobState === 'eating') {
+    entry._eatElapsed += dt;
+    if (entry._eatElapsed >= FROG_EAT_DURATION) {
+      if (entry._preyEntry) eatSlime(entry._preyEntry);
+      entry._preyEntry = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = FROG_IDLE_MIN + Math.random() * (FROG_IDLE_MAX - FROG_IDLE_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y + entry._hopHeight, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  // The real tongue-lick: retracted flat the rest of the time, stretches
+  // out and snaps back only during the real 'eating' animation window.
+  const tongueScale = entry._mobState === 'eating' ? 1 + Math.sin((entry._eatElapsed / FROG_EAT_DURATION) * Math.PI) * 3 : 0.01;
+  for (const c of obj.children) if (c.userData.isFrogTongue) c.scale.z = tongueScale;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -7394,7 +7602,7 @@ function renderBlueprint(model) {
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
-    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'],
+    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -7456,7 +7664,7 @@ function renderBlueprint(model) {
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
-    panda: 'Panda', slimeball: 'Slimeball',
+    panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -7560,6 +7768,7 @@ function renderCommands(model) {
       else if (d.type === 'torchflower_seed') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:torchflower`);
       else if (d.type === 'panda') lines.push(`summon minecraft:panda ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d.personality ? ` {MainGene:"${d.personality}"}` : ''}`);
       else if (d.type === 'slimeball') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:slime_ball",Count:1}}`);
+      else if (d.type === 'frog') lines.push(`summon minecraft:frog ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
