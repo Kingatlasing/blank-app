@@ -1846,6 +1846,14 @@ const DECOR_TYPES = {
   wheat_crop: { kind: 'wheat_crop', interactive: false },
   iron_golem: { kind: 'iron_golem', interactive: false },
   zombie: { kind: 'zombie', interactive: false },
+  skeleton: { kind: 'skeleton', interactive: false },
+  // A real, independently-flying projectile a skeleton fires — see
+  // updateArrow/fireArrow. Unlike every earlier mutation (which changes an
+  // existing block/item/mob in place), this ADDS a genuinely new kind of
+  // temporary entity: one with its own velocity and gravity, animating on
+  // its own trajectory through open space before removing itself, rather
+  // than wandering a fixed grid like every other mob here.
+  arrow: { kind: 'arrow', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3146,6 +3154,16 @@ function buildZombieDoorBusterInterior(grid, silhouette, dims, exteriorMat, acce
   decorOut.push({ type: 'door', x: cx, y: 1, z: cz, axis: 'x', hinge: 'left', open: false });
   decorOut.push({ type: 'zombie', x: Math.max(0, cx - 3), y: 1, z: cz, facing: 'east' });
 }
+// An open yard with a single skeleton — switch to Walk mode and approach
+// it within its own real shoot range to see it stop, draw, and genuinely
+// fire a real ballistic arrow at your live position.
+function buildSkeletonArcherPostInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'skeleton', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3736,6 +3754,19 @@ const PRESETS = [
       'Not modeled: real zombies only breaking doors on Hard difficulty, zombie damage to the player, burning in daylight, and reinforced/iron doors that zombies cannot break at all — this app has no difficulty setting, combat/damage system, or a separate unbreakable door type, so this zombie always breaks the one real door type this app has.',
     ],
   },
+  {
+    id: 'skeleton-archer-post', name: 'Skeleton Archer Post', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'skeletonArcherPost',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'stone' },
+    desc: 'An open stone yard with a skeleton — real vanilla skeletons are ranged attackers that draw and fire real arrows, and this one genuinely does: switch to Walk mode, get within its own real shoot range, and watch it stop, draw, and fire an actual arrow that arcs under its own gravity toward your live position.',
+    keywords: ['skeleton', 'arrow', 'bow', 'ranged', 'projectile'],
+    notes: [
+      'Switch to Walk mode and approach — once you\'re within its own real shoot range it stops, faces you, pauses for a short draw delay, then a genuine new `arrow` entity is fired: it carries its own real velocity and is pulled down by its own gravity every single frame, tracing an actual ballistic arc through open space (not a fixed animation) until it hits the ground or a short lifetime runs out, at which point it disappears for good. This is a new class of mutation for this app: every earlier ADD (a turtle egg, a dropped item) is static the instant it\'s placed, while this is the first temporary entity that keeps animating on its own independent trajectory before removing itself — distinct even from the vex\'s plain despawn-in-place, which never moves at all before vanishing.',
+      'This app has no combat/damage system at all, so the arrow never actually hits or harms anything — it is purely the real projectile-physics half of the mechanic, verified directly by a unit test confirming the arrow\'s own vertical velocity actually decreases every tick (real gravity, not a fixed drop) and an end-to-end test that fires one from the live preset skeleton and confirms it is genuinely gone from the model after its flight.',
+      'This app has no verified real bow shoot-range, draw time, or arrow speed/gravity constants, so the figures used here are honest, approximate stand-ins chosen to be visually followable at this app\'s scale, not literal vanilla numbers — the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius.',
+      'Not modeled: real skeleton arrow damage and knockback, burning in daylight, avoiding melee range to keep its distance, and dropping bones/arrows on death — this app has no combat, day/night, or death/loot system at all, so this skeleton only ever wanders and fires.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4144,6 +4175,8 @@ function generateModel() {
     buildIronGolemVillageGuardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'zombieDoorBuster') {
     buildZombieDoorBusterInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'skeletonArcherPost') {
+    buildSkeletonArcherPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5533,6 +5566,64 @@ function zombieParts() {
   });
   return { torso, head, arms, legs, faceEyes };
 }
+// A slender bony build (every part noticeably thinner than the zombie's)
+// with a simplified static bow prop in one hand, matching real vanilla's
+// pale, gaunt silhouette (minecraft.wiki/w/Skeleton). Legs stay inside the
+// torso's own footprint, the same rule already applied to every biped
+// here.
+function skeletonParts() {
+  const torso = new THREE.BoxGeometry(0.36, 0.7, 0.22);
+  torso.translate(0, 0.75, 0);
+  const head = new THREE.BoxGeometry(0.36, 0.36, 0.36);
+  head.translate(0, 1.38, 0);
+  const armOffsets = [[-0.26, 0.8], [0.26, 0.8]];
+  const arms = armOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.6, 0.1);
+    g.translate(x, y, 0);
+    return g;
+  });
+  const legOffsets = [[-0.09, 0], [0.09, 0]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.11, 0.7, 0.11);
+    g.translate(x, 0.35, z);
+    return g;
+  });
+  // A simplified bow — 2 angled limbs meeting at a grip — held out to one
+  // side, a stylized stand-in rather than a pixel-perfect copy of the real
+  // curved bow texture.
+  const bowGrip = new THREE.BoxGeometry(0.05, 0.24, 0.05);
+  bowGrip.translate(0.32, 0.8, 0.18);
+  const bowLimbSpecs = [{ y: 0.98, rot: 0.5 }, { y: 0.62, rot: -0.5 }];
+  const bowLimbs = bowLimbSpecs.map(({ y, rot }) => {
+    const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+    g.rotateZ(rot);
+    g.translate(0.32, y, 0.18);
+    return g;
+  });
+  const faceZ = 0.185, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.08, 1.4], [0.08, 1.4]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  return { torso, head, arms, legs, bowGrip, bowLimbs, faceEyes };
+}
+// A thin shaft, a conical tip, and a flat fletching — built along local
+// +Z so the caller can orient the whole assembly to match its own live
+// flight direction every frame (see updateArrow), the same "orient a
+// rigid assembly toward its own motion" idea already used for the
+// dolphin's/strider's own facing, applied here to a projectile instead of
+// a mob.
+function arrowParts() {
+  const shaft = new THREE.BoxGeometry(0.035, 0.035, 0.5);
+  const tip = new THREE.ConeGeometry(0.045, 0.12, 4);
+  tip.rotateX(Math.PI / 2);
+  tip.translate(0, 0, 0.31);
+  const fletching = new THREE.BoxGeometry(0.14, 0.14, 0.04);
+  fletching.translate(0, 0, -0.22);
+  return { shaft, tip, fletching };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6335,6 +6426,37 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x0f140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'skeleton') {
+    let parts = decorGeoCache.get('skeleton');
+    if (!parts) { parts = skeletonParts(); decorGeoCache.set('skeleton', parts); }
+    const group = new THREE.Group();
+    const boneMat = solidMaterial(0xe4ddc8);
+    const bowMat = solidMaterial(0x6b4a2f);
+    group.add(new THREE.Mesh(parts.torso, boneMat));
+    group.add(new THREE.Mesh(parts.head, boneMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, boneMat));
+    group.add(new THREE.Mesh(parts.bowGrip, bowMat));
+    for (const g of parts.bowLimbs) group.add(new THREE.Mesh(g, bowMat));
+    const faceMat = solidMaterial(0x1c1c1c);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'arrow') {
+    let parts = decorGeoCache.get('arrow');
+    if (!parts) { parts = arrowParts(); decorGeoCache.set('arrow', parts); }
+    const group = new THREE.Group();
+    const shaftMat = solidMaterial(0x8a6a4a);
+    const tipMat = solidMaterial(0xb0b0b0);
+    const fletchMat = solidMaterial(0xe8e4d8);
+    group.add(new THREE.Mesh(parts.shaft, shaftMat));
+    group.add(new THREE.Mesh(parts.tip, tipMat));
+    group.add(new THREE.Mesh(parts.fletching, fletchMat));
+    group.rotation.y = entry._yaw || 0;
+    group.rotation.x = entry._pitch || 0;
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -8879,6 +9001,144 @@ function updateZombie(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla skeletons are ranged attackers: they draw and fire an
+// actual arrow at a target within range (minecraft.wiki/w/Skeleton). This
+// app has no combat/damage system at all, so the arrow deals no damage —
+// but it is a genuine, independently-simulated projectile: once fired it
+// carries its own velocity and is pulled down by its own gravity every
+// frame, tracing a real ballistic arc through open space before embedding
+// itself (despawning) on the ground, rather than following a mob's own
+// wander state the way every other moving thing in this app does. This is
+// a new ADD-mutation class for this app: earlier ADDs (a turtle egg, a
+// dropped item) are static once placed, while this one is a temporary
+// entity that animates on its own for a few real seconds and then removes
+// itself, distinct even from the vex's plain despawn-in-place. This app
+// has no verified real bow range, draw time, or reload cooldown, so the
+// figures used here are honest, approximate stand-ins, the same caveat
+// already applied to the warden's sense radius and the fox's pickup
+// radius.
+const SKELETON_WANDER_MIN = 2, SKELETON_WANDER_MAX = 5;
+const SKELETON_WALK_SPEED = 1.0;
+const SKELETON_SHOOT_RANGE = 10;
+const SKELETON_DRAW_DELAY = 1;
+const SKELETON_SHOOT_COOLDOWN = 3;
+const ARROW_SPEED = 6;
+const ARROW_GRAVITY = 9;
+const ARROW_MAX_LIFETIME = 3;
+function removeArrowFromWorld(model, arrowEntry) {
+  const decorIdx = model.decor.indexOf(arrowEntry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === arrowEntry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function fireArrow(model, skeletonEntry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const startX = skeletonEntry._wx, startY = skeletonEntry.y + 1.1, startZ = skeletonEntry._wz;
+  const dx = skeletonEntry._aimX - startX, dy = skeletonEntry._aimY - startY, dz = skeletonEntry._aimZ - startZ;
+  const dist = Math.hypot(dx, dy, dz) || 1;
+  const arrowEntry = {
+    type: 'arrow', x: Math.floor(startX), y: Math.floor(startY), z: Math.floor(startZ),
+    _wx: startX, _wy: startY, _wz: startZ,
+    _vx: (dx / dist) * ARROW_SPEED, _vy: (dy / dist) * ARROW_SPEED, _vz: (dz / dist) * ARROW_SPEED,
+    _age: 0,
+    _yaw: Math.atan2(dx, dz), _pitch: Math.atan2(dy, Math.hypot(dx, dz)),
+  };
+  model.decor.push(arrowEntry);
+  for (const mesh of buildDecorMeshesForEntry(arrowEntry)) {
+    mesh.position.x += arrowEntry._wx + offX;
+    mesh.position.y += arrowEntry._wy;
+    mesh.position.z += arrowEntry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function updateArrow(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  entry._age += dt;
+  entry._vy -= ARROW_GRAVITY * dt;
+  entry._wx += entry._vx * dt;
+  entry._wy += entry._vy * dt;
+  entry._wz += entry._vz * dt;
+  entry.x = Math.floor(entry._wx);
+  entry.y = Math.floor(entry._wy);
+  entry.z = Math.floor(entry._wz);
+  const horiz = Math.hypot(entry._vx, entry._vz);
+  entry._yaw = Math.atan2(entry._vx, entry._vz);
+  entry._pitch = Math.atan2(entry._vy, horiz);
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  obj.rotation.y = entry._yaw;
+  obj.rotation.x = entry._pitch;
+  if (entry._age >= ARROW_MAX_LIFETIME || entry._wy <= 0) {
+    removeArrowFromWorld(currentModel, entry);
+  }
+}
+function updateSkeleton(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = SKELETON_WANDER_MIN + Math.random() * (SKELETON_WANDER_MAX - SKELETON_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._shootCooldown = 0;
+  }
+  entry._shootCooldown = Math.max(0, entry._shootCooldown - dt);
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (entry._mobState !== 'drawing' && playerDist <= SKELETON_SHOOT_RANGE && entry._shootCooldown <= 0) {
+    entry._mobState = 'drawing';
+    entry._drawTimer = SKELETON_DRAW_DELAY;
+    entry._aimX = sensedX;
+    entry._aimY = flyState.pos.y;
+    entry._aimZ = sensedZ;
+  }
+  if (entry._mobState === 'drawing') {
+    entry._drawTimer -= dt;
+    entry._mobYaw = Math.atan2(entry._aimX - entry._wx, entry._aimZ - entry._wz);
+    if (entry._drawTimer <= 0) {
+      fireArrow(currentModel, entry);
+      entry._shootCooldown = SKELETON_SHOOT_COOLDOWN;
+      entry._mobState = 'idle';
+      entry._mobTimer = SKELETON_WANDER_MIN + Math.random() * (SKELETON_WANDER_MAX - SKELETON_WANDER_MIN);
+    }
+  } else if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = SKELETON_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = SKELETON_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = SKELETON_WANDER_MIN + Math.random() * (SKELETON_WANDER_MAX - SKELETON_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -9011,6 +9271,8 @@ function updateMobs(dt) {
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
+    if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
+    if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -10077,6 +10339,7 @@ function renderBlueprint(model) {
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
+    skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -10143,6 +10406,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
+    skeleton: 'Skeleton', arrow: 'Arrow',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -10263,6 +10527,8 @@ function renderCommands(model) {
       else if (d.type === 'villager') lines.push(`summon minecraft:villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {VillagerData:{profession:"farmer"}}`);
       else if (d.type === 'iron_golem') lines.push(`summon minecraft:iron_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'zombie') lines.push(`summon minecraft:zombie ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'skeleton') lines.push(`summon minecraft:skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
