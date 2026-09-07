@@ -3426,8 +3426,8 @@ const PRESETS = [
   {
     id: 'vex-chamber', name: 'Vex Chamber', shape: 'box', category: 'Farms & Automation',
     real: { height: 5, baseX: 7, baseZ: 7 }, interiorMode: 'vexChamber',
-    blocks: { exterior: 'cobblestone', interior: 'cobblestone', accent: 'stone_bricks' },
-    desc: 'A small, fully sealed cobblestone chamber with two vexes flying freely through its walls — real vanilla vexes are "not hindered by solid blocks in any way," and these two genuinely ignore the room\'s real solid geometry rather than being confined by it like every other mob in this app.',
+    blocks: { exterior: 'dark_oak_planks', interior: 'dark_oak_planks', accent: 'cobblestone' },
+    desc: 'A small, fully sealed dark-wood chamber with two vexes flying freely through its walls — real vanilla vexes are "not hindered by solid blocks in any way," and these two genuinely ignore the room\'s real solid geometry rather than being confined by it like every other mob in this app.',
     keywords: ['vex', 'phase', 'wall', 'evoker', 'chamber', 'despawn'],
     notes: [
       'Every other flying/floating mob here still needs something real to move through: the bat needs a solid ceiling to roost under, and the ghast needs actual open air (`ghastCellFloatable`) to drift through. A vex needs neither — its own wander target is picked with no collision check at all, so watch it fly straight through this chamber\'s real solid walls and ceiling, exactly matching real vanilla\'s "fly through walls, floors, [and] the ground itself."',
@@ -3752,7 +3752,11 @@ function generateModel() {
 
   const fillMode = el('fill-mode').value;
   const wallThickness = Math.max(1, parseInt(el('wall-thickness').value, 10) || 1);
-  const grid = new Uint8Array(dims.sx * dims.sy * dims.sz);
+  // Uint16Array, not Uint8Array: this stores real material-index values
+  // (1..MATERIALS.length), and the palette has grown past 255 entries —
+  // a Uint8Array would silently wrap values above 255 around to the wrong
+  // material. Uint16Array (max 65535) gives enormous headroom.
+  const grid = new Uint16Array(dims.sx * dims.sy * dims.sz);
 
   if (fillMode === 'hollow') {
     const shell = hollowCarve(silhouette, dims, wallThickness);
@@ -7943,7 +7947,10 @@ function renderThree(model, preserveCamera) {
   const note = el('render-note');
   if (total > RENDER_INSTANCE_CAP) {
     const surface = hollowCarve(silhouette, dims, 1);
-    const trimmed = new Uint8Array(grid.length);
+    // Uint16Array, matching grid itself — this copies real material-index
+    // values out of grid, and a Uint8Array here would silently re-truncate
+    // any value above 255 right back down, even after the fix above.
+    const trimmed = new Uint16Array(grid.length);
     for (let i = 0; i < grid.length; i++) trimmed[i] = (surface[i] && grid[i]) ? grid[i] : 0;
     sourceGrid = trimmed;
     note.style.display = 'block';
@@ -8144,7 +8151,11 @@ function renderCommands(model) {
   let truncated = false;
   outer:
   for (let y = 0; y < dims.sy; y++) {
-    const mask = new Uint8Array(dims.sx * dims.sz);
+    // Uint16Array: this mask carries real material-index values (read back
+    // via `r.type` below to look up the block name for the /fill command),
+    // not a boolean flag — a Uint8Array here would silently corrupt the
+    // exported command's block name for any material above index 255.
+    const mask = new Uint16Array(dims.sx * dims.sz);
     for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) mask[z * dims.sx + x] = grid[idx(x, y, z, dims)];
     let any = false;
     for (let i = 0; i < mask.length; i++) if (mask[i]) { any = true; break; }
