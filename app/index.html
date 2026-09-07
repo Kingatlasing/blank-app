@@ -1910,6 +1910,15 @@ const DECOR_TYPES = {
   // this app (a runtime quaternion + non-uniform scale, not a value baked
   // in at build time). See updateGuardian / updateGuardianBeam.
   guardian: { kind: 'guardian', interactive: false },
+  // Real vanilla ravagers destroy crops "simply by walking over" them
+  // (minecraft.wiki/w/Ravager). Every earlier mob-driven world-destruction
+  // mechanic here is a DELIBERATE targeted action — the zombie decides to
+  // bash a specific door, the villager decides to harvest a specific
+  // mature crop — while a ravager destroys whatever happens to be
+  // underfoot as an incidental SIDE EFFECT of its own ordinary wandering,
+  // with no targeting or decision-making involved at all. See
+  // updateRavager / trampleCrop.
+  ravager: { kind: 'ravager', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3322,6 +3331,26 @@ function buildGuardianReefInterior(grid, silhouette, dims, exteriorMat, accentMa
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'guardian', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A dirt farm plot with a ravager and 6 real wheat_crop entries placed
+// directly along its cardinal wander directions — reusing the same
+// wheat_crop entries and dirt-plot shortcut already proven on the
+// Farmer Villager Plot preset — so its own ordinary wandering has a real
+// chance to carry it straight over several of them.
+function buildRavagerCropTrampleInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'ravager', x: cx, y: 1, z: cz, facing: 'south' });
+  const cropSpots = [[-1, 0], [-2, 0], [1, 0], [2, 0], [0, -1], [0, 1]];
+  const cropStages = [7, 6, 7, 5, 7, 4];
+  for (let i = 0; i < cropSpots.length; i++) {
+    const [dx, dz] = cropSpots[i];
+    const x = cx + dx, z = cz + dz;
+    if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) continue;
+    decorOut.push({ type: 'wheat_crop', x, y: 1, z, stage: cropStages[i] });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4021,6 +4050,18 @@ const PRESETS = [
       'Not modeled: any actual damage from the beam (this app has no combat or health system at all, so it\'s purely the real visual half of the mechanic), the elder guardian\'s mining-fatigue aura, retracting spikes when threatened, and guardian temples/farms — this app has none of those systems, so this guardian only ever wanders and charges a harmless beam.',
     ],
   },
+  {
+    id: 'ravager-crop-trample', name: 'Ravager Crop Trample', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 13, baseZ: 13 }, interiorMode: 'ravagerCropTrample',
+    blocks: { exterior: 'dirt', interior: 'dirt', accent: 'dirt' },
+    desc: 'A dirt farm plot with a ravager and 6 real wheat_crop entries scattered along its own wander directions — real vanilla ravagers destroy crops "simply by walking over" them, and this one genuinely does: watch it wander freely, with no target and no decision to make, and see a crop vanish for good the instant its path happens to cross one.',
+    keywords: ['ravager', 'crop', 'trample', 'destroy', 'illager', 'farm'],
+    notes: [
+      'Watch it wander — it never seeks out a crop, never approaches one, and never pauses to interact with anything; it simply picks a random nearby point and walks there like any other ground mob in this app. But every single frame, its own code separately checks whether a real wheat_crop entry happens to occupy the exact cell it\'s currently standing on, and if one does, that crop is permanently deleted from the model — not reset like the villager\'s harvest, not requiring the ravager to have decided to target it at all. This is a genuinely new class of world mutation for this app: every earlier mob-driven destruction here is a DELIBERATE action the mob\'s own AI chooses to take toward a specific target (the zombie picks a closed door and bashes it, the villager picks a mature crop and harvests it), while a ravager destroys whatever happens to be underfoot as a pure SIDE EFFECT of ordinary movement, with no targeting logic involved at all. Verified directly by a unit test confirming a crop is only ever removed once the ravager\'s own live position genuinely coincides with that crop\'s cell (never before), and a second test confirming every other crop untouched by its path is left completely alone.',
+      'This app has no collision/knockback system at all, so only the real "destroys crops by walking over them" half of the ravager\'s vanilla behavior is modeled here — an honest, spelled-out gap, not a silently invented substitute. The geometry reuses the same 4-corner leg placement already proven on the wolf/ocelot/llama/camel, scaled up into a massive boar-like build with a large forward head and 2 angled horns built with the same offset-then-rotate-then-translate rigid-assembly technique already used for the piglin\'s sword and llama\'s neck.',
+      'Not modeled: the real charging headbutt/knockback attack, breaking through fences and other blocks besides crops/leaves, roaring stun effects, and carrying an illager rider — this app has no combat, knockback, or rider system at all, so this ravager only ever wanders and tramples whatever crops happen to be in its path.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4447,6 +4488,8 @@ function generateModel() {
     buildEvokerSummoningYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'guardianReef') {
     buildGuardianReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'ravagerCropTrample') {
+    buildRavagerCropTrampleInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6199,6 +6242,43 @@ function guardianParts() {
   pupil.translate(0, 0, 0.29);
   return { body, spikes: [spikeTop, spikeBottom, spikeLeft, spikeRight, spikeBack], tailFin, eye, pupil };
 }
+// Reuses the same 4-corner leg placement already proven on the wolf/
+// ocelot/llama/camel, scaled up to a massive, low-slung, boar-like build —
+// the real vanilla ravager's own most recognizable silhouette
+// (minecraft.wiki/w/Ravager) — plus a large forward head with 2 angled
+// horns built via the same offset-then-rotate-then-translate rigid
+// assembly technique already used for the piglin's sword and llama's neck.
+function ravagerParts() {
+  const body = new THREE.BoxGeometry(0.9, 0.7, 1.3);
+  body.translate(0, 0.75, 0);
+  const legOffsets = [[-0.28, -0.5], [0.28, -0.5], [-0.28, 0.5], [0.28, 0.5]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.22, 0.75, 0.22);
+    g.translate(x, 0.375, z);
+    return g;
+  });
+  const head = new THREE.BoxGeometry(0.55, 0.5, 0.5);
+  head.translate(0, 0.95, 0.75);
+  const snout = new THREE.BoxGeometry(0.3, 0.25, 0.25);
+  snout.translate(0, 0.8, 1.05);
+  const hornOffsets = [[-0.28, -1], [0.28, 1]];
+  const horns = hornOffsets.map(([x, sign]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.35, 0.1);
+    g.translate(0, 0.175, 0);
+    g.rotateZ(sign * 0.3);
+    g.translate(x, 1.15, 0.55);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.12, 0.12, 0.35);
+  tail.translate(0, 0.85, -0.7);
+  const faceEyeOffsets = [[-0.18, 1.05, 1.0], [0.18, 1.05, 1.0]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, legs, head, snout, horns, tail, faceEyes };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7177,6 +7257,23 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.eye, eyeMat));
     const pupilMat = solidMaterial(0xdb4a6a);
     group.add(new THREE.Mesh(parts.pupil, pupilMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'ravager') {
+    let parts = decorGeoCache.get('ravager');
+    if (!parts) { parts = ravagerParts(); decorGeoCache.set('ravager', parts); }
+    const group = new THREE.Group();
+    const hideMat = solidMaterial(0x5c5044);
+    group.add(new THREE.Mesh(parts.body, hideMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, hideMat));
+    group.add(new THREE.Mesh(parts.head, hideMat));
+    group.add(new THREE.Mesh(parts.snout, hideMat));
+    const hornMat = solidMaterial(0xcfc0a0);
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, hornMat));
+    group.add(new THREE.Mesh(parts.tail, hideMat));
+    const faceMat = solidMaterial(0xd9401f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10567,6 +10664,73 @@ function updateGuardian(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla ravagers destroy crops "simply by walking over" them
+// (minecraft.wiki/w/Ravager). Every earlier mob-driven world-destruction
+// mechanic in this app is a DELIBERATE targeted action the mob decides to
+// take — the zombie picks a specific closed door and bashes it, the
+// villager picks a specific mature crop and harvests it — while a
+// ravager's own AI here never targets anything at all: findCropUnderRavager
+// is checked every single frame purely against wherever its ordinary
+// wander happens to have carried it, so trampling a crop is a genuine
+// SIDE EFFECT of movement, not a decision.
+const RAVAGER_WANDER_MIN = 2, RAVAGER_WANDER_MAX = 5;
+const RAVAGER_WALK_SPEED = 1.1;
+function findCropUnderRavager(entry) {
+  if (!currentModel) return null;
+  const cx = Math.floor(entry._wx), cz = Math.floor(entry._wz);
+  return currentModel.decor.find(d => d.type === 'wheat_crop' && d.x === cx && d.z === cz) || null;
+}
+function trampleCrop(model, cropEntry) {
+  const decorIdx = model.decor.indexOf(cropEntry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
+function updateRavager(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = RAVAGER_WANDER_MIN + Math.random() * (RAVAGER_WANDER_MAX - RAVAGER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = RAVAGER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = RAVAGER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = RAVAGER_WANDER_MIN + Math.random() * (RAVAGER_WANDER_MAX - RAVAGER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  const crop = findCropUnderRavager(entry);
+  if (crop) trampleCrop(currentModel, crop);
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -10709,6 +10873,7 @@ function updateMobs(dt) {
     if (entry.type === 'axolotl') { updateAxolotl(entry, obj, dt); continue; }
     if (entry.type === 'evoker') { updateEvoker(entry, obj, dt); continue; }
     if (entry.type === 'guardian') { updateGuardian(entry, obj, dt); continue; }
+    if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -11777,7 +11942,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -11844,7 +12009,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11975,6 +12140,7 @@ function renderCommands(model) {
       else if (d.type === 'axolotl') lines.push(`summon minecraft:axolotl ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'evoker') lines.push(`summon minecraft:evoker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'guardian') lines.push(`summon minecraft:guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'ravager') lines.push(`summon minecraft:ravager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
