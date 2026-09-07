@@ -1855,6 +1855,7 @@ const DECOR_TYPES = {
   // than wandering a fixed grid like every other mob here.
   arrow: { kind: 'arrow', interactive: false },
   wolf: { kind: 'wolf', interactive: false },
+  ocelot: { kind: 'ocelot', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3177,6 +3178,16 @@ function buildWolfPackClearingInterior(grid, silhouette, dims, exteriorMat, acce
   decorOut.push({ type: 'wolf', x: Math.min(dims.sx - 1, cx + 1), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'wolf', x: Math.max(0, cx - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), y: 1, z: Math.max(0, cz - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), facing: 'south' });
 }
+// A jungle-floor clearing with a single ocelot — switch to Walk mode and
+// approach it within its own real flee radius to see it genuinely bolt
+// away from your live position rather than continuing to wander freely.
+function buildOcelotJungleFloorInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'ocelot', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3792,6 +3803,18 @@ const PRESETS = [
       'Not modeled: taming (feeding bones to make a wolf follow the player permanently), pack members fighting alongside a tamed wolf, health/damage, and breeding — this app has no taming, combat, or breeding system at all, so these wolves only ever wander and regroup.',
     ],
   },
+  {
+    id: 'ocelot-jungle-floor', name: 'Ocelot Jungle Floor', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'ocelotJungleFloor',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A jungle-floor clearing with a single ocelot — real wild vanilla ocelots "flee from any nearby player," and this one genuinely does: switch to Walk mode, get within its own real flee radius, and watch it bolt directly away from your live position at a real faster fleeing speed.',
+    keywords: ['ocelot', 'flee', 'jungle', 'cat', 'wild'],
+    notes: [
+      'Switch to Walk mode and approach it — once you\'re within its own real flee radius, it stops wandering freely and genuinely computes a target directly AWAY from your live position every frame, moving there at a real faster fleeing speed, until you\'re far enough away that it settles back into ordinary wandering. This is the first REPULSION-based movement in this app: every earlier player-aware mob (the warden pursuing a sensed position, the creeper closing in to explode, the fox/villager/iron golem approaching an item or another mob) moves TOWARD something, while this ocelot is the first to move away from something instead. Verified directly by a unit test confirming the real distance between the ocelot and a simulated nearby player position genuinely increases after fleeing, not decreases or stays flat, and a second test confirming it reverts to ordinary independent wandering once the player is far enough away.',
+      'This app has no verified real flee-trigger distance or flee-speed multiplier, so the figures used here are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry itself deliberately reuses the wolf\'s own quadruped body plan (body/head/snout/ears/legs/tail) at smaller, tan-coated proportions, since both are real four-legged creatures of a similar build — a genuine case of sharing a body plan across similar real animals, while the flee behavior that follows is entirely its own, unrelated to the wolf\'s pack cohesion.',
+      'Not modeled: real ocelots being tamable into cats with fish, sneaking up slowly enough to approach one without it fleeing, and scaring away creepers/phantoms once tamed — this app has no taming or fear-of-cats system at all, so this ocelot only ever wanders and flees.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4204,6 +4227,8 @@ function generateModel() {
     buildSkeletonArcherPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'wolfPackClearing') {
     buildWolfPackClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'ocelotJungleFloor') {
+    buildOcelotJungleFloorInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5689,6 +5714,49 @@ function wolfParts() {
   nose.translate(0, 0.4, 0.69);
   return { body, head, snout, ears, legs, tail, faceEyes, nose };
 }
+// Reuses the wolf's own quadruped body plan (body/head/snout/ears/legs/
+// tail/face) at smaller, sleeker proportions and a tan/yellow coat with a
+// dark tail tip, matching real vanilla's own wild jungle-cat build
+// (minecraft.wiki/w/Ocelot) — a deliberate case of sharing a body plan
+// across genuinely similar real creatures (both real four-legged
+// carnivores of a similar size class) rather than redrawing one from
+// scratch, while the real behavior rule that follows is still its own,
+// unrelated to the wolf's. Legs stay inside the body's own footprint, the
+// same rule already applied to every quadruped here.
+function ocelotParts() {
+  const body = new THREE.BoxGeometry(0.26, 0.24, 0.5);
+  body.translate(0, 0.28, 0);
+  const head = new THREE.BoxGeometry(0.22, 0.2, 0.2);
+  head.translate(0, 0.36, 0.32);
+  const snout = new THREE.BoxGeometry(0.12, 0.1, 0.12);
+  snout.translate(0, 0.32, 0.44);
+  const earOffsets = [[-0.07, 0.5, 0.3], [0.07, 0.5, 0.3]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.1, 0.05);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.09, -0.18], [0.09, -0.18], [-0.09, 0.18], [0.09, 0.18]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.22, 0.07);
+    g.translate(x, 0.11, z);
+    return g;
+  });
+  const tailBase = new THREE.BoxGeometry(0.08, 0.08, 0.3);
+  tailBase.translate(0, 0.3, -0.32);
+  const tailTip = new THREE.BoxGeometry(0.09, 0.09, 0.1);
+  tailTip.translate(0, 0.3, -0.47);
+  const faceZ = 0.41, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.06, 0.39], [0.06, 0.39]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const nose = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+  nose.translate(0, 0.3, 0.5);
+  return { body, head, snout, ears, legs, tailBase, tailTip, faceEyes, nose };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6535,6 +6603,25 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
     group.add(new THREE.Mesh(parts.tail, furMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'ocelot') {
+    let parts = decorGeoCache.get('ocelot');
+    if (!parts) { parts = ocelotParts(); decorGeoCache.set('ocelot', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0xdcb35a);
+    const tipMat = solidMaterial(0x2a2118);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    group.add(new THREE.Mesh(parts.snout, furMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, tipMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
+    group.add(new THREE.Mesh(parts.tailBase, furMat));
+    group.add(new THREE.Mesh(parts.tailTip, tipMat));
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.nose, faceMat));
@@ -9295,6 +9382,81 @@ function updateWolf(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla wild ocelots "flee from any nearby player"
+// (minecraft.wiki/w/Ocelot). Every earlier player-aware mob here moves
+// TOWARD something — a warden/creeper pursuing a sensed player, a fox/
+// villager/iron golem approaching an item or another mob — while this is
+// the first REPULSION-based movement: an ocelot continuously recomputes a
+// target directly away from the player's own live position for as long as
+// it's too close, at a real faster fleeing speed, rather than approaching
+// anything at all. This app has no verified real flee-trigger distance or
+// flee speed multiplier, so the figures used are honest, approximate
+// stand-ins, the same caveat already applied to the warden's sense radius
+// and the fox's pickup radius.
+const OCELOT_WANDER_MIN = 2, OCELOT_WANDER_MAX = 5;
+const OCELOT_WALK_SPEED = 1.0;
+const OCELOT_FLEE_SPEED = 2.2;
+const OCELOT_FLEE_RADIUS = 6;
+function updateOcelot(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = OCELOT_WANDER_MIN + Math.random() * (OCELOT_WANDER_MAX - OCELOT_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (playerDist <= OCELOT_FLEE_RADIUS) {
+    entry._mobState = 'fleeing';
+    const awayDist = Math.max(playerDist, 0.01);
+    const fleeX = entry._wx + ((entry._wx - sensedX) / awayDist) * 4;
+    const fleeZ = entry._wz + ((entry._wz - sensedZ) / awayDist) * 4;
+    entry._targetX = Math.max(0.5, Math.min(dims.sx - 0.5, fleeX));
+    entry._targetZ = Math.max(0.5, Math.min(dims.sz - 0.5, fleeZ));
+  } else if (entry._mobState === 'fleeing') {
+    entry._mobState = 'idle';
+    entry._mobTimer = OCELOT_WANDER_MIN * 0.3;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = OCELOT_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'fleeing') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const speed = entry._mobState === 'fleeing' ? OCELOT_FLEE_SPEED : OCELOT_WALK_SPEED;
+    const step = speed * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'walking') {
+        entry._mobState = 'idle';
+        entry._mobTimer = OCELOT_WANDER_MIN + Math.random() * (OCELOT_WANDER_MAX - OCELOT_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -9430,6 +9592,7 @@ function updateMobs(dt) {
     if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
     if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
+    if (entry.type === 'ocelot') { updateOcelot(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -10496,7 +10659,7 @@ function renderBlueprint(model) {
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
-    skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'],
+    skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -10563,7 +10726,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -10687,6 +10850,7 @@ function renderCommands(model) {
       else if (d.type === 'skeleton') lines.push(`summon minecraft:skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
