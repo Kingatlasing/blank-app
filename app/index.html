@@ -5048,12 +5048,17 @@ function silverfishParts() {
   });
   return { segments, antennae };
 }
-// A stocky boar-like torso, a wide flattened head with a pig snout and 2
-// tusks, 2 small ears, and 2 arms/2 legs — real vanilla piglins are stout,
-// pig-faced humanoids. See DECOR_TYPES.piglin.
+// A stocky boar-like torso wearing a real leather-look vest and gold
+// belt, a wide flattened head with a pig snout, 2 tusks, and 2 large
+// prominent ears, 2 arms/2 legs with dark boots, and an optional held
+// sword — matched directly against a real reference image of the in-game
+// model (real vanilla piglins are always dressed, and sometimes carry a
+// weapon), rather than left bare-skinned. See DECOR_TYPES.piglin.
 function piglinParts() {
   const torso = new THREE.BoxGeometry(0.6, 0.7, 0.4);
   torso.translate(0, 0.75, 0);
+  const belt = new THREE.BoxGeometry(0.62, 0.1, 0.42);
+  belt.translate(0, 0.46, 0);
   const head = new THREE.BoxGeometry(0.42, 0.34, 0.36);
   head.translate(0, 1.28, 0.02);
   const snout = new THREE.BoxGeometry(0.2, 0.14, 0.14);
@@ -5064,9 +5069,9 @@ function piglinParts() {
     g.translate(x, y, z);
     return g;
   });
-  const earOffsets = [[-0.2, 1.46, -0.02], [0.2, 1.46, -0.02]];
+  const earOffsets = [[-0.25, 1.52, -0.04], [0.25, 1.52, -0.04]];
   const ears = earOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.1, 0.12, 0.06);
+    const g = new THREE.BoxGeometry(0.15, 0.2, 0.09);
     g.translate(x, y, z);
     return g;
   });
@@ -5082,7 +5087,27 @@ function piglinParts() {
     g.translate(x, 0.22, z);
     return g;
   });
-  return { torso, head, snout, tusks, ears, arms, legs };
+  const bootOffsets = [[-0.16, 0.22], [0.16, 0.22]];
+  const boots = bootOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.21, 0.12, 0.21);
+    g.translate(x, 0.06, z);
+    return g;
+  });
+  // A held sword (hilt + blade), angled up and out of the right hand —
+  // real vanilla piglins sometimes carry one, so this is only attached
+  // for some piglins (see the render branch), not every one. The blade
+  // is stacked above the hilt's own local origin BEFORE the shared
+  // rotate+translate, so the two rotate together as one real assembly
+  // rather than ending up misaligned.
+  const swordAngle = -0.6, swordX = 0.46, swordY = 0.58, swordZ = 0.06;
+  const swordHilt = new THREE.BoxGeometry(0.07, 0.16, 0.07);
+  swordHilt.rotateZ(swordAngle);
+  swordHilt.translate(swordX, swordY, swordZ);
+  const swordBlade = new THREE.BoxGeometry(0.06, 0.5, 0.06);
+  swordBlade.translate(0, 0.33, 0);
+  swordBlade.rotateZ(swordAngle);
+  swordBlade.translate(swordX, swordY, swordZ);
+  return { torso, belt, head, snout, tusks, ears, arms, legs, boots, swordHilt, swordBlade };
 }
 
 const decorGeoCache = new Map();
@@ -5727,14 +5752,26 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('piglin');
     if (!parts) { parts = piglinParts(); decorGeoCache.set('piglin', parts); }
     const group = new THREE.Group();
-    const bodyMat = solidMaterial(0xd48a68), tuskMat = solidMaterial(0xe8dcc0);
-    group.add(new THREE.Mesh(parts.torso, bodyMat));
-    group.add(new THREE.Mesh(parts.head, bodyMat));
-    group.add(new THREE.Mesh(parts.snout, bodyMat));
+    const skinMat = solidMaterial(0xe8a888), tuskMat = solidMaterial(0xe8dcc0);
+    const vestMat = solidMaterial(0x6b4a35), beltMat = solidMaterial(0xd4af37), bootMat = solidMaterial(0x1a1410);
+    group.add(new THREE.Mesh(parts.torso, vestMat));
+    group.add(new THREE.Mesh(parts.belt, beltMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.snout, skinMat));
     for (const g of parts.tusks) group.add(new THREE.Mesh(g, tuskMat));
-    for (const g of parts.ears) group.add(new THREE.Mesh(g, bodyMat));
-    for (const g of parts.arms) group.add(new THREE.Mesh(g, bodyMat));
-    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.boots) group.add(new THREE.Mesh(g, bootMat));
+    // Real vanilla piglins are only sometimes seen carrying a weapon —
+    // decided once per piglin and remembered on the entry itself so it
+    // doesn't randomly flicker on/off across a rebuild-mode re-render.
+    if (entry._hasSword === undefined) entry._hasSword = Math.random() < 0.6;
+    if (entry._hasSword) {
+      const swordMat = solidMaterial(0x8a7a3a);
+      group.add(new THREE.Mesh(parts.swordHilt, bootMat));
+      group.add(new THREE.Mesh(parts.swordBlade, swordMat));
+    }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
