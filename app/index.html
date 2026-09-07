@@ -1815,6 +1815,8 @@ const DECOR_TYPES = {
   frog: { kind: 'frog', interactive: false },
   goat: { kind: 'goat', interactive: false },
   vex: { kind: 'vex', interactive: false },
+  allay: { kind: 'allay', interactive: false },
+  dropped_item: { kind: 'dropped_item', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2966,6 +2968,30 @@ function buildVexChamberInterior(grid, silhouette, dims, exteriorMat, accentMat,
   decorOut.push({ type: 'vex', x: Math.max(1, cx - 1), y: cy, z: cz, facing: 'south' });
   decorOut.push({ type: 'vex', x: Math.min(dims.sx - 2, cx + 1), y: cy, z: cz, facing: 'north' });
 }
+// An open grass courtyard — no walls, matching every other single-mob
+// flourish preset — with a real note block placed as an actual block
+// (not decor), an allay already holding a real item, and several real
+// dropped items scattered within its own scan range so the collect-and-
+// deliver loop is directly observable, one item at a time.
+function buildAllayItemRelayInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const noteX = cx, noteZ = Math.max(1, cz - 3);
+  grid[idx(noteX, 1, noteZ, dims)] = MATERIAL_INDEX['note_block'] + 1;
+  if (!decorOut) return;
+  decorOut.push({
+    type: 'allay', x: cx, y: 1, z: cz, facing: 'south',
+    heldItemType: 'emerald', deliverX: noteX, deliverY: 2, deliverZ: noteZ,
+  });
+  const itemSpots = [[cx - 3, cz + 2], [cx + 3, cz + 1], [cx, cz + 3]];
+  for (const [ix, iz] of itemSpots) {
+    decorOut.push({
+      type: 'dropped_item', itemType: 'emerald',
+      x: Math.max(0, Math.min(dims.sx - 1, ix)), y: 1, z: Math.max(0, Math.min(dims.sz - 1, iz)),
+    });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3435,6 +3461,18 @@ const PRESETS = [
       'Not modeled: the real red "charging" glow and sword-lunge vexes show while actually attacking (this app has no combat or player-targeting for it), and the real 15×11×15 wander cuboid vanilla ties to its evoker (this app bounds its wander around its own spawn point instead, since there is no evoker position to tie it to).',
     ],
   },
+  {
+    id: 'allay-item-relay', name: 'Allay Item Relay', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'allayItemRelay',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'note_block' },
+    desc: 'An open grass courtyard with a real note block and an allay already holding an emerald, plus 3 real dropped emeralds scattered nearby — real vanilla allays "collect dropped instances of [their held] item and deliver them" to the note block they were given it near, and this one genuinely does exactly that, one item at a time.',
+    keywords: ['allay', 'note block', 'item', 'deliver', 'collect', 'relay'],
+    notes: [
+      'Watch it fly out to the nearest real dropped emerald, pick it up (a genuine removal of that decor entry, not a fake grab), carry it back, and drop a real new one at the note block — then do it again for the next one. This is a new kind of world mutation for this app: earlier mobs only ever added something or removed something; this is the first that does both together as a real relocation from one place to another.',
+      'Real vanilla allays only start this behavior after an actual player hands them the matching item; this app has no player inventory or held-item concept at all, so every allay here simply spawns already holding one, an honest, spelled-out shortcut rather than a silently skipped detail.',
+      'Real vanilla allays also "dance" when they hear a note block play nearby; this app shows a real, visible spin at the delivery point as an honest stand-in for that, since there is no actual audio system here to trigger it from. Not modeled: retargeting mid-delivery to a closer active note block (this app has no sound-propagation model), and the real item-duplication player exploit some builds rely on — this allay only ever moves items that already exist, never creates new ones out of thin air.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3823,6 +3861,8 @@ function generateModel() {
     buildGoatBluffInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'vexChamber') {
     buildVexChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'allayItemRelay') {
+    buildAllayItemRelayInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4058,6 +4098,13 @@ let _vexSkinMaterial = null;
 function vexSkinMaterial() {
   if (!_vexSkinMaterial) _vexSkinMaterial = new THREE.MeshStandardMaterial({ color: 0x6a8fc9, roughness: 0.5, transparent: true, opacity: 0.75, clippingPlanes: [cutawayPlane] });
   return _vexSkinMaterial;
+}
+// Real vanilla allay wings are a pale, slightly translucent light blue —
+// a genuine see-through material, distinct from its more solid body.
+let _allayWingMaterial = null;
+function allayWingMaterial() {
+  if (!_allayWingMaterial) _allayWingMaterial = new THREE.MeshStandardMaterial({ color: 0xaee3f5, roughness: 0.4, transparent: true, opacity: 0.7, clippingPlanes: [cutawayPlane] });
+  return _allayWingMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4753,6 +4800,33 @@ function vexParts() {
   sword.translate(0.26, 0.32, 0.05);
   return { body, head, arms, sword };
 }
+// A small rounded body, head, 2 flat wings, and a held-item slot in front
+// (scaled to nothing except while actually carrying something) — real
+// vanilla allays are small blue fairy-like mobs that visibly hold whatever
+// item they were given. See DECOR_TYPES.allay.
+function allayParts() {
+  const body = new THREE.BoxGeometry(0.26, 0.34, 0.2);
+  body.translate(0, 0.35, 0);
+  const head = new THREE.BoxGeometry(0.22, 0.2, 0.22);
+  head.translate(0, 0.6, 0);
+  const wingOffsets = [[-0.16, 0.4, -0.08], [0.16, 0.4, -0.08]];
+  const wings = wingOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.2, 0.22, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  const heldItem = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+  heldItem.translate(0, 0.32, 0.18);
+  return { body, head, wings, heldItem };
+}
+// A small floating cube standing in for a real dropped item entity — same
+// "new procedural geometry, no item-entity asset exists in this app"
+// approach as the slimeball. See DECOR_TYPES.dropped_item.
+function droppedItemParts() {
+  const cube = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+  cube.translate(0, -0.3, 0);
+  return { cube };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5337,6 +5411,31 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
     group.add(new THREE.Mesh(parts.sword, swordMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'allay') {
+    let parts = decorGeoCache.get('allay');
+    if (!parts) { parts = allayParts(); decorGeoCache.set('allay', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x4a6ee0);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, allayWingMaterial()));
+    const heldMesh = new THREE.Mesh(parts.heldItem, solidMaterial(0x2acb57));
+    heldMesh.userData.isAllayHeldItem = true;
+    heldMesh.scale.setScalar(entry._carrying ? 1 : 0.001);
+    group.add(heldMesh);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'dropped_item') {
+    let parts = decorGeoCache.get('dropped_item');
+    if (!parts) { parts = droppedItemParts(); decorGeoCache.set('dropped_item', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.cube, solidMaterial(0x2acb57)));
+    // Registered like a mob (even though it never moves on its own) so an
+    // allay's real pickup/delivery can find and remove its exact live mesh
+    // — the same registry eatSlime/removeVexFromWorld already rely on.
     registerMob(group, entry);
     objs.push(group);
   }
@@ -7026,10 +7125,157 @@ function updateVex(entry, obj, dt) {
     obj.visible = true;
   }
 }
+// Real vanilla allays (minecraft.wiki/w/Allay), once given an item by a
+// player, "collect dropped instances of that item and deliver them" to
+// the note block they were given the item near — real pickup-and-carry,
+// not the item-duplication some players expect (that's a separate
+// exploit, not documented AI behavior). This app has no player inventory
+// or hand-item concept at all, so the "a player gives it an item" step is
+// honestly skipped: every allay here simply spawns already holding a
+// fixed item type (`entry.heldItemType`), the same kind of deliberate,
+// spelled-out shortcut this app already takes for the sea turtle heading
+// home on its own timer instead of after breeding.
+//
+// The genuine world-mutation this produces is new for this app: earlier
+// mobs only ever ADDED something (turtle egg, torchflower seed, panda's
+// slimeball) or REMOVED something (the frog eating a slime, a vex
+// removing itself); an allay's delivery does BOTH as one linked action —
+// it removes the real `dropped_item` decor entry it picked up from where
+// it actually found it, then adds an equivalent one back at its real
+// note-block delivery point, genuinely relocating a world object from one
+// fixed place to another instead of just creating or destroying one.
+// Real vanilla allays also "dance" when they hear a note block play
+// nearby; this app models a real, visible spin at the delivery point as
+// an honest stand-in for that, rather than reproducing actual audio.
+const ALLAY_FLY_SPEED = 1.6;
+const ALLAY_SCAN_INTERVAL_MIN = 1, ALLAY_SCAN_INTERVAL_MAX = 2.5;
+const ALLAY_SCAN_RADIUS = 10; // how far an allay looks for a real matching dropped item
+const ALLAY_DANCE_DURATION = 2; // compressed stand-in for real vanilla's real ~30-second note-block linger
+const ALLAY_HOVER_BOB_RATE = 2, ALLAY_HOVER_BOB_HEIGHT = 0.08;
+function findMatchingDroppedItem(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item' || other.itemType !== entry.heldItemType) continue;
+    const dist = Math.hypot(other.x - entry._wx, other.y - entry._wy, other.z - entry._wz);
+    if (dist <= ALLAY_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function removeDroppedItemFromWorld(itemEntry) {
+  if (!currentModel) return;
+  const decorIdx = currentModel.decor.indexOf(itemEntry);
+  if (decorIdx !== -1) currentModel.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === itemEntry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function deliverAllayItem(entry) {
+  if (!currentModel || !three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const itemEntry = { type: 'dropped_item', x: entry._deliverCellX, y: entry._deliverCellY, z: entry._deliverCellZ, itemType: entry.heldItemType };
+  currentModel.decor.push(itemEntry);
+  for (const mesh of buildDecorMeshesForEntry(itemEntry)) {
+    mesh.position.x += itemEntry.x + offX + 0.5;
+    mesh.position.y += itemEntry.y + 0.5;
+    mesh.position.z += itemEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateAllay(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ALLAY_SCAN_INTERVAL_MIN + Math.random() * (ALLAY_SCAN_INTERVAL_MAX - ALLAY_SCAN_INTERVAL_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._deliverCellX = entry.deliverX !== undefined ? entry.deliverX : entry.x;
+    entry._deliverCellY = entry.deliverY !== undefined ? entry.deliverY : entry.y;
+    entry._deliverCellZ = entry.deliverZ !== undefined ? entry.deliverZ : entry.z;
+    entry._deliverX = entry._deliverCellX + 0.5;
+    entry._deliverY = entry._deliverCellY + 0.5;
+    entry._deliverZ = entry._deliverCellZ + 0.5;
+    entry._carrying = false;
+    entry._bobPhase = Math.random() * Math.PI * 2;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const item = findMatchingDroppedItem(entry);
+      if (item) {
+        entry._targetItem = item;
+        entry._targetX = item.x + 0.5;
+        entry._targetY = item.y + 0.5;
+        entry._targetZ = item.z + 0.5;
+        entry._mobState = 'toItem';
+      } else {
+        entry._mobTimer = ALLAY_SCAN_INTERVAL_MIN + Math.random() * (ALLAY_SCAN_INTERVAL_MAX - ALLAY_SCAN_INTERVAL_MIN);
+      }
+    }
+    entry._bobPhase += dt * ALLAY_HOVER_BOB_RATE;
+  } else if (entry._mobState === 'toItem') {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = ALLAY_FLY_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      const item = entry._targetItem;
+      if (item && mobObjects.some(m => m.entry === item)) {
+        removeDroppedItemFromWorld(item);
+        entry._carrying = true;
+      }
+      entry._targetItem = null;
+      entry._targetX = entry._deliverX;
+      entry._targetY = entry._deliverY;
+      entry._targetZ = entry._deliverZ;
+      entry._mobState = 'toDelivery';
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'toDelivery') {
+    const dx = entry._deliverX - entry._wx, dy = entry._deliverY - entry._wy, dz = entry._deliverZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = ALLAY_FLY_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._deliverX;
+      entry._wy = entry._deliverY;
+      entry._wz = entry._deliverZ;
+      if (entry._carrying) { deliverAllayItem(entry); entry._carrying = false; }
+      entry._mobState = 'dancing';
+      entry._danceElapsed = 0;
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'dancing') {
+    entry._danceElapsed += dt;
+    if (entry._danceElapsed >= ALLAY_DANCE_DURATION) {
+      entry._mobState = 'idle';
+      entry._mobTimer = ALLAY_SCAN_INTERVAL_MIN + Math.random() * (ALLAY_SCAN_INTERVAL_MAX - ALLAY_SCAN_INTERVAL_MIN);
+    }
+  }
+  const bobY = entry._mobState === 'idle' ? Math.sin(entry._bobPhase) * ALLAY_HOVER_BOB_HEIGHT : 0;
+  obj.position.set(entry._wx + offX, entry._wy + bobY, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  if (entry._mobState === 'dancing') {
+    obj.rotation.y = (entry._danceElapsed * 6) % (Math.PI * 2); // a real, visible "dance" spin — real vanilla allays dance when a note block plays nearby
+  }
+  for (const c of obj.children) if (c.userData.isAllayHeldItem) c.scale.setScalar(entry._carrying ? 1 : 0.001);
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
     if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
@@ -8054,6 +8300,7 @@ function renderBlueprint(model) {
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
+    allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -8116,6 +8363,7 @@ function renderBlueprint(model) {
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
+    allay: 'Allay', dropped_item: 'Dropped Item',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -8226,6 +8474,8 @@ function renderCommands(model) {
       else if (d.type === 'frog') lines.push(`summon minecraft:frog ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'goat') lines.push(`summon minecraft:goat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'vex') lines.push(`summon minecraft:vex ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'allay') lines.push(`summon minecraft:allay ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}${d.heldItemType ? ` {Inventory:[{Slot:0b,Item:{id:"minecraft:${d.heldItemType}",Count:1b}}]}` : ''}`);
+      else if (d.type === 'dropped_item') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:${d.itemType || 'emerald'}",Count:1}}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
