@@ -5081,13 +5081,13 @@ function piglinParts() {
     g.translate(x, y, z);
     return g;
   });
-  const legOffsets = [[-0.16, 0.22], [0.16, 0.22]];
+  const legOffsets = [[-0.16, 0], [0.16, 0]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.2, 0.44, 0.2);
     g.translate(x, 0.22, z);
     return g;
   });
-  const bootOffsets = [[-0.16, 0.22], [0.16, 0.22]];
+  const bootOffsets = [[-0.16, 0], [0.16, 0]];
   const boots = bootOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.21, 0.12, 0.21);
     g.translate(x, 0.06, z);
