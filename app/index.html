@@ -5380,13 +5380,27 @@ function villagerParts() {
   });
   const apron = new THREE.BoxGeometry(0.36, 0.5, 0.02);
   apron.translate(0, 0.75, 0.16);
+  // A minimal face — 2 small dark eyes set close together and a thin
+  // unibrow above them, matching real vanilla's own distinctive villager
+  // look — built from small flat panels sitting just proud of the head's
+  // own front face, the same technique already used for the creeper's and
+  // snow golem's faces.
+  const faceZ = 0.205, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.07, 1.42], [0.07, 1.42]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const faceBrow = new THREE.BoxGeometry(0.22, 0.03, faceDepth);
+  faceBrow.translate(0, 1.47, faceZ);
   // A small held wheat sheaf — only added to the render once
   // entry._wheatCount is positive (see the render branch), the visual
   // proof of the real "gathers the harvest into its own inventory"
   // behavior, the same technique already used for the fox's held item.
   const heldWheat = new THREE.BoxGeometry(0.16, 0.2, 0.1);
   heldWheat.translate(0.4, 0.65, 0.08);
-  return { robe, head, nose, arms, apron, heldWheat };
+  return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat };
 }
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
@@ -6147,6 +6161,9 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.nose, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
     group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
     if (entry._wheatCount) {
       group.add(new THREE.Mesh(parts.heldWheat, solidMaterial(0xdcc35e)));
     }
