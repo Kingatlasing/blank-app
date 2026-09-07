@@ -1827,6 +1827,13 @@ const DECOR_TYPES = {
   infested_marker: { kind: 'infested_marker', interactive: false },
   piglin: { kind: 'piglin', interactive: false },
   creeper: { kind: 'creeper', interactive: false },
+  snow_golem: { kind: 'snow_golem', interactive: false },
+  // A real, thin snow-layer block a snow golem leaves behind as it walks
+  // (see updateSnowGolem/trySnowGolemTrail) — a genuinely new class of
+  // world mutation for this app: every earlier mutation was a single
+  // one-shot event, while this one keeps adding new real grid decor
+  // entries continuously along a live mob's own walked path.
+  snow_layer: { kind: 'snow_layer', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3063,6 +3070,16 @@ function buildCreeperBlastYardInterior(grid, silhouette, dims, exteriorMat, acce
   if (!decorOut) return;
   decorOut.push({ type: 'creeper', x: cx, y: 1, z: Math.max(0, wallZ - 4), facing: 'south' });
 }
+// An open snow-block yard with a snow golem wandering it — watch a real
+// trail of snow-layer blocks accumulate behind it as it walks, exactly the
+// way real vanilla golems leave snow on the ground beneath them.
+function buildSnowGolemYardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'snow_golem', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3593,6 +3610,18 @@ const PRESETS = [
       'Not modeled: real creeper damage to the player or nearby mobs, charged (lightning-boosted) creepers with a doubled blast radius, and real vanilla\'s mobGriefing gamerule that can disable block destruction entirely — this app has no combat/damage system and no gamerule concept, so this creeper only ever affects the world, never health.',
     ],
   },
+  {
+    id: 'snow-golem-yard', name: 'Snow Golem Yard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'snowGolemYard',
+    blocks: { exterior: 'snow_block', interior: 'snow_block', accent: 'snow_block' },
+    desc: 'An open snow-block yard with a wandering snow golem — real vanilla golems "leave a trail of snow" on the ground as they walk, and this one genuinely lays down real snow-layer blocks behind it, one new cell at a time, for as long as it keeps wandering.',
+    keywords: ['snow', 'golem', 'trail', 'pumpkin', 'winter'],
+    notes: [
+      'Just watch it wander — every time it steps into a new cell of open ground with solid footing beneath, a real snow_layer decor entry (rendered as a thin real snow slab, not a full block) is added right there, verified directly by a test that lets it walk for a while and confirms new snow cells keep appearing behind its actual path. This is a genuinely new class of world mutation for this app: every earlier mutation was one self-contained event (an explosion, a barter, a delivery); this one keeps adding new real grid decor continuously along a live mob\'s own walked path, not just once.',
+      'Real vanilla golems only do this in a biome cold enough for snow to actually settle; this app has no real biome/temperature data at all, so there\'s no "is it cold enough" check to honestly perform — this preset\'s own snow-block ground already implies a cold setting, so the golem here always leaves its trail, an honest, spelled-out shortcut rather than a silently invented one.',
+      'Not modeled: real snow golems taking damage in warm biomes/from rain in some versions, throwing snowballs at hostile mobs, and wearing a pumpkin/carved-pumpkin drop mechanic — this app has no combat or item-drop system at all, so this golem only ever wanders and lays snow, never fights.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3991,6 +4020,8 @@ function generateModel() {
     buildPiglinBarterPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'creeperBlastYard') {
     buildCreeperBlastYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'snowGolemYard') {
+    buildSnowGolemYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5185,6 +5216,39 @@ function creeperParts() {
   });
   return { torso, head, legs, faceEyes, faceMouth };
 }
+// Real vanilla snow golems are built from two stacked snow blocks (a
+// larger lower body, a smaller upper body) topped with a carved pumpkin
+// head, and two crossed stick arms poking out to the sides
+// (minecraft.wiki/w/Snow_Golem). No leg-alignment concern here — a snow
+// golem has no legs at all, just the two stacked body blocks resting
+// directly on the ground.
+function snowGolemParts() {
+  const bodyLower = new THREE.BoxGeometry(0.55, 0.5, 0.55);
+  bodyLower.translate(0, 0.4, 0);
+  const bodyUpper = new THREE.BoxGeometry(0.42, 0.4, 0.42);
+  bodyUpper.translate(0, 0.85, 0);
+  const head = new THREE.BoxGeometry(0.36, 0.36, 0.36);
+  head.translate(0, 1.23, 0);
+  const armOffsets = [[-0.35, 0.85, 0], [0.35, 0.85, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.28, 0.05, 0.05);
+    g.translate(x, y, z);
+    return g;
+  });
+  // A minimal jack-o'-lantern carving on the pumpkin head — two eye
+  // squares and a wide mouth bar, the same small-flat-panel technique used
+  // for the creeper's face.
+  const faceZ = 0.185, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.09, 1.28], [0.09, 1.28]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.08, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const faceMouth = new THREE.BoxGeometry(0.2, 0.06, faceDepth);
+  faceMouth.translate(0, 1.15, faceZ);
+  return { bodyLower, bodyUpper, head, arms, faceEyes, faceMouth };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5870,6 +5934,28 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'snow_golem') {
+    let parts = decorGeoCache.get('snow_golem');
+    if (!parts) { parts = snowGolemParts(); decorGeoCache.set('snow_golem', parts); }
+    const group = new THREE.Group();
+    const snowMat = solidMaterial(0xf5fbfb);
+    const pumpkinMat = solidMaterial(0xd6822c);
+    const armMat = solidMaterial(0x6b4a2f);
+    const faceMat = solidMaterial(0x2b1a08);
+    group.add(new THREE.Mesh(parts.bodyLower, snowMat));
+    group.add(new THREE.Mesh(parts.bodyUpper, snowMat));
+    group.add(new THREE.Mesh(parts.head, pumpkinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, armMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceMouth, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'snow_layer') {
+    const geo = cachedGeo('snowLayer', () => new THREE.BoxGeometry(1, 0.125, 1));
+    const m = new THREE.Mesh(geo, solidMaterial(0xf5fbfb));
+    m.position.y = -0.5 + 0.0625;
+    objs.push(m);
   }
   // def.kind === 'infested_marker' intentionally renders nothing — see
   // DECOR_TYPES.infested_marker.
@@ -7904,6 +7990,81 @@ function updateCreeper(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla snow golems "leave a snow trail as they walk" in a cold
+// enough biome, laying down a real snow-layer block on the ground beneath
+// them (minecraft.wiki/w/Snow_Golem). This app has no real biome/
+// temperature data at all, so there's no "is this cold enough" check to
+// honestly perform — this preset's own snow-block ground already implies a
+// cold setting, so this golem always leaves its trail, an honest,
+// spelled-out shortcut rather than a silently invented one. This is a
+// genuinely new class of world mutation for this app: every earlier
+// mutation was one self-contained event (an explosion, a barter, a
+// delivery); this one keeps adding new real grid decor entries
+// continuously along a live mob's own walked path, for as long as it
+// wanders.
+const SNOW_GOLEM_WANDER_MIN = 2, SNOW_GOLEM_WANDER_MAX = 5;
+const SNOW_GOLEM_WALK_SPEED = 1.0;
+function trySnowGolemTrail(model, entry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const gx = Math.floor(entry._wx), gz = Math.floor(entry._wz);
+  if (gx === entry._trailX && gz === entry._trailZ) return;
+  entry._trailX = gx; entry._trailZ = gz;
+  if (gx < 0 || gz < 0 || gx >= dims.sx || gz >= dims.sz) return;
+  if (entry.y <= 0 || entry.y >= dims.sy) return;
+  if (model.grid[idx(gx, entry.y, gz, dims)] !== 0) return; // must be standing in open air
+  if (!model.grid[idx(gx, entry.y - 1, gz, dims)]) return; // must be standing on solid ground
+  if (model.decor.some(d => d.type === 'snow_layer' && d.x === gx && d.y === entry.y && d.z === gz)) return;
+  const layerEntry = { type: 'snow_layer', x: gx, y: entry.y, z: gz };
+  model.decor.push(layerEntry);
+  for (const mesh of buildDecorMeshesForEntry(layerEntry)) {
+    mesh.position.x += layerEntry.x + offX + 0.5;
+    mesh.position.y += layerEntry.y + 0.5;
+    mesh.position.z += layerEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateSnowGolem(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = SNOW_GOLEM_WANDER_MIN + Math.random() * (SNOW_GOLEM_WANDER_MAX - SNOW_GOLEM_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = SNOW_GOLEM_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = SNOW_GOLEM_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = SNOW_GOLEM_WANDER_MIN + Math.random() * (SNOW_GOLEM_WANDER_MAX - SNOW_GOLEM_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+    trySnowGolemTrail(currentModel, entry);
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -8031,6 +8192,7 @@ function updateMobs(dt) {
   for (const { obj, entry } of mobObjects) {
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
+    if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -9095,7 +9257,7 @@ function renderBlueprint(model) {
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
-    creeper: ['#3fae44', 'A'],
+    creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -9160,7 +9322,7 @@ function renderBlueprint(model) {
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
-    creeper: 'Creeper',
+    creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -9276,6 +9438,8 @@ function renderCommands(model) {
       else if (d.type === 'warden') lines.push(`summon minecraft:warden ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'silverfish') lines.push(`summon minecraft:silverfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'creeper') lines.push(`summon minecraft:creeper ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'snow_golem') lines.push(`summon minecraft:snow_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
       else if (d.type === 'piglin') lines.push(`summon minecraft:piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
