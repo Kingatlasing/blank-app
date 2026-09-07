@@ -1818,6 +1818,13 @@ const DECOR_TYPES = {
   allay: { kind: 'allay', interactive: false },
   dropped_item: { kind: 'dropped_item', interactive: false },
   warden: { kind: 'warden', interactive: false },
+  silverfish: { kind: 'silverfish', interactive: false },
+  // A purely invisible data marker — real vanilla infested blocks are
+  // disguised as an ordinary block with no visual tell at all, so this
+  // deliberately renders NOTHING (see buildDecorMeshesForEntry) and only
+  // exists so mineBlock() can recognize which specific cell is secretly
+  // hiding a silverfish. See DECOR_TYPES.silverfish.
+  infested_marker: { kind: 'infested_marker', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3008,6 +3015,25 @@ function buildDeepDarkDenInterior(grid, silhouette, dims, exteriorMat, accentMat
   if (!decorOut) return;
   decorOut.push({ type: 'warden', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A small stone-brick alcove with a mineable back wall — real vanilla
+// infested blocks are visually indistinguishable from their normal
+// counterpart, so a few of this exact wall's cells are secretly flagged
+// with a real infested_marker at generation time, using the SAME material
+// as the rest of the wall. Turn on Build Mode (Remove) and mine into the
+// wall to find one.
+function buildSilverfishNestInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const wallZ = Math.min(dims.sz - 2, cz + 3);
+  for (let x = Math.max(0, cx - 2); x <= Math.min(dims.sx - 1, cx + 2); x++) {
+    grid[idx(x, 1, wallZ, dims)] = exteriorMat;
+    grid[idx(x, 2, wallZ, dims)] = exteriorMat;
+  }
+  if (!decorOut) return;
+  const infestedSpots = [[cx - 1, 1, wallZ], [cx, 2, wallZ], [cx + 1, 1, wallZ]];
+  for (const [x, y, z] of infestedSpots) decorOut.push({ type: 'infested_marker', x, y, z });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3501,6 +3527,18 @@ const PRESETS = [
       'Not modeled: the real rising anger/threat meter, actual sculk sensor/shrieker blocks feeding it vibration events, and its ranged sonic boom attack (a real, fixed 10-damage hit, not an instant kill) — this app has no combat system at all, so this warden is all sensing and pursuit, never actually attacking.',
     ],
   },
+  {
+    id: 'silverfish-nest', name: 'Silverfish Nest', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'silverfishNest',
+    blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'stone_bricks' },
+    desc: 'A small stone-brick alcove with a mineable back wall — real vanilla infested blocks are visually indistinguishable from an ordinary block and "spawn a silverfish" the instant one is actually mined. Turn on Build Mode (Remove) and click into the back wall to find one.',
+    keywords: ['silverfish', 'infested', 'stone', 'mine', 'hidden', 'spawn'],
+    notes: [
+      'Three of the back wall\'s cells are secretly flagged infested at generation time, using the exact same stone-brick material as the rest of the wall — there is genuinely no visual tell in the 3D preview, matching real vanilla\'s own disguise. Mine one (Build Mode → Remove → click it) and watch the block itself disappear while a real silverfish spawns exactly where it was — the first mutation in this app that converts an actual placed BLOCK into a live mob, rather than adding, removing, displacing, or relocating a decor entry.',
+      'Real vanilla spares this spawn if the block is mined with a Silk Touch tool, dropping the plain block instead; this app has no tool/Silk Touch concept at all, so every mining of a flagged cell here spawns one — an honest simplification down to the one case this app can actually represent.',
+      'Not modeled: the real silverfish "immediately attacks the player" on spawning, and the real chain reaction where attacking a silverfish directly wakes up others within a real 21×11×21 area — both require a combat system this app doesn\'t have, so this silverfish just wanders peacefully once it emerges, the same as every other passive mob here.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3893,6 +3931,8 @@ function generateModel() {
     buildAllayItemRelayInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'deepDarkDen') {
     buildDeepDarkDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'silverfishNest') {
+    buildSilverfishNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4946,6 +4986,27 @@ function wardenParts() {
   });
   return { torso, head, crown, tendrils, arms, shoulders, legs, ribs };
 }
+// A small, low, gray segmented body (3 body segments plus 2 short
+// antennae) — real vanilla's own in-game silverfish model is described as
+// "block-shaped, gray, and segmented," not the elongated real-world
+// insect shape, so this stays deliberately simple and low. See
+// DECOR_TYPES.silverfish.
+function silverfishParts() {
+  const segOffsets = [-0.18, 0, 0.18];
+  const segments = segOffsets.map((z, i) => {
+    const w = i === 1 ? 0.22 : 0.16;
+    const g = new THREE.BoxGeometry(w, 0.14, 0.16);
+    g.translate(0, 0.09, z);
+    return g;
+  });
+  const antennaOffsets = [[-0.05, 0.14, 0.34], [0.05, 0.14, 0.34]];
+  const antennae = antennaOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.12);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { segments, antennae };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5574,7 +5635,19 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'silverfish') {
+    let parts = decorGeoCache.get('silverfish');
+    if (!parts) { parts = silverfishParts(); decorGeoCache.set('silverfish', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x8a8f8a);
+    for (const g of parts.segments) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.antennae) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
+  // def.kind === 'infested_marker' intentionally renders nothing — see
+  // DECOR_TYPES.infested_marker.
   return objs;
 }
 
@@ -5630,7 +5703,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider']);
+const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -8165,6 +8238,38 @@ function settleGravityBlocks(model) {
   }
   return moved;
 }
+// Real vanilla infested blocks are disguised as an ordinary block (stone,
+// stone bricks, etc.) with no visual tell at all, and "spawn a silverfish
+// that immediately attacks the player" when mined — Silk Touch is the one
+// documented exception, dropping the plain block with no spawn instead
+// (minecraft.wiki/w/Infested_Block). This app has no tool/Silk Touch
+// concept at all, so every real mining of a flagged cell here spawns a
+// silverfish — an honest simplification of that two-case real rule down
+// to the one case this app can actually represent. This is a genuinely
+// new class of world mutation: every earlier mob mutation added, removed,
+// displaced, or relocated a DECOR entry or a mob's position; this
+// converts an actual GRID BLOCK into a live mob.
+function mineBlock(model, x, y, z) {
+  const dims = model.dims;
+  const markerIdx = model.decor.findIndex(d => d.type === 'infested_marker' && d.x === x && d.y === y && d.z === z);
+  model.grid[idx(x, y, z, dims)] = 0;
+  if (markerIdx !== -1) {
+    model.decor.splice(markerIdx, 1);
+    spawnSilverfishFromBlock(model, x, y, z);
+  }
+}
+function spawnSilverfishFromBlock(model, x, y, z) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const entry = { type: 'silverfish', x, y, z, facing: 'south' };
+  model.decor.push(entry);
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry.x + offX + 0.5;
+    mesh.position.y += entry.y + 0.5;
+    mesh.position.z += entry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
 function attemptBuild(clientX, clientY, removeMode) {
   if (!el('build-toggle').checked || !three || !currentModel) return;
   const rect = three.renderer.domElement.getBoundingClientRect();
@@ -8179,7 +8284,11 @@ function attemptBuild(clientX, clientY, removeMode) {
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   const gx = Math.floor(p.x - offX), gy = Math.floor(p.y), gz = Math.floor(p.z - offZ);
   if (gx < 0 || gy < 0 || gz < 0 || gx >= dims.sx || gy >= dims.sy || gz >= dims.sz) return;
-  currentModel.grid[idx(gx, gy, gz, dims)] = removeMode ? 0 : (MATERIAL_INDEX[el('build-block-select').value] + 1);
+  if (removeMode) {
+    mineBlock(currentModel, gx, gy, gz);
+  } else {
+    currentModel.grid[idx(gx, gy, gz, dims)] = MATERIAL_INDEX[el('build-block-select').value] + 1;
+  }
   settleGravityBlocks(currentModel);
   currentModel._lampCells = null; // grid changed — re-scan for redstone lamps next computeRedstone call
   computeRedstone(currentModel);
@@ -8512,6 +8621,7 @@ function renderBlueprint(model) {
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
+    silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -8575,6 +8685,7 @@ function renderBlueprint(model) {
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
+    silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -8688,6 +8799,8 @@ function renderCommands(model) {
       else if (d.type === 'allay') lines.push(`summon minecraft:allay ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}${d.heldItemType ? ` {Inventory:[{Slot:0b,Item:{id:"minecraft:${d.heldItemType}",Count:1b}}]}` : ''}`);
       else if (d.type === 'dropped_item') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:${d.itemType || 'emerald'}",Count:1}}`);
       else if (d.type === 'warden') lines.push(`summon minecraft:warden ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'silverfish') lines.push(`summon minecraft:silverfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
