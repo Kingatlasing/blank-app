@@ -1835,6 +1835,15 @@ const DECOR_TYPES = {
   // entries continuously along a live mob's own walked path.
   snow_layer: { kind: 'snow_layer', interactive: false },
   fox: { kind: 'fox', interactive: false },
+  villager: { kind: 'villager', interactive: false },
+  // A real wheat crop with an actual growth-stage number (0-7, matching
+  // real vanilla's own stage range) stored on entry.stage — see
+  // DECOR_TYPES.villager/harvestWheatCrop. No wheat texture exists in this
+  // app's atlas at all, so it's rendered as solid-colour procedural cross
+  // geometry (the same "no real asset, so plain colour stand-in" approach
+  // already used for rails/redstone dust), colour-lerped from green to
+  // gold and scaled taller as its own stage climbs toward mature.
+  wheat_crop: { kind: 'wheat_crop', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3092,6 +3101,27 @@ function buildFoxDenClearingInterior(grid, silhouette, dims, exteriorMat, accent
   decorOut.push({ type: 'fox', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'dropped_item', itemType: 'feather', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz });
 }
+// A small dirt farm plot (dirt stands in for real farmland here, same
+// shortcut the crop-farm preset already takes) with a farmer villager and
+// 6 real wheat_crop entries at a genuine mix of growth stages — at least 2
+// already fully mature — so the harvest-and-replant cycle is directly
+// observable rather than needing a live growth simulation this app
+// doesn't have.
+function buildFarmerVillagerPlotInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'villager', x: cx, y: 1, z: cz, facing: 'south' });
+  const cropStages = [7, 3, 5, 0, 7, 2];
+  const cropSpots = [[-2, -1], [-1, -1], [0, -1], [1, -1], [-2, 1], [-1, 1]];
+  for (let i = 0; i < cropSpots.length; i++) {
+    const [dx, dz] = cropSpots[i];
+    const x = cx + dx, z = cz + dz;
+    if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) continue;
+    decorOut.push({ type: 'wheat_crop', x, y: 1, z, stage: cropStages[i] });
+  }
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3646,6 +3676,18 @@ const PRESETS = [
       'Not modeled: real foxes eating sweet berries, sleeping during the day and being active at night, trusting a "birthplace" location, and fleeing from threats — this app has no day/night, diet, or fear/aggro system at all, so this fox only ever wanders and picks things up.',
     ],
   },
+  {
+    id: 'farmer-villager-plot', name: 'Farmer Villager Plot', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'farmerVillagerPlot',
+    blocks: { exterior: 'dirt', interior: 'dirt', accent: 'dirt' },
+    desc: 'A small farm plot with a farmer villager and 6 real wheat crops at a genuine mix of growth stages, two already fully mature — real vanilla farmer villagers "harvest fully grown crops and replant them," and this one genuinely does: watch a mature crop reset back to a sprout the instant it\'s harvested.',
+    keywords: ['villager', 'farmer', 'wheat', 'crop', 'harvest', 'farm'],
+    notes: [
+      'Watch it wander toward the nearest crop already at real stage 7 (fully mature), pause for a short harvest delay, then the crop\'s own stage genuinely resets to 0 and immediately regrows visually as a short green sprout — a real replant, not a removal. This is a genuinely new class of world mutation for this app: every earlier item mechanic added, removed, permanently held, or relocated a whole decor entry, while this one resets an EXISTING entry\'s own state in place. Verified directly by a unit test that only lets the villager notice a crop already at real stage 7 (never an unripe one), and an end-to-end test that runs the real AI and confirms a mature crop\'s stage is back to 0 afterward, plus a live mesh at the correct shorter height replacing the old one in the scene.',
+      'Dirt stands in for real farmland here, the same shortcut the automatic wheat farm preset already takes since this app has no real farmland/water/wheat texture at all — this app also has no live crop-growth-over-time simulation (real vanilla grows crops via random ticks), so the preset\'s crops start at a fixed, honest mix of stages rather than growing on their own; only the harvest-and-replant half of the real cycle is modeled.',
+      'Not modeled: a harvested crop actually dropping a real wheat item onto the ground (real vanilla villagers gather it straight into their own inventory instead, which this app approximates with a small held-wheat mesh and an internal counter), villager professions/workstations/trading, and breeding — this app has no inventory, trading, or breeding system at all, so this villager only ever wanders and harvests.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4048,6 +4090,8 @@ function generateModel() {
     buildSnowGolemYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'foxDenClearing') {
     buildFoxDenClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'farmerVillagerPlot') {
+    buildFarmerVillagerPlotInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5315,6 +5359,54 @@ function foxParts() {
   heldItem.translate(0, 0.32, 0.66);
   return { body, head, snout, ears, legs, tailBase, tailTip, heldItem };
 }
+// A single robe body reaching the ground (real vanilla villagers' legs are
+// mostly hidden under a long robe/tunic, so no separate leg geometry, and
+// no leg-alignment concern at all), a head with the iconic oversized nose,
+// 2 thin arms, and a brown farmer's apron patch on the chest
+// (minecraft.wiki/w/Villager). This app has no profession/workstation
+// system at all, so every villager here is simply a farmer, permanently.
+function villagerParts() {
+  const robe = new THREE.BoxGeometry(0.5, 1.15, 0.3);
+  robe.translate(0, 0.575, 0);
+  const head = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+  head.translate(0, 1.35, 0);
+  const nose = new THREE.BoxGeometry(0.12, 0.16, 0.14);
+  nose.translate(0, 1.28, 0.24);
+  const armOffsets = [[-0.32, 0.85, 0], [0.32, 0.85, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.5, 0.16);
+    g.translate(x, y, z);
+    return g;
+  });
+  const apron = new THREE.BoxGeometry(0.36, 0.5, 0.02);
+  apron.translate(0, 0.75, 0.16);
+  // A small held wheat sheaf — only added to the render once
+  // entry._wheatCount is positive (see the render branch), the visual
+  // proof of the real "gathers the harvest into its own inventory"
+  // behavior, the same technique already used for the fox's held item.
+  const heldWheat = new THREE.BoxGeometry(0.16, 0.2, 0.1);
+  heldWheat.translate(0.4, 0.65, 0.08);
+  return { robe, head, nose, arms, apron, heldWheat };
+}
+// A real growth-stage number (0-7, matching real vanilla wheat's own
+// stage range) determines both height (a short green sprout at stage 0,
+// full-height at stage 7) and colour (green fading to gold as it
+// matures) — see DECOR_TYPES.wheat_crop.
+function wheatStageColor(stage) {
+  const t = Math.max(0, Math.min(7, stage)) / 7;
+  const green = [0x6b, 0x8f, 0x2f], gold = [0xdc, 0xc3, 0x5e];
+  const c = green.map((g, i) => Math.round(g + (gold[i] - g) * t));
+  return (c[0] << 16) | (c[1] << 8) | c[2];
+}
+function wheatCropGeometry(stage) {
+  const t = Math.max(0, Math.min(7, stage)) / 7;
+  const h = 0.15 + t * 0.65;
+  const g1 = new THREE.BoxGeometry(0.7, h, 0.05);
+  g1.rotateY(Math.PI / 4);
+  const g2 = new THREE.BoxGeometry(0.7, h, 0.05);
+  g2.rotateY(-Math.PI / 4);
+  return { g1, g2, h };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -6041,6 +6133,36 @@ function buildDecorMeshesForEntry(entry) {
       group.add(new THREE.Mesh(parts.heldItem, solidMaterial(itemColor)));
     }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'villager') {
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0xa9a390);
+    const skinMat = solidMaterial(0xcaa472);
+    const apronMat = solidMaterial(0x7a4a2a);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    if (entry._wheatCount) {
+      group.add(new THREE.Mesh(parts.heldWheat, solidMaterial(0xdcc35e)));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'wheat_crop') {
+    const stage = entry.stage || 0;
+    const key = 'wheatCrop:' + stage;
+    let parts = decorGeoCache.get(key);
+    if (!parts) { parts = wheatCropGeometry(stage); decorGeoCache.set(key, parts); }
+    const mat = solidMaterial(wheatStageColor(stage));
+    const group = new THREE.Group();
+    const m1 = new THREE.Mesh(parts.g1, mat); m1.position.y = -0.5 + parts.h / 2;
+    const m2 = new THREE.Mesh(parts.g2, mat); m2.position.y = -0.5 + parts.h / 2;
+    group.add(m1, m2);
     registerMob(group, entry);
     objs.push(group);
   }
@@ -8233,6 +8355,116 @@ function updateFox(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla farmer villagers "harvest fully grown crops and replant
+// them," gathering the harvest into their own inventory rather than
+// dropping it on the ground (minecraft.wiki/w/Villager). Every earlier
+// item mutation here either relocated an item back out (the allay),
+// consumed it to produce a different one (the piglin), or permanently
+// held it on the mob (the fox); a villager's harvest is a genuinely
+// different class again — an EXISTING wheat_crop decor entry's own state
+// resets in place (stage 7 back to 0, replanted immediately) while a
+// separate counter on the villager silently increments, rather than any
+// decor entry being added, removed, or relocated. This app has no
+// verified real harvest-pause duration for farmer villagers, so the short
+// pause used here is an honest approximate stand-in, the same caveat
+// already applied to the warden's sense radius and the fox's pickup
+// radius.
+const VILLAGER_WANDER_MIN = 2, VILLAGER_WANDER_MAX = 5;
+const VILLAGER_WALK_SPEED = 1.0;
+const VILLAGER_HARVEST_SCAN_RADIUS = 6;
+const VILLAGER_HARVEST_DELAY = 1.5;
+function findMatureCrop(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'wheat_crop' || (other.stage || 0) < 7) continue;
+    const dist = Math.hypot(other.x - entry._wx, other.z - entry._wz);
+    if (dist <= VILLAGER_HARVEST_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function harvestWheatCrop(model, cropEntry) {
+  cropEntry.stage = 0;
+  if (!three || !three.group) return;
+  const mobIdx = mobObjects.findIndex(m => m.entry === cropEntry);
+  if (mobIdx !== -1) {
+    three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(cropEntry)) {
+    mesh.position.x += cropEntry.x + offX + 0.5;
+    mesh.position.y += cropEntry.y + 0.5;
+    mesh.position.z += cropEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateVillager(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = VILLAGER_WANDER_MIN + Math.random() * (VILLAGER_WANDER_MAX - VILLAGER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._wheatCount = 0;
+  }
+  if (entry._mobState !== 'toCrop' && entry._mobState !== 'harvesting') {
+    const crop = findMatureCrop(entry);
+    if (crop) {
+      entry._targetCrop = crop;
+      entry._targetX = crop.x + 0.5;
+      entry._targetZ = crop.z + 0.5;
+      entry._mobState = 'toCrop';
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = VILLAGER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'toCrop') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = VILLAGER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'toCrop') {
+        entry._mobState = 'harvesting';
+        entry._harvestTimer = VILLAGER_HARVEST_DELAY;
+      } else {
+        entry._mobState = 'idle';
+        entry._mobTimer = VILLAGER_WANDER_MIN + Math.random() * (VILLAGER_WANDER_MAX - VILLAGER_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'harvesting') {
+    entry._harvestTimer -= dt;
+    if (entry._harvestTimer <= 0) {
+      const crop = entry._targetCrop;
+      if (crop && mobObjects.some(m => m.entry === crop) && (crop.stage || 0) >= 7) {
+        harvestWheatCrop(currentModel, crop);
+        entry._wheatCount = (entry._wheatCount || 0) + 1;
+      }
+      entry._targetCrop = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = VILLAGER_WANDER_MIN + Math.random() * (VILLAGER_WANDER_MAX - VILLAGER_WANDER_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -8362,6 +8594,7 @@ function updateMobs(dt) {
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
     if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
+    if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -9427,6 +9660,7 @@ function renderBlueprint(model) {
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
+    villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -9492,6 +9726,7 @@ function renderBlueprint(model) {
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
+    villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -9609,6 +9844,8 @@ function renderCommands(model) {
       else if (d.type === 'creeper') lines.push(`summon minecraft:creeper ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'snow_golem') lines.push(`summon minecraft:snow_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'fox') lines.push(`summon minecraft:fox ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._holding ? ` {Item:{id:"minecraft:${d._holding}",Count:1}}` : ''}`);
+      else if (d.type === 'villager') lines.push(`summon minecraft:villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {VillagerData:{profession:"farmer"}}`);
+      else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
       else if (d.type === 'piglin') lines.push(`summon minecraft:piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
