@@ -1808,6 +1808,8 @@ const DECOR_TYPES = {
   dolphin: { kind: 'dolphin', interactive: false },
   lava: { kind: 'lava_block', interactive: false },
   strider: { kind: 'strider', interactive: false },
+  sniffer: { kind: 'sniffer', interactive: false },
+  torchflower_seed: { kind: 'torchflower_seed', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2888,6 +2890,18 @@ function buildStriderLavaCrossingInterior(grid, silhouette, dims, exteriorMat, a
   const dryX = Math.min(dims.sx - 2, Math.floor(dims.sx * 0.85));
   decorOut.push({ type: 'strider', x: dryX, y: 1, z: cz, facing: 'south' }); // far dry ground — real vanilla: shivers, walks slower, turns purple here
 }
+// An open dirt-and-moss meadow — no walls, matching every other
+// single-mob flourish preset — giving the sniffer real, undisturbed
+// ground to sniff and dig into. Real vanilla sniffers dig seeds "out of
+// dirt, grass, and moss blocks," so the accent block is moss specifically
+// rather than an arbitrary decoration choice.
+function buildSnifferMeadowInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'sniffer', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3297,6 +3311,18 @@ const PRESETS = [
       'Real vanilla striders are also immune to fire and lava damage, but take damage from water and rain — none of that is modeled, since this app has no damage or weather system at all, so the striders here are never in any real danger either way.',
     ],
   },
+  {
+    id: 'sniffer-meadow', name: 'Sniffer Meadow', shape: 'box', category: 'Farms & Automation',
+    real: { height: 2, baseX: 11, baseZ: 11 }, interiorMode: 'snifferMeadow',
+    blocks: { exterior: 'dirt', interior: 'dirt', accent: 'moss_block' },
+    desc: 'An open dirt meadow with a sniffer wandering it, occasionally stopping to sniff out and dig up a real torchflower seed — real vanilla sniffers "sniff out and dig out seeds for various unique decorative plants," the only real source of either a Torchflower Seed or a Pitcher Pod.',
+    keywords: ['sniffer', 'torchflower', 'dig', 'seed', 'ancient', 'meadow'],
+    notes: [
+      'Watch it wander, then head to a real nearby spot, pause to sniff and dig, and leave behind a real new torchflower seed — like the sea turtle\'s egg, this genuinely adds a new decor entry and mesh to the live model rather than just moving. Real vanilla sniffers "[store] the last 20 locations [they have] dug up so [they] can\'t dig there anymore," and this one keeps the same real memory, so it never re-digs a spot it\'s already used.',
+      'Real vanilla waits a real 8 minutes after a successful dig before trying again; this app has no reason to make anyone actually wait that long to see the mechanic, so the cooldown is compressed into a much shorter timer — an honest stand-in, not a literal reproduction of the real wait.',
+      'No aggro/predation model exists in this app (no combat at all) — real vanilla sniffers are simply passive and this one has nothing to flee from or be attacked by.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3671,6 +3697,8 @@ function generateModel() {
     buildDolphinCoveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'striderLavaCrossing') {
     buildStriderLavaCrossingInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'snifferMeadow') {
+    buildSnifferMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4438,6 +4466,36 @@ function striderParts() {
   });
   return { body, legs };
 }
+// A large round body, a long snout for sniffing, 4 stout legs, and a
+// small tail — real vanilla sniffers are big, dinosaur-like, low-slung
+// mobs; simplified here like every other low-poly stand-in mob in this
+// app. See DECOR_TYPES.sniffer.
+function snifferParts() {
+  const body = new THREE.BoxGeometry(0.75, 0.5, 0.9);
+  body.translate(0, 0.32, 0);
+  const snout = new THREE.BoxGeometry(0.28, 0.22, 0.4);
+  snout.translate(0, 0.22, 0.58);
+  const tail = new THREE.BoxGeometry(0.2, 0.18, 0.35);
+  tail.translate(0, 0.28, -0.55);
+  const legOffsets = [[-0.28, 0.28], [0.28, 0.28], [-0.28, -0.28], [0.28, -0.28]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.32, 0.16);
+    g.translate(x, -0.09, z);
+    return g;
+  });
+  return { body, snout, tail, legs };
+}
+// A thin stem with a small flame-orange bloom on top, standing in for a
+// real torchflower — no torchflower texture/model exists in this app,
+// same "new procedural geometry as a stand-in" approach as the hopper and
+// turtle_egg. See DECOR_TYPES.torchflower_seed.
+function torchflowerSeedParts() {
+  const stem = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+  stem.translate(0, -0.25, 0);
+  const bloom = new THREE.BoxGeometry(0.22, 0.16, 0.22);
+  bloom.translate(0, -0.02, 0);
+  return { stem, bloom };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -4945,6 +5003,25 @@ function buildDecorMeshesForEntry(entry) {
     }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'sniffer') {
+    let parts = decorGeoCache.get('sniffer');
+    if (!parts) { parts = snifferParts(); decorGeoCache.set('sniffer', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xc9a876), snoutMat = solidMaterial(0x9c7a52);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.snout, snoutMat));
+    group.add(new THREE.Mesh(parts.tail, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'torchflower_seed') {
+    let parts = decorGeoCache.get('torchflower_seed');
+    if (!parts) { parts = torchflowerSeedParts(); decorGeoCache.set('torchflower_seed', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.stem, solidMaterial(0x5a7a3a)));
+    group.add(new THREE.Mesh(parts.bloom, solidMaterial(0xe8871e)));
     objs.push(group);
   }
   return objs;
@@ -5959,10 +6036,111 @@ function updateStrider(entry, obj, dt) {
   const skinMat = striderIsOnLava(currentModel, entry) ? striderWarmMaterial() : striderColdMaterial();
   for (const c of obj.children) if (c.userData.isStriderSkin) c.material = skinMat;
 }
+// Real vanilla sniffers "sniff out and dig out seeds for various unique
+// decorative plants out of dirt, grass, and moss blocks" — smelling the
+// ground, then splooting down to dig up a real Torchflower Seed or
+// Pitcher Pod, the only way to get either (source:
+// minecraft.wiki/w/Sniffer). Like the sea turtle's egg, a completed dig
+// is a genuine runtime world mutation (a real new decor entry + mesh
+// added to the live scene), not just movement — but a sniffer adds a
+// second, new kind of rule on top of that: real vanilla sniffers
+// "[store] the last 20 locations [they have] dug up so [they] can't dig
+// there anymore," so this one remembers its own dig spots and never
+// repeats one, then serves a real cooldown before its next attempt
+// (real vanilla: 8 minutes — compressed here into a much shorter timer,
+// an honest stand-in rather than a literal 8-minute wait).
+const SNIFFER_WANDER_RADIUS = 3;
+const SNIFFER_WANDER_MIN = 2, SNIFFER_WANDER_MAX = 5;
+const SNIFFER_DIG_PAUSE_MIN = 2, SNIFFER_DIG_PAUSE_MAX = 4; // real vanilla: a real sniff-and-sploot-and-dig animation, compressed for a watchable demo
+const SNIFFER_COOLDOWN_MIN = 15, SNIFFER_COOLDOWN_MAX = 25; // this app's compressed stand-in for real vanilla's 8-minute post-dig cooldown
+const SNIFFER_MEMORY_CAP = 20; // real vanilla: remembers exactly its last 20 dig locations
+function pickSnifferDigTarget(model, entry) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * SNIFFER_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * SNIFFER_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = entry.x + dx, tz = entry.z + dz;
+    if (entry._dugSpots.includes(tx + ',' + tz)) continue; // real vanilla: never redigs a remembered spot
+    if (mobCellWalkable(model, tx, entry.y, tz)) return { x: tx, z: tz };
+  }
+  return null;
+}
+function layTorchflowerSeed(entry) {
+  if (!currentModel || !three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const seedEntry = { type: 'torchflower_seed', x: entry.x, y: entry.y, z: entry.z };
+  currentModel.decor.push(seedEntry);
+  for (const mesh of buildDecorMeshesForEntry(seedEntry)) {
+    mesh.position.x += seedEntry.x + offX + 0.5;
+    mesh.position.y += seedEntry.y + 0.5;
+    mesh.position.z += seedEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateSniffer(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'wandering';
+    entry._mobTimer = SNIFFER_WANDER_MIN + Math.random() * (SNIFFER_WANDER_MAX - SNIFFER_WANDER_MIN);
+    entry._digCooldown = 0; // ready to attempt a dig right away
+    entry._dugSpots = [];
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  entry._digCooldown -= dt;
+  if (entry._mobState === 'wandering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const digTarget = entry._digCooldown <= 0 ? pickSnifferDigTarget(currentModel, entry) : null;
+      const target = digTarget || pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = digTarget ? 'walkingToDig' : 'walking';
+      } else {
+        entry._mobTimer = SNIFFER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'walkingToDig') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = MOB_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'walkingToDig') {
+        entry._mobState = 'digging';
+        entry._mobTimer = SNIFFER_DIG_PAUSE_MIN + Math.random() * (SNIFFER_DIG_PAUSE_MAX - SNIFFER_DIG_PAUSE_MIN);
+      } else {
+        entry._mobState = 'wandering';
+        entry._mobTimer = SNIFFER_WANDER_MIN + Math.random() * (SNIFFER_WANDER_MAX - SNIFFER_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'digging') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      layTorchflowerSeed(entry);
+      entry._dugSpots.push(entry.x + ',' + entry.z);
+      if (entry._dugSpots.length > SNIFFER_MEMORY_CAP) entry._dugSpots.shift(); // real vanilla: only the last 20
+      entry._digCooldown = SNIFFER_COOLDOWN_MIN + Math.random() * (SNIFFER_COOLDOWN_MAX - SNIFFER_COOLDOWN_MIN);
+      entry._mobState = 'wandering';
+      entry._mobTimer = SNIFFER_WANDER_MIN + Math.random() * (SNIFFER_WANDER_MAX - SNIFFER_WANDER_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
     if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
     if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
@@ -6977,7 +7155,7 @@ function renderBlueprint(model) {
     bee: ['#e8b923', 'A'], beehive: ['#c99a4e', 'H'], flower: ['#d43f3f', 'F'], dandelion: ['#e8d33a', 'F'],
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
-    lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'],
+    lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -7038,7 +7216,7 @@ function renderBlueprint(model) {
     bee: 'Bee', beehive: 'Beehive', flower: 'Poppy', dandelion: 'Dandelion',
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
-    lava: 'Lava', strider: 'Strider',
+    lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -7138,6 +7316,8 @@ function renderCommands(model) {
       else if (d.type === 'dolphin') lines.push(`summon minecraft:dolphin ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'lava') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:lava`);
       else if (d.type === 'strider') lines.push(`summon minecraft:strider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'sniffer') lines.push(`summon minecraft:sniffer ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'torchflower_seed') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:torchflower`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
