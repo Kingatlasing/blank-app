@@ -1885,6 +1885,19 @@ const DECOR_TYPES = {
   // first time instead of a fixed piece of static decor. See
   // captureAxolotlToBucket / attemptInteract.
   axolotl: { kind: 'axolotl', interactive: true },
+  // Real vanilla evokers "summon 3 vexes to assist" them
+  // (minecraft.wiki/w/Evoker). Every earlier world-mutation mob here either
+  // moves, mutates, or removes something that already exists — nothing yet
+  // has ever ADDED a brand new live mob to the world at runtime, the way
+  // mineBlock's silverfish-from-a-mined-block does, but even that is a
+  // single mob triggered by the PLAYER mining, not another mob's own AI
+  // choosing to create several new ones. An evoker is the first mob whose
+  // own decision-making spawns multiple new full mob entries mid-simulation
+  // — reusing the vex's existing geometry and AI completely unchanged, the
+  // same "reuse where genuinely similar" pattern already used for the
+  // ocelot (wolf's body) and camel (llama's neck). See updateEvoker /
+  // spawnVexesFromEvoker.
+  evoker: { kind: 'evoker', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3269,6 +3282,16 @@ function buildAxolotlTankInterior(grid, silhouette, dims, exteriorMat, accentMat
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'axolotl', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// An open grass yard with a single evoker — switch to Walk mode and
+// approach it to see the real new mechanic: it casts, then genuinely
+// spawns 3 brand new vex entries into the live model, not a canned effect.
+function buildEvokerSummoningYardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'evoker', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3944,6 +3967,18 @@ const PRESETS = [
       'Not modeled: playing dead when hurt, the several real colour morphs (this app always uses the common leucistic pink), predation on nearby squid/fish/drowned, and breeding with tropical fish — this app has no combat, health, or breeding system at all, so this axolotl only ever wanders until it\'s clicked.',
     ],
   },
+  {
+    id: 'evoker-summoning-yard', name: 'Evoker Summoning Yard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 13, baseZ: 13 }, interiorMode: 'evokerSummoningYard',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An open grass yard with a single evoker — real vanilla evokers "summon 3 vexes to assist" them, and this one genuinely does: switch to Walk mode, approach it, and watch it cast, then watch 3 brand new live vexes actually appear in the model and start wandering on their own.',
+    keywords: ['evoker', 'vex', 'summon', 'illager', 'spell', 'cast'],
+    notes: [
+      'Switch to Walk mode and approach it — once you\'re within its own real summon range, it stops wandering, turns to face you, and after a brief cast delay genuinely pushes 3 brand new {type:\'vex\'} entries into the live model\'s own decor list, builds their real meshes, and adds them to the scene, exactly the way this app already builds every other vex — they then wander off completely on their own using the vex\'s own full existing AI (including its own real self-despawn timer), unrelated to the evoker from that point on. This is a genuinely new class of world mutation for this app: every earlier mutation moves, changes, or removes something that already exists, while this is the first time one mob\'s own AI decision ADDS multiple brand new live mobs to the world at runtime — mineBlock\'s silverfish-from-a-mined-block is the closest prior case, but that\'s triggered by the PLAYER mining, not a mob choosing to act. Verified directly by a unit test confirming the model\'s own mob count for real vex entries genuinely increases by exactly 3 after a simulated cast completes, and a second test confirming it won\'t cast again immediately afterward (a real cooldown), only once a live player is sensed again after that cooldown expires.',
+      'This app has no verified real cast-animation length or summon-spell cooldown, so the figures used here are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry reuses the villager\'s own humanoid robe/head/arm proportions (real illagers share the same basic body plan), recoloured into a dark robe with a light collar band instead of a villager\'s apron.',
+      'Not modeled: the real fang-attack spell (a line of damaging spikes erupting from the ground), the "wololo" sheep-to-mooshroom curse, raids, and being led by an illusioner — this app has no combat or raid system at all, so this evoker only ever wanders and summons vexes.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4366,6 +4401,8 @@ function generateModel() {
     buildParrotPerchGardenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'axolotlTank') {
     buildAxolotlTankInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'evokerSummoningYard') {
+    buildEvokerSummoningYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6061,6 +6098,38 @@ function axolotlParts() {
   });
   return { body, head, tail, legs, gills, faceEyes };
 }
+// Real illagers share the same basic humanoid build as a villager
+// (minecraft.wiki/w/Evoker), so this reuses villagerParts' own robe/head/
+// nose/arm proportions rather than redrawing a humanoid from scratch, with
+// a dark robe, a light collar band, and no apron/held-item props (an
+// evoker holds nothing in this app, since it has no combat/fang-attack
+// system at all — see DECOR_TYPES.evoker).
+function evokerParts() {
+  const robe = new THREE.BoxGeometry(0.5, 1.15, 0.3);
+  robe.translate(0, 0.575, 0);
+  const collar = new THREE.BoxGeometry(0.52, 0.15, 0.32);
+  collar.translate(0, 1.05, 0);
+  const head = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+  head.translate(0, 1.35, 0);
+  const nose = new THREE.BoxGeometry(0.12, 0.16, 0.14);
+  nose.translate(0, 1.28, 0.24);
+  const armOffsets = [[-0.32, 0.85, 0], [0.32, 0.85, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.5, 0.16);
+    g.translate(x, y, z);
+    return g;
+  });
+  const faceZ = 0.205, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.07, 1.42], [0.07, 1.42]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const faceBrow = new THREE.BoxGeometry(0.22, 0.03, faceDepth);
+  faceBrow.translate(0, 1.47, faceZ);
+  return { robe, collar, head, nose, arms, faceEyes, faceBrow };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7007,6 +7076,24 @@ function buildDecorMeshesForEntry(entry) {
     // those use.
     group.userData.decorEntry = entry;
     group.userData.decorKind = 'axolotl';
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'evoker') {
+    let parts = decorGeoCache.get('evoker');
+    if (!parts) { parts = evokerParts(); decorGeoCache.set('evoker', parts); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x35314a);
+    const collarMat = solidMaterial(0xb9b6c9);
+    const skinMat = solidMaterial(0xcfa987);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.collar, collarMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -10170,6 +10257,106 @@ function captureAxolotlToBucket(model, entry) {
   renderCommands(model);
   renderStats(model);
 }
+// Real vanilla evokers "summon 3 vexes to assist" them
+// (minecraft.wiki/w/Evoker). Every earlier world-mutation mob in this app
+// moves, mutates, or removes something that already exists — nothing has
+// ever ADDED a brand new live mob at runtime through another mob's own AI
+// decision (mineBlock's silverfish spawn is the closest prior case, but
+// that's triggered by the PLAYER mining a block, not a mob choosing to).
+// spawnVexesFromEvoker pushes plain {type:'vex',...} entries — the exact
+// same shape the vex's own preset builder already uses — and lets
+// buildDecorMeshesForEntry's existing vex branch build and register each
+// one exactly the way it already does for every other vex in this app;
+// the vex's own geometry and full AI (including its own real self-
+// despawn timer) are reused completely unchanged.
+const EVOKER_WANDER_MIN = 2, EVOKER_WANDER_MAX = 5;
+const EVOKER_WALK_SPEED = 1.0;
+const EVOKER_SUMMON_RANGE = 8; // how close a live player must be before it starts casting
+const EVOKER_CAST_DELAY = 2; // this app's stand-in for the real cast animation's length — not a verified vanilla tick count
+const EVOKER_SUMMON_COOLDOWN = 10; // an honest, approximate stand-in for real vanilla's own spell cooldown
+const EVOKER_VEX_COUNT = 3; // real vanilla: always exactly 3
+function spawnVexesFromEvoker(model, evokerEntry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (let i = 0; i < EVOKER_VEX_COUNT; i++) {
+    const angle = (i / EVOKER_VEX_COUNT) * Math.PI * 2;
+    const vx = Math.max(0, Math.min(dims.sx - 1, Math.round(evokerEntry._wx + Math.cos(angle) * 1.5 - 0.5)));
+    const vz = Math.max(0, Math.min(dims.sz - 1, Math.round(evokerEntry._wz + Math.sin(angle) * 1.5 - 0.5)));
+    const entry = { type: 'vex', x: vx, y: evokerEntry.y, z: vz, facing: 'south' };
+    model.decor.push(entry);
+    // Manually pre-position this frame's meshes the same way
+    // spawnSilverfishFromBlock does, so the newly spawned vex renders in
+    // the right place immediately rather than flashing at the origin for
+    // one frame before updateVex's own init block ever gets to run.
+    for (const mesh of buildDecorMeshesForEntry(entry)) {
+      mesh.position.x += entry.x + offX + 0.5;
+      mesh.position.y += entry.y + 0.5;
+      mesh.position.z += entry.z + offZ + 0.5;
+      three.group.add(mesh);
+    }
+  }
+}
+function updateEvoker(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = EVOKER_WANDER_MIN + Math.random() * (EVOKER_WANDER_MAX - EVOKER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._summonCooldown = 0;
+  }
+  entry._summonCooldown = Math.max(0, entry._summonCooldown - dt);
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (entry._mobState !== 'casting' && playerDist <= EVOKER_SUMMON_RANGE && entry._summonCooldown <= 0) {
+    entry._mobState = 'casting';
+    entry._castTimer = EVOKER_CAST_DELAY;
+    entry._mobYaw = Math.atan2(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (entry._mobState === 'casting') {
+    entry._castTimer -= dt;
+    if (entry._castTimer <= 0) {
+      spawnVexesFromEvoker(currentModel, entry);
+      entry._summonCooldown = EVOKER_SUMMON_COOLDOWN;
+      entry._mobState = 'idle';
+      entry._mobTimer = EVOKER_WANDER_MIN + Math.random() * (EVOKER_WANDER_MAX - EVOKER_WANDER_MIN);
+    }
+  } else if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = EVOKER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = EVOKER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = EVOKER_WANDER_MIN + Math.random() * (EVOKER_WANDER_MAX - EVOKER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -10310,6 +10497,7 @@ function updateMobs(dt) {
     if (entry.type === 'camel') { updateCamel(entry, obj, dt); continue; }
     if (entry.type === 'parrot') { updateParrot(entry, obj, dt); continue; }
     if (entry.type === 'axolotl') { updateAxolotl(entry, obj, dt); continue; }
+    if (entry.type === 'evoker') { updateEvoker(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -11378,7 +11566,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -11445,7 +11633,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11574,6 +11762,7 @@ function renderCommands(model) {
       else if (d.type === 'camel') lines.push(`summon minecraft:camel ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'parrot') lines.push(`summon minecraft:parrot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'axolotl') lines.push(`summon minecraft:axolotl ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'evoker') lines.push(`summon minecraft:evoker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
