@@ -1834,6 +1834,7 @@ const DECOR_TYPES = {
   // one-shot event, while this one keeps adding new real grid decor
   // entries continuously along a live mob's own walked path.
   snow_layer: { kind: 'snow_layer', interactive: false },
+  fox: { kind: 'fox', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3080,6 +3081,17 @@ function buildSnowGolemYardInterior(grid, silhouette, dims, exteriorMat, accentM
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'snow_golem', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A grassy clearing with a wandering fox and a real dropped feather within
+// its own pickup-scan range — watch it walk over, genuinely pick the item
+// up, and carry it in its mouth forever after.
+function buildFoxDenClearingInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'fox', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'dropped_item', itemType: 'feather', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3622,6 +3634,18 @@ const PRESETS = [
       'Not modeled: real snow golems taking damage in warm biomes/from rain in some versions, throwing snowballs at hostile mobs, and wearing a pumpkin/carved-pumpkin drop mechanic — this app has no combat or item-drop system at all, so this golem only ever wanders and lays snow, never fights.',
     ],
   },
+  {
+    id: 'fox-den-clearing', name: 'Fox Den Clearing', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'foxDenClearing',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grassy clearing with a wandering fox and a real dropped feather nearby — real vanilla foxes "pick up nearby dropped items... and hold them in their mouth," and this one genuinely does, permanently, the moment it wanders close enough.',
+    keywords: ['fox', 'pickup', 'item', 'carry', 'forest'],
+    notes: [
+      'Watch it wander — the instant a real dropped item enters its own pickup-scan range, it walks straight to it, and the item is genuinely removed from the world and attached to the fox as a small held mesh at its mouth, verified directly by a unit test that places items both inside and outside the scan radius and confirms only the in-range one is ever targeted, plus an end-to-end test that runs the real AI and confirms the item is actually gone from the model and the fox is shown holding it afterward. Every earlier item mechanic here either relocated an item back out (the allay) or consumed it to produce a different one (the piglin); a fox\'s pickup does neither — the item is just gone, permanently held, matching real vanilla\'s "will not pick up another item while already holding one," which this app enforces too: a fox that\'s already holding never scans for a second item.',
+      'This app has no verified exact real pickup-radius figure for foxes, so the scan range used here is an honest, approximate stand-in rather than a literal vanilla number, the same caveat already applied to the warden\'s own sense radius.',
+      'Not modeled: real foxes eating sweet berries, sleeping during the day and being active at night, trusting a "birthplace" location, and fleeing from threats — this app has no day/night, diet, or fear/aggro system at all, so this fox only ever wanders and picks things up.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4022,6 +4046,8 @@ function generateModel() {
     buildCreeperBlastYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'snowGolemYard') {
     buildSnowGolemYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'foxDenClearing') {
+    buildFoxDenClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5039,6 +5065,7 @@ const DROPPED_ITEM_COLORS = {
   quartz: 0xe8ddc8,
   nether_bricks: 0x2a1418,
   gravel: 0x8a8478,
+  feather: 0xf0ead6,
 };
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
@@ -5248,6 +5275,45 @@ function snowGolemParts() {
   const faceMouth = new THREE.BoxGeometry(0.2, 0.06, faceDepth);
   faceMouth.translate(0, 1.15, faceZ);
   return { bodyLower, bodyUpper, head, arms, faceEyes, faceMouth };
+}
+// A low, elongated quadruped body with a pointed snout, 2 upright ears, a
+// bushy white-tipped tail, and 4 short dark-socked legs at the corners of
+// the body's own footprint — matching real vanilla's orange-red fur with a
+// white underside/tail-tip and darker leg markings
+// (minecraft.wiki/w/Fox). All 4 leg offsets stay strictly inside the
+// torso's own half-width/half-depth, the same "legs must sit under the
+// body" rule already applied to every other mob here, generalized to a
+// quadruped's front/back leg split rather than a biped's or the creeper's
+// symmetric 4 corners.
+function foxParts() {
+  const body = new THREE.BoxGeometry(0.32, 0.28, 0.62);
+  body.translate(0, 0.32, 0);
+  const head = new THREE.BoxGeometry(0.26, 0.22, 0.26);
+  head.translate(0, 0.4, 0.38);
+  const snout = new THREE.BoxGeometry(0.14, 0.12, 0.16);
+  snout.translate(0, 0.34, 0.54);
+  const earOffsets = [[-0.08, 0.55, 0.34], [0.08, 0.55, 0.34]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.12, 0.06);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.1, -0.22], [0.1, -0.22], [-0.1, 0.22], [0.1, 0.22]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.09, 0.24, 0.09);
+    g.translate(x, 0.12, z);
+    return g;
+  });
+  const tailBase = new THREE.BoxGeometry(0.14, 0.14, 0.32);
+  tailBase.translate(0, 0.36, -0.42);
+  const tailTip = new THREE.BoxGeometry(0.15, 0.15, 0.14);
+  tailTip.translate(0, 0.4, -0.62);
+  // A small held item, positioned right at the snout — only added to the
+  // render when entry._holding is set (see the render branch), the visual
+  // proof of the real "carries a picked-up item in its mouth" behavior.
+  const heldItem = new THREE.BoxGeometry(0.14, 0.14, 0.14);
+  heldItem.translate(0, 0.32, 0.66);
+  return { body, head, snout, ears, legs, tailBase, tailTip, heldItem };
 }
 
 const decorGeoCache = new Map();
@@ -5956,6 +6022,27 @@ function buildDecorMeshesForEntry(entry) {
     const m = new THREE.Mesh(geo, solidMaterial(0xf5fbfb));
     m.position.y = -0.5 + 0.0625;
     objs.push(m);
+  } else if (def.kind === 'fox') {
+    let parts = decorGeoCache.get('fox');
+    if (!parts) { parts = foxParts(); decorGeoCache.set('fox', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0xc9622a);
+    const darkMat = solidMaterial(0x1c1410);
+    const lightMat = solidMaterial(0xf5f0e6);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    group.add(new THREE.Mesh(parts.snout, furMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, darkMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, darkMat));
+    group.add(new THREE.Mesh(parts.tailBase, furMat));
+    group.add(new THREE.Mesh(parts.tailTip, lightMat));
+    if (entry._holding) {
+      const itemColor = DROPPED_ITEM_COLORS[entry._holding] || 0x2acb57;
+      group.add(new THREE.Mesh(parts.heldItem, solidMaterial(itemColor)));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   }
   // def.kind === 'infested_marker' intentionally renders nothing — see
   // DECOR_TYPES.infested_marker.
@@ -8065,6 +8152,87 @@ function updateSnowGolem(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla foxes "pick up nearby dropped items... and hold them in
+// their mouth," and "will not pick up another item while already holding
+// one" (minecraft.wiki/w/Fox). Every earlier item mechanic here either
+// relocates an item back out (the allay) or consumes it to produce a
+// different one (the piglin); a fox's pickup is neither — the item is
+// simply removed from the world and permanently attached to the mob,
+// never returned or transformed, a genuinely new "permanent hold" mutation
+// class for this app. This app has no verified exact real pickup-radius
+// figure, so the scan radius used is an honest, approximate stand-in
+// rather than a literal vanilla number, the same caveat already applied to
+// the warden's own sense radius.
+const FOX_WANDER_MIN = 2, FOX_WANDER_MAX = 5;
+const FOX_WALK_SPEED = 1.2;
+const FOX_PICKUP_SCAN_RADIUS = 3;
+function findNearestFoxItem(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item') continue;
+    const dist = Math.hypot(other.x - entry._wx, other.z - entry._wz);
+    if (dist <= FOX_PICKUP_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function updateFox(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = FOX_WANDER_MIN + Math.random() * (FOX_WANDER_MAX - FOX_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._holding = null;
+  }
+  if (!entry._holding && entry._mobState !== 'toItem') {
+    const item = findNearestFoxItem(entry);
+    if (item) {
+      entry._targetItem = item;
+      entry._targetX = item.x + 0.5;
+      entry._targetZ = item.z + 0.5;
+      entry._mobState = 'toItem';
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = FOX_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'toItem') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = FOX_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'toItem') {
+        const item = entry._targetItem;
+        if (item && mobObjects.some(m => m.entry === item)) {
+          entry._holding = item.itemType;
+          removeDroppedItemFromWorld(item);
+        }
+        entry._targetItem = null;
+      }
+      entry._mobState = 'idle';
+      entry._mobTimer = FOX_WANDER_MIN + Math.random() * (FOX_WANDER_MAX - FOX_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -8193,6 +8361,7 @@ function updateMobs(dt) {
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
+    if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -9257,7 +9426,7 @@ function renderBlueprint(model) {
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
-    creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'],
+    creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -9322,7 +9491,7 @@ function renderBlueprint(model) {
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
-    creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer',
+    creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -9439,6 +9608,7 @@ function renderCommands(model) {
       else if (d.type === 'silverfish') lines.push(`summon minecraft:silverfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'creeper') lines.push(`summon minecraft:creeper ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'snow_golem') lines.push(`summon minecraft:snow_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'fox') lines.push(`summon minecraft:fox ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._holding ? ` {Item:{id:"minecraft:${d._holding}",Count:1}}` : ''}`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
       else if (d.type === 'piglin') lines.push(`summon minecraft:piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
