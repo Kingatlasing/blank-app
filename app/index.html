@@ -3911,14 +3911,22 @@ function lavaMaterial() {
 // Real vanilla striders "turn purple, shiver a lot" whenever they aren't
 // actually on lava — a genuine, live, testable color change, not just
 // flavor text. See updateStrider.
-let _striderWarmMaterial = null, _striderColdMaterial = null;
+let _striderWarmMaterial = null, _striderColdMaterial = null, _striderLegMaterial = null;
 function striderWarmMaterial() {
-  if (!_striderWarmMaterial) _striderWarmMaterial = new THREE.MeshStandardMaterial({ color: 0xc97a5a, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  if (!_striderWarmMaterial) _striderWarmMaterial = new THREE.MeshStandardMaterial({ color: 0x8a3a32, roughness: 0.85, clippingPlanes: [cutawayPlane] });
   return _striderWarmMaterial;
 }
 function striderColdMaterial() {
-  if (!_striderColdMaterial) _striderColdMaterial = new THREE.MeshStandardMaterial({ color: 0x7a5c9e, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  if (!_striderColdMaterial) _striderColdMaterial = new THREE.MeshStandardMaterial({ color: 0x6b5a7a, roughness: 0.85, clippingPlanes: [cutawayPlane] });
   return _striderColdMaterial;
+}
+// The legs stay a fixed dark color regardless of warm/cold state — the
+// reference photo this geometry was matched against shows them notably
+// darker than the body in every shot, and the cited "turn purple" fact is
+// about the strider overall, not documented specifically down to the legs.
+function striderLegMaterial() {
+  if (!_striderLegMaterial) _striderLegMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2422, roughness: 0.8, clippingPlanes: [cutawayPlane] });
+  return _striderLegMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4449,19 +4457,17 @@ function dolphinParts() {
 function lavaBlockParts() {
   return { box: new THREE.BoxGeometry(0.98, 0.98, 0.98) };
 }
-// A tall round body on three long, thin, outward-angled legs — real
-// vanilla striders are unusually tall and stand on exactly 3 legs, unlike
-// every 2- or 4-legged mob in this app so far. See DECOR_TYPES.strider.
+// A boxy, roughly cubic body on 4 long, thin legs hanging nearly straight
+// down — matched directly against a real reference image of the in-game
+// model rather than guessed at (an earlier "exactly 3 legs" claim here
+// was wrong and has been corrected). See DECOR_TYPES.strider.
 function striderParts() {
-  const body = new THREE.BoxGeometry(0.5, 0.6, 0.5);
-  body.translate(0, 0.35, 0);
-  const legAngles = [0, (2 * Math.PI) / 3, (4 * Math.PI) / 3];
-  const legs = legAngles.map((angle) => {
-    const g = new THREE.BoxGeometry(0.1, 0.55, 0.1);
-    g.translate(0, -0.28, 0);
-    g.rotateX(0.35);
-    g.rotateY(angle);
-    g.translate(Math.sin(angle) * 0.18, 0.35, Math.cos(angle) * 0.18);
+  const body = new THREE.BoxGeometry(0.62, 0.58, 0.62);
+  body.translate(0, 0.42, 0);
+  const legOffsets = [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.62, 0.08);
+    g.translate(x, -0.02, z);
     return g;
   });
   return { body, legs };
@@ -4996,11 +5002,7 @@ function buildDecorMeshesForEntry(entry) {
     const bodyMesh = new THREE.Mesh(parts.body, striderWarmMaterial());
     bodyMesh.userData.isStriderSkin = true;
     group.add(bodyMesh);
-    for (const g of parts.legs) {
-      const legMesh = new THREE.Mesh(g, striderWarmMaterial());
-      legMesh.userData.isStriderSkin = true;
-      group.add(legMesh);
-    }
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, striderLegMaterial()));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
