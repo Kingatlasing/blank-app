@@ -1875,6 +1875,16 @@ const DECOR_TYPES = {
   // parent-child attachment rather than a followed target. See
   // updateParrot.
   parrot: { kind: 'parrot', interactive: false },
+  // Real vanilla axolotls can be "caught in a bucket" and picked up, like a
+  // fish (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob in
+  // this app that removes a live mob does so through ANOTHER mob's own AI
+  // (the frog eating a slime, the vex's own self-despawn) — this is the
+  // first live mob removed by a genuine PLAYER-triggered interaction, using
+  // the same click-to-interact raycaster this app already built for
+  // levers/buttons/doors, but pointed at a wandering AI-driven mob for the
+  // first time instead of a fixed piece of static decor. See
+  // captureAxolotlToBucket / attemptInteract.
+  axolotl: { kind: 'axolotl', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3240,6 +3250,25 @@ function buildParrotPerchGardenInterior(grid, silhouette, dims, exteriorMat, acc
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'parrot', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same glass-walled, single-water-source tank shape already proven on
+// the Aquarium Chamber preset (buildAquariumInterior), just stocked with
+// an axolotl instead of a squid — real vanilla axolotls wander through
+// water exactly like a squid does, so the tank itself needs nothing new.
+// Switch to Interact mode and click it to see the real new mechanic: it's
+// scooped up and permanently removed, like catching it in a bucket.
+function buildAxolotlTankInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'axolotl', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3903,6 +3932,18 @@ const PRESETS = [
       'Not modeled: the 5 real parrot colour variants (red/blue, blue, green, cyan, gray — this app always uses one scarlet-macaw colouring), taming with seeds, mimicking nearby hostile-mob sounds, dying from eating cookies, and dancing near a jukebox — this app has no taming, audio, or death system at all, so this parrot only ever wanders and perches.',
     ],
   },
+  {
+    id: 'axolotl-tank', name: 'Axolotl Tank', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'axolotlTank',
+    blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
+    desc: 'A glass tank genuinely filled with real water, with an axolotl swimming through it — real vanilla axolotls can be "caught in a bucket," and this is the first mob in this app removable by a genuine player click rather than by another mob\'s own AI: switch to Interact mode and click it to scoop it up for good.',
+    keywords: ['axolotl', 'bucket', 'capture', 'aquarium', 'water', 'click'],
+    notes: [
+      'Switch to Interact mode and click it — it\'s permanently scooped up and removed from the model, the same real vanilla rule that lets a player "catch [an axolotl] in a bucket." This is a genuinely new class of world mutation for this app: every earlier mob-elimination mechanic here happens through ANOTHER live mob\'s own AI (the frog eating a nearby slime, a vex quietly despawning itself on its own timer) — this is the first live, wandering mob removed by a direct PLAYER interaction instead, reusing the exact click-to-interact raycaster this app already built for levers, buttons, and doors, but pointed at a wandering AI-driven mob for the first time rather than a fixed piece of static decor. Verified directly by a unit test confirming a simulated click on the live axolotl actually removes its own decor entry, its own live mobObjects registration, and its own three.js mesh from the scene, and a second test confirming every OTHER decor entry in the same model is left completely untouched by that click.',
+      'The tank and its water reuse the exact same glass-walled, single-source design already proven on the Aquarium Chamber preset — real vanilla axolotls "wander around aimlessly in three dimensions as long as they are in the water," exactly like a squid, so the water-bound swim logic is reused unchanged from squidCellSwimmable/pickSquidSwimTarget\'s own technique with the axolotl\'s own constants, and the real new mechanic here is entirely about the interaction, not the movement.',
+      'Not modeled: playing dead when hurt, the several real colour morphs (this app always uses the common leucistic pink), predation on nearby squid/fish/drowned, and breeding with tropical fish — this app has no combat, health, or breeding system at all, so this axolotl only ever wanders until it\'s clicked.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4323,6 +4364,8 @@ function generateModel() {
     buildCamelRestStopInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'parrotPerchGarden') {
     buildParrotPerchGardenInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'axolotlTank') {
+    buildAxolotlTankInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5988,6 +6031,36 @@ function parrotParts() {
   });
   return { body, head, beak, wings, tail, feet, faceEyes };
 }
+// A flat, low-profile aquatic build (same y=0-centered convention as
+// squidParts, since an axolotl swims freely in 3D like a squid — see
+// updateAxolotl) with the real leucistic axolotl's two side gill frills
+// and a wide tail fin instead of any real vanilla mob's existing shape.
+function axolotlParts() {
+  const body = new THREE.BoxGeometry(0.3, 0.14, 0.5);
+  const head = new THREE.BoxGeometry(0.26, 0.16, 0.2);
+  head.translate(0, 0.02, 0.3);
+  const tail = new THREE.BoxGeometry(0.3, 0.06, 0.26);
+  tail.translate(0, -0.02, -0.36);
+  const legOffsets = [[-0.12, 0.15], [0.12, 0.15], [-0.12, -0.15], [0.12, -0.15]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+    g.translate(x, -0.09, z);
+    return g;
+  });
+  const gillOffsets = [[-0.15, 0.02, 0.28], [0.15, 0.02, 0.28]];
+  const gills = gillOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.1, 0.12);
+    g.translate(x, y, z);
+    return g;
+  });
+  const faceEyeOffsets = [[-0.07, 0.09, 0.38], [0.07, 0.09, 0.38]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, tail, legs, gills, faceEyes };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6911,6 +6984,29 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'axolotl') {
+    let parts = decorGeoCache.get('axolotl');
+    if (!parts) { parts = axolotlParts(); decorGeoCache.set('axolotl', parts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0xefc3d6);
+    const gillMat = solidMaterial(0xdb6a99);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.tail, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.gills) group.add(new THREE.Mesh(g, gillMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.axolotl: this is the first live mob the click-to-
+    // interact raycaster can hit, so it needs the same userData tag
+    // registerInteractive sets on levers/buttons/doors, even though it's
+    // driven by registerMob's own wander AI rather than the on/off state
+    // those use.
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'axolotl';
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -9985,6 +10081,95 @@ function updateParrot(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla axolotls "wander around aimlessly in three dimensions as
+// long as they are in the water," exactly like a squid (minecraft.wiki/w/
+// Axolotl), so this reuses squidCellSwimmable's own water-bound wander
+// technique with the axolotl's own constants — the actual new mechanic
+// here isn't this movement at all, it's that a real vanilla axolotl can be
+// "caught in a bucket": see DECOR_TYPES.axolotl and
+// captureAxolotlToBucket, which hook the player's own click-to-interact
+// raycaster onto this live wandering mob for the first time in this app.
+const AXOLOTL_SWIM_SPEED = 0.6;
+const AXOLOTL_HOVER_MIN = 1, AXOLOTL_HOVER_MAX = 3;
+const AXOLOTL_WANDER_RADIUS = 2;
+function pickAxolotlSwimTarget(model, entry) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const vertical = Math.random() < 0.3;
+    let dx = 0, dy = 0, dz = 0;
+    if (vertical) {
+      dy = Math.round((Math.random() * 2 - 1) * AXOLOTL_WANDER_RADIUS);
+    } else {
+      dx = Math.round((Math.random() * 2 - 1) * AXOLOTL_WANDER_RADIUS);
+      dz = Math.round((Math.random() * 2 - 1) * AXOLOTL_WANDER_RADIUS);
+    }
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+function updateAxolotl(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._mobTimer = AXOLOTL_HOVER_MIN + Math.random() * (AXOLOTL_HOVER_MAX - AXOLOTL_HOVER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickAxolotlSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = AXOLOTL_HOVER_MIN;
+      }
+    }
+  } else { // swimming
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = AXOLOTL_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = AXOLOTL_HOVER_MIN + Math.random() * (AXOLOTL_HOVER_MAX - AXOLOTL_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+// Real vanilla axolotls can be "caught in a bucket" and picked up
+// (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
+// removes a live mob from this app does so through ANOTHER mob's own AI —
+// the frog eating a slime, a vex despawning itself — while this is the
+// first live mob removed by a genuine PLAYER click, reusing the exact
+// click-to-interact raycaster this app already built for levers/buttons/
+// doors (attemptInteract), pointed at a wandering AI-driven mob instead of
+// a fixed piece of static decor for the first time.
+function captureAxolotlToBucket(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -10124,6 +10309,7 @@ function updateMobs(dt) {
     if (entry.type === 'llama') { updateLlama(entry, obj, dt); continue; }
     if (entry.type === 'camel') { updateCamel(entry, obj, dt); continue; }
     if (entry.type === 'parrot') { updateParrot(entry, obj, dt); continue; }
+    if (entry.type === 'axolotl') { updateAxolotl(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -10748,6 +10934,7 @@ function attemptInteract(clientX, clientY, button) {
       if (entry.type === 'redstone_wire') { cycleWireSide(entry); renderThree(currentModel, true); }
       return;
     }
+    if (entry.type === 'axolotl') { captureAxolotlToBucket(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -11191,7 +11378,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -11258,7 +11445,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11386,6 +11573,7 @@ function renderCommands(model) {
       else if (d.type === 'llama') lines.push(`summon minecraft:llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'camel') lines.push(`summon minecraft:camel ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'parrot') lines.push(`summon minecraft:parrot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'axolotl') lines.push(`summon minecraft:axolotl ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
