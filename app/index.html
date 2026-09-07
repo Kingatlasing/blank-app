@@ -2915,7 +2915,7 @@ function buildSnifferMeadowInterior(grid, silhouette, dims, exteriorMat, accentM
 // within 10 blocks jump" radius, so that mechanic is directly observable
 // between them. Real pandas spawn in jungle biomes on grass under bamboo;
 // no bamboo/jungle-specific texture exists in this app's atlas, so leafy
-// oak_leaves stands in as the accent block instead.
+// azalea_leaves stands in as the accent block instead.
 function buildPandaGroveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
   for (let i = 0; i < grid.length; i++) grid[i] = 0;
   for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
@@ -3416,7 +3416,7 @@ const PRESETS = [
   {
     id: 'panda-grove', name: 'Panda Grove', shape: 'box', category: 'Farms & Automation',
     real: { height: 3, baseX: 13, baseZ: 9 }, interiorMode: 'pandaGrove',
-    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'oak_leaves' },
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'azalea_leaves' },
     desc: 'An open grass clearing with two pandas — one lazy, one playful — placed within real vanilla\'s own 10-block "sneeze" radius of each other, so a sneeze from either one visibly makes the other jump.',
     keywords: ['panda', 'sneeze', 'lazy', 'playful', 'personality', 'slimeball', 'grove'],
     notes: [
@@ -3951,6 +3951,21 @@ function paintFaceUVRect(geo, faceIndex, tileKey, px0, py0, px1, py1) {
   }
 }
 
+// grass_block_top.png and every leaf texture (azalea_leaves.png, etc.) are
+// genuinely grayscale in the raw asset — real vanilla tints them green
+// per-biome at render time; an untinted material renders them washed-out
+// gray instead. grass_block's *other* faces (its side/bottom textures)
+// are already full-color and must NOT be tinted, so this can't be a
+// simple per-material color multiply the way the tree's leaves use
+// (tintedMaterial) — that only works because a tree's leaf cube uses one
+// grayscale texture on every face. The general block palette shares one
+// cubeMaterial() across every grid value, so per-face vertex colors (the
+// same trick getGrassGroundGeometry already uses for the decorative
+// ground margin) are what let that one shared material tint only the
+// faces that actually need it, leaving every other block's real
+// full-color texture completely untouched (white = no tint).
+const LEAF_TILE_NAMES = new Set(['azalea_leaves', 'flowering_azalea_leaves']);
+const BIOME_TINT = 0x5da845; // matches tintedMaterial's and grassGroundMaterial's own real vanilla default-biome green
 function buildTexturedBoxGeometry(faces) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   const sideTile = faces.all || faces.side;
@@ -3958,6 +3973,19 @@ function buildTexturedBoxGeometry(faces) {
   const bottomTile = faces.all || faces.bottom || sideTile;
   [sideTile, sideTile, topTile, bottomTile, sideTile, sideTile].forEach((tile, i) => paintFaceUV(geo, i, tile));
   geo.attributes.uv.needsUpdate = true;
+
+  const count = geo.attributes.position.count;
+  const color = new Float32Array(count * 3).fill(1);
+  const tint = new THREE.Color(BIOME_TINT);
+  const tintFace = (faceIndex) => {
+    for (let v = 0; v < 4; v++) {
+      const i = (faceIndex * 4 + v) * 3;
+      color[i] = tint.r; color[i + 1] = tint.g; color[i + 2] = tint.b;
+    }
+  };
+  if (topTile === 'grass_block_top') tintFace(2); // BoxGeometry face order: 2 = +Y (top) — only the top needs it
+  else if (LEAF_TILE_NAMES.has(sideTile)) [0, 1, 2, 3, 4, 5].forEach(tintFace); // every face is the same grayscale texture
+  geo.setAttribute('color', new THREE.BufferAttribute(color, 3));
   return geo;
 }
 
@@ -4002,7 +4030,12 @@ function grassGroundMaterial() {
 
 let _cubeMaterial = null;
 function cubeMaterial() {
-  if (!_cubeMaterial) _cubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), roughness: 0.95, metalness: 0.02, clippingPlanes: [cutawayPlane] });
+  // vertexColors:true so grass_block's top face and every leaf block's
+  // real biome tint (baked into each geometry by buildTexturedBoxGeometry)
+  // actually render — every other block's geometry carries all-white
+  // vertex colors, which is a no-op multiply, so this changes nothing for
+  // the rest of the palette.
+  if (!_cubeMaterial) _cubeMaterial = new THREE.MeshStandardMaterial({ map: getAtlasTexture(), vertexColors: true, roughness: 0.95, metalness: 0.02, clippingPlanes: [cutawayPlane] });
   return _cubeMaterial;
 }
 // Glass and every stained-glass color are real vanilla transparent blocks
