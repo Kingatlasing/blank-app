@@ -1814,6 +1814,7 @@ const DECOR_TYPES = {
   slimeball: { kind: 'slimeball', interactive: false },
   frog: { kind: 'frog', interactive: false },
   goat: { kind: 'goat', interactive: false },
+  vex: { kind: 'vex', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2947,6 +2948,24 @@ function buildGoatBluffInterior(grid, silhouette, dims, exteriorMat, accentMat, 
   decorOut.push({ type: 'goat', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'sheep', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'north' });
 }
+// A fully enclosed 6-sided room — floor, ceiling, and all 4 walls —
+// deliberately boxed in on every side, unlike every other single-mob
+// flourish preset, since a vex needs real solid walls around it for its
+// wall-phasing flight to actually mean something to watch.
+function buildVexChamberInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) for (let z = 0; z < dims.sz; z++) {
+      if (x === 0 || x === dims.sx - 1 || z === 0 || z === dims.sz - 1 || y === 0 || y === dims.sy - 1) {
+        grid[idx(x, y, z, dims)] = exteriorMat;
+      }
+    }
+  }
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2), cy = Math.max(1, Math.floor(dims.sy / 2));
+  decorOut.push({ type: 'vex', x: Math.max(1, cx - 1), y: cy, z: cz, facing: 'south' });
+  decorOut.push({ type: 'vex', x: Math.min(dims.sx - 2, cx + 1), y: cy, z: cz, facing: 'north' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3404,6 +3423,18 @@ const PRESETS = [
       'Real vanilla goats never ram another goat or a ghast — a real exclusion this app\'s own target search honors directly — and also have a rare 2% "screaming" variant that rams more often, plus an unusually high real jump. Neither the screaming variant nor the jump is modeled, and the real horn item a goat drops when it rams into a solid block is skipped entirely, since this app has no player inventory to receive one into anyway.',
     ],
   },
+  {
+    id: 'vex-chamber', name: 'Vex Chamber', shape: 'box', category: 'Farms & Automation',
+    real: { height: 5, baseX: 7, baseZ: 7 }, interiorMode: 'vexChamber',
+    blocks: { exterior: 'cobblestone', interior: 'cobblestone', accent: 'stone_bricks' },
+    desc: 'A small, fully sealed cobblestone chamber with two vexes flying freely through its walls — real vanilla vexes are "not hindered by solid blocks in any way," and these two genuinely ignore the room\'s real solid geometry rather than being confined by it like every other mob in this app.',
+    keywords: ['vex', 'phase', 'wall', 'evoker', 'chamber', 'despawn'],
+    notes: [
+      'Every other flying/floating mob here still needs something real to move through: the bat needs a solid ceiling to roost under, and the ghast needs actual open air (`ghastCellFloatable`) to drift through. A vex needs neither — its own wander target is picked with no collision check at all, so watch it fly straight through this chamber\'s real solid walls and ceiling, exactly matching real vanilla\'s "fly through walls, floors, [and] the ground itself."',
+      'Real vanilla vexes summoned by an evoker also carry a genuine, timed self-destruct: a real internal counter that, once it expires (30-119 real seconds), makes the vex start taking damage every real second until it dies entirely on its own — no predator involved. This app compresses that same real rule into a much shorter window so it is actually watchable. This app has no evoker mob at all, so every vex here is treated as evoker-summoned specifically so this mechanic has something to demonstrate; a real command/spawn-egg-summoned vex would never get this timer at all, a deliberate, honestly-noted deviation.',
+      'Not modeled: the real red "charging" glow and sword-lunge vexes show while actually attacking (this app has no combat or player-targeting for it), and the real 15×11×15 wander cuboid vanilla ties to its evoker (this app bounds its wander around its own spawn point instead, since there is no evoker position to tie it to).',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3786,6 +3817,8 @@ function generateModel() {
     buildSwampFrogPondInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'goatBluff') {
     buildGoatBluffInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'vexChamber') {
+    buildVexChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4014,6 +4047,13 @@ function striderColdMaterial() {
 function striderLegMaterial() {
   if (!_striderLegMaterial) _striderLegMaterial = new THREE.MeshStandardMaterial({ color: 0x2a2422, roughness: 0.8, clippingPlanes: [cutawayPlane] });
   return _striderLegMaterial;
+}
+// Real vanilla vexes have "bluish translucent skin" — a genuine
+// see-through material, not just a pale color.
+let _vexSkinMaterial = null;
+function vexSkinMaterial() {
+  if (!_vexSkinMaterial) _vexSkinMaterial = new THREE.MeshStandardMaterial({ color: 0x6a8fc9, roughness: 0.5, transparent: true, opacity: 0.75, clippingPlanes: [cutawayPlane] });
+  return _vexSkinMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4690,6 +4730,25 @@ function goatParts() {
   });
   return { body, head, snout, horns, ears, beard, tail, legs };
 }
+// A small humanoid torso/head/2 arms with a permanently-held iron sword —
+// real vanilla vexes are always shown armed, not just while attacking, so
+// the sword is a fixed prop here rather than a state-driven one. See
+// DECOR_TYPES.vex.
+function vexParts() {
+  const body = new THREE.BoxGeometry(0.28, 0.42, 0.16);
+  body.translate(0, 0.35, 0);
+  const head = new THREE.BoxGeometry(0.24, 0.22, 0.24);
+  head.translate(0, 0.68, 0);
+  const armOffsets = [[-0.19, 0.4, 0], [0.19, 0.4, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+    g.translate(x, y, z);
+    return g;
+  });
+  const sword = new THREE.BoxGeometry(0.05, 0.32, 0.05);
+  sword.translate(0.26, 0.32, 0.05);
+  return { body, head, arms, sword };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5261,6 +5320,18 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.beard, hornMat));
     group.add(new THREE.Mesh(parts.tail, bodyMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'vex') {
+    let parts = decorGeoCache.get('vex');
+    if (!parts) { parts = vexParts(); decorGeoCache.set('vex', parts); }
+    const group = new THREE.Group();
+    const skinMat = vexSkinMaterial(), swordMat = solidMaterial(0xc7c7c7);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    group.add(new THREE.Mesh(parts.sword, swordMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -6826,10 +6897,136 @@ function updateGoat(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla vexes (minecraft.wiki/w/Vex) are "not hindered by solid
+// blocks in any way, allowing them to fly through walls, floors, [...] or
+// the ground itself" — genuine collision-ignoring flight. Every other
+// flying/floating mob here still needs something real: the bat needs a
+// solid ceiling to roost under, and the ghast needs actual open air to
+// drift through (`ghastCellFloatable`). A vex needs neither — its own
+// wander target is picked with no grid/collision check at all, so it can
+// (and does) fly straight through this app's real solid geometry.
+//
+// Real vanilla also documents a genuine timed self-destruct for a vex
+// summoned by an evoker: a real internal counter that, once it runs out
+// (30-119 real seconds), makes the vex start taking damage every real
+// second until it dies entirely on its own — no player or predator
+// involved. Every earlier world-mutation mob either added something
+// (turtle egg, torchflower seed, panda's slimeball) or removed something
+// ELSE (the frog eating a slime); this is the first mob that removes
+// ITSELF. This app has no evoker mob at all, so there's no real spawn-
+// method distinction to preserve — every vex here is treated as if
+// evoker-summoned specifically so this real self-destruct rule has
+// something to demonstrate, an honest, spelled-out deviation rather than
+// a silently invented one.
+const VEX_WANDER_RADIUS = 5; // free 3D wander radius, unlike any ground mob's, since a vex ignores walls entirely
+const VEX_FLY_SPEED = 2.0;
+const VEX_IDLE_MIN = 1, VEX_IDLE_MAX = 3;
+const VEX_LIFE_MIN = 6, VEX_LIFE_MAX = 12; // compressed stand-in for real vanilla's real 30-119 second life-tick window
+const VEX_DEATH_TICK_INTERVAL = 0.5; // compressed stand-in for real vanilla's 1-damage-every-20-ticks (1 real second) rule
+const VEX_DEATH_HITS = 5; // a compressed stand-in for real vanilla's ~7 hits' worth of health — not a literal HP model
+function pickVexWanderTarget(entry) {
+  return {
+    x: entry._homeX + (Math.random() * 2 - 1) * VEX_WANDER_RADIUS,
+    y: entry._homeY + (Math.random() * 2 - 1) * VEX_WANDER_RADIUS * 0.6,
+    z: entry._homeZ + (Math.random() * 2 - 1) * VEX_WANDER_RADIUS,
+  };
+}
+// The reverse of the frog's predation: this genuinely removes the vex's
+// OWN decor entry, scene mesh, and mobObjects registration — a real mob
+// deleting itself from the world, not being killed by anything else.
+function removeVexFromWorld(entry) {
+  if (!currentModel) return;
+  const decorIdx = currentModel.decor.indexOf(entry);
+  if (decorIdx !== -1) currentModel.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function updateVex(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = VEX_IDLE_MIN + Math.random() * (VEX_IDLE_MAX - VEX_IDLE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._homeX = entry._wx;
+    entry._homeY = entry._wy;
+    entry._homeZ = entry._wz;
+    entry._lifeElapsed = 0;
+    entry._lifeLimit = VEX_LIFE_MIN + Math.random() * (VEX_LIFE_MAX - VEX_LIFE_MIN);
+    entry._deathHitsTaken = 0;
+    entry._deathTickTimer = VEX_DEATH_TICK_INTERVAL;
+    entry._dyingElapsed = 0;
+  }
+  // The real life-tick timer runs independently of whatever else the vex
+  // is doing, right up until it actually starts dying.
+  if (entry._mobState !== 'dying') {
+    entry._lifeElapsed += dt;
+    if (entry._lifeElapsed >= entry._lifeLimit) {
+      entry._mobState = 'dying';
+      entry._dyingElapsed = 0;
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickVexWanderTarget(entry);
+      entry._targetX = target.x;
+      entry._targetY = target.y;
+      entry._targetZ = target.z;
+      entry._mobState = 'flying';
+    }
+  } else if (entry._mobState === 'flying') {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = VEX_FLY_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry._mobState = 'idle';
+      entry._mobTimer = VEX_IDLE_MIN + Math.random() * (VEX_IDLE_MAX - VEX_IDLE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'dying') {
+    entry._dyingElapsed += dt;
+    entry._wy += Math.sin(entry._dyingElapsed * 3) * 0.15 * dt; // still restlessly drifting, not frozen, right up until it actually dies
+    entry._deathTickTimer -= dt;
+    if (entry._deathTickTimer <= 0) {
+      entry._deathHitsTaken++;
+      entry._deathTickTimer = VEX_DEATH_TICK_INTERVAL;
+      if (entry._deathHitsTaken >= VEX_DEATH_HITS) {
+        removeVexFromWorld(entry);
+        return;
+      }
+    }
+  }
+  entry.x = Math.floor(entry._wx);
+  entry.y = Math.floor(entry._wy);
+  entry.z = Math.floor(entry._wz);
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  // A purely cosmetic blink while dying — this app's own invented visual
+  // cue that the real life-tick timer has run out, not itself a cited
+  // vanilla fact — so it's obvious on screen that removal is imminent.
+  if (entry._mobState === 'dying') {
+    obj.visible = Math.floor(entry._dyingElapsed / 0.15) % 2 === 0;
+  } else {
+    obj.visible = true;
+  }
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
     if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
@@ -7849,7 +8046,7 @@ function renderBlueprint(model) {
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
-    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'],
+    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -7911,7 +8108,7 @@ function renderBlueprint(model) {
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
-    panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat',
+    panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -8017,6 +8214,7 @@ function renderCommands(model) {
       else if (d.type === 'slimeball') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:slime_ball",Count:1}}`);
       else if (d.type === 'frog') lines.push(`summon minecraft:frog ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'goat') lines.push(`summon minecraft:goat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'vex') lines.push(`summon minecraft:vex ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
