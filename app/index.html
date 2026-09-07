@@ -1813,6 +1813,7 @@ const DECOR_TYPES = {
   panda: { kind: 'panda', interactive: false },
   slimeball: { kind: 'slimeball', interactive: false },
   frog: { kind: 'frog', interactive: false },
+  goat: { kind: 'goat', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2934,6 +2935,18 @@ function buildSwampFrogPondInterior(grid, silhouette, dims, exteriorMat, accentM
   decorOut.push({ type: 'frog', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'slime', x: Math.min(dims.sx - 2, cx + 2), y: 1, z: cz, size: 1 });
 }
+// A rocky, snow-dusted bluff — no walls, matching every other single-mob
+// flourish preset — with a goat and a sheep placed within the goat's real
+// ram-scan range so the charge-and-knockback mechanic is directly
+// observable. Real vanilla goats spawn in mountainous biomes.
+function buildGoatBluffInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'goat', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'sheep', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'north' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3379,6 +3392,18 @@ const PRESETS = [
       'This app has no magma cube mob at all, so only the small-slime half of real vanilla\'s "eats small slimes and magma cubes" diet is modeled — an honest gap, not a silently generalized rule. No aggro/predation exists in the other direction either: a real frog has nothing to fear here, since this app has no combat system at all.',
     ],
   },
+  {
+    id: 'goat-bluff', name: 'Goat Bluff', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 9 }, interiorMode: 'goatBluff',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'snow_block' },
+    desc: 'A rocky, snow-dusted bluff with a goat and a sheep nearby — real vanilla goats periodically charge and ram a real nearby target, knocking it back, and this one genuinely displaces the sheep\'s own live position when a charge actually connects.',
+    keywords: ['goat', 'ram', 'knockback', 'charge', 'bluff', 'mountain'],
+    notes: [
+      'Real vanilla goats ram "every 30 to 300 seconds," a real long real-time window this app compresses into a much shorter one so the mechanic is actually watchable — an honest stand-in, not a literal reproduction of the wait. Real vanilla also only rams a target that "has not moved" since being picked, and this app enforces that same real stillness gate: a sheep that starts wandering away mid-wind-up genuinely dodges the charge that was already coming for it.',
+      'This is a new kind of inter-mob effect for this app: the panda\'s sneeze only ever changes another mob\'s STATE, and the frog eating a slime removes it outright — a goat\'s ram genuinely displaces another live mob\'s actual world position, the same real physical knockback vanilla applies, just compressed in distance for a small demo room.',
+      'Real vanilla goats never ram another goat or a ghast — a real exclusion this app\'s own target search honors directly — and also have a rare 2% "screaming" variant that rams more often, plus an unusually high real jump. Neither the screaming variant nor the jump is modeled, and the real horn item a goat drops when it rams into a solid block is skipped entirely, since this app has no player inventory to receive one into anyway.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3759,6 +3784,8 @@ function generateModel() {
     buildPandaGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'swampFrogPond') {
     buildSwampFrogPondInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'goatBluff') {
+    buildGoatBluffInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4627,6 +4654,42 @@ function frogParts() {
   });
   return { body, eyes, tongue, frontLegs, backLegs };
 }
+// A stocky body, a head with 2 curved-back horns, a snout, 2 ears, a chin
+// beard, a small tail, and 4 legs — real vanilla goats also have a rare
+// (2%) "screaming" cosmetic variant that isn't modeled here, since it only
+// changes sounds and ram frequency, nothing visual or structurally new.
+// See DECOR_TYPES.goat.
+function goatParts() {
+  const body = new THREE.BoxGeometry(0.55, 0.45, 0.75);
+  body.translate(0, 0.4, 0);
+  const head = new THREE.BoxGeometry(0.3, 0.3, 0.32);
+  head.translate(0, 0.58, 0.5);
+  const snout = new THREE.BoxGeometry(0.16, 0.14, 0.14);
+  snout.translate(0, 0.5, 0.68);
+  const hornOffsets = [[-0.1, 0.78, 0.5], [0.1, 0.78, 0.5]];
+  const horns = hornOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.22, 0.07);
+    g.translate(x, y, z);
+    return g;
+  });
+  const earOffsets = [[-0.19, 0.62, 0.42], [0.19, 0.62, 0.42]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.06, 0.14);
+    g.translate(x, y, z);
+    return g;
+  });
+  const beard = new THREE.BoxGeometry(0.08, 0.14, 0.06);
+  beard.translate(0, 0.4, 0.66);
+  const tail = new THREE.BoxGeometry(0.1, 0.14, 0.08);
+  tail.translate(0, 0.55, -0.38);
+  const legOffsets = [[-0.18, 0.28], [0.18, 0.28], [-0.18, -0.28], [0.18, -0.28]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.4, 0.14);
+    g.translate(x, 0.05, z);
+    return g;
+  });
+  return { body, head, snout, horns, ears, beard, tail, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5182,6 +5245,22 @@ function buildDecorMeshesForEntry(entry) {
     group.add(tongueMesh);
     for (const g of parts.frontLegs) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.backLegs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'goat') {
+    let parts = decorGeoCache.get('goat');
+    if (!parts) { parts = goatParts(); decorGeoCache.set('goat', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xd8cdb8), hornMat = solidMaterial(0x3a352f);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.snout, hornMat));
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, hornMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, bodyMat));
+    group.add(new THREE.Mesh(parts.beard, hornMat));
+    group.add(new THREE.Mesh(parts.tail, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -6580,10 +6659,178 @@ function updateFrog(entry, obj, dt) {
   const tongueScale = entry._mobState === 'eating' ? 1 + Math.sin((entry._eatElapsed / FROG_EAT_DURATION) * Math.PI) * 3 : 0.01;
   for (const c of obj.children) if (c.userData.isFrogTongue) c.scale.z = tongueScale;
 }
+// Real vanilla goats (minecraft.wiki/w/Goat) periodically pick a nearby
+// target and ram it — "every 30 to 300 seconds" for a normal goat — with a
+// real wind-up before a fast charge that "knocks back" whatever it hits.
+// Every earlier inter-mob effect in this app only ever changed another
+// mob's STATE (the panda's sneeze forces a sibling into a jump) or removed
+// it outright (the frog eating a slime); this is the first that genuinely
+// DISPLACES another live mob's actual world position — a real physical
+// knockback impulse, not a state flag or a deletion. Real vanilla also
+// documents a genuine gate on when a ram is even allowed to land: a goat
+// only rams a target that "has not moved" since it was picked, so a target
+// that's actively wandering away during the wind-up genuinely dodges it.
+// Real vanilla goats never ram another goat or a ghast, a real exclusion
+// this app's own target search honors directly.
+const GOAT_IDLE_MIN = 2, GOAT_IDLE_MAX = 5;
+const GOAT_WANDER_SPEED = 1.3;
+const GOAT_RAM_MIN = 6, GOAT_RAM_MAX = 12; // compressed stand-in for real vanilla's real 30-300 second window
+const GOAT_RAM_SCAN_RADIUS = 6; // how far a goat looks for a real target before deciding to ram
+const GOAT_RAM_WINDUP_DURATION = 0.6; // a real wind-up/bleat pause before the charge
+const GOAT_RAM_SPEED = 6; // a real fast charge, well above any normal wander pace
+const GOAT_RAM_HIT_RANGE = 1.2;
+const GOAT_KNOCKBACK_DISTANCE = 4; // a compressed stand-in for real vanilla's much longer ~9-block ram knockback
+const GOAT_STILLNESS_EPSILON = 0.05; // real vanilla only rams a target that "has not moved" since being picked
+function goatTargetPos(target) {
+  return { x: target._wx !== undefined ? target._wx : target.x + 0.5, z: target._wz !== undefined ? target._wz : target.z + 0.5 };
+}
+function findGoatRamTarget(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other === entry) continue;
+    if (other.type === 'goat' || other.type === 'ghast') continue; // real vanilla: goats never ram another goat or a ghast
+    const pos = goatTargetPos(other);
+    const dist = Math.hypot(pos.x - entry._wx, pos.z - entry._wz);
+    if (dist <= GOAT_RAM_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+// The real physical knockback: genuinely moves the TARGET's own live
+// position (both its float coordinates and its integer cell), the same
+// displacement a real vanilla ram knockback applies to whatever it hits.
+// The push direction comes from the goat's own real charge direction
+// (recorded when the charge began), not from the rammer-to-target vector
+// at the moment of impact — by the time a dash actually connects, the
+// goat and its target are at (or very near) the same point, so that
+// vector would be degenerate.
+function applyGoatKnockback(rammer, target) {
+  const dims = currentModel.dims;
+  const pos = goatTargetPos(target);
+  const nx = rammer._ramDirX || 0, nz = rammer._ramDirZ || 1;
+  const newX = Math.max(0.5, Math.min(dims.sx - 0.5, pos.x + nx * GOAT_KNOCKBACK_DISTANCE));
+  const newZ = Math.max(0.5, Math.min(dims.sz - 0.5, pos.z + nz * GOAT_KNOCKBACK_DISTANCE));
+  target._wx = newX;
+  target._wz = newZ;
+  target.x = Math.floor(newX);
+  target.z = Math.floor(newZ);
+}
+function updateGoat(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = GOAT_IDLE_MIN + Math.random() * (GOAT_IDLE_MAX - GOAT_IDLE_MIN);
+    entry._ramTimer = GOAT_RAM_MIN + Math.random() * (GOAT_RAM_MAX - GOAT_RAM_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  // The ram timer runs independently of whatever else this goat is doing,
+  // same as a real goat's own charge timer, except while it's already
+  // mid-charge (winding up or dashing).
+  if (entry._mobState !== 'windup' && entry._mobState !== 'dashing') {
+    entry._ramTimer -= dt;
+    if (entry._ramTimer <= 0) {
+      const target = findGoatRamTarget(entry);
+      if (target) {
+        const pos = goatTargetPos(target);
+        entry._ramTarget = target;
+        entry._ramWatchX = pos.x;
+        entry._ramWatchZ = pos.z;
+        entry._windupElapsed = 0;
+        entry._mobYaw = Math.atan2(pos.x - entry._wx, pos.z - entry._wz);
+        const dirDist = Math.hypot(pos.x - entry._wx, pos.z - entry._wz) || 1;
+        entry._ramDirX = (pos.x - entry._wx) / dirDist;
+        entry._ramDirZ = (pos.z - entry._wz) / dirDist;
+        entry._mobState = 'windup';
+      } else {
+        entry._ramTimer = GOAT_RAM_MIN; // nothing real in range right now — check again soon
+      }
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = GOAT_IDLE_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = GOAT_WANDER_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = GOAT_IDLE_MIN + Math.random() * (GOAT_IDLE_MAX - GOAT_IDLE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'windup') {
+    entry._windupElapsed += dt;
+    const target = entry._ramTarget;
+    const stillExists = target && mobObjects.some(m => m.entry === target);
+    if (!stillExists) {
+      entry._ramTarget = null;
+      entry._mobState = 'idle';
+      entry._ramTimer = GOAT_RAM_MIN + Math.random() * (GOAT_RAM_MAX - GOAT_RAM_MIN);
+    } else {
+      const pos = goatTargetPos(target);
+      const moved = Math.hypot(pos.x - entry._ramWatchX, pos.z - entry._ramWatchZ) > GOAT_STILLNESS_EPSILON;
+      if (moved) {
+        // Real vanilla only rams a target that "has not moved" — this one
+        // did, so the charge is called off before it even starts.
+        entry._ramTarget = null;
+        entry._mobState = 'idle';
+        entry._ramTimer = GOAT_RAM_MIN + Math.random() * (GOAT_RAM_MAX - GOAT_RAM_MIN);
+      } else if (entry._windupElapsed >= GOAT_RAM_WINDUP_DURATION) {
+        entry._dashTargetX = pos.x;
+        entry._dashTargetZ = pos.z;
+        entry._mobState = 'dashing';
+      }
+    }
+  } else if (entry._mobState === 'dashing') {
+    const dx = entry._dashTargetX - entry._wx, dz = entry._dashTargetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = GOAT_RAM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._dashTargetX;
+      entry._wz = entry._dashTargetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      const target = entry._ramTarget;
+      if (target && mobObjects.some(m => m.entry === target)) {
+        const pos = goatTargetPos(target);
+        if (Math.hypot(pos.x - entry._wx, pos.z - entry._wz) <= GOAT_RAM_HIT_RANGE) {
+          applyGoatKnockback(entry, target);
+        }
+      }
+      entry._ramTarget = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = GOAT_IDLE_MIN + Math.random() * (GOAT_IDLE_MAX - GOAT_IDLE_MIN);
+      entry._ramTimer = GOAT_RAM_MIN + Math.random() * (GOAT_RAM_MAX - GOAT_RAM_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
@@ -7602,7 +7849,7 @@ function renderBlueprint(model) {
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
-    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'],
+    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -7664,7 +7911,7 @@ function renderBlueprint(model) {
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
-    panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog',
+    panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -7769,6 +8016,7 @@ function renderCommands(model) {
       else if (d.type === 'panda') lines.push(`summon minecraft:panda ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d.personality ? ` {MainGene:"${d.personality}"}` : ''}`);
       else if (d.type === 'slimeball') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:slime_ball",Count:1}}`);
       else if (d.type === 'frog') lines.push(`summon minecraft:frog ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'goat') lines.push(`summon minecraft:goat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
