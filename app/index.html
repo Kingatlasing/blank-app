@@ -5458,7 +5458,20 @@ function ironGolemParts() {
     g.translate(x, 0.275, z);
     return g;
   });
-  return { torso, head, arms, legs };
+  // A minimal face — 2 small dark eyes near the top of the head and a
+  // flat, downturned mouth line below them, matching real vanilla's own
+  // small-eyed, stern expression — the same flat-panel technique already
+  // used for the creeper's, snow golem's, and villager's faces.
+  const faceZ = 0.255, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.1, 1.92], [0.1, 1.92]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const faceMouth = new THREE.BoxGeometry(0.22, 0.04, faceDepth);
+  faceMouth.translate(0, 1.75, faceZ);
+  return { torso, head, arms, legs, faceEyes, faceMouth };
 }
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
@@ -6242,6 +6255,9 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, limbMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, limbMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceMouth, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
