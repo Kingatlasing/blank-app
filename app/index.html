@@ -1826,6 +1826,7 @@ const DECOR_TYPES = {
   // hiding a silverfish. See DECOR_TYPES.silverfish.
   infested_marker: { kind: 'infested_marker', interactive: false },
   piglin: { kind: 'piglin', interactive: false },
+  creeper: { kind: 'creeper', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3047,6 +3048,21 @@ function buildPiglinBarterPostInterior(grid, silhouette, dims, exteriorMat, acce
   decorOut.push({ type: 'piglin', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'dropped_item', itemType: 'gold_ingot', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz });
 }
+// A small stone-brick outpost wall with a creeper loitering nearby — switch
+// to Walk mode and approach it to see the real proximity fuse: it closes
+// in, then primes and explodes once you're within its real melee range,
+// carving a genuine crater out of the wall.
+function buildCreeperBlastYardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const wallZ = Math.min(dims.sz - 2, cz + 3);
+  for (let x = Math.max(0, cx - 3); x <= Math.min(dims.sx - 1, cx + 3); x++) {
+    for (let y = 1; y < dims.sy; y++) grid[idx(x, y, wallZ, dims)] = exteriorMat;
+  }
+  if (!decorOut) return;
+  decorOut.push({ type: 'creeper', x: cx, y: 1, z: Math.max(0, wallZ - 4), facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3564,6 +3580,19 @@ const PRESETS = [
       'Not modeled: real piglins fleeing zombified piglins/zoglins and fearing soul fire, their aggression toward a player without gold armor, and hoglin-hunting behavior — this app has no combat, no zoglin/hoglin mobs, and no fear/aggro system at all, so this piglin only ever wanders and barters, never fights or flees.',
     ],
   },
+  {
+    id: 'creeper-blast-yard', name: 'Creeper Blast Yard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'creeperBlastYard',
+    blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'stone_bricks' },
+    desc: 'A stone-brick outpost wall with a creeper nearby — switch to Walk mode and approach it: it closes the distance, primes for a real "1.5-second" fuse once you\'re within melee range, and genuinely explodes, carving a real crater out of the wall.',
+    keywords: ['creeper', 'explosion', 'fuse', 'blast', 'crater', 'tnt'],
+    notes: [
+      'Switch to Walk mode and walk toward the creeper. It wanders until it notices you, walks over, then stops and primes — flashing a lighter green while its real fuse counts up — and explodes once the fuse completes, carving away every real grid cell within a radius of its position and removing the creeper itself. This is a genuinely new class of world mutation for this app: every earlier mutation touched at most one block or one decor entry per event, while this one removes many real grid cells across a 3D radius in a single event.',
+      'Back away while it\'s priming (still inside its fuse countdown) and real vanilla lets the fuse "go out" and count back down instead of committing to the blast — this app models that reset too, so retreating in time genuinely saves the wall.',
+      'The blast radius here is a simplified deterministic sphere carved around the creeper\'s position, not real vanilla\'s actual per-block blast-resistance and line-of-sight raycasting (which lets some blocks like obsidian survive point-blank and can leave an irregular, partially-blocked crater) — this app has no per-block blast-resistance data at all, so every block inside the radius is removed unconditionally.',
+      'Not modeled: real creeper damage to the player or nearby mobs, charged (lightning-boosted) creepers with a doubled blast radius, and real vanilla\'s mobGriefing gamerule that can disable block destruction entirely — this app has no combat/damage system and no gamerule concept, so this creeper only ever affects the world, never health.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3960,6 +3989,8 @@ function generateModel() {
     buildSilverfishNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'piglinBarterPost') {
     buildPiglinBarterPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'creeperBlastYard') {
+    buildCreeperBlastYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5109,6 +5140,26 @@ function piglinParts() {
   swordBlade.translate(swordX, swordY, swordZ);
   return { torso, belt, head, snout, tusks, ears, arms, legs, boots, swordHilt, swordBlade };
 }
+// Real vanilla creepers have no arms — just a head, a body, and 4 short
+// legs at the corners of the body's own footprint (minecraft.wiki/w/Creeper
+// model/geometry description). All 4 leg offsets are kept strictly inside
+// the torso's own half-width/half-depth (0.25/0.25) — the same "legs must
+// sit under the body, never poking out in front of it" lesson learned from
+// the piglin/warden leg-alignment fixes, generalized here to 4 corner legs
+// instead of 2.
+function creeperParts() {
+  const torso = new THREE.BoxGeometry(0.5, 0.7, 0.5);
+  torso.translate(0, 0.85, 0);
+  const head = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  head.translate(0, 1.45, 0);
+  const legOffsets = [[-0.15, -0.15], [0.15, -0.15], [-0.15, 0.15], [0.15, 0.15]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.18, 0.5, 0.18);
+    g.translate(x, 0.25, z);
+    return g;
+  });
+  return { torso, head, legs };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5772,6 +5823,22 @@ function buildDecorMeshesForEntry(entry) {
       group.add(new THREE.Mesh(parts.swordHilt, bootMat));
       group.add(new THREE.Mesh(parts.swordBlade, swordMat));
     }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'creeper') {
+    let parts = decorGeoCache.get('creeper');
+    if (!parts) { parts = creeperParts(); decorGeoCache.set('creeper', parts); }
+    const group = new THREE.Group();
+    // Real vanilla creepers flash brighter green and their whole body
+    // pulses while the fuse is counting up — approximated here with a
+    // straight color swap to a lighter green while entry._mobState is
+    // 'fused', reverting once it defuses or explodes.
+    const skinColor = entry._mobState === 'fused' ? 0x8de89a : 0x3fae44;
+    const skinMat = solidMaterial(skinColor);
+    group.add(new THREE.Mesh(parts.torso, skinMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -7684,6 +7751,131 @@ function updateWarden(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla creepers wander like an ordinary passive mob until a player
+// comes within its notice range, then walk toward the player; once within
+// real melee range it stops and "primes" — hissing and flashing for a real
+// "1.5 seconds (30 ticks)" fuse — before exploding
+// (minecraft.wiki/w/Creeper). If the player backs away before the fuse
+// finishes, real vanilla lets the fuse "go out" and count back down rather
+// than committing to the blast — that reset is modeled here too, not just
+// the ignite-and-explode path. This app has no health/damage system, so
+// the explosion itself is reduced to its most Minecraft-recognizable real
+// side effect: a real creeper's explosion power actually gouges a crater
+// out of the terrain, so this carves every grid cell within a radius of
+// the creeper's position, then the creeper itself is removed — a genuinely
+// new class of world mutation for this app: every earlier mutation
+// touched at most one block or one decor entry at a time, while this one
+// removes many real grid cells across a 3D radius in a single event.
+const CREEPER_WANDER_MIN = 2, CREEPER_WANDER_MAX = 5;
+const CREEPER_WALK_SPEED = 1.1;
+const CREEPER_PURSUE_RADIUS = 16; // real default follow_range attribute shared by hostile mobs incl. creeper (minecraft.wiki/w/Attribute)
+const CREEPER_IGNITE_RADIUS = 3; // approximate real distance at which a creeper stops closing in and starts its fuse
+const CREEPER_FUSE_TIME = 1.5; // real "1.5 seconds (30 ticks)" fuse at 20 ticks/sec
+const CREEPER_EXPLOSION_RADIUS = 3; // approximates real creeper explosion power 3's blast radius — a simplified deterministic sphere, not vanilla's per-block blast-resistance/raycast falloff
+function explodeCreeper(model, entry) {
+  const dims = model.dims;
+  const cx = entry._wx, cy = entry.y + 0.85, cz = entry._wz;
+  const r = CREEPER_EXPLOSION_RADIUS;
+  const minX = Math.max(0, Math.floor(cx - r)), maxX = Math.min(dims.sx - 1, Math.ceil(cx + r));
+  const minY = Math.max(0, Math.floor(cy - r)), maxY = Math.min(dims.sy - 1, Math.ceil(cy + r));
+  const minZ = Math.max(0, Math.floor(cz - r)), maxZ = Math.min(dims.sz - 1, Math.ceil(cz + r));
+  for (let gy = minY; gy <= maxY; gy++) {
+    for (let gz = minZ; gz <= maxZ; gz++) {
+      for (let gx = minX; gx <= maxX; gx++) {
+        const dist = Math.hypot(gx + 0.5 - cx, gy + 0.5 - cy, gz + 0.5 - cz);
+        if (dist <= r) model.grid[idx(gx, gy, gz, dims)] = 0;
+      }
+    }
+  }
+  const entryIdx = model.decor.indexOf(entry);
+  if (entryIdx !== -1) model.decor.splice(entryIdx, 1);
+}
+function updateCreeper(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'wandering';
+    entry._mobTimer = CREEPER_WANDER_MIN + Math.random() * (CREEPER_WANDER_MAX - CREEPER_WANDER_MIN);
+    entry._fuseTimer = 0;
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  let dist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    dist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (dist <= CREEPER_IGNITE_RADIUS) {
+    entry._mobState = 'fused';
+    entry._fuseTimer += dt;
+    entry._mobYaw = Math.atan2(sensedX - entry._wx, sensedZ - entry._wz);
+    if (entry._fuseTimer >= CREEPER_FUSE_TIME) {
+      explodeCreeper(currentModel, entry);
+      settleGravityBlocks(currentModel);
+      currentModel._lampCells = null;
+      computeRedstone(currentModel);
+      renderThree(currentModel, true);
+      renderBlueprint(currentModel);
+      renderCommands(currentModel);
+      renderStats(currentModel);
+      return;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'fused') {
+    entry._fuseTimer = Math.max(0, entry._fuseTimer - dt);
+    if (entry._fuseTimer > 0) {
+      obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+      obj.rotation.y = entry._mobYaw;
+      return;
+    }
+    entry._mobState = 'wandering';
+    entry._mobTimer = 0;
+  }
+  if (dist <= CREEPER_PURSUE_RADIUS) {
+    entry._mobState = 'pursuing';
+    entry._targetX = sensedX;
+    entry._targetZ = sensedZ;
+  } else if (entry._mobState === 'pursuing') {
+    entry._mobState = 'wandering';
+    entry._mobTimer = 0;
+  }
+  if (entry._mobState === 'wandering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walkingIdle';
+      } else {
+        entry._mobTimer = CREEPER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walkingIdle' || entry._mobState === 'pursuing') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const d = Math.hypot(dx, dz);
+    const step = CREEPER_WALK_SPEED * dt;
+    if (d <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'walkingIdle') {
+        entry._mobState = 'wandering';
+        entry._mobTimer = CREEPER_WANDER_MIN + Math.random() * (CREEPER_WANDER_MAX - CREEPER_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / d) * step;
+      entry._wz += (dz / d) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -7810,6 +8002,7 @@ function updateMobs(dt) {
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
+    if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -8874,6 +9067,7 @@ function renderBlueprint(model) {
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
+    creeper: ['#3fae44', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -8938,6 +9132,7 @@ function renderBlueprint(model) {
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
+    creeper: 'Creeper',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -9052,6 +9247,7 @@ function renderCommands(model) {
       else if (d.type === 'dropped_item') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:${d.itemType || 'emerald'}",Count:1}}`);
       else if (d.type === 'warden') lines.push(`summon minecraft:warden ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'silverfish') lines.push(`summon minecraft:silverfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'creeper') lines.push(`summon minecraft:creeper ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
       else if (d.type === 'piglin') lines.push(`summon minecraft:piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
