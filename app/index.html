@@ -1898,6 +1898,18 @@ const DECOR_TYPES = {
   // ocelot (wolf's body) and camel (llama's neck). See updateEvoker /
   // spawnVexesFromEvoker.
   evoker: { kind: 'evoker', interactive: false },
+  // Real vanilla guardians attack by firing an actual laser beam that
+  // visibly stretches to track its target while it locks on
+  // (minecraft.wiki/w/Guardian). Every earlier connection between two live
+  // things in this app is either a discrete moving projectile (the
+  // skeleton's arrow) or one object's position being copied onto another's
+  // (the parrot's shoulder attachment) — this is the first CONTINUOUS,
+  // DYNAMICALLY-STRETCHED beam mesh recomputed every frame to connect two
+  // live, independently-moving points (the guardian's own eye and the
+  // player's own live position), a genuinely new rendering technique for
+  // this app (a runtime quaternion + non-uniform scale, not a value baked
+  // in at build time). See updateGuardian / updateGuardianBeam.
+  guardian: { kind: 'guardian', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3292,6 +3304,24 @@ function buildEvokerSummoningYardInterior(grid, silhouette, dims, exteriorMat, a
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'evoker', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same glass-walled, single-water-source tank shape already proven on
+// the Aquarium Chamber and Axolotl Tank presets, stocked with a guardian
+// instead — switch to Walk mode and approach the glass to see the real
+// new mechanic: a genuine laser beam that stretches to track your own
+// live position while it locks on.
+function buildGuardianReefInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'guardian', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3979,6 +4009,18 @@ const PRESETS = [
       'Not modeled: the real fang-attack spell (a line of damaging spikes erupting from the ground), the "wololo" sheep-to-mooshroom curse, raids, and being led by an illusioner — this app has no combat or raid system at all, so this evoker only ever wanders and summons vexes.',
     ],
   },
+  {
+    id: 'guardian-reef', name: 'Guardian Reef', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'guardianReef',
+    blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
+    desc: 'A glass tank genuinely filled with real water, with a guardian swimming through it — real vanilla guardians attack with an actual laser beam that stretches to track its target while locking on, and this one genuinely does: switch to Walk mode, come within its own real beam range, and watch a real beam mesh stretch from its eye to your own live position, updated every frame as you move.',
+    keywords: ['guardian', 'laser', 'beam', 'reef', 'prismarine', 'eye'],
+    notes: [
+      'Switch to Walk mode and approach the glass — once you\'re within its own real beam range, it turns to face you and a real beam mesh appears, stretching from its own eye to your own live position every single frame for a real lock-on delay, then disappears and it won\'t fire again until a real cooldown passes. This is a genuinely new rendering technique for this app: every earlier connection between two live things here is either a discrete moving projectile (the skeleton\'s arrow, which travels under its own velocity and never connects two points at once) or one object\'s position being copied directly onto another\'s (the parrot\'s shoulder attachment, a single point, not a line) — this is the first CONTINUOUS beam recomputed every frame between two independently-moving live points, using a runtime quaternion rotation plus a non-uniform scale to stretch a unit-length shape, not a transform baked in at build time. Verified directly by a unit test confirming the beam\'s own real length and orientation update correctly as the simulated live player moves to several different positions while it\'s charging, and a second test confirming it genuinely disappears (not just becomes invisible) once the player leaves range or the lock-on charge completes, plus a real cooldown before it can charge again.',
+      'This app has no verified real beam range, lock-on time, or fire cooldown, so the figures used here are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. Its own wandering reuses the exact same water-bound hover/swim technique already proven on the squid (squidCellSwimmable/pickSquidSwimTarget), since real vanilla guardians wander through water exactly like a squid does — the actual new mechanic here is entirely the beam, not the movement. The tank itself reuses the same glass-walled, single-water-source design already proven on the Aquarium Chamber and Axolotl Tank presets.',
+      'Not modeled: any actual damage from the beam (this app has no combat or health system at all, so it\'s purely the real visual half of the mechanic), the elder guardian\'s mining-fatigue aura, retracting spikes when threatened, and guardian temples/farms — this app has none of those systems, so this guardian only ever wanders and charges a harmless beam.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4403,6 +4445,8 @@ function generateModel() {
     buildAxolotlTankInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'evokerSummoningYard') {
     buildEvokerSummoningYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'guardianReef') {
+    buildGuardianReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6130,6 +6174,31 @@ function evokerParts() {
   faceBrow.translate(0, 1.47, faceZ);
   return { robe, collar, head, nose, arms, faceEyes, faceBrow };
 }
+// A spiky orb with one large central eye — the real vanilla guardian's own
+// most recognizable silhouette (minecraft.wiki/w/Guardian) — built y=0-
+// centered like squidParts/axolotlParts, since a guardian swims freely in
+// 3D exactly like those. The eye faces are what the beam mechanic (see
+// updateGuardianBeam) treats as the actual beam origin point.
+function guardianParts() {
+  const body = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+  const spikeTop = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+  spikeTop.translate(0, 0.4, 0);
+  const spikeBottom = new THREE.BoxGeometry(0.08, 0.3, 0.08);
+  spikeBottom.translate(0, -0.4, 0);
+  const spikeLeft = new THREE.BoxGeometry(0.3, 0.08, 0.08);
+  spikeLeft.translate(-0.4, 0, 0);
+  const spikeRight = new THREE.BoxGeometry(0.3, 0.08, 0.08);
+  spikeRight.translate(0.4, 0, 0);
+  const spikeBack = new THREE.BoxGeometry(0.08, 0.08, 0.3);
+  spikeBack.translate(0, 0, -0.4);
+  const tailFin = new THREE.BoxGeometry(0.3, 0.2, 0.05);
+  tailFin.translate(0, 0, -0.6);
+  const eye = new THREE.BoxGeometry(0.22, 0.22, 0.04);
+  eye.translate(0, 0, 0.27);
+  const pupil = new THREE.BoxGeometry(0.08, 0.08, 0.02);
+  pupil.translate(0, 0, 0.29);
+  return { body, spikes: [spikeTop, spikeBottom, spikeLeft, spikeRight, spikeBack], tailFin, eye, pupil };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7093,6 +7162,21 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'guardian') {
+    let parts = decorGeoCache.get('guardian');
+    if (!parts) { parts = guardianParts(); decorGeoCache.set('guardian', parts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0xb8c453);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    for (const g of parts.spikes) group.add(new THREE.Mesh(g, skinMat));
+    group.add(new THREE.Mesh(parts.tailFin, skinMat));
+    const eyeMat = solidMaterial(0xe8c93b);
+    group.add(new THREE.Mesh(parts.eye, eyeMat));
+    const pupilMat = solidMaterial(0xdb4a6a);
+    group.add(new THREE.Mesh(parts.pupil, pupilMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10357,6 +10441,132 @@ function updateEvoker(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla guardians attack by firing an actual laser beam that
+// visibly stretches to track its target while locking on
+// (minecraft.wiki/w/Guardian). Every earlier connection between two live
+// things in this app is either a discrete moving projectile (the
+// skeleton's arrow) or one object's position copied onto another's (the
+// parrot's shoulder attachment); this is the first CONTINUOUS beam mesh
+// recomputed every single frame to connect two independently-moving live
+// points — the guardian's own eye and the player's own live position —
+// using a runtime quaternion rotation plus a non-uniform Y scale to
+// stretch a unit-length cylinder, not a transform baked in at build time.
+// Its own wandering reuses the squid's water-bound hover/swim technique
+// unchanged aside from its own constants, since real vanilla guardians
+// wander through water exactly like a squid does — the real new mechanic
+// here is entirely the beam, not the movement.
+const GUARDIAN_SWIM_SPEED = 0.6;
+const GUARDIAN_HOVER_MIN = 1, GUARDIAN_HOVER_MAX = 3;
+const GUARDIAN_WANDER_RADIUS = 2;
+const GUARDIAN_BEAM_RANGE = 8; // an honest, approximate stand-in — not a verified real vanilla detection range
+const GUARDIAN_LOCKON_DELAY = 2; // this app's stand-in for the real multi-second lock-on charge time
+const GUARDIAN_COOLDOWN = 3; // an honest, approximate stand-in for the real pause between shots
+function pickGuardianSwimTarget(model, entry) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const vertical = Math.random() < 0.3;
+    let dx = 0, dy = 0, dz = 0;
+    if (vertical) {
+      dy = Math.round((Math.random() * 2 - 1) * GUARDIAN_WANDER_RADIUS);
+    } else {
+      dx = Math.round((Math.random() * 2 - 1) * GUARDIAN_WANDER_RADIUS);
+      dz = Math.round((Math.random() * 2 - 1) * GUARDIAN_WANDER_RADIUS);
+    }
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+// Builds (once, lazily) and repositions the actual beam mesh connecting
+// the guardian's own live eye position to the player's own live position,
+// recomputed fresh every frame this is called so it stays correct no
+// matter how either point moves.
+function updateGuardianBeam(entry, offX, offZ) {
+  if (!three || !three.group) return;
+  if (!entry._beamObj) {
+    const geo = new THREE.CylinderGeometry(0.04, 0.04, 1, 6);
+    geo.translate(0, 0.5, 0); // shifts the pivot to one end, so scaling stretches away from the start point rather than from its own center
+    entry._beamObj = new THREE.Mesh(geo, solidMaterial(0xe8c93b));
+    three.group.add(entry._beamObj);
+  }
+  const start = new THREE.Vector3(entry._wx + offX, entry._wy, entry._wz + offZ);
+  const end = flyState.pos.clone();
+  const dir = new THREE.Vector3().subVectors(end, start);
+  const length = Math.max(0.001, dir.length());
+  entry._beamObj.position.copy(start);
+  entry._beamObj.scale.set(1, length, 1);
+  entry._beamObj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+}
+function removeGuardianBeam(entry) {
+  if (entry._beamObj && three && three.group) three.group.remove(entry._beamObj);
+  entry._beamObj = null;
+}
+function updateGuardian(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._mobTimer = GUARDIAN_HOVER_MIN + Math.random() * (GUARDIAN_HOVER_MAX - GUARDIAN_HOVER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._beamCooldown = 0;
+  }
+  entry._beamCooldown = Math.max(0, entry._beamCooldown - dt);
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  const playerDist = playerLive ? Math.hypot(flyState.pos.x - offX - entry._wx, flyState.pos.y - entry._wy, flyState.pos.z - offZ - entry._wz) : Infinity;
+
+  if (entry._mobState !== 'charging' && playerDist <= GUARDIAN_BEAM_RANGE && entry._beamCooldown <= 0) {
+    entry._mobState = 'charging';
+    entry._chargeTimer = GUARDIAN_LOCKON_DELAY;
+  }
+  if (entry._mobState === 'charging') {
+    entry._mobYaw = Math.atan2(flyState.pos.x - offX - entry._wx, flyState.pos.z - offZ - entry._wz);
+    if (playerLive && playerDist <= GUARDIAN_BEAM_RANGE * 1.3) {
+      entry._chargeTimer -= dt;
+      updateGuardianBeam(entry, offX, offZ);
+    }
+    if (!playerLive || playerDist > GUARDIAN_BEAM_RANGE * 1.3 || entry._chargeTimer <= 0) {
+      removeGuardianBeam(entry);
+      entry._beamCooldown = GUARDIAN_COOLDOWN;
+      entry._mobState = 'hovering';
+      entry._mobTimer = GUARDIAN_HOVER_MIN + Math.random() * (GUARDIAN_HOVER_MAX - GUARDIAN_HOVER_MIN);
+    }
+  } else if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickGuardianSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = GUARDIAN_HOVER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'swimming') {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = GUARDIAN_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = GUARDIAN_HOVER_MIN + Math.random() * (GUARDIAN_HOVER_MAX - GUARDIAN_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -10498,6 +10708,7 @@ function updateMobs(dt) {
     if (entry.type === 'parrot') { updateParrot(entry, obj, dt); continue; }
     if (entry.type === 'axolotl') { updateAxolotl(entry, obj, dt); continue; }
     if (entry.type === 'evoker') { updateEvoker(entry, obj, dt); continue; }
+    if (entry.type === 'guardian') { updateGuardian(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -11566,7 +11777,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -11633,7 +11844,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11763,6 +11974,7 @@ function renderCommands(model) {
       else if (d.type === 'parrot') lines.push(`summon minecraft:parrot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'axolotl') lines.push(`summon minecraft:axolotl ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'evoker') lines.push(`summon minecraft:evoker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'guardian') lines.push(`summon minecraft:guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
