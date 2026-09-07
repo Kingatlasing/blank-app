@@ -1810,6 +1810,8 @@ const DECOR_TYPES = {
   strider: { kind: 'strider', interactive: false },
   sniffer: { kind: 'sniffer', interactive: false },
   torchflower_seed: { kind: 'torchflower_seed', interactive: false },
+  panda: { kind: 'panda', interactive: false },
+  slimeball: { kind: 'slimeball', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2902,6 +2904,21 @@ function buildSnifferMeadowInterior(grid, silhouette, dims, exteriorMat, accentM
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'sniffer', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// An open grass clearing — no walls, matching every other single-mob
+// flourish preset — with two pandas placed close enough together to sit
+// within real vanilla's own 10-block "sneezing makes all adult pandas
+// within 10 blocks jump" radius, so that mechanic is directly observable
+// between them. Real pandas spawn in jungle biomes on grass under bamboo;
+// no bamboo/jungle-specific texture exists in this app's atlas, so leafy
+// oak_leaves stands in as the accent block instead.
+function buildPandaGroveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'panda', x: Math.max(0, cx - 3), y: 1, z: cz, facing: 'south', personality: 'lazy' });
+  decorOut.push({ type: 'panda', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'north', personality: 'playful' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3323,6 +3340,18 @@ const PRESETS = [
       'No aggro/predation model exists in this app (no combat at all) — real vanilla sniffers are simply passive and this one has nothing to flee from or be attacked by.',
     ],
   },
+  {
+    id: 'panda-grove', name: 'Panda Grove', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 13, baseZ: 9 }, interiorMode: 'pandaGrove',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'oak_leaves' },
+    desc: 'An open grass clearing with two pandas — one lazy, one playful — placed within real vanilla\'s own 10-block "sneeze" radius of each other, so a sneeze from either one visibly makes the other jump.',
+    keywords: ['panda', 'sneeze', 'lazy', 'playful', 'personality', 'slimeball', 'grove'],
+    notes: [
+      'Real vanilla pandas have 7 documented personalities (normal, lazy, worried, playful, aggressive, weak, brown); only lazy and playful are modeled here, chosen specifically because they produce visibly different idle behavior side by side — lazy pandas "usually lay on their bellies" and are the slowest personality, while playful pandas "jump over and roll around." The other 5 are honestly left unmodeled.',
+      'The real, novel mechanic here: "sneezing makes all adult pandas within 10 blocks jump" — the first mechanic in this app where one mob\'s own action changes the state of a nearby mob of the same kind, rather than just reacting to terrain or a fluid. Watch a sneeze from either panda make the other one jump, using the exact real 10-block radius.',
+      'Real vanilla also gives a sneezing baby panda a small chance to drop a slimeball; this app has no baby/adult distinction, so that same chance is honestly applied to every panda\'s sneeze here instead of being silently generalized without comment.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3699,6 +3728,8 @@ function generateModel() {
     buildStriderLavaCrossingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'snifferMeadow') {
     buildSnifferMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'pandaGrove') {
+    buildPandaGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4502,6 +4533,40 @@ function torchflowerSeedParts() {
   bloom.translate(0, -0.02, 0);
   return { stem, bloom };
 }
+// A round body, round head, 2 small ears, and a black eye-patch band —
+// real vanilla pandas are white/cream with black patches around the eyes,
+// ears, and limbs; simplified here to the same low-poly stand-in level as
+// every other mob in this app. See DECOR_TYPES.panda.
+function pandaParts() {
+  const body = new THREE.BoxGeometry(0.7, 0.5, 0.85);
+  body.translate(0, 0.35, 0);
+  const head = new THREE.BoxGeometry(0.42, 0.4, 0.4);
+  head.translate(0, 0.5, 0.55);
+  const earOffsets = [[-0.14, 0.68, 0.62], [0.14, 0.68, 0.62]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.12, 0.08);
+    g.translate(x, y, z);
+    return g;
+  });
+  const eyePatch = new THREE.BoxGeometry(0.44, 0.14, 0.1);
+  eyePatch.translate(0, 0.52, 0.75);
+  const legOffsets = [[-0.26, 0.3], [0.26, 0.3], [-0.26, -0.3], [0.26, -0.3]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.2, 0.3, 0.2);
+    g.translate(x, 0.05, z);
+    return g;
+  });
+  return { body, head, ears, eyePatch, legs };
+}
+// A small round ball standing in for a real dropped slimeball item entity
+// — no item-entity geometry exists anywhere in this app (every other decor
+// is a placed block or a mob), same "new procedural geometry" approach
+// used for the torchflower seed. See DECOR_TYPES.slimeball.
+function slimeballParts() {
+  const ball = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+  ball.translate(0, -0.35, 0);
+  return { ball };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5024,6 +5089,25 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     group.add(new THREE.Mesh(parts.stem, solidMaterial(0x5a7a3a)));
     group.add(new THREE.Mesh(parts.bloom, solidMaterial(0xe8871e)));
+    objs.push(group);
+  } else if (def.kind === 'panda') {
+    let parts = decorGeoCache.get('panda');
+    if (!parts) { parts = pandaParts(); decorGeoCache.set('panda', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xf5f0e6), patchMat = solidMaterial(0x1c1a1d);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, patchMat));
+    group.add(new THREE.Mesh(parts.eyePatch, patchMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, patchMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'slimeball') {
+    let parts = decorGeoCache.get('slimeball');
+    if (!parts) { parts = slimeballParts(); decorGeoCache.set('slimeball', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.ball, solidMaterial(0x9fc94f)));
     objs.push(group);
   }
   return objs;
@@ -6138,10 +6222,162 @@ function updateSniffer(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla pandas (minecraft.wiki/w/Panda) have 7 documented
+// personalities (normal, lazy, worried, playful, aggressive, weak, brown);
+// only 'lazy' and 'playful' are modeled here — the other 5 are honestly
+// left unmodeled — because that pair alone shows the same underlying
+// personality-driven idle-action system producing genuinely different real
+// behavior side by side: lazy pandas "usually lay on their bellies" and
+// are the slowest personality, while playful pandas "jump over and roll
+// around." Every personality can also "occasionally lie on their backs,
+// roll over, or sit upright with their paws together" as a baseline idle
+// action, which is why every personality's weight table includes all 4.
+//
+// The one genuinely new mechanic here, unlike anything else in this app:
+// real vanilla pandas react to EACH OTHER, not just to the terrain —
+// "sneezing makes all adult pandas within 10 blocks jump." Every other mob
+// so far only reacts to the world it's standing in (ground, water, lava);
+// this is the first inter-mob reactive behavior, a real state change on
+// one entity triggered by another entity of the same kind. Real vanilla
+// also gives a sneezing baby panda a small chance to drop a slimeball;
+// this app has no baby/adult distinction, so that same chance is honestly
+// applied to every panda's sneeze here instead of being silently dropped.
+const PANDA_WANDER_MIN = 3, PANDA_WANDER_MAX = 6;
+const PANDA_IDLE_MIN = 3, PANDA_IDLE_MAX = 7;
+const PANDA_LAZY_SPEED = 0.7, PANDA_NORMAL_SPEED = 1.3; // real vanilla: lazy pandas are the slowest personality
+const PANDA_SNEEZE_MIN = 8, PANDA_SNEEZE_MAX = 16; // compressed stand-in for real vanilla's per-tick sneeze chance
+const PANDA_SNEEZE_DURATION = 0.8;
+const PANDA_JUMP_DURATION = 0.5;
+const PANDA_JUMP_RADIUS = 10; // real vanilla: "sneezing makes all adult pandas within 10 blocks jump"
+const PANDA_SLIMEBALL_CHANCE = 0.35; // compressed/simplified stand-in — real vanilla restricts this to baby pandas at a much lower rate
+const PANDA_IDLE_WEIGHTS = {
+  lazy: { lie_belly: 0.7, sit: 0.2, lie_back: 0.05, roll: 0.05 },
+  playful: { roll: 0.6, sit: 0.2, lie_belly: 0.1, lie_back: 0.1 },
+};
+function pickPandaIdleAction(personality) {
+  const weights = PANDA_IDLE_WEIGHTS[personality] || PANDA_IDLE_WEIGHTS.lazy;
+  let r = Math.random(), acc = 0;
+  for (const action in weights) {
+    acc += weights[action];
+    if (r <= acc) return action;
+  }
+  return 'sit';
+}
+function layPandaSlimeball(entry) {
+  if (!currentModel || !three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const ballEntry = { type: 'slimeball', x: entry.x, y: entry.y, z: entry.z };
+  currentModel.decor.push(ballEntry);
+  for (const mesh of buildDecorMeshesForEntry(ballEntry)) {
+    mesh.position.x += ballEntry.x + offX + 0.5;
+    mesh.position.y += ballEntry.y + 0.5;
+    mesh.position.z += ballEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+// The real inter-mob reaction: every OTHER panda currently registered as a
+// live mob, genuinely within the real 10-block radius, gets its state
+// force-changed to 'jumping' — interrupting whatever it was doing, exactly
+// like a real jump-startle would.
+function triggerPandaSneezeReactions(sneezerEntry) {
+  for (const { entry } of mobObjects) {
+    if (entry === sneezerEntry || entry.type !== 'panda') continue;
+    const dist = Math.hypot(entry.x - sneezerEntry.x, entry.z - sneezerEntry.z);
+    if (dist <= PANDA_JUMP_RADIUS) {
+      entry._mobState = 'jumping';
+      entry._jumpElapsed = 0;
+    }
+  }
+  if (Math.random() < PANDA_SLIMEBALL_CHANCE) layPandaSlimeball(sneezerEntry);
+}
+function updatePanda(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle_action';
+    entry._idleAction = pickPandaIdleAction(entry.personality);
+    entry._mobTimer = PANDA_IDLE_MIN + Math.random() * (PANDA_IDLE_MAX - PANDA_IDLE_MIN);
+    entry._sneezeTimer = PANDA_SNEEZE_MIN + Math.random() * (PANDA_SNEEZE_MAX - PANDA_SNEEZE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  // The sneeze timer runs independently of whatever else this panda is
+  // doing, same as a real panda can sneeze mid-activity.
+  if (entry._mobState !== 'sneezing' && entry._mobState !== 'jumping') {
+    entry._sneezeTimer -= dt;
+    if (entry._sneezeTimer <= 0) {
+      entry._mobState = 'sneezing';
+      entry._sneezeElapsed = 0;
+    }
+  }
+  if (entry._mobState === 'idle_action') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'wandering';
+      } else {
+        entry._mobTimer = PANDA_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'wandering') {
+    const speed = entry.personality === 'lazy' ? PANDA_LAZY_SPEED : PANDA_NORMAL_SPEED;
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = speed * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle_action';
+      entry._idleAction = pickPandaIdleAction(entry.personality);
+      entry._mobTimer = PANDA_IDLE_MIN + Math.random() * (PANDA_IDLE_MAX - PANDA_IDLE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'sneezing') {
+    entry._sneezeElapsed += dt;
+    if (entry._sneezeElapsed >= PANDA_SNEEZE_DURATION) {
+      triggerPandaSneezeReactions(entry);
+      entry._sneezeTimer = PANDA_SNEEZE_MIN + Math.random() * (PANDA_SNEEZE_MAX - PANDA_SNEEZE_MIN);
+      entry._mobState = 'idle_action';
+      entry._idleAction = pickPandaIdleAction(entry.personality);
+      entry._mobTimer = PANDA_IDLE_MIN + Math.random() * (PANDA_IDLE_MAX - PANDA_IDLE_MIN);
+    }
+  } else if (entry._mobState === 'jumping') {
+    entry._jumpElapsed += dt;
+    if (entry._jumpElapsed >= PANDA_JUMP_DURATION) {
+      entry._mobState = 'idle_action';
+      entry._idleAction = pickPandaIdleAction(entry.personality);
+      entry._mobTimer = PANDA_IDLE_MIN + Math.random() * (PANDA_IDLE_MAX - PANDA_IDLE_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  obj.rotation.x = 0; obj.rotation.z = 0;
+  if (entry._mobState === 'idle_action' && entry._idleAction === 'lie_belly') {
+    obj.rotation.x = -Math.PI / 2;
+    obj.position.y = entry.y - 0.15;
+  } else if (entry._mobState === 'idle_action' && entry._idleAction === 'lie_back') {
+    obj.rotation.x = Math.PI / 2;
+    obj.position.y = entry.y - 0.15;
+  } else if (entry._mobState === 'idle_action' && entry._idleAction === 'roll') {
+    obj.rotation.z = (entry._mobTimer * 6) % (Math.PI * 2);
+  } else if (entry._mobState === 'sneezing') {
+    obj.rotation.x = Math.sin((entry._sneezeElapsed / PANDA_SNEEZE_DURATION) * Math.PI) * 0.4;
+  } else if (entry._mobState === 'jumping') {
+    obj.position.y = entry.y + Math.sin((entry._jumpElapsed / PANDA_JUMP_DURATION) * Math.PI) * 0.5;
+  }
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
     if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
@@ -7158,6 +7394,7 @@ function renderBlueprint(model) {
     slime: ['#6cbf4a', 'A'], water: ['#3878c9', 'Q'], squid: ['#8f7bc9', 'A'],
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
+    panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -7219,6 +7456,7 @@ function renderBlueprint(model) {
     slime: 'Slime', water: 'Water', squid: 'Squid',
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
+    panda: 'Panda', slimeball: 'Slimeball',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -7320,6 +7558,8 @@ function renderCommands(model) {
       else if (d.type === 'strider') lines.push(`summon minecraft:strider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'sniffer') lines.push(`summon minecraft:sniffer ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'torchflower_seed') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:torchflower`);
+      else if (d.type === 'panda') lines.push(`summon minecraft:panda ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d.personality ? ` {MainGene:"${d.personality}"}` : ''}`);
+      else if (d.type === 'slimeball') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:slime_ball",Count:1}}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
