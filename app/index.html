@@ -1854,6 +1854,7 @@ const DECOR_TYPES = {
   // its own trajectory through open space before removing itself, rather
   // than wandering a fixed grid like every other mob here.
   arrow: { kind: 'arrow', interactive: false },
+  wolf: { kind: 'wolf', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3164,6 +3165,18 @@ function buildSkeletonArcherPostInterior(grid, silhouette, dims, exteriorMat, ac
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'skeleton', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// 3 wolves — 2 already close together, 1 placed well beyond the real pack
+// leash radius — so the third wolf's own regroup-toward-the-pack behavior
+// is directly observable against the other two's ordinary free wandering.
+function buildWolfPackClearingInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'wolf', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'wolf', x: Math.min(dims.sx - 1, cx + 1), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'wolf', x: Math.max(0, cx - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), y: 1, z: Math.max(0, cz - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3767,6 +3780,18 @@ const PRESETS = [
       'Not modeled: real skeleton arrow damage and knockback, burning in daylight, avoiding melee range to keep its distance, and dropping bones/arrows on death — this app has no combat, day/night, or death/loot system at all, so this skeleton only ever wanders and fires.',
     ],
   },
+  {
+    id: 'wolf-pack-clearing', name: 'Wolf Pack Clearing', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 15, baseZ: 15 }, interiorMode: 'wolfPackClearing',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass clearing with 3 wolves — real vanilla wolves spawn together in a pack and "will not stray far from each other," and this one genuinely doesn\'t: watch the one placed far away head straight back toward its packmates instead of wandering off on its own.',
+    keywords: ['wolf', 'pack', 'cohesion', 'group', 'flock'],
+    notes: [
+      'Two of the wolves start right next to each other; the third starts well beyond the real pack leash radius. Watch it: instead of picking a random wander target like every other mob here, it genuinely heads toward its own nearest packmate\'s live position until it\'s back within range, then wanders freely again just like the other two. This is a genuinely new class of mechanic for this app: every earlier mob wanders completely independently with no awareness of any other mob\'s position at all, while a wolf is the first to factor a DIFFERENT live mob of the same type into its own movement decision. Verified directly by a unit test that places two wolves beyond the leash radius and confirms the distance between them actually shrinks over real simulated time, and a second test confirming two wolves already within range keep moving independently rather than being forced together.',
+      'This app has no verified real pack-straying distance, so the leash radius used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius.',
+      'Not modeled: taming (feeding bones to make a wolf follow the player permanently), pack members fighting alongside a tamed wolf, health/damage, and breeding — this app has no taming, combat, or breeding system at all, so these wolves only ever wander and regroup.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4177,6 +4202,8 @@ function generateModel() {
     buildZombieDoorBusterInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'skeletonArcherPost') {
     buildSkeletonArcherPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'wolfPackClearing') {
+    buildWolfPackClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5624,6 +5651,44 @@ function arrowParts() {
   fletching.translate(0, 0, -0.22);
   return { shaft, tip, fletching };
 }
+// A gray-furred quadruped, larger than the fox, with upright pointed ears
+// and a raised bushy tail (real vanilla wolves hold their tail up, unlike
+// a fox's low, level tail) — matching real vanilla's build
+// (minecraft.wiki/w/Wolf). All 4 legs stay within the torso's own
+// footprint, the same rule already applied to every other quadruped here.
+function wolfParts() {
+  const body = new THREE.BoxGeometry(0.38, 0.34, 0.68);
+  body.translate(0, 0.38, 0);
+  const head = new THREE.BoxGeometry(0.3, 0.26, 0.28);
+  head.translate(0, 0.48, 0.42);
+  const snout = new THREE.BoxGeometry(0.16, 0.14, 0.18);
+  snout.translate(0, 0.42, 0.6);
+  const earOffsets = [[-0.1, 0.66, 0.38], [0.1, 0.66, 0.38]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.09, 0.14, 0.06);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.12, -0.24], [0.12, -0.24], [-0.12, 0.24], [0.12, 0.24]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.28, 0.1);
+    g.translate(x, 0.14, z);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.12, 0.32, 0.12);
+  tail.rotateX(-0.5);
+  tail.translate(0, 0.62, -0.42);
+  const faceZ = 0.56, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.08, 0.5], [0.08, 0.5]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const nose = new THREE.BoxGeometry(0.06, 0.06, faceDepth);
+  nose.translate(0, 0.4, 0.69);
+  return { body, head, snout, ears, legs, tail, faceEyes, nose };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6457,6 +6522,23 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.fletching, fletchMat));
     group.rotation.y = entry._yaw || 0;
     group.rotation.x = entry._pitch || 0;
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'wolf') {
+    let parts = decorGeoCache.get('wolf');
+    if (!parts) { parts = wolfParts(); decorGeoCache.set('wolf', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0x8a8a86);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    group.add(new THREE.Mesh(parts.snout, furMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
+    group.add(new THREE.Mesh(parts.tail, furMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -9139,6 +9221,80 @@ function updateSkeleton(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla wolves spawn together in a pack and "will not stray far
+// from each other" (minecraft.wiki/w/Wolf). Every earlier mob here wanders
+// completely independently, picking its own random target with no
+// awareness of any other mob's position at all; a wolf is the first to
+// factor a DIFFERENT live mob of the SAME type into its own wander
+// decision — a genuine multi-instance coordination mechanic, distinct
+// even from the iron golem's one-time mob-to-mob interaction (which never
+// repeats once the gift is given, and never influences movement). This
+// app has no verified real pack-straying distance, so the leash radius
+// used here is an honest, approximate stand-in, the same caveat already
+// applied to the warden's sense radius and the fox's pickup radius.
+const WOLF_WANDER_MIN = 2, WOLF_WANDER_MAX = 5;
+const WOLF_WALK_SPEED = 1.1;
+const WOLF_PACK_LEASH_RADIUS = 6;
+function findNearestPackmate(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other === entry || other.type !== 'wolf') continue;
+    const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
+    const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
+    const dist = Math.hypot(ox - entry._wx, oz - entry._wz);
+    if (dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best ? { entry: best, dist: bestDist } : null;
+}
+function updateWolf(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = WOLF_WANDER_MIN + Math.random() * (WOLF_WANDER_MAX - WOLF_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const packmate = findNearestPackmate(entry);
+      if (packmate && packmate.dist > WOLF_PACK_LEASH_RADIUS) {
+        // Straying too far from the pack — head back toward the nearest
+        // packmate's own live position instead of a random wander target.
+        entry._targetX = packmate.entry._wx;
+        entry._targetZ = packmate.entry._wz;
+        entry._mobState = 'walking';
+      } else {
+        const target = pickWanderTarget(currentModel, entry);
+        if (target) {
+          entry._targetX = target.x + 0.5;
+          entry._targetZ = target.z + 0.5;
+          entry._mobState = 'walking';
+        } else {
+          entry._mobTimer = WOLF_WANDER_MIN;
+        }
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = WOLF_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = WOLF_WANDER_MIN + Math.random() * (WOLF_WANDER_MAX - WOLF_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -9273,6 +9429,7 @@ function updateMobs(dt) {
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
     if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
+    if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -10339,7 +10496,7 @@ function renderBlueprint(model) {
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
-    skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'],
+    skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -10406,7 +10563,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -10529,6 +10686,7 @@ function renderCommands(model) {
       else if (d.type === 'zombie') lines.push(`summon minecraft:zombie ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'skeleton') lines.push(`summon minecraft:skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
