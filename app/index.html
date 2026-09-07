@@ -1845,6 +1845,7 @@ const DECOR_TYPES = {
   // gold and scaled taller as its own stage climbs toward mature.
   wheat_crop: { kind: 'wheat_crop', interactive: false },
   iron_golem: { kind: 'iron_golem', interactive: false },
+  zombie: { kind: 'zombie', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3134,6 +3135,17 @@ function buildIronGolemVillageGuardInterior(grid, silhouette, dims, exteriorMat,
   decorOut.push({ type: 'villager', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east' });
   decorOut.push({ type: 'iron_golem', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'west' });
 }
+// An open yard with a real closed door and a zombie within its own
+// door-scan range — watch it approach, pause, and genuinely destroy the
+// door, leaving an empty doorway behind.
+function buildZombieDoorBusterInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'door', x: cx, y: 1, z: cz, axis: 'x', hinge: 'left', open: false });
+  decorOut.push({ type: 'zombie', x: Math.max(0, cx - 3), y: 1, z: cz, facing: 'east' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3712,6 +3724,18 @@ const PRESETS = [
       'Not modeled: real iron golems patrolling and attacking hostile mobs to protect villagers, golems spawning naturally in large villages, and players crafting/summoning one from blocks and a pumpkin — this app has no combat, village-population, or crafting system at all, so this golem only ever wanders and gifts.',
     ],
   },
+  {
+    id: 'zombie-door-buster', name: 'Zombie Door Buster', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'zombieDoorBuster',
+    blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'stone_bricks' },
+    desc: 'An open stone-brick yard with a real closed door and a zombie within its own door-scan range — real vanilla zombies "can break down wooden doors," and this one genuinely does: watch it approach, pause, and the door is permanently destroyed, leaving an open doorway.',
+    keywords: ['zombie', 'door', 'break', 'destroy', 'undead'],
+    notes: [
+      'Watch it wander until it notices the real closed door, walk over, pause for a short bash delay, then the exact same `door` decor entry every other preset\'s lever/button/plate can open and close is genuinely removed from the model for good — verified directly by a unit test that only ever lets it target a real CLOSED door (an already-open one is invisible to it, matching real vanilla only bashing shut doors), and an end-to-end test that runs the real AI and confirms the door is actually gone from the model afterward, not just toggled open. This is a genuinely new class of world mutation for this app: every earlier mob mutation changed a grid block, a dropped item, or another live mob\'s own state; this is the first where a mob targets and permanently destroys a static INTERACTIVE decor object.',
+      'This app has no verified real door-breaking duration or per-tick break-chance model at all — real vanilla\'s is a probabilistic multi-hit process, and only active on Hard difficulty — so the single bash pause used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius, the fox\'s pickup radius, and the villager\'s/iron golem\'s own pause durations.',
+      'Not modeled: real zombies only breaking doors on Hard difficulty, zombie damage to the player, burning in daylight, and reinforced/iron doors that zombies cannot break at all — this app has no difficulty setting, combat/damage system, or a separate unbreakable door type, so this zombie always breaks the one real door type this app has.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4118,6 +4142,8 @@ function generateModel() {
     buildFarmerVillagerPlotInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'ironGolemVillageGuard') {
     buildIronGolemVillageGuardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'zombieDoorBuster') {
+    buildZombieDoorBusterInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5473,6 +5499,40 @@ function ironGolemParts() {
   faceMouth.translate(0, 1.75, faceZ);
   return { torso, head, arms, legs, faceEyes, faceMouth };
 }
+// The iconic vanilla zombie pose: bare arms held straight out in front at
+// shoulder height (built long-axis-along-Z so they reach forward, not
+// hanging at the sides like every other biped here), rotting green skin, a
+// torn blue shirt, and 2 legs kept inside the torso's own footprint — the
+// same leg-alignment rule already applied to every other biped
+// (minecraft.wiki/w/Zombie).
+function zombieParts() {
+  const torso = new THREE.BoxGeometry(0.5, 0.7, 0.3);
+  torso.translate(0, 0.75, 0);
+  const head = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+  head.translate(0, 1.4, 0);
+  const armOffsets = [[-0.34, 1.0], [0.34, 1.0]];
+  const arms = armOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.16, 0.6);
+    g.translate(x, y, 0.3);
+    return g;
+  });
+  const legOffsets = [[-0.14, 0], [0.14, 0]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.18, 0.7, 0.18);
+    g.translate(x, 0.35, z);
+    return g;
+  });
+  // A minimal face — 2 small dark, sunken eyes, the same flat-panel
+  // technique already used for every other mob's face here.
+  const faceZ = 0.215, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.09, 1.44], [0.09, 1.44]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.06, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  return { torso, head, arms, legs, faceEyes };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6258,6 +6318,22 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.faceMouth, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'zombie') {
+    let parts = decorGeoCache.get('zombie');
+    if (!parts) { parts = zombieParts(); decorGeoCache.set('zombie', parts); }
+    const group = new THREE.Group();
+    const shirtMat = solidMaterial(0x35618a);
+    const skinMat = solidMaterial(0x4c7a4c);
+    const pantsMat = solidMaterial(0x5a4a3a);
+    group.add(new THREE.Mesh(parts.torso, shirtMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
+    const faceMat = solidMaterial(0x0f140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -8697,6 +8773,112 @@ function updateIronGolem(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla zombies "can break down wooden doors" (minecraft.wiki/w/
+// Zombie). Every earlier mutation a mob performs here changes a grid
+// block, a dropped item, or another live mob's own state; this is the
+// first where a mob targets and permanently destroys a static
+// INTERACTIVE decor object — the exact same `door` entry every other
+// preset's lever/button/plate can open and close — rather than a passive
+// block or a live mob. This app has no verified real door-breaking
+// duration or per-tick break-chance model (real vanilla's is a
+// probabilistic multi-hit process, only active on Hard difficulty), so
+// the bash pause used here is a single honest, approximate stand-in, the
+// same caveat already applied to the warden's sense radius, the fox's
+// pickup radius, and the villager's/iron golem's own pause durations.
+const ZOMBIE_WANDER_MIN = 2, ZOMBIE_WANDER_MAX = 5;
+const ZOMBIE_WALK_SPEED = 1.0;
+const ZOMBIE_DOOR_SCAN_RADIUS = 8;
+const ZOMBIE_BASH_DELAY = 2;
+function findNearestClosedDoor(entry) {
+  if (!currentModel) return null;
+  let best = null, bestDist = Infinity;
+  for (const other of currentModel.decor) {
+    if (other.type !== 'door' || other.open) continue;
+    const dist = Math.hypot((other.x + 0.5) - entry._wx, (other.z + 0.5) - entry._wz);
+    if (dist <= ZOMBIE_DOOR_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function destroyDoor(model, doorEntry) {
+  const decorIdx = model.decor.indexOf(doorEntry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
+function updateZombie(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ZOMBIE_WANDER_MIN + Math.random() * (ZOMBIE_WANDER_MAX - ZOMBIE_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState !== 'toDoor' && entry._mobState !== 'bashing') {
+    const door = findNearestClosedDoor(entry);
+    if (door) {
+      entry._targetDoor = door;
+      entry._targetX = door.x + 0.5;
+      entry._targetZ = door.z + 0.5;
+      entry._mobState = 'toDoor';
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ZOMBIE_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'toDoor') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ZOMBIE_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'toDoor') {
+        if (entry._targetDoor && currentModel.decor.includes(entry._targetDoor) && !entry._targetDoor.open) {
+          entry._mobState = 'bashing';
+          entry._bashTimer = ZOMBIE_BASH_DELAY;
+        } else {
+          entry._targetDoor = null;
+          entry._mobState = 'idle';
+          entry._mobTimer = ZOMBIE_WANDER_MIN + Math.random() * (ZOMBIE_WANDER_MAX - ZOMBIE_WANDER_MIN);
+        }
+      } else {
+        entry._mobState = 'idle';
+        entry._mobTimer = ZOMBIE_WANDER_MIN + Math.random() * (ZOMBIE_WANDER_MAX - ZOMBIE_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'bashing') {
+    entry._bashTimer -= dt;
+    if (entry._bashTimer <= 0) {
+      const door = entry._targetDoor;
+      if (door && currentModel.decor.includes(door) && !door.open) {
+        destroyDoor(currentModel, door);
+      }
+      entry._targetDoor = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = ZOMBIE_WANDER_MIN + Math.random() * (ZOMBIE_WANDER_MAX - ZOMBIE_WANDER_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -8828,6 +9010,7 @@ function updateMobs(dt) {
     if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
+    if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -9893,7 +10076,7 @@ function renderBlueprint(model) {
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
-    villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'],
+    villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -9959,7 +10142,7 @@ function renderBlueprint(model) {
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
-    villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem',
+    villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -10079,6 +10262,7 @@ function renderCommands(model) {
       else if (d.type === 'fox') lines.push(`summon minecraft:fox ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._holding ? ` {Item:{id:"minecraft:${d._holding}",Count:1}}` : ''}`);
       else if (d.type === 'villager') lines.push(`summon minecraft:villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {VillagerData:{profession:"farmer"}}`);
       else if (d.type === 'iron_golem') lines.push(`summon minecraft:iron_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'zombie') lines.push(`summon minecraft:zombie ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
