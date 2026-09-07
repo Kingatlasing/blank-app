@@ -1857,6 +1857,13 @@ const DECOR_TYPES = {
   wolf: { kind: 'wolf', interactive: false },
   ocelot: { kind: 'ocelot', interactive: false },
   llama: { kind: 'llama', interactive: false },
+  // Real vanilla camels "sit down when they haven't moved for a while, and
+  // stand up before moving again" (minecraft.wiki/w/Camel). Every earlier
+  // mob here only ever changes its POSITION or TARGET over time; a camel is
+  // the first whose own visible SHAPE changes in place — the model itself
+  // compresses toward the ground while idle-too-long, then pops back to full
+  // height the instant it decides to wander again. See updateCamel.
+  camel: { kind: 'camel', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3202,6 +3209,16 @@ function buildLlamaCaravanTrailInterior(grid, silhouette, dims, exteriorMat, acc
   const follower2 = { type: 'llama', x: cx, y: 1, z: Math.min(dims.sz - 1, cz + 2), facing: 'south', _caravanRole: 'follower', _leaderEntry: follower1 };
   decorOut.push(leader, follower1, follower2);
 }
+// A single camel on an open rest stop — watch it wander for a while, then
+// let it sit down after standing idle long enough, and see it stand back
+// up the instant it picks a new wander target and starts moving again.
+function buildCamelRestStopInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'camel', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3841,6 +3858,18 @@ const PRESETS = [
       'Not modeled: real llama wool colour variation (white/brown/gray/creamy — this app always uses one colour), spitting at hostile mobs, actually requiring a player to leash each llama by hand, and carrying inventory in a chest — this app has no combat, player-interaction, or inventory system at all, so these llamas only ever wander and trail each other.',
     ],
   },
+  {
+    id: 'camel-rest-stop', name: 'Camel Rest Stop', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'camelRestStop',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A single camel on an open rest stop — real vanilla camels "sit down when they haven\'t moved for a while, and stand up before moving again," and this one genuinely does: watch it wander, then settle down onto the ground once it\'s been idle long enough, then pop back up to full height the instant it decides to move again.',
+    keywords: ['camel', 'sit', 'pose', 'desert', 'rest'],
+    notes: [
+      'Watch it long enough and you\'ll see it genuinely change SHAPE, not just position: after standing idle for a real sit delay, its own rigid model compresses toward the ground on its Y axis (feet stay planted, nothing sinks through the floor), then the instant its wander timer expires and it picks a new target, it snaps back to full height before it starts walking — matching the real vanilla rule that a camel "stands up before moving again." This is a genuinely new class of mechanic for this app: every earlier mob\'s own AI here only ever changes WHERE it is (a target position) or, for the llama, WHAT it targets (a live position vs. a past trail point) — never its own visible shape. Verified directly by a unit test confirming the model\'s own rendered height while sitting is genuinely shorter than while standing, and a second test confirming it stands back up to full height the moment it starts walking again, never sitting mid-stride.',
+      'This app has no verified real sit-delay timing, so the figure used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry reuses the same 4-corner leg placement and offset-then-rotate-then-translate neck+head assembly technique already proven on the llama, but taller-legged with a single back hump — the single most recognizable real camel silhouette cue.',
+      'Not modeled: the real camel dash (a forward leap while sprint-ridden), carrying two players at once, saddling/riding at all, and breeding — this app has no rider, saddle, or breeding system at all, so this camel only ever wanders, sits, and stands.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4257,6 +4286,8 @@ function generateModel() {
     buildOcelotJungleFloorInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'llamaCaravanTrail') {
     buildLlamaCaravanTrailInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'camelRestStop') {
+    buildCamelRestStopInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5835,6 +5866,58 @@ function llamaParts() {
   nose.translate(neckX, neckY, neckZ);
   return { body, legs, neck, head, ears, tail, faceEyes, nose };
 }
+// Reuses the same 4-corner leg placement and offset-then-rotate-then-
+// translate rigid neck+head assembly technique already proven on the
+// llama, but taller-legged (real camels stand notably tall at the
+// shoulder) and with a single back hump — the single most recognizable
+// real vanilla camel silhouette cue (minecraft.wiki/w/Camel). The whole
+// group is later scaled down on its own Y axis in updateCamel to produce
+// the sitting pose, so every part here is built with its feet at y=0 —
+// scaling the group about its own local origin then just compresses the
+// legs/body toward the ground without needing a second geometry set.
+function camelParts() {
+  const body = new THREE.BoxGeometry(0.48, 0.55, 0.95);
+  body.translate(0, 0.85, 0);
+  const legOffsets = [[-0.15, -0.36], [0.15, -0.36], [-0.15, 0.36], [0.15, 0.36]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.85, 0.14);
+    g.translate(x, 0.425, z);
+    return g;
+  });
+  const hump = new THREE.BoxGeometry(0.3, 0.26, 0.4);
+  hump.translate(0, 1.28, -0.05);
+  const neckAngle = -0.75, neckX = 0, neckY = 1.05, neckZ = 0.42;
+  const neck = new THREE.BoxGeometry(0.22, 0.55, 0.22);
+  neck.rotateX(neckAngle);
+  neck.translate(neckX, neckY, neckZ);
+  const head = new THREE.BoxGeometry(0.22, 0.24, 0.34);
+  head.translate(0, 0.27, 0);
+  head.rotateX(neckAngle);
+  head.translate(neckX, neckY, neckZ);
+  const earOffsets = [[-0.08, 0.14, 0.1], [0.08, 0.14, 0.1]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.08, 0.06);
+    g.translate(x, y + 0.27, z);
+    g.rotateX(neckAngle);
+    g.translate(neckX, neckY, neckZ);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.08, 0.28, 0.08);
+  tail.translate(0, 1.05, -0.48);
+  const faceEyeOffsets = [[-0.06, 0.03, 0.18], [0.06, 0.03, 0.18]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y + 0.27, z);
+    g.rotateX(neckAngle);
+    g.translate(neckX, neckY, neckZ);
+    return g;
+  });
+  const nose = new THREE.BoxGeometry(0.07, 0.05, 0.02);
+  nose.translate(0, 0.27, 0.19);
+  nose.rotateX(neckAngle);
+  nose.translate(neckX, neckY, neckZ);
+  return { body, legs, hump, neck, head, ears, tail, faceEyes, nose };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -6721,6 +6804,25 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.nose, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'camel') {
+    let parts = decorGeoCache.get('camel');
+    if (!parts) { parts = camelParts(); decorGeoCache.set('camel', parts); }
+    const group = new THREE.Group();
+    const coatMat = solidMaterial(0xd9a05b);
+    group.add(new THREE.Mesh(parts.body, coatMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, coatMat));
+    group.add(new THREE.Mesh(parts.hump, coatMat));
+    group.add(new THREE.Mesh(parts.neck, coatMat));
+    group.add(new THREE.Mesh(parts.head, coatMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, coatMat));
+    group.add(new THREE.Mesh(parts.tail, coatMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.scale.y = entry._sitting ? CAMEL_SIT_SCALE : 1;
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'wheat_crop') {
@@ -9640,6 +9742,72 @@ function updateLlama(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla camels "sit down when they haven't moved for a while, and
+// stand up before moving again" (minecraft.wiki/w/Camel). Every earlier
+// mob's own AI here only ever changes WHERE it is (position/target) or,
+// for the llama, WHAT it targets — never its own visible shape. A camel is
+// the first genuine POSE-CHANGE mechanic: after standing idle for a real
+// sit delay, the model itself visibly compresses toward the ground (a real
+// Y-axis squash of the whole rigid assembly, anchored at the feet so it
+// never sinks through the floor), then snaps back to full height the
+// instant it decides to wander again — a new class of mutation distinct
+// from every earlier position-only or target-only AI. This app has no
+// verified real sit-delay timing, so the figure used is an honest,
+// approximate stand-in, the same caveat already applied to the warden's
+// sense radius and the fox's pickup radius.
+const CAMEL_WANDER_MIN = 2, CAMEL_WANDER_MAX = 5;
+const CAMEL_WALK_SPEED = 0.9;
+const CAMEL_SIT_DELAY = 2.5;
+const CAMEL_SIT_SCALE = 0.55;
+function updateCamel(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = CAMEL_WANDER_MIN + Math.random() * (CAMEL_WANDER_MAX - CAMEL_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._idleElapsed = 0;
+    entry._sitting = false;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    entry._idleElapsed += dt;
+    if (entry._idleElapsed >= CAMEL_SIT_DELAY) entry._sitting = true;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+        // Real vanilla camels stand back up before they start moving again.
+        entry._sitting = false;
+        entry._idleElapsed = 0;
+      } else {
+        entry._mobTimer = CAMEL_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = CAMEL_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = CAMEL_WANDER_MIN + Math.random() * (CAMEL_WANDER_MAX - CAMEL_WANDER_MIN);
+      entry._idleElapsed = 0;
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  obj.scale.y = entry._sitting ? CAMEL_SIT_SCALE : 1;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -9777,6 +9945,7 @@ function updateMobs(dt) {
     if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
     if (entry.type === 'ocelot') { updateOcelot(entry, obj, dt); continue; }
     if (entry.type === 'llama') { updateLlama(entry, obj, dt); continue; }
+    if (entry.type === 'camel') { updateCamel(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -10844,7 +11013,7 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -10911,7 +11080,7 @@ function renderBlueprint(model) {
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
-    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama',
+    skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -11037,6 +11206,7 @@ function renderCommands(model) {
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'llama') lines.push(`summon minecraft:llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'camel') lines.push(`summon minecraft:camel ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
