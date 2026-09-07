@@ -5013,7 +5013,7 @@ function wardenParts() {
     g.translate(x, y, z);
     return g;
   });
-  const legOffsets = [[-0.2, 0.15], [0.2, 0.15]];
+  const legOffsets = [[-0.2, 0], [0.2, 0]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.24, 0.3, 0.24);
     g.translate(x, 0.15, z);
