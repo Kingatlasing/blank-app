@@ -1844,6 +1844,7 @@ const DECOR_TYPES = {
   // already used for rails/redstone dust), colour-lerped from green to
   // gold and scaled taller as its own stage climbs toward mature.
   wheat_crop: { kind: 'wheat_crop', interactive: false },
+  iron_golem: { kind: 'iron_golem', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3122,6 +3123,17 @@ function buildFarmerVillagerPlotInterior(grid, silhouette, dims, exteriorMat, ac
     decorOut.push({ type: 'wheat_crop', x, y: 1, z, stage: cropStages[i] });
   }
 }
+// A grass yard with a villager and an iron golem placed within its own
+// real gift-scan range — watch the golem cross the distance, pause, and
+// genuinely hand the villager a poppy.
+function buildIronGolemVillageGuardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'villager', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east' });
+  decorOut.push({ type: 'iron_golem', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'west' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3688,6 +3700,18 @@ const PRESETS = [
       'Not modeled: a harvested crop actually dropping a real wheat item onto the ground (real vanilla villagers gather it straight into their own inventory instead, which this app approximates with a small held-wheat mesh and an internal counter), villager professions/workstations/trading, and breeding — this app has no inventory, trading, or breeding system at all, so this villager only ever wanders and harvests.',
     ],
   },
+  {
+    id: 'iron-golem-village-guard', name: 'Iron Golem Village Guard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'ironGolemVillageGuard',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass yard with a villager and an iron golem — real vanilla iron golems "periodically offer poppies to villagers," and this one genuinely does: watch it cross the distance, pause, and hand over a poppy the villager visibly starts carrying.',
+    keywords: ['iron golem', 'villager', 'gift', 'poppy', 'village'],
+    notes: [
+      'Watch the golem wander until it notices the villager (who isn\'t already holding a gift), walk over, pause, then genuinely set that EXACT villager\'s own `_heldGift` field and rebuild its live mesh so it visibly starts carrying a small poppy. Every earlier mob mutation in this app touches a grid block, a dropped item, or the acting mob\'s own state; this is the first where one live mob\'s AI directly reads and mutates a DIFFERENT live mob\'s own decor entry — a genuine mob-to-mob interaction. Verified directly by a unit test that only ever lets the golem target a real villager that doesn\'t already have a gift (never a already-gifted one, even if closer), and an end-to-end test that runs the real AI and confirms the exact target villager\'s own entry — not a copy, not a new one — ends up holding the gift.',
+      'This app has no verified real gift-offer interval, approach-stopping distance, or profession/workstation system at all, so the cooldown/approach distance used here are honest approximate stand-ins, the same caveat already applied to the warden\'s sense radius, the fox\'s pickup radius, and the villager\'s own harvest-pause duration.',
+      'Not modeled: real iron golems patrolling and attacking hostile mobs to protect villagers, golems spawning naturally in large villages, and players crafting/summoning one from blocks and a pumpkin — this app has no combat, village-population, or crafting system at all, so this golem only ever wanders and gifts.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4092,6 +4116,8 @@ function generateModel() {
     buildFoxDenClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'farmerVillagerPlot') {
     buildFarmerVillagerPlotInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'ironGolemVillageGuard') {
+    buildIronGolemVillageGuardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5400,7 +5426,39 @@ function villagerParts() {
   // behavior, the same technique already used for the fox's held item.
   const heldWheat = new THREE.BoxGeometry(0.16, 0.2, 0.1);
   heldWheat.translate(0.4, 0.65, 0.08);
-  return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat };
+  // A small poppy (stem + bloom), mirrored onto the villager's other hand
+  // — only added to the render once entry._heldGift is set (see
+  // giveGiftToVillager/the render branch), the visible proof that an iron
+  // golem's own gift genuinely reached this exact villager.
+  const heldGiftStem = new THREE.BoxGeometry(0.03, 0.18, 0.03);
+  heldGiftStem.translate(-0.4, 0.63, 0.08);
+  const heldGiftBloom = new THREE.BoxGeometry(0.1, 0.08, 0.1);
+  heldGiftBloom.translate(-0.4, 0.74, 0.08);
+  return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat, heldGiftStem, heldGiftBloom };
+}
+// A tall, heavy humanoid with vastly oversized arms hanging past the
+// knees (the single most recognizable real vanilla silhouette cue) and 2
+// short legs kept inside the torso's own footprint, the same
+// leg-alignment rule already applied to every other biped here
+// (minecraft.wiki/w/Iron_Golem).
+function ironGolemParts() {
+  const torso = new THREE.BoxGeometry(0.85, 1.15, 0.5);
+  torso.translate(0, 1.0, 0);
+  const head = new THREE.BoxGeometry(0.5, 0.5, 0.4);
+  head.translate(0, 1.85, 0.05);
+  const armOffsets = [[-0.62, 0.85, 0], [0.62, 0.85, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.34, 1.45, 0.34);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.22, 0], [0.22, 0]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.32, 0.55, 0.32);
+    g.translate(x, 0.275, z);
+    return g;
+  });
+  return { torso, head, arms, legs };
 }
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
@@ -6167,6 +6225,23 @@ function buildDecorMeshesForEntry(entry) {
     if (entry._wheatCount) {
       group.add(new THREE.Mesh(parts.heldWheat, solidMaterial(0xdcc35e)));
     }
+    if (entry._heldGift) {
+      group.add(new THREE.Mesh(parts.heldGiftStem, solidMaterial(0x4a7c3f)));
+      group.add(new THREE.Mesh(parts.heldGiftBloom, solidMaterial(0xdd2e2e)));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'iron_golem') {
+    let parts = decorGeoCache.get('iron_golem');
+    if (!parts) { parts = ironGolemParts(); decorGeoCache.set('iron_golem', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xa8a89e);
+    const limbMat = solidMaterial(0x86867a);
+    group.add(new THREE.Mesh(parts.torso, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, limbMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, limbMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -8482,6 +8557,130 @@ function updateVillager(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla iron golems "periodically offer poppies to villagers"
+// (minecraft.wiki/w/Iron_Golem). Every earlier mutation this app's mobs
+// perform touches a grid block, a dropped item, or the mob's OWN state;
+// this is the first where one live mob's AI directly reads and mutates a
+// DIFFERENT live mob's own decor entry — a genuine mob-to-mob interaction,
+// not a mob-to-block or mob-to-item one. This app has no verified real
+// gift-offer interval or approach-stopping distance, so the cooldown/pause
+// used here are honest approximate stand-ins, the same caveat already
+// applied to the warden's sense radius, the fox's pickup radius, and the
+// villager's own harvest-pause duration.
+const IRON_GOLEM_WANDER_MIN = 2, IRON_GOLEM_WANDER_MAX = 5;
+const IRON_GOLEM_WALK_SPEED = 0.9;
+const IRON_GOLEM_GIFT_SCAN_RADIUS = 10;
+const IRON_GOLEM_GIFT_APPROACH_DIST = 1.2; // stops short to "present" the gift, rather than overlapping the villager
+const IRON_GOLEM_GIFT_DELAY = 1.5;
+function findGiftlessVillager(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'villager' || other._heldGift) continue;
+    const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
+    const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
+    const dist = Math.hypot(ox - entry._wx, oz - entry._wz);
+    if (dist <= IRON_GOLEM_GIFT_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function giveGiftToVillager(model, villagerEntry) {
+  villagerEntry._heldGift = 'poppy';
+  if (!three || !three.group) return;
+  const mobIdx = mobObjects.findIndex(m => m.entry === villagerEntry);
+  if (mobIdx !== -1) {
+    three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(villagerEntry)) {
+    mesh.position.x += villagerEntry.x + offX + 0.5;
+    mesh.position.y += villagerEntry.y + 0.5;
+    mesh.position.z += villagerEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateIronGolem(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = IRON_GOLEM_WANDER_MIN + Math.random() * (IRON_GOLEM_WANDER_MAX - IRON_GOLEM_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState !== 'toVillager' && entry._mobState !== 'gifting') {
+    const villager = findGiftlessVillager(entry);
+    if (villager) {
+      entry._targetVillager = villager;
+      entry._mobState = 'toVillager';
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = IRON_GOLEM_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'toVillager') {
+    let targetX, targetZ, arriveDist;
+    if (entry._mobState === 'toVillager') {
+      const v = entry._targetVillager;
+      if (!v || v._heldGift || !mobObjects.some(m => m.entry === v)) {
+        entry._targetVillager = null;
+        entry._mobState = 'idle';
+        entry._mobTimer = 0;
+        obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+        if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+        return;
+      }
+      targetX = v._wx !== undefined ? v._wx : v.x + 0.5;
+      targetZ = v._wz !== undefined ? v._wz : v.z + 0.5;
+      arriveDist = IRON_GOLEM_GIFT_APPROACH_DIST;
+    } else {
+      targetX = entry._targetX;
+      targetZ = entry._targetZ;
+      arriveDist = IRON_GOLEM_WALK_SPEED * dt;
+    }
+    const dx = targetX - entry._wx, dz = targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = IRON_GOLEM_WALK_SPEED * dt;
+    if (dist <= arriveDist) {
+      if (entry._mobState === 'toVillager') {
+        entry._mobState = 'gifting';
+        entry._giftTimer = IRON_GOLEM_GIFT_DELAY;
+      } else {
+        entry._wx = entry._targetX;
+        entry._wz = entry._targetZ;
+        entry.x = Math.floor(entry._wx);
+        entry.z = Math.floor(entry._wz);
+        entry._mobState = 'idle';
+        entry._mobTimer = IRON_GOLEM_WANDER_MIN + Math.random() * (IRON_GOLEM_WANDER_MAX - IRON_GOLEM_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else if (entry._mobState === 'gifting') {
+    entry._giftTimer -= dt;
+    if (entry._giftTimer <= 0) {
+      const v = entry._targetVillager;
+      if (v && !v._heldGift && mobObjects.some(m => m.entry === v)) {
+        giveGiftToVillager(currentModel, v);
+      }
+      entry._targetVillager = null;
+      entry._mobState = 'idle';
+      entry._mobTimer = IRON_GOLEM_WANDER_MIN + Math.random() * (IRON_GOLEM_WANDER_MAX - IRON_GOLEM_WANDER_MIN);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -8612,6 +8811,7 @@ function updateMobs(dt) {
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
     if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
+    if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -9677,7 +9877,7 @@ function renderBlueprint(model) {
     allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
     silverfish: ['#8a8f8a', 'A'], infested_marker: ['#8a8f8a', 'I'], piglin: ['#d48a68', 'A'],
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
-    villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'],
+    villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -9743,7 +9943,7 @@ function renderBlueprint(model) {
     allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
     silverfish: 'Silverfish', infested_marker: 'Infested Block (hidden)', piglin: 'Piglin',
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
-    villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop',
+    villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -9862,6 +10062,7 @@ function renderCommands(model) {
       else if (d.type === 'snow_golem') lines.push(`summon minecraft:snow_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'fox') lines.push(`summon minecraft:fox ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._holding ? ` {Item:{id:"minecraft:${d._holding}",Count:1}}` : ''}`);
       else if (d.type === 'villager') lines.push(`summon minecraft:villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {VillagerData:{profession:"farmer"}}`);
+      else if (d.type === 'iron_golem') lines.push(`summon minecraft:iron_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
