@@ -4897,24 +4897,38 @@ function droppedItemParts() {
   cube.translate(0, -0.3, 0);
   return { cube };
 }
-// A tall, hunched torso, a small head with 2 thin feeler "tendrils", long
-// arms, thick legs, and a glowing chest sac — real vanilla wardens are
-// imposing, hunched, roughly humanoid mobs, simplified here like every
-// other low-poly stand-in mob in this app. See DECOR_TYPES.warden.
+// A tall, hunched torso, a head with a wide teal crown band and 2 curved
+// feeler tendrils sweeping outward, long arms with tan bark-like shoulder
+// pads, short thick legs, and a vertical rib-like cluster of glowing
+// chest bars — matched directly against a real reference image of the
+// in-game model (near-black body, teal crest/tendrils/ribs, tan shoulder
+// texture) rather than guessed at. See DECOR_TYPES.warden.
 function wardenParts() {
   const torso = new THREE.BoxGeometry(0.7, 1.3, 0.5);
   torso.translate(0, 0.95, 0);
   const head = new THREE.BoxGeometry(0.4, 0.35, 0.4);
   head.translate(0, 1.75, 0.05);
-  const tendrilOffsets = [[-0.1, 1.98, 0.05], [0.1, 1.98, 0.05]];
-  const tendrils = tendrilOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.06, 0.22, 0.06);
+  const crown = new THREE.BoxGeometry(0.46, 0.1, 0.44);
+  crown.translate(0, 1.95, 0.05);
+  const tendrilSpecs = [
+    { x: -0.22, y: 2.05, z: 0.05, rot: -0.6 },
+    { x: 0.22, y: 2.05, z: 0.05, rot: 0.6 },
+  ];
+  const tendrils = tendrilSpecs.map(({ x, y, z, rot }) => {
+    const g = new THREE.BoxGeometry(0.07, 0.32, 0.07);
+    g.rotateZ(rot);
     g.translate(x, y, z);
     return g;
   });
-  const armOffsets = [[-0.44, 0.9, 0], [0.44, 0.9, 0]];
+  const armOffsets = [[-0.44, 0.85, 0], [0.44, 0.85, 0]];
   const arms = armOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.18, 0.9, 0.18);
+    const g = new THREE.BoxGeometry(0.2, 1.0, 0.2);
+    g.translate(x, y, z);
+    return g;
+  });
+  const shoulderOffsets = [[-0.44, 1.35, 0], [0.44, 1.35, 0]];
+  const shoulders = shoulderOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.24, 0.32, 0.3);
     g.translate(x, y, z);
     return g;
   });
@@ -4924,9 +4938,13 @@ function wardenParts() {
     g.translate(x, 0.15, z);
     return g;
   });
-  const chestGlow = new THREE.BoxGeometry(0.16, 0.16, 0.06);
-  chestGlow.translate(0, 1.1, 0.26);
-  return { torso, head, tendrils, arms, legs, chestGlow };
+  const ribOffsets = [-0.14, 0, 0.14];
+  const ribs = ribOffsets.map((x) => {
+    const g = new THREE.BoxGeometry(0.09, 0.36, 0.06);
+    g.translate(x, 1.05, 0.26);
+    return g;
+  });
+  return { torso, head, crown, tendrils, arms, shoulders, legs, ribs };
 }
 
 const decorGeoCache = new Map();
@@ -5543,13 +5561,16 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('warden');
     if (!parts) { parts = wardenParts(); decorGeoCache.set('warden', parts); }
     const group = new THREE.Group();
-    const bodyMat = solidMaterial(0x3d4a4a);
+    const bodyMat = solidMaterial(0x1c2224);
+    const shoulderMat = solidMaterial(0xc4b193);
     group.add(new THREE.Mesh(parts.torso, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
-    for (const g of parts.tendrils) group.add(new THREE.Mesh(g, bodyMat));
+    group.add(new THREE.Mesh(parts.crown, wardenGlowMaterial()));
+    for (const g of parts.tendrils) group.add(new THREE.Mesh(g, wardenGlowMaterial()));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.shoulders) group.add(new THREE.Mesh(g, shoulderMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
-    group.add(new THREE.Mesh(parts.chestGlow, wardenGlowMaterial()));
+    for (const g of parts.ribs) group.add(new THREE.Mesh(g, wardenGlowMaterial()));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
