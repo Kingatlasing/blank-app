@@ -1817,6 +1817,7 @@ const DECOR_TYPES = {
   vex: { kind: 'vex', interactive: false },
   allay: { kind: 'allay', interactive: false },
   dropped_item: { kind: 'dropped_item', interactive: false },
+  warden: { kind: 'warden', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -2992,6 +2993,21 @@ function buildAllayItemRelayInterior(grid, silhouette, dims, exteriorMat, accent
     });
   }
 }
+// An open deepslate clearing with a small sculk-touched patch — no walls,
+// matching every other single-mob flourish preset — real vanilla wardens
+// are found in the Deep Dark biome, built from deepslate and sculk.
+function buildDeepDarkDenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const sculkPatch = accentMat || exteriorMat;
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+    const x = cx + dx, z = cz + dz;
+    if (x >= 0 && x < dims.sx && z >= 0 && z < dims.sz) grid[idx(x, 0, z, dims)] = sculkPatch;
+  }
+  if (!decorOut) return;
+  decorOut.push({ type: 'warden', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -3473,6 +3489,18 @@ const PRESETS = [
       'Real vanilla allays also "dance" when they hear a note block play nearby; this app shows a real, visible spin at the delivery point as an honest stand-in for that, since there is no actual audio system here to trigger it from. Not modeled: retargeting mid-delivery to a closer active note block (this app has no sound-propagation model), and the real item-duplication player exploit some builds rely on — this allay only ever moves items that already exist, never creates new ones out of thin air.',
     ],
   },
+  {
+    id: 'deep-dark-den', name: 'Deep Dark Den', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'deepDarkDen',
+    blocks: { exterior: 'deepslate', interior: 'deepslate', accent: 'sculk' },
+    desc: 'A dark deepslate clearing with a sculk-touched patch and a warden — real vanilla wardens are "completely blind, relying entirely on vibrations and its sense of smell" to find prey, and this one genuinely only reacts to a periodic sensing event, never your live position.',
+    keywords: ['warden', 'sculk', 'deep dark', 'blind', 'vibration', 'sniff'],
+    notes: [
+      'Switch to Walk or Third-person mode and move around: every real ~4 seconds (the warden\'s real "sniffs for nearby players roughly every four seconds" cadence) it takes one real snapshot of your position, if you\'re within its sense range, and walks toward exactly that spot — not wherever you actually are by the time it arrives. Step away right after a sniff and watch it head confidently for the empty spot you just left.',
+      'This app has no verified real detection-radius figure for the sniff itself, so the sense range used here is an honest, approximate stand-in, not a literal vanilla number. Between sniffs — or when nothing is in range — it just wanders randomly, matching real vanilla\'s own stated baseline.',
+      'Not modeled: the real rising anger/threat meter, actual sculk sensor/shrieker blocks feeding it vibration events, and its ranged sonic boom attack (a real, fixed 10-damage hit, not an instant kill) — this app has no combat system at all, so this warden is all sensing and pursuit, never actually attacking.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -3863,6 +3891,8 @@ function generateModel() {
     buildVexChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'allayItemRelay') {
     buildAllayItemRelayInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'deepDarkDen') {
+    buildDeepDarkDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -4138,6 +4168,13 @@ let _allayWingMaterial = null;
 function allayWingMaterial() {
   if (!_allayWingMaterial) _allayWingMaterial = new THREE.MeshStandardMaterial({ color: 0xaee3f5, roughness: 0.4, transparent: true, opacity: 0.7, clippingPlanes: [cutawayPlane] });
   return _allayWingMaterial;
+}
+// Real vanilla wardens have a bioluminescent teal chest sac — a genuine
+// emissive accent, matching its real in-game appearance.
+let _wardenGlowMaterial = null;
+function wardenGlowMaterial() {
+  if (!_wardenGlowMaterial) _wardenGlowMaterial = new THREE.MeshStandardMaterial({ color: 0x2fd7c4, emissive: 0x1fa89c, emissiveIntensity: 1.1, roughness: 0.4, clippingPlanes: [cutawayPlane] });
+  return _wardenGlowMaterial;
 }
 
 // grass_block_top.png and every leaf texture (oak_leaves.png etc.) are
@@ -4860,6 +4897,37 @@ function droppedItemParts() {
   cube.translate(0, -0.3, 0);
   return { cube };
 }
+// A tall, hunched torso, a small head with 2 thin feeler "tendrils", long
+// arms, thick legs, and a glowing chest sac — real vanilla wardens are
+// imposing, hunched, roughly humanoid mobs, simplified here like every
+// other low-poly stand-in mob in this app. See DECOR_TYPES.warden.
+function wardenParts() {
+  const torso = new THREE.BoxGeometry(0.7, 1.3, 0.5);
+  torso.translate(0, 0.95, 0);
+  const head = new THREE.BoxGeometry(0.4, 0.35, 0.4);
+  head.translate(0, 1.75, 0.05);
+  const tendrilOffsets = [[-0.1, 1.98, 0.05], [0.1, 1.98, 0.05]];
+  const tendrils = tendrilOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.22, 0.06);
+    g.translate(x, y, z);
+    return g;
+  });
+  const armOffsets = [[-0.44, 0.9, 0], [0.44, 0.9, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.18, 0.9, 0.18);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.2, 0.15], [0.2, 0.15]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.24, 0.3, 0.24);
+    g.translate(x, 0.15, z);
+    return g;
+  });
+  const chestGlow = new THREE.BoxGeometry(0.16, 0.16, 0.06);
+  chestGlow.translate(0, 1.1, 0.26);
+  return { torso, head, tendrils, arms, legs, chestGlow };
+}
 
 const decorGeoCache = new Map();
 function cachedGeo(key, builder) {
@@ -5469,6 +5537,20 @@ function buildDecorMeshesForEntry(entry) {
     // Registered like a mob (even though it never moves on its own) so an
     // allay's real pickup/delivery can find and remove its exact live mesh
     // — the same registry eatSlime/removeVexFromWorld already rely on.
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'warden') {
+    let parts = decorGeoCache.get('warden');
+    if (!parts) { parts = wardenParts(); decorGeoCache.set('warden', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x3d4a4a);
+    group.add(new THREE.Mesh(parts.torso, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.tendrils) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.add(new THREE.Mesh(parts.chestGlow, wardenGlowMaterial()));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   }
@@ -7304,10 +7386,85 @@ function updateAllay(entry, obj, dt) {
   }
   for (const c of obj.children) if (c.userData.isAllayHeldItem) c.scale.setScalar(entry._carrying ? 1 : 0.001);
 }
+// Real vanilla wardens (minecraft.wiki/w/Warden) are "completely blind,
+// relying entirely on vibrations and its sense of smell to detect
+// players," and periodically "sniffs for nearby players roughly every
+// four seconds" — a real, DISCRETE sensing event, not a continuous live-
+// position check. Every earlier player-aware mob in this app (a cow
+// looking at the player, a bat fleeing one) re-checks the player's actual
+// current position every single frame; a warden here deliberately does
+// not. It only updates its pursuit target at that real ~4-second sniff
+// interval, then walks toward exactly that remembered point regardless of
+// where the player actually goes in between — a genuinely laggy pursuit
+// of a stale sensed location, not real-time tracking, matching how a
+// blind mob reacting to a past vibration/smell event would actually
+// behave. This app has no verified real detection-radius figure for the
+// sniff itself, so the sense range below is an honest, approximate
+// stand-in rather than a literal vanilla number.
+const WARDEN_WANDER_RADIUS = 4;
+const WARDEN_WANDER_MIN = 2, WARDEN_WANDER_MAX = 5;
+const WARDEN_WALK_SPEED = 1.4;
+const WARDEN_SNIFF_INTERVAL = 4; // real vanilla: "sniffs for nearby players roughly every four seconds"
+const WARDEN_SENSE_RADIUS = 10; // this app's own approximate stand-in — no precise real detection-radius figure is verified here
+function updateWarden(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'wandering';
+    entry._mobTimer = WARDEN_WANDER_MIN + Math.random() * (WARDEN_WANDER_MAX - WARDEN_WANDER_MIN);
+    entry._sniffTimer = WARDEN_SNIFF_INTERVAL;
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  entry._sniffTimer -= dt;
+  if (entry._sniffTimer <= 0) {
+    entry._sniffTimer = WARDEN_SNIFF_INTERVAL;
+    if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+      const sensedX = flyState.pos.x - offX, sensedZ = flyState.pos.z - offZ;
+      const dist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+      if (dist <= WARDEN_SENSE_RADIUS) {
+        entry._targetX = sensedX;
+        entry._targetZ = sensedZ;
+        entry._mobState = 'pursuing';
+      }
+    }
+  }
+  if (entry._mobState === 'wandering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walkingIdle';
+      } else {
+        entry._mobTimer = WARDEN_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walkingIdle' || entry._mobState === 'pursuing') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = WARDEN_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'wandering';
+      entry._mobTimer = WARDEN_WANDER_MIN + Math.random() * (WARDEN_WANDER_MAX - WARDEN_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
     if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
@@ -8333,7 +8490,7 @@ function renderBlueprint(model) {
     turtle: ['#4a7c3f', 'A'], turtle_egg: ['#e8dfc0', 'E'], glow_squid: ['#4dd0c4', 'A'], dolphin: ['#6e7f8a', 'A'],
     lava: ['#d9531e', 'X'], strider: ['#c97a5a', 'A'], sniffer: ['#c9a876', 'A'], torchflower_seed: ['#e8871e', 'S'],
     panda: ['#f5f0e6', 'A'], slimeball: ['#9fc94f', 'G'], frog: ['#9bbf3f', 'A'], goat: ['#d8cdb8', 'A'], vex: ['#6a8fc9', 'A'],
-    allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'],
+    allay: ['#4a6ee0', 'A'], dropped_item: ['#2acb57', 'G'], warden: ['#3d4a4a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -8396,7 +8553,7 @@ function renderBlueprint(model) {
     turtle: 'Turtle', turtle_egg: 'Turtle Egg', glow_squid: 'Glow Squid', dolphin: 'Dolphin',
     lava: 'Lava', strider: 'Strider', sniffer: 'Sniffer', torchflower_seed: 'Torchflower Seed',
     panda: 'Panda', slimeball: 'Slimeball', frog: 'Frog', goat: 'Goat', vex: 'Vex',
-    allay: 'Allay', dropped_item: 'Dropped Item',
+    allay: 'Allay', dropped_item: 'Dropped Item', warden: 'Warden',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -8509,6 +8666,7 @@ function renderCommands(model) {
       else if (d.type === 'vex') lines.push(`summon minecraft:vex ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'allay') lines.push(`summon minecraft:allay ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}${d.heldItemType ? ` {Inventory:[{Slot:0b,Item:{id:"minecraft:${d.heldItemType}",Count:1b}}]}` : ''}`);
       else if (d.type === 'dropped_item') lines.push(`summon minecraft:item ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5} {Item:{id:"minecraft:${d.itemType || 'emerald'}",Count:1}}`);
+      else if (d.type === 'warden') lines.push(`summon minecraft:warden ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle') lines.push(`summon minecraft:turtle ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'turtle_egg') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:turtle_egg[eggs=2]`);
       else if (d.type === 'door') {
