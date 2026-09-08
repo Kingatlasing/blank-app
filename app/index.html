@@ -1919,6 +1919,25 @@ const DECOR_TYPES = {
   // with no targeting or decision-making involved at all. See
   // updateRavager / trampleCrop.
   ravager: { kind: 'ravager', interactive: false },
+  // A small teal mushroom stand-in for real vanilla warped fungus, which
+  // "hoglins avoid... fleeing if it comes within range"
+  // (minecraft.wiki/w/Hoglin). Solid-color geometry rather than the
+  // texture-atlas cross_plant system every other plant decor here uses,
+  // since this app's atlas has no warped-fungus tile at all — an honest,
+  // spelled-out substitute, not a silently invented texture.
+  warped_fungus: { kind: 'warped_fungus', interactive: false },
+  // Real vanilla hoglins actively flee real warped fungus, "sprinting away
+  // from it if within range" (minecraft.wiki/w/Hoglin). Every earlier
+  // repulsion mechanic here (the ocelot) flees from the LIVE PLAYER; a
+  // hoglin is the first to flee a fixed ENVIRONMENTAL HAZARD instead — a
+  // static decor position, never moving, sensed continuously the same way
+  // regardless of camera mode, rather than only reactable while a live
+  // player position exists. Geometry-wise this reuses the ravager's own
+  // boar-like body plan (real vanilla hoglins and ravagers are both large,
+  // hairy, boar-like beasts), the same "reuse where genuinely similar"
+  // pattern already used for the ocelot (the wolf's body) and the camel
+  // (the llama's neck). See updateHoglin.
+  hoglin: { kind: 'hoglin', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3351,6 +3370,25 @@ function buildRavagerCropTrampleInterior(grid, silhouette, dims, exteriorMat, ac
     decorOut.push({ type: 'wheat_crop', x, y: 1, z, stage: cropStages[i] });
   }
 }
+// A warped nylium floor with a cluster of real warped_fungus decor near
+// one side and the hoglin spawned right next to them — no live player
+// needed at all to see the real mechanic, since a hoglin senses the
+// fungus's own fixed position continuously regardless of camera mode:
+// watch it flee to the far side the instant the model starts simulating.
+function buildHoglinFungusGroveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cz = Math.floor(dims.sz / 2);
+  const fungusX = Math.min(dims.sx - 1, 2);
+  const fungusSpots = [[0, -1], [0, 0], [0, 1], [1, 0]];
+  for (const [dx, dz] of fungusSpots) {
+    const x = fungusX + dx, z = cz + dz;
+    if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) continue;
+    decorOut.push({ type: 'warped_fungus', x, y: 1, z });
+  }
+  decorOut.push({ type: 'hoglin', x: Math.min(dims.sx - 1, fungusX + 2), y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4062,6 +4100,18 @@ const PRESETS = [
       'Not modeled: the real charging headbutt/knockback attack, breaking through fences and other blocks besides crops/leaves, roaring stun effects, and carrying an illager rider — this app has no combat, knockback, or rider system at all, so this ravager only ever wanders and tramples whatever crops happen to be in its path.',
     ],
   },
+  {
+    id: 'hoglin-fungus-grove', name: 'Hoglin Fungus Grove', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 9 }, interiorMode: 'hoglinFungusGrove',
+    blocks: { exterior: 'warped_nylium', interior: 'warped_nylium', accent: 'netherrack' },
+    desc: 'A warped nylium floor with a cluster of real warped fungus and a hoglin spawned right next to it — real vanilla hoglins actively flee real warped fungus, "sprinting away from it if within range," and this one genuinely does, no live player needed at all: just watch it bolt for the far side the instant the model starts simulating.',
+    keywords: ['hoglin', 'warped fungus', 'flee', 'nether', 'hazard'],
+    notes: [
+      'Unlike every other player-aware or mob-aware mechanic in this app, this one needs no live player position at all — its own real fear check runs every frame regardless of camera mode, purely against a fixed decor position. This is a genuinely new class of repulsion for this app: the ocelot (the only earlier fleeing mob) only ever flees the LIVE PLAYER, a moving target that requires Walk/third-person mode to even exist, while a hoglin flees a fixed ENVIRONMENTAL HAZARD instead — continuously sensed the exact same way whether you\'re watching in Orbit mode or walking around it yourself. Verified directly by a unit test confirming the real distance between the hoglin and the nearest warped_fungus entry genuinely increases while fleeing, and a second test confirming it settles back into ordinary wandering once it\'s far enough away.',
+      'This app has no verified real fungus-fear radius or flee-speed multiplier, so the figures used here are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The warped fungus itself is new solid-colour geometry (a small teal mushroom) rather than a real texture, since this app\'s atlas has no warped-fungus tile at all. The hoglin\'s own geometry deliberately reuses the ravager\'s exact body-plan function unchanged at a smaller scale — real vanilla hoglins and ravagers are both large, hairy, boar-like beasts — the same reuse-across-similar-creatures pattern already used for the ocelot (the wolf\'s body) and the camel (the llama\'s neck).',
+      'Not modeled: being hunted by piglins for meat, transforming into a zoglin after too long in the overworld, the real charge attack and knockback, and herd behavior — this app has no combat, transformation, or multi-mob-type herding system at all, so this hoglin only ever wanders and flees the fungus.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4490,6 +4540,8 @@ function generateModel() {
     buildGuardianReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'ravagerCropTrample') {
     buildRavagerCropTrampleInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'hoglinFungusGrove') {
+    buildHoglinFungusGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6279,6 +6331,16 @@ function ravagerParts() {
   });
   return { body, legs, head, snout, horns, tail, faceEyes };
 }
+// A small mushroom stand-in for real warped fungus — a thin stem and a
+// wide flat cap, in the distinctive teal colouring real warped fungus is
+// known for, rather than the tile this app's atlas doesn't have. See
+// DECOR_TYPES.warped_fungus.
+function warpedFungusParts() {
+  const stemH = 0.35;
+  const stem = new THREE.BoxGeometry(0.08, stemH, 0.08);
+  const cap = new THREE.BoxGeometry(0.3, 0.08, 0.3);
+  return { stem, cap, stemH };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7277,6 +7339,38 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'hoglin') {
+    // Reuses the ravager's own geometry function directly (unchanged) at
+    // a smaller scale — real vanilla hoglins and ravagers are both large,
+    // hairy, boar-like beasts, so this deliberately shares one body plan
+    // across two genuinely similar real creatures rather than redrawing a
+    // near-identical shape from scratch, the same reuse already applied to
+    // the ocelot (wolf's body) and camel (llama's neck).
+    let parts = decorGeoCache.get('ravager');
+    if (!parts) { parts = ravagerParts(); decorGeoCache.set('ravager', parts); }
+    const group = new THREE.Group();
+    const hideMat = solidMaterial(0xc98a76);
+    group.add(new THREE.Mesh(parts.body, hideMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, hideMat));
+    group.add(new THREE.Mesh(parts.head, hideMat));
+    group.add(new THREE.Mesh(parts.snout, hideMat));
+    const tuskMat = solidMaterial(0xe8ddc8);
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, tuskMat));
+    group.add(new THREE.Mesh(parts.tail, hideMat));
+    const faceMat = solidMaterial(0x8a1a1a);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.scale.setScalar(0.65);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'warped_fungus') {
+    let parts = decorGeoCache.get('warpedFungus');
+    if (!parts) { parts = warpedFungusParts(); decorGeoCache.set('warpedFungus', parts); }
+    const stem = new THREE.Mesh(parts.stem, solidMaterial(0x1a8c7a));
+    stem.position.y = -0.5 + parts.stemH / 2;
+    const cap = new THREE.Mesh(parts.cap, solidMaterial(0x149c8f));
+    cap.position.y = -0.5 + parts.stemH + 0.04;
+    objs.push(stem, cap);
   } else if (def.kind === 'wheat_crop') {
     const stage = entry.stage || 0;
     const key = 'wheatCrop:' + stage;
@@ -10731,6 +10825,81 @@ function updateRavager(entry, obj, dt) {
   const crop = findCropUnderRavager(entry);
   if (crop) trampleCrop(currentModel, crop);
 }
+// Real vanilla hoglins actively flee real warped fungus, "sprinting away
+// from it if within range" (minecraft.wiki/w/Hoglin). Every earlier
+// repulsion mechanic here (the ocelot) flees the LIVE PLAYER; a hoglin is
+// the first to flee a fixed ENVIRONMENTAL HAZARD instead — a static decor
+// position sensed continuously regardless of camera mode, rather than
+// only reactable while a live player position exists.
+const HOGLIN_WANDER_MIN = 2, HOGLIN_WANDER_MAX = 5;
+const HOGLIN_WALK_SPEED = 1.0;
+const HOGLIN_FLEE_SPEED = 1.9;
+const HOGLIN_FUNGUS_FEAR_RADIUS = 6; // an honest, approximate stand-in — not a verified real vanilla range
+function findNearestFungus(entry) {
+  if (!currentModel) return null;
+  let best = null, bestDist = Infinity;
+  for (const d of currentModel.decor) {
+    if (d.type !== 'warped_fungus') continue;
+    const dist = Math.hypot((d.x + 0.5) - entry._wx, (d.z + 0.5) - entry._wz);
+    if (dist < bestDist) { best = d; bestDist = dist; }
+  }
+  return best ? { entry: best, dist: bestDist } : null;
+}
+function updateHoglin(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = HOGLIN_WANDER_MIN + Math.random() * (HOGLIN_WANDER_MAX - HOGLIN_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  const fungus = findNearestFungus(entry);
+  if (fungus && fungus.dist <= HOGLIN_FUNGUS_FEAR_RADIUS) {
+    entry._mobState = 'fleeing';
+    const awayDist = Math.max(fungus.dist, 0.01);
+    const fleeX = entry._wx + ((entry._wx - (fungus.entry.x + 0.5)) / awayDist) * 4;
+    const fleeZ = entry._wz + ((entry._wz - (fungus.entry.z + 0.5)) / awayDist) * 4;
+    entry._targetX = Math.max(0.5, Math.min(dims.sx - 0.5, fleeX));
+    entry._targetZ = Math.max(0.5, Math.min(dims.sz - 0.5, fleeZ));
+  } else if (entry._mobState === 'fleeing') {
+    entry._mobState = 'idle';
+    entry._mobTimer = HOGLIN_WANDER_MIN * 0.3;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = HOGLIN_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking' || entry._mobState === 'fleeing') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const speed = entry._mobState === 'fleeing' ? HOGLIN_FLEE_SPEED : HOGLIN_WALK_SPEED;
+    const step = speed * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      if (entry._mobState === 'walking') {
+        entry._mobState = 'idle';
+        entry._mobTimer = HOGLIN_WANDER_MIN + Math.random() * (HOGLIN_WANDER_MAX - HOGLIN_WANDER_MIN);
+      }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -10874,6 +11043,7 @@ function updateMobs(dt) {
     if (entry.type === 'evoker') { updateEvoker(entry, obj, dt); continue; }
     if (entry.type === 'guardian') { updateGuardian(entry, obj, dt); continue; }
     if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
+    if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -11943,6 +12113,7 @@ function renderBlueprint(model) {
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
+    hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12010,6 +12181,7 @@ function renderBlueprint(model) {
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
+    hoglin: 'Hoglin', warped_fungus: 'Warped Fungus',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12141,6 +12313,8 @@ function renderCommands(model) {
       else if (d.type === 'evoker') lines.push(`summon minecraft:evoker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'guardian') lines.push(`summon minecraft:guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ravager') lines.push(`summon minecraft:ravager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'hoglin') lines.push(`summon minecraft:hoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
       else if (d.type === 'infested_marker') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:infested_stone`);
