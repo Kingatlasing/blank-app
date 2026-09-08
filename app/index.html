@@ -2000,6 +2000,18 @@ const DECOR_TYPES = {
   // departWanderingTrader. Reuses the villager's own humanoid geometry
   // unchanged, recoloured into its own real teal trading robe.
   wandering_trader: { kind: 'wandering_trader', interactive: false },
+  // Real vanilla shearing a mooshroom "turns it into a cow" permanently,
+  // dropping mushrooms in the process (minecraft.wiki/w/Mooshroom). Every
+  // earlier interactive removal here deletes the SAME entry outright (the
+  // axolotl's bucket capture); this is the first interaction that MUTATES
+  // one live mob's own entry into a genuinely different mob type in
+  // place — the exact same JS object just becomes a cow from that point
+  // on, rather than being spliced out and something new spawned in its
+  // place. See shearMooshroom / the mooshroom-specific branch in
+  // attemptInteract. Wanders and looks at the player exactly like an
+  // ordinary cow (see MOB_KINDS) since it's mechanically just a reskinned
+  // one until sheared.
+  mooshroom: { kind: 'mooshroom', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3508,6 +3520,16 @@ function buildWanderingTraderWaystationInterior(grid, silhouette, dims, exterior
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'wandering_trader', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A mycelium clearing (real vanilla mooshrooms only spawn on real mushroom
+// fields mycelium) with a single mooshroom — right-click it in Interact
+// mode to shear it and watch it genuinely become a plain cow.
+function buildMooshroomFieldInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'mooshroom', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4291,6 +4313,18 @@ const PRESETS = [
       'Not modeled: actual trading/UI, its own 2 llama escorts, drinking invisibility potion instead of vanishing outright when threatened at night, and its real distance-based despawn rules on top of the timer — this app has no trading, potion-effect, or threat-detection system at all, so this trader only ever wanders and eventually leaves.',
     ],
   },
+  {
+    id: 'mooshroom-field', name: 'Mooshroom Field', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'mooshroomField',
+    blocks: { exterior: 'mycelium', interior: 'mycelium', accent: 'mycelium' },
+    desc: 'A mycelium clearing with a single mooshroom — real vanilla shearing a mooshroom turns it into a plain cow, and this one genuinely does: switch to Interact mode, right-click it, and watch the exact same mob become a cow and drop mushrooms.',
+    keywords: ['mooshroom', 'shear', 'cow', 'mushroom', 'mycelium', 'transform'],
+    notes: [
+      'Switch to Interact mode and right-click the mooshroom — its own entry genuinely changes type from `mooshroom` to `cow` in place, its geometry immediately re-renders as a plain cow, and 2 real red_mushroom items drop next to it. Real vanilla shearing a mooshroom "turns it into a cow" while dropping mushrooms (minecraft.wiki/w/Mooshroom). This is a genuinely new class of mechanic for this app: every earlier interactive removal deletes its own entry outright (the axolotl\'s bucket capture splices it out of the model entirely), while `shearMooshroom` instead MUTATES the very same live entry object into a different mob type — the exact same JS object mobObjects is still tracking simply becomes a cow, rather than being deleted and a new cow spawned in its place. Verified directly by a unit test confirming the identical entry object\'s own `type` field is genuinely `cow` after shearing (not merely visually similar), that it\'s still the exact same object reference inside `model.decor` and `mobObjects` afterward, and that exactly 2 real mushroom items appear next to it, plus a second test confirming an unsheared mooshroom keeps wandering and looking at the player exactly like an ordinary cow the whole time beforehand.',
+      'The geometry reuses the cow\'s own body/head/legs completely unchanged (real mooshrooms share the cow\'s base model) — the same reuse pattern already used for the hoglin (the ravager\'s own body) — plus its own 3 small red-and-white mushroom bumps scattered across its back and a real face, since the older plain `cowParts()` this reuses predates this app\'s own standing rule that every mob gets one.',
+      'Not modeled: the brown mooshroom variant (bred from lightning-struck cows, gives suspicious stew instead of mushrooms), being milked, and actual mushroom-stew crafting — this app has no weather, breeding, or crafting system at all, so this mooshroom only ever wanders until sheared.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4731,6 +4765,8 @@ function generateModel() {
     buildCatCreeperDeterrentInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'wanderingTraderWaystation') {
     buildWanderingTraderWaystationInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'mooshroomField') {
+    buildMooshroomFieldInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5276,6 +5312,34 @@ function cowParts() {
   });
   return { body, head, legs };
 }
+// A real mooshroom's own body/head/legs are the exact same as a cow's —
+// see DECOR_TYPES.mooshroom — plus 3 small red-and-white mushroom bumps
+// scattered across its back and a real face (this app's own standing rule
+// for every mob, which the older plain cowParts predates), all built the
+// same "position it, translate it" recipe as everything else here.
+function mooshroomBumpParts() {
+  const bumpOffsets = [[-0.1, -0.2], [0.12, 0.05], [-0.06, 0.28]];
+  const stems = [], caps = [], dots = [];
+  for (const [x, z] of bumpOffsets) {
+    const stem = new THREE.BoxGeometry(0.05, 0.08, 0.05);
+    stem.translate(x, 0.44, z);
+    stems.push(stem);
+    const cap = new THREE.BoxGeometry(0.14, 0.05, 0.14);
+    cap.translate(x, 0.505, z);
+    caps.push(cap);
+    const dot = new THREE.BoxGeometry(0.03, 0.015, 0.03);
+    dot.translate(x, 0.531, z);
+    dots.push(dot);
+  }
+  const faceZ = 0.75, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.08, 0.24], [0.08, 0.24]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  return { stems, caps, dots, faceEyes };
+}
 // Same low-poly recipe as the cow (body/head/4 legs, plain coloured boxes,
 // no texture/model exists in this app for it either) — see DECOR_TYPES.pig.
 function pigParts() {
@@ -5749,6 +5813,7 @@ const DROPPED_ITEM_COLORS = {
   nether_bricks: 0x2a1418,
   gravel: 0x8a8478,
   feather: 0xf0ead6,
+  red_mushroom: 0xc22b2b,
 };
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
@@ -6999,6 +7064,30 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'mooshroom') {
+    // Reuses the cow's own body/head/legs geometry unchanged (real
+    // mooshrooms share the cow's base model) — see hoglin's identical
+    // reuse of ravagerParts — plus its own mushroom-bump and face parts.
+    let cowGeo = decorGeoCache.get('cow');
+    if (!cowGeo) { cowGeo = cowParts(); decorGeoCache.set('cow', cowGeo); }
+    let bumps = decorGeoCache.get('mooshroomBumps');
+    if (!bumps) { bumps = mooshroomBumpParts(); decorGeoCache.set('mooshroomBumps', bumps); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x8a2323), headMat = solidMaterial(0xd8cdb8);
+    group.add(new THREE.Mesh(cowGeo.body, bodyMat));
+    group.add(new THREE.Mesh(cowGeo.head, headMat));
+    for (const g of cowGeo.legs) group.add(new THREE.Mesh(g, bodyMat));
+    const stemMat = solidMaterial(0xd8cdb8), capMat = solidMaterial(0xc22b2b), dotMat = solidMaterial(0xf0ead6);
+    for (const g of bumps.stems) group.add(new THREE.Mesh(g, stemMat));
+    for (const g of bumps.caps) group.add(new THREE.Mesh(g, capMat));
+    for (const g of bumps.dots) group.add(new THREE.Mesh(g, dotMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of bumps.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'mooshroom';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'pig') {
     let parts = decorGeoCache.get('pig');
     if (!parts) { parts = pigParts(); decorGeoCache.set('pig', parts); }
@@ -7883,7 +7972,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -11117,6 +11206,33 @@ function captureAxolotlToBucket(model, entry) {
   renderCommands(model);
   renderStats(model);
 }
+// Real vanilla shearing a mooshroom "turns it into a cow", dropping
+// mushrooms (minecraft.wiki/w/Mooshroom). Unlike captureAxolotlToBucket
+// (which deletes its entry outright), this MUTATES the SAME entry object
+// in place — mooshroom-only fields are cleared and its type becomes
+// 'cow' — so any other code still holding a reference to this exact entry
+// (mobObjects included) sees a real cow from this point on, not a deleted
+// mob replaced by a new one. Safe to call a full renderThree() here since,
+// like the axolotl's bucket capture, this only ever runs from the
+// player's own click handler, never from inside updateMobs' own per-frame
+// loop (contrast departWanderingTrader, which deliberately avoids this for
+// exactly that reason).
+function shearMooshroom(model, entry) {
+  entry.type = 'cow';
+  delete entry._mobYaw;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const dropSpots = [[-1, 0], [1, 0]];
+  for (const [dx, dz] of dropSpots) {
+    const x = Math.max(0, Math.min(dims.sx - 1, entry.x + dx));
+    const z = Math.max(0, Math.min(dims.sz - 1, entry.z + dz));
+    model.decor.push({ type: 'dropped_item', itemType: 'red_mushroom', x, y: entry.y, z });
+  }
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
 // Real vanilla evokers "summon 3 vexes to assist" them
 // (minecraft.wiki/w/Evoker). Every earlier world-mutation mob in this app
 // moves, mutates, or removes something that already exists — nothing has
@@ -12425,6 +12541,7 @@ function attemptInteract(clientX, clientY, button) {
       return;
     }
     if (entry.type === 'axolotl') { captureAxolotlToBucket(currentModel, entry); return; }
+    if (entry.type === 'mooshroom') { shearMooshroom(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -12871,7 +12988,7 @@ function renderBlueprint(model) {
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
-    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'],
+    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12940,7 +13057,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
-    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader',
+    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13079,6 +13196,7 @@ function renderCommands(model) {
       else if (d.type === 'wind_charge') lines.push(`summon minecraft:wind_charge ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'cat') lines.push(`summon minecraft:cat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wandering_trader') lines.push(`summon minecraft:wandering_trader ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'mooshroom') lines.push(`summon minecraft:mooshroom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
