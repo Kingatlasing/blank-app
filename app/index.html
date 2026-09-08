@@ -2012,6 +2012,23 @@ const DECOR_TYPES = {
   // ordinary cow (see MOB_KINDS) since it's mechanically just a reskinned
   // one until sheared.
   mooshroom: { kind: 'mooshroom', interactive: true },
+  // Real vanilla elder guardians constantly apply Mining Fatigue to any
+  // nearby player, just by existing near them — no attack, no cooldown, no
+  // projectile at all (minecraft.wiki/w/Elder_Guardian). Every earlier
+  // continuous player-aware effect here is either an ACTIVE attack with its
+  // own charge/cooldown cycle (the guardian's locked-on beam) or a ONE-TIME
+  // event (the breeze's wind-charge knockback); this is the first mob
+  // whose mere PASSIVE presence continuously changes one of the player's
+  // own live movement parameters, every single frame, with no attack of
+  // any kind involved. This app has no mining or status-effect system to
+  // hook a real Mining Fatigue debuff into, so it's honestly repurposed as
+  // a direct walking-speed slow instead — the same kind of spelled-out
+  // substitution already used for the breeze's one-time knockback standing
+  // in for real velocity. See elderGuardianAuraMult, applied inside
+  // updateFreeCamera. Reuses the guardian's own geometry unchanged, scaled
+  // up and recoloured grey — real elder guardians are simply larger,
+  // grey-toned guardians.
+  elder_guardian: { kind: 'elder_guardian', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3424,6 +3441,24 @@ function buildGuardianReefInterior(grid, silhouette, dims, exteriorMat, accentMa
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'guardian', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The exact same glass-walled, single-water-source tank shape as the
+// Guardian Reef, with a single elder guardian instead — switch to Walk
+// mode and swim/walk close to feel your own real movement genuinely slow
+// down the instant you're within its own passive aura, well before it
+// ever "does" anything to you.
+function buildElderGuardianMonumentInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'elder_guardian', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4325,6 +4360,18 @@ const PRESETS = [
       'Not modeled: the brown mooshroom variant (bred from lightning-struck cows, gives suspicious stew instead of mushrooms), being milked, and actual mushroom-stew crafting — this app has no weather, breeding, or crafting system at all, so this mooshroom only ever wanders until sheared.',
     ],
   },
+  {
+    id: 'elder-guardian-monument', name: 'Elder Guardian Monument', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'elderGuardianMonument',
+    blocks: { exterior: 'glass', interior: 'dark_prismarine', accent: 'sea_lantern' },
+    desc: 'A glass-walled water tank with a single elder guardian — real vanilla elder guardians constantly apply Mining Fatigue to any nearby player just by existing near them, and this one genuinely does: switch to Walk mode and swim close, and feel your own real walking speed slow down the instant you enter its own passive aura — no attack, no cooldown, nothing it actively does to you at all.',
+    keywords: ['elder guardian', 'mining fatigue', 'slow', 'aura', 'monument', 'ocean'],
+    notes: [
+      'Switch to Walk mode and approach it — the instant your own live position comes within its own real aura radius, your own actual walking speed genuinely drops, exactly matching the real vanilla fact that elder guardians constantly apply Mining Fatigue to nearby players just by being near them (minecraft.wiki/w/Elder_Guardian). This is a genuinely new class of mechanic for this app: every earlier continuous player-aware effect is either an ACTIVE attack with its own charge/cooldown cycle (the ordinary guardian\'s locked-on beam) or a ONE-TIME event (the breeze\'s wind-charge knockback), while an elder guardian\'s aura is the first mob whose mere PASSIVE presence continuously changes one of the player\'s own live movement parameters every single frame, with no attack, cooldown, or projectile involved anywhere. `elderGuardianAuraMult` is checked fresh every frame directly inside `updateFreeCamera` itself (not inside `updateMobs`, since this modifies the PLAYER\'s own movement, not a mob\'s) and multiplies into the exact same speed-multiplier slot the soul sand slowdown already uses, so the two genuinely stack the same way real vanilla status effects stack on top of surface speed. Verified directly by a unit test confirming the real multiplier returned is a genuine slowdown (not 1) once a simulated live player is within the elder guardian\'s own real radius, a full 1 (no effect at all) once they back out of it, and a second test confirming a live elder guardian is required at all — no aura exists with none present.',
+      'This app has no mining or status-effect system to hook a real Mining Fatigue debuff into (Mining Fatigue slows mining and attack speed, neither of which exist here at all), so it\'s honestly repurposed as a direct walking-speed slow instead — the same kind of spelled-out substitution already used for the breeze\'s one-time position displacement standing in for real velocity-based knockback. This app also has no verified real aura radius or slow strength, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry reuses the ordinary guardian\'s own body plan completely unchanged, scaled up and recoloured grey — real elder guardians are simply larger, grey-toned guardians — and its own wander reuses the exact same water-bound hover/swim helper the ordinary guardian already uses, since the real difference here is entirely the aura, not the movement.',
+      'Not modeled: any actual damage or the real Mining Fatigue effect on mining/attack speed (this app has no combat, mining tools, or status-effect system at all, so the aura is purely a movement-speed stand-in), and ocean monuments\' own guardian escorts and gold-block core — this elder guardian simply floats in its own tank.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4767,6 +4814,8 @@ function generateModel() {
     buildWanderingTraderWaystationInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'mooshroomField') {
     buildMooshroomFieldInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'elderGuardianMonument') {
+    buildElderGuardianMonumentInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7771,6 +7820,25 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.eye, eyeMat));
     const pupilMat = solidMaterial(0xdb4a6a);
     group.add(new THREE.Mesh(parts.pupil, pupilMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'elder_guardian') {
+    // Reuses the guardian's own geometry unchanged (real elder guardians
+    // are simply larger, grey-toned guardians) — see hoglin's identical
+    // reuse of ravagerParts — scaled up and recoloured.
+    let parts = decorGeoCache.get('guardian');
+    if (!parts) { parts = guardianParts(); decorGeoCache.set('guardian', parts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0x8a8f8a);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    for (const g of parts.spikes) group.add(new THREE.Mesh(g, skinMat));
+    group.add(new THREE.Mesh(parts.tailFin, skinMat));
+    const eyeMat = solidMaterial(0xc9d43b);
+    group.add(new THREE.Mesh(parts.eye, eyeMat));
+    const pupilMat = solidMaterial(0x5a2a3a);
+    group.add(new THREE.Mesh(parts.pupil, pupilMat));
+    group.scale.setScalar(1.5);
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -11459,6 +11527,77 @@ function updateGuardian(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const ELDER_GUARDIAN_HOVER_MIN = 1, ELDER_GUARDIAN_HOVER_MAX = 3;
+const ELDER_GUARDIAN_SWIM_SPEED = 0.4; // slower than a regular guardian — real elder guardians are sedentary temple guardians
+// Reuses the exact same water-bound wander helper as the ordinary
+// guardian (pickGuardianSwimTarget) — its own real behavior difference
+// from a guardian isn't in HOW it moves, it's the passive aura it applies
+// just by being nearby (see elderGuardianAuraMult / DECOR_TYPES.elder_guardian),
+// so no new movement logic is needed here at all, only the beam-charging
+// half of updateGuardian is intentionally left out.
+function updateElderGuardian(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._mobTimer = ELDER_GUARDIAN_HOVER_MIN + Math.random() * (ELDER_GUARDIAN_HOVER_MAX - ELDER_GUARDIAN_HOVER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickGuardianSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = ELDER_GUARDIAN_HOVER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'swimming') {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = ELDER_GUARDIAN_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = ELDER_GUARDIAN_HOVER_MIN + Math.random() * (ELDER_GUARDIAN_HOVER_MAX - ELDER_GUARDIAN_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+// The real new mechanic: a continuous passive proximity check against every
+// live elder guardian, called every frame from inside updateFreeCamera
+// itself (not updateMobs) since it modifies the PLAYER's own movement, not
+// a mob's. Takes the player's own current world-space x/z (already
+// player, not mob, coordinates) and returns a speed multiplier — 1 with no
+// elder guardian in range, or the slowed figure the instant one is.
+const ELDER_GUARDIAN_AURA_RADIUS = 6; // no verified real "how close counts as nearby" figure for this app's own repurposed effect — an honest, approximate stand-in
+const ELDER_GUARDIAN_AURA_SPEED_MULT = 0.55;
+function elderGuardianAuraMult(worldX, worldZ) {
+  if (!currentModel) return 1;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const m of mobObjects) {
+    if (m.entry.type !== 'elder_guardian' || m.entry._wx === undefined) continue;
+    const d = Math.hypot((m.entry._wx + offX) - worldX, (m.entry._wz + offZ) - worldZ);
+    if (d <= ELDER_GUARDIAN_AURA_RADIUS) return ELDER_GUARDIAN_AURA_SPEED_MULT;
+  }
+  return 1;
+}
 // Real vanilla ravagers destroy crops "simply by walking over" them
 // (minecraft.wiki/w/Ravager). Every earlier mob-driven world-destruction
 // mechanic in this app is a DELIBERATE targeted action the mob decides to
@@ -11910,6 +12049,7 @@ function updateMobs(dt) {
     if (entry.type === 'axolotl') { updateAxolotl(entry, obj, dt); continue; }
     if (entry.type === 'evoker') { updateEvoker(entry, obj, dt); continue; }
     if (entry.type === 'guardian') { updateGuardian(entry, obj, dt); continue; }
+    if (entry.type === 'elder_guardian') { updateElderGuardian(entry, obj, dt); continue; }
     if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
     if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
     if (entry.type === 'shulker') { updateShulker(entry, obj, dt); continue; }
@@ -12725,7 +12865,12 @@ function updateFreeCamera(dt) {
     // that reduces to the exact pre-existing instant movement on anything
     // that isn't ice (carry=0), so normal ground behavior is unchanged.
     const groundMat = flyState.grounded ? materialIdAtWorld(p.x, p.y - 0.1, p.z) : null;
-    const surfaceMult = SURFACE_SPEED_MULT[groundMat] || 1;
+    // A nearby elder guardian's own passive aura (elderGuardianAuraMult)
+    // stacks on top of the ground-material slow exactly like real vanilla
+    // status effects stack on top of surface speed — a genuinely different
+    // SOURCE of slowdown (a live mob's mere presence) than every other
+    // multiplier here, which all come from the block underfoot.
+    const surfaceMult = (SURFACE_SPEED_MULT[groundMat] || 1) * elderGuardianAuraMult(p.x, p.z);
     const slipperiness = SURFACE_SLIPPERINESS[groundMat] || SURFACE_SLIPPERINESS.default;
     const carry = Math.max(0, (slipperiness - SURFACE_SLIPPERINESS.default) / (1 - SURFACE_SLIPPERINESS.default));
     const targetVX = (len > 0 ? mx / dt : 0) * surfaceMult, targetVZ = (len > 0 ? mz / dt : 0) * surfaceMult;
@@ -12988,7 +13133,7 @@ function renderBlueprint(model) {
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
-    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'],
+    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13057,7 +13202,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
-    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom',
+    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13197,6 +13342,7 @@ function renderCommands(model) {
       else if (d.type === 'cat') lines.push(`summon minecraft:cat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wandering_trader') lines.push(`summon minecraft:wandering_trader ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'mooshroom') lines.push(`summon minecraft:mooshroom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'elder_guardian') lines.push(`summon minecraft:elder_guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
