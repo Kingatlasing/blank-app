@@ -1986,6 +1986,20 @@ const DECOR_TYPES = {
   // descended ocelot body plan, which read as a dog — with a plain wander
   // (no fleeing — cats don't flee anything in this app).
   cat: { kind: 'cat', interactive: false },
+  // Real vanilla wandering traders that go untraded with for too long
+  // "teleport away" on their own, vanishing from the world entirely
+  // (minecraft.wiki/w/Wandering_Trader). Every earlier mob removal in this
+  // app needs either a player action (the axolotl bucket capture, a door
+  // being opened) or an environmental collision (a creeper's explosion, a
+  // ravager trampling a crop, a wind charge hitting the player or timing
+  // out mid-flight — but that's a temporary PROJECTILE, not a persistent,
+  // villager-class NPC); a wandering trader is the first ordinary,
+  // standing mob here that decides entirely on its own, on a real timer,
+  // with zero player interaction and nothing around it changing at all, to
+  // leave the world for good. See updateWanderingTrader /
+  // departWanderingTrader. Reuses the villager's own humanoid geometry
+  // unchanged, recoloured into its own real teal trading robe.
+  wandering_trader: { kind: 'wandering_trader', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3484,6 +3498,16 @@ function buildCatCreeperDeterrentInterior(grid, silhouette, dims, exteriorMat, a
   decorOut.push({ type: 'creeper', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'cat', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'south' });
 }
+// An open road-side waystation with a single wandering trader — just let
+// it wander on its own real timer with no interaction at all, and watch it
+// genuinely vanish from the world once that timer runs out.
+function buildWanderingTraderWaystationInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'wandering_trader', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4251,8 +4275,20 @@ const PRESETS = [
     keywords: ['cat', 'creeper', 'deter', 'scare', 'suppress', 'fuse'],
     notes: [
       'Switch to Walk mode and walk right up to the creeper — with the cat sitting nearby, its own real proximity fuse never starts no matter how close you get, exactly matching the real vanilla fact that "cats... scare off creepers" (minecraft.wiki/w/Cat). This is a genuinely new class of mechanic for this app: every earlier mob-to-mob interaction is either predation that consumes or removes something (a fox catching a chicken) or a one-time mutation (an evoker spawning vexes), while this is the first continuous SUPPRESSION between two different mob types — the cat never touches or removes the creeper, it just being present in range holds the creeper\'s own fuse-igniting check back fresh every single frame, and the moment the cat wanders far enough away, the creeper resumes its completely normal proximity fuse toward the player. Verified directly by a unit test confirming a creeper genuinely cannot enter its own fused state while a live cat is within range even with a simulated player standing right next to it, and a second test confirming it resumes fusing normally the instant the cat is moved out of range.',
-      'The cat reuses the ocelot\'s exact body geometry (real cats and ocelots share the same base model in vanilla — the same reuse already applied between the hoglin and ravager), recoloured, with a plain idle/walking wander and no flee behavior at all, since real vanilla cats don\'t flee from the player the way wild ocelots do. This app has no verified real cat-to-creeper deterrence radius (vanilla just documents that a nearby cat "prevents" creepers from exploding, without an exact published range), so the figure used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius.',
+      'The cat has its own distinct geometry — a shorter, more compact body, a rounder flat-faced head, shorter legs, and a tail held mostly upright — rather than reusing the ocelot\'s own body plan outright, since the ocelot\'s geometry itself already reuses the wolf\'s, and a cat built two removes from a wolf just read as a small dog. It has a plain idle/walking wander with no flee behavior at all, since real vanilla cats don\'t flee from the player the way wild ocelots do. This app has no verified real cat-to-creeper deterrence radius (vanilla just documents that a nearby cat "prevents" creepers from exploding, without an exact published range), so the figure used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius.',
       'Not modeled: cats scaring off phantoms as well (this app\'s phantom has no fear/flee state of its own to hook into), taming/sitting/gifting behavior, and creepers being repelled from approaching a cat\'s position outright rather than simply never fusing — this app\'s creeper still walks up to and stands next to the player exactly as before, it just never ignites while the cat is close.',
+    ],
+  },
+  {
+    id: 'wandering-trader-waystation', name: 'Wandering Trader Waystation', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'wanderingTraderWaystation',
+    blocks: { exterior: 'gravel', interior: 'gravel', accent: 'gravel' },
+    desc: 'An open gravel waystation with a single wandering trader — real vanilla wandering traders that go untraded with for too long teleport away on their own, and this one genuinely does: leave it alone and simulate real time passing, and it vanishes from the world entirely with no interaction at all.',
+    keywords: ['wandering trader', 'trader', 'despawn', 'teleport', 'timer', 'vanish'],
+    notes: [
+      'This is the first ordinary, standing mob in this app that removes itself from the world on nothing but its own internal timer — no player click, no block, no collision, nothing around it changing at all. Real vanilla wandering traders that aren\'t traded with in time "teleport away" for good (minecraft.wiki/w/Wandering_Trader). This app\'s own `updateWanderingTrader` counts its own real lifespan down every single frame alongside its ordinary wander, and the instant it reaches zero, `departWanderingTrader` splices it out of the model and its own scene entirely — the exact same lightweight removal already used for a wind charge reaching the end of its own real lifetime, deliberately NOT the heavier full-scene-rebuild removal used for a one-off player click (like the axolotl\'s bucket capture), since this one fires mid-simulation from inside the same per-frame loop that\'s already iterating live mobs. Verified directly by a unit test confirming it\'s still genuinely present and wandering normally well before its own timer runs out, and a second test confirming it\'s completely gone from both the model\'s own decor list and the live scene\'s tracked mobs the instant enough simulated time has passed, with zero player interaction anywhere in the test.',
+      'The real vanilla timer is on the order of many real minutes; this app compresses it down to a much shorter figure so the effect is actually observable while simulating, the same kind of honest compression already used for the goat\'s own ram-cooldown window. The geometry reuses the villager\'s own humanoid body plan completely unchanged — real wandering traders share the villager\'s base model — recoloured into its own real teal trading robe.',
+      'Not modeled: actual trading/UI, its own 2 llama escorts, drinking invisibility potion instead of vanishing outright when threatened at night, and its real distance-based despawn rules on top of the timer — this app has no trading, potion-effect, or threat-detection system at all, so this trader only ever wanders and eventually leaves.',
     ],
   },
 ];
@@ -4693,6 +4729,8 @@ function generateModel() {
     buildBreezeGustPlatformInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'catCreeperDeterrent') {
     buildCatCreeperDeterrentInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'wanderingTraderWaystation') {
+    buildWanderingTraderWaystationInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7415,6 +7453,27 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'wandering_trader') {
+    // Reuses the villager's own geometry unchanged (real wandering traders
+    // share the villager's base humanoid model) — see hoglin's identical
+    // reuse of ravagerParts — recoloured into its own real teal robe.
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x2f7d7a);
+    const skinMat = solidMaterial(0xcaa472);
+    const apronMat = solidMaterial(0x1c4a48);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'iron_golem') {
     let parts = decorGeoCache.get('iron_golem');
     if (!parts) { parts = ironGolemParts(); decorGeoCache.set('iron_golem', parts); }
@@ -10072,6 +10131,79 @@ function updateVillager(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const WANDERING_TRADER_WANDER_MIN = 2, WANDERING_TRADER_WANDER_MAX = 5;
+const WANDERING_TRADER_WALK_SPEED = 1.0;
+// Real vanilla wandering traders that go untraded with for too long
+// "teleport away", vanishing from the world entirely — a compressed
+// stand-in for real vanilla's much longer real-world timer (minutes), the
+// same kind of compression already used for the goat's own ram-cooldown
+// window.
+const WANDERING_TRADER_LIFESPAN = 20;
+// Removes a wandering trader from the world the same lightweight way a
+// wind charge despawns after its own real max lifetime — spliced directly
+// out of model.decor and mobObjects and its own mesh pulled straight out
+// of the live scene, rather than a full renderThree() rebuild (which would
+// reassign the shared mobObjects array out from under updateMobs' own
+// in-progress for-of loop, since this runs mid-frame from inside it, not
+// from a one-off click handler like the axolotl's bucket capture) — the
+// real difference from every earlier removal being that nothing at all
+// triggered this one: no player click, no block, no collision, just its
+// own timer running out mid-wander.
+function departWanderingTrader(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function updateWanderingTrader(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = WANDERING_TRADER_WANDER_MIN + Math.random() * (WANDERING_TRADER_WANDER_MAX - WANDERING_TRADER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._lifespanTimer = WANDERING_TRADER_LIFESPAN;
+  }
+  entry._lifespanTimer -= dt;
+  if (entry._lifespanTimer <= 0) {
+    departWanderingTrader(currentModel, entry);
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = WANDERING_TRADER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = WANDERING_TRADER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = WANDERING_TRADER_WANDER_MIN + Math.random() * (WANDERING_TRADER_WANDER_MAX - WANDERING_TRADER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla iron golems "periodically offer poppies to villagers"
 // (minecraft.wiki/w/Iron_Golem). Every earlier mutation this app's mobs
 // perform touches a grid block, a dropped item, or the mob's OWN state;
@@ -11648,6 +11780,7 @@ function updateMobs(dt) {
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
     if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
+    if (entry.type === 'wandering_trader') { updateWanderingTrader(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
     if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
@@ -12738,7 +12871,7 @@ function renderBlueprint(model) {
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
-    cat: ['#d8d3c8', 'A'],
+    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12807,7 +12940,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
-    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat',
+    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12945,6 +13078,7 @@ function renderCommands(model) {
       else if (d.type === 'breeze') lines.push(`summon minecraft:breeze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wind_charge') lines.push(`summon minecraft:wind_charge ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'cat') lines.push(`summon minecraft:cat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'wandering_trader') lines.push(`summon minecraft:wandering_trader ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
