@@ -1980,10 +1980,11 @@ const DECOR_TYPES = {
   // doesn't touch or remove the creeper, it just being present in range
   // holds the creeper's own fuse-igniting behavior back every single
   // frame, and the creeper resumes normally the instant the cat leaves.
-  // See updateCat / the cat-proximity check inside updateCreeper. Reuses
-  // ocelot's exact body plan (real cats and ocelots share the same base
-  // model in vanilla), recoloured, with a plain wander (no fleeing —
-  // cats don't flee anything in this app).
+  // See updateCat / the cat-proximity check inside updateCreeper. Has its
+  // own distinct geometry (see catParts()) — a shorter body, rounder
+  // flat-faced head, and a raised tail, rather than reusing the wolf-
+  // descended ocelot body plan, which read as a dog — with a plain wander
+  // (no fleeing — cats don't flee anything in this app).
   cat: { kind: 'cat', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
@@ -6185,7 +6186,10 @@ function wolfParts() {
 // carnivores of a similar size class) rather than redrawing one from
 // scratch, while the real behavior rule that follows is still its own,
 // unrelated to the wolf's. Legs stay inside the body's own footprint, the
-// same rule already applied to every quadruped here.
+// same rule already applied to every quadruped here. Also carries a
+// cheetah-style coat: small dark solid spots scattered across its back,
+// flanks, head, and tail, built as thin surface-decal boxes the same way
+// as the face's own eyes/nose.
 function ocelotParts() {
   const body = new THREE.BoxGeometry(0.26, 0.24, 0.5);
   body.translate(0, 0.28, 0);
@@ -6218,6 +6222,86 @@ function ocelotParts() {
   });
   const nose = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
   nose.translate(0, 0.3, 0.5);
+  // A cheetah-style coat pattern: small solid dark spots scattered across
+  // the back, flanks, head, and tail, built the same way as every other
+  // surface decal here (the face's own eyes/nose) — a thin pancake box
+  // translated to sit just outside the surface it decorates so it reads
+  // as a marking rather than z-fighting with the fur underneath it.
+  const spotDepth = 0.015;
+  const topSpotOffsets = [[-0.06, -0.15], [0.06, -0.05], [-0.06, 0.05], [0.06, 0.15]];
+  const topSpots = topSpotOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, spotDepth, 0.05);
+    g.translate(x, 0.4 + spotDepth / 2, z);
+    return g;
+  });
+  const sideSpotOffsets = [[-0.131, -0.1], [-0.131, 0.1], [0.131, -0.1], [0.131, 0.1]];
+  const sideSpots = sideSpotOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(spotDepth, 0.05, 0.05);
+    g.translate(x + (x < 0 ? -spotDepth / 2 : spotDepth / 2), 0.28, z);
+    return g;
+  });
+  const headSpot = new THREE.BoxGeometry(0.045, spotDepth, 0.045);
+  headSpot.translate(0, 0.46 + spotDepth / 2, 0.32);
+  const tailSpot = new THREE.BoxGeometry(0.04, spotDepth, 0.04);
+  tailSpot.translate(0, 0.34 + spotDepth / 2, -0.32);
+  const spots = [...topSpots, ...sideSpots, headSpot, tailSpot];
+  return { body, head, snout, ears, legs, tailBase, tailTip, faceEyes, nose, spots };
+}
+// A cat originally reused the ocelot's own geometry outright (the same
+// reuse-across-similar-creatures pattern already applied to the hoglin's
+// use of the ravager's body), but that geometry itself already reused the
+// wolf's own body plan for the ocelot, so a cat built on it two removes
+// from a wolf read as a dog, not a cat. This is its own distinct geometry
+// instead: a shorter, more compact body, a rounder flat-faced head with
+// small close-set upright ears (real cats have a flatter face and smaller
+// ears than a dog/wolf), noticeably shorter legs relative to the body, and
+// — the single biggest silhouette cue — a tail held mostly UP rather than
+// trailing straight back near the ground, built with the same "position
+// each segment relative to the assembly's own local origin, then rotate,
+// then translate" rigid-assembly technique already used for the piglin's
+// sword and llama's neck.
+function catParts() {
+  const body = new THREE.BoxGeometry(0.22, 0.2, 0.36);
+  body.translate(0, 0.2, 0);
+  const head = new THREE.BoxGeometry(0.2, 0.19, 0.19);
+  head.translate(0, 0.3, 0.24);
+  const snout = new THREE.BoxGeometry(0.09, 0.07, 0.06);
+  snout.translate(0, 0.26, 0.32);
+  const earOffsets = [[-0.055, 0.42, 0.22], [0.055, 0.42, 0.22]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.09, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.07, -0.13], [0.07, -0.13], [-0.07, 0.13], [0.07, 0.13]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.14, 0.05);
+    g.translate(x, 0.07, z);
+    return g;
+  });
+  // A raised, slightly-back-leaning tail — the real vanilla cat's own
+  // distinctive silhouette cue, and the opposite of the low, horizontal,
+  // trailing tail every dog-descended body plan here (wolf/ocelot) uses.
+  const tailPivot = { x: 0, y: 0.3, z: -0.17 };
+  const tailAngle = -0.4;
+  function tailSegment(y0, y1, thickness) {
+    const g = new THREE.BoxGeometry(thickness, y1 - y0, thickness);
+    g.translate(0, (y0 + y1) / 2, 0);
+    g.rotateX(tailAngle);
+    g.translate(tailPivot.x, tailPivot.y, tailPivot.z);
+    return g;
+  }
+  const tailBase = tailSegment(0, 0.12, 0.045);
+  const tailTip = tailSegment(0.12, 0.21, 0.035);
+  const faceZ = 0.325, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.05, 0.33], [0.05, 0.33]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  const nose = new THREE.BoxGeometry(0.04, 0.03, faceDepth);
+  nose.translate(0, 0.26, 0.34);
   return { body, head, snout, ears, legs, tailBase, tailTip, faceEyes, nose };
 }
 // Reuses the same 4-corner leg placement already proven on the wolf/
@@ -7427,6 +7511,8 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.nose, faceMat));
+    const spotMat = solidMaterial(0x241a11);
+    for (const g of parts.spots) group.add(new THREE.Mesh(g, spotMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -7640,17 +7726,17 @@ function buildDecorMeshesForEntry(entry) {
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'cat') {
-    // Reuses ocelot's exact geometry (real cats and ocelots share the same
-    // base model in vanilla) — see hoglin's identical reuse of ravagerParts.
-    let parts = decorGeoCache.get('ocelot');
-    if (!parts) { parts = ocelotParts(); decorGeoCache.set('ocelot', parts); }
+    // Its own distinct geometry — see catParts() for why this no longer
+    // reuses ocelot's own body plan.
+    let parts = decorGeoCache.get('cat');
+    if (!parts) { parts = catParts(); decorGeoCache.set('cat', parts); }
     const group = new THREE.Group();
     const furMat = solidMaterial(0xd8d3c8);
     const tipMat = solidMaterial(0xc9793a);
     group.add(new THREE.Mesh(parts.body, furMat));
     group.add(new THREE.Mesh(parts.head, furMat));
     group.add(new THREE.Mesh(parts.snout, furMat));
-    for (const g of parts.ears) group.add(new THREE.Mesh(g, tipMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
     group.add(new THREE.Mesh(parts.tailBase, furMat));
     group.add(new THREE.Mesh(parts.tailTip, tipMat));
