@@ -1938,6 +1938,16 @@ const DECOR_TYPES = {
   // pattern already used for the ocelot (the wolf's body) and the camel
   // (the llama's neck). See updateHoglin.
   hoglin: { kind: 'hoglin', interactive: false },
+  // Real vanilla shulkers appear as a plain block while closed and open to
+  // reveal a single eye once they notice a nearby target
+  // (minecraft.wiki/w/Shulker). Every earlier mob here is visually
+  // distinct at a glance; a shulker is the first genuine CAMOUFLAGE
+  // mechanic — its default rendered state deliberately reads as ordinary
+  // terrain rather than a creature, and a live player's own proximity
+  // triggers a snap reveal (an inner head raised up out of its own shell)
+  // rather than any kind of movement at all — the first mob in this app
+  // that never moves from its spawn cell. See updateShulker.
+  shulker: { kind: 'shulker', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3389,6 +3399,16 @@ function buildHoglinFungusGroveInterior(grid, silhouette, dims, exteriorMat, acc
   }
   decorOut.push({ type: 'hoglin', x: Math.min(dims.sx - 1, fungusX + 2), y: 1, z: cz, facing: 'south' });
 }
+// An end stone floor with a single shulker sitting camouflaged in the
+// open — switch to Walk mode and approach it to see it reveal its real
+// inner head the instant you're within its own sense range.
+function buildShulkerEndChamberInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'shulker', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4112,6 +4132,18 @@ const PRESETS = [
       'Not modeled: being hunted by piglins for meat, transforming into a zoglin after too long in the overworld, the real charge attack and knockback, and herd behavior — this app has no combat, transformation, or multi-mob-type herding system at all, so this hoglin only ever wanders and flees the fungus.',
     ],
   },
+  {
+    id: 'shulker-end-chamber', name: 'Shulker End Chamber', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'shulkerEndChamber',
+    blocks: { exterior: 'end_stone', interior: 'end_stone', accent: 'purpur_block' },
+    desc: 'An end stone chamber with a single shulker sitting camouflaged in the open — real vanilla shulkers appear as a plain block while closed and open to reveal a single eye once they notice a nearby target, and this one genuinely does: switch to Walk mode and approach it to watch its real inner head rise up out of its own shell.',
+    keywords: ['shulker', 'camouflage', 'end', 'purpur', 'hidden', 'reveal'],
+    notes: [
+      'It never moves from its spawn cell at all — the first mob in this app that doesn\'t wander even a little. Switch to Walk mode and approach it: once you\'re within its own real sense range, its own inner head genuinely rises up out of the top of its shell, revealing a real eye that was fully hidden inside the closed shell the entire time (occluded by ordinary depth-testing, not a visibility flag) — then sinks back down and disappears from view again once you back away. This is a genuinely new class of mechanic for this app: every earlier mob is visually distinct from ordinary terrain at a glance and moves through its own space, while a shulker is the first genuine CAMOUFLAGE — its default rendered state deliberately reads as unremarkable terrain, and player proximity triggers a reveal rather than any movement at all. Verified directly by a unit test confirming the head\'s own position is genuinely inside the shell\'s footprint (not just invisible) while closed, and a second test confirming it\'s pushed up above the shell\'s own top face the instant a simulated live player comes within range, then sinks back down once they leave.',
+      'This app has no verified real shulker sense radius, so the figure used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry is new: a near-cubic shell (the actual camouflage) plus a small inner head with one eye, built so the head sits completely within the shell\'s own bounds when hidden.',
+      'Not modeled: the real levitation-bullet attack, teleporting short distances when hit, and attaching to ceilings/walls as well as floors — this app has no combat or attachment-orientation system at all, so this shulker only ever sits and reveals itself.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4542,6 +4574,8 @@ function generateModel() {
     buildRavagerCropTrampleInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'hoglinFungusGrove') {
     buildHoglinFungusGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'shulkerEndChamber') {
+    buildShulkerEndChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6341,6 +6375,20 @@ function warpedFungusParts() {
   const cap = new THREE.BoxGeometry(0.3, 0.08, 0.3);
   return { stem, cap, stemH };
 }
+// A near-cubic shell (the real vanilla shulker's own camouflage — it
+// reads as an ordinary block at a glance) plus a small inner head that
+// sits fully hidden inside the shell's own footprint when closed, so
+// three.js's normal depth-testing occludes it completely — no visibility
+// flag needed — and only pokes out above the shell's top face once
+// updateShulker raises it on open. See DECOR_TYPES.shulker.
+function shulkerParts() {
+  const shell = new THREE.BoxGeometry(0.85, 0.85, 0.85);
+  shell.translate(0, 0.425, 0);
+  const head = new THREE.BoxGeometry(0.5, 0.3, 0.5);
+  const eye = new THREE.BoxGeometry(0.14, 0.14, 0.04);
+  eye.translate(0, 0, 0.27);
+  return { shell, head, eye };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7361,6 +7409,26 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.scale.setScalar(0.65);
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'shulker') {
+    let parts = decorGeoCache.get('shulker');
+    if (!parts) { parts = shulkerParts(); decorGeoCache.set('shulker', parts); }
+    const group = new THREE.Group();
+    const shellMat = solidMaterial(0x9a4fae);
+    group.add(new THREE.Mesh(parts.shell, shellMat));
+    const headGroup = new THREE.Group();
+    const headMat = solidMaterial(0x6f3480);
+    headGroup.add(new THREE.Mesh(parts.head, headMat));
+    const eyeMat = solidMaterial(0xd9b23a);
+    headGroup.add(new THREE.Mesh(parts.eye, eyeMat));
+    // Fully inside the shell's own footprint when closed (hidden by
+    // ordinary depth-testing), raised above the shell's top face once
+    // updateShulker sets entry._open — see DECOR_TYPES.shulker.
+    headGroup.position.y = entry._open ? 1.0 : 0.425;
+    group.add(headGroup);
+    group.userData.headGroup = headGroup;
+    group.rotation.y = FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'warped_fungus') {
@@ -10900,6 +10968,26 @@ function updateHoglin(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Real vanilla shulkers appear as a plain block while closed and open to
+// reveal a single eye once they notice a nearby target
+// (minecraft.wiki/w/Shulker). Every earlier mob here is visually distinct
+// from ordinary terrain at a glance and moves around its own space; a
+// shulker is the first genuine CAMOUFLAGE mechanic — it never leaves its
+// spawn cell at all, and its own default rendered state is deliberately
+// unremarkable, only revealing its true inner head via a snap position
+// change once a live player comes close, the opposite of every earlier
+// mob's always-visible silhouette.
+const SHULKER_SENSE_RADIUS = 6; // an honest, approximate stand-in — not a verified real vanilla detection range
+function updateShulker(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  let playerDist = Infinity;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    playerDist = Math.hypot(flyState.pos.x - offX - (entry.x + 0.5), flyState.pos.z - offZ - (entry.z + 0.5));
+  }
+  entry._open = playerDist <= SHULKER_SENSE_RADIUS;
+  obj.position.set(entry.x + offX + 0.5, entry.y, entry.z + offZ + 0.5);
+  if (obj.userData.headGroup) obj.userData.headGroup.position.y = entry._open ? 1.0 : 0.425;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -11044,6 +11132,7 @@ function updateMobs(dt) {
     if (entry.type === 'guardian') { updateGuardian(entry, obj, dt); continue; }
     if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
     if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
+    if (entry.type === 'shulker') { updateShulker(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -12113,7 +12202,7 @@ function renderBlueprint(model) {
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
-    hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'],
+    hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12181,7 +12270,7 @@ function renderBlueprint(model) {
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
-    hoglin: 'Hoglin', warped_fungus: 'Warped Fungus',
+    hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12314,6 +12403,7 @@ function renderCommands(model) {
       else if (d.type === 'guardian') lines.push(`summon minecraft:guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ravager') lines.push(`summon minecraft:ravager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'hoglin') lines.push(`summon minecraft:hoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'shulker') lines.push(`summon minecraft:shulker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
