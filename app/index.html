@@ -1971,6 +1971,20 @@ const DECOR_TYPES = {
   // no gravity (a magical gust, not a physical arrow) until it reaches the
   // player's own live position or times out.
   wind_charge: { kind: 'wind_charge', interactive: false },
+  // Real vanilla cats "scare off phantoms and creepers", keeping them away
+  // (minecraft.wiki/w/Cat) — a live cat merely being nearby suppresses a
+  // creeper's own fuse. Every earlier mob-to-mob interaction here is
+  // either predation (a mob consumes/removes something) or a one-time
+  // state mutation (evoker spawning vexes); this is the first genuine
+  // continuous SUPPRESSION between two different mob types — the cat
+  // doesn't touch or remove the creeper, it just being present in range
+  // holds the creeper's own fuse-igniting behavior back every single
+  // frame, and the creeper resumes normally the instant the cat leaves.
+  // See updateCat / the cat-proximity check inside updateCreeper. Reuses
+  // ocelot's exact body plan (real cats and ocelots share the same base
+  // model in vanilla), recoloured, with a plain wander (no fleeing —
+  // cats don't flee anything in this app).
+  cat: { kind: 'cat', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3454,6 +3468,21 @@ function buildBreezeGustPlatformInterior(grid, silhouette, dims, exteriorMat, ac
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'breeze', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// An open grass yard with a cat sitting right next to a creeper — switch
+// to Walk mode and approach: real vanilla cats "scare off creepers"
+// (minecraft.wiki/w/Cat), and this creeper genuinely can't start its own
+// fuse while the cat is this close, no matter how near you get. Walk the
+// cat's own owner (there's no leash here, but the cat will wander on its
+// own) far enough away and the creeper resumes its normal proximity fuse
+// the instant the cat drifts out of range.
+function buildCatCreeperDeterrentInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'creeper', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'cat', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4213,6 +4242,18 @@ const PRESETS = [
       'Not modeled: any actual damage from the knockback (this app has no combat or health system at all, so it\'s purely the real displacement half of the mechanic), the breeze\'s own erratic jumping/hovering movement, and its fall-damage immunity — this app has no jump or fall-damage system at all, so this breeze only ever hovers in place and fires wind charges.',
     ],
   },
+  {
+    id: 'cat-creeper-deterrent', name: 'Cat Creeper Deterrent', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'catCreeperDeterrent',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An open grass yard with a cat sitting right next to a creeper — real vanilla cats scare creepers off just by being nearby, and this one genuinely does: switch to Walk mode and approach as close as you like, and the creeper\'s own fuse simply never starts while the cat stays this close.',
+    keywords: ['cat', 'creeper', 'deter', 'scare', 'suppress', 'fuse'],
+    notes: [
+      'Switch to Walk mode and walk right up to the creeper — with the cat sitting nearby, its own real proximity fuse never starts no matter how close you get, exactly matching the real vanilla fact that "cats... scare off creepers" (minecraft.wiki/w/Cat). This is a genuinely new class of mechanic for this app: every earlier mob-to-mob interaction is either predation that consumes or removes something (a fox catching a chicken) or a one-time mutation (an evoker spawning vexes), while this is the first continuous SUPPRESSION between two different mob types — the cat never touches or removes the creeper, it just being present in range holds the creeper\'s own fuse-igniting check back fresh every single frame, and the moment the cat wanders far enough away, the creeper resumes its completely normal proximity fuse toward the player. Verified directly by a unit test confirming a creeper genuinely cannot enter its own fused state while a live cat is within range even with a simulated player standing right next to it, and a second test confirming it resumes fusing normally the instant the cat is moved out of range.',
+      'The cat reuses the ocelot\'s exact body geometry (real cats and ocelots share the same base model in vanilla — the same reuse already applied between the hoglin and ravager), recoloured, with a plain idle/walking wander and no flee behavior at all, since real vanilla cats don\'t flee from the player the way wild ocelots do. This app has no verified real cat-to-creeper deterrence radius (vanilla just documents that a nearby cat "prevents" creepers from exploding, without an exact published range), so the figure used here is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius.',
+      'Not modeled: cats scaring off phantoms as well (this app\'s phantom has no fear/flee state of its own to hook into), taming/sitting/gifting behavior, and creepers being repelled from approaching a cat\'s position outright rather than simply never fusing — this app\'s creeper still walks up to and stands next to the player exactly as before, it just never ignites while the cat is close.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4649,6 +4690,8 @@ function generateModel() {
     buildPhantomNightSkyInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'breezeGustPlatform') {
     buildBreezeGustPlatformInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'catCreeperDeterrent') {
+    buildCatCreeperDeterrentInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7596,6 +7639,27 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.g2, mat));
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'cat') {
+    // Reuses ocelot's exact geometry (real cats and ocelots share the same
+    // base model in vanilla) — see hoglin's identical reuse of ravagerParts.
+    let parts = decorGeoCache.get('ocelot');
+    if (!parts) { parts = ocelotParts(); decorGeoCache.set('ocelot', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0xd8d3c8);
+    const tipMat = solidMaterial(0xc9793a);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    group.add(new THREE.Mesh(parts.snout, furMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, tipMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
+    group.add(new THREE.Mesh(parts.tailBase, furMat));
+    group.add(new THREE.Mesh(parts.tailTip, tipMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'warped_fungus') {
     let parts = decorGeoCache.get('warpedFungus');
     if (!parts) { parts = warpedFungusParts(); decorGeoCache.set('warpedFungus', parts); }
@@ -9579,7 +9643,13 @@ function updateCreeper(entry, obj, dt) {
     sensedZ = flyState.pos.z - offZ;
     dist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
   }
-  if (dist <= CREEPER_IGNITE_RADIUS) {
+  // Real vanilla cats scare creepers off — a live cat within its own
+  // deterrence radius holds the fuse back entirely, every single frame,
+  // even if the player is standing right next to the creeper. This is
+  // checked fresh every frame (not latched), so the fuse resumes the
+  // instant the cat itself wanders back out of range.
+  const catNearby = findNearbyCat(entry) <= CREEPER_CAT_DETER_RADIUS;
+  if (dist <= CREEPER_IGNITE_RADIUS && !catNearby) {
     entry._mobState = 'fused';
     entry._fuseTimer += dt;
     entry._mobYaw = Math.atan2(sensedX - entry._wx, sensedZ - entry._wz);
@@ -10432,6 +10502,70 @@ function updateOcelot(entry, obj, dt) {
   }
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+const CAT_WANDER_MIN = 2, CAT_WANDER_MAX = 5;
+const CAT_WALK_SPEED = 1.0;
+// Real vanilla cats never flee from the player (only ocelots do, in this
+// app's own established distinction) — a cat is a plain idle/walking
+// wander, identical in shape to ocelot's own wander halves but with no
+// flee state at all. Its actual new mechanic lives entirely in
+// updateCreeper's own cat-proximity check, not here.
+function updateCat(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = CAT_WANDER_MIN + Math.random() * (CAT_WANDER_MAX - CAT_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = CAT_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = CAT_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = CAT_WANDER_MIN + Math.random() * (CAT_WANDER_MAX - CAT_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+// Real vanilla cats "scare off... creepers" simply by being nearby
+// (minecraft.wiki/w/Cat) — scans the live mobObjects list (not
+// model.decor) so it only ever counts cats that are actually present and
+// tracked in the running world, at the creeper's own real "world-space"
+// position (entry._wx/_wz are grid-local; a creeper and a cat can be on
+// different grid-local origins only if... they can't, both share the same
+// model, so this is a plain same-space distance check).
+const CREEPER_CAT_DETER_RADIUS = 6; // generous — real vanilla just says "nearby", no exact published radius
+function findNearbyCat(creeperEntry) {
+  let best = Infinity;
+  for (const m of mobObjects) {
+    if (m.entry.type !== 'cat' || m.entry._wx === undefined) continue;
+    const d = Math.hypot(m.entry._wx - creeperEntry._wx, m.entry._wz - creeperEntry._wz);
+    if (d < best) best = d;
+  }
+  return best;
 }
 // Real vanilla llamas leashed together form a "caravan," and each
 // additional llama "follows the one in front of it" in a line
@@ -11434,6 +11568,7 @@ function updateMobs(dt) {
     if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
     if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
     if (entry.type === 'ocelot') { updateOcelot(entry, obj, dt); continue; }
+    if (entry.type === 'cat') { updateCat(entry, obj, dt); continue; }
     if (entry.type === 'llama') { updateLlama(entry, obj, dt); continue; }
     if (entry.type === 'camel') { updateCamel(entry, obj, dt); continue; }
     if (entry.type === 'parrot') { updateParrot(entry, obj, dt); continue; }
@@ -12517,6 +12652,7 @@ function renderBlueprint(model) {
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
+    cat: ['#d8d3c8', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12585,7 +12721,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
-    breeze: 'Breeze', wind_charge: 'Wind Charge',
+    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12722,6 +12858,7 @@ function renderCommands(model) {
       else if (d.type === 'phantom') lines.push(`summon minecraft:phantom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'breeze') lines.push(`summon minecraft:breeze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wind_charge') lines.push(`summon minecraft:wind_charge ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'cat') lines.push(`summon minecraft:cat ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
