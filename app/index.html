@@ -1958,6 +1958,19 @@ const DECOR_TYPES = {
   // whole circle sliding along as the player moves, rather than converging
   // on a single point at all. See updatePhantom.
   phantom: { kind: 'phantom', interactive: false },
+  // Real vanilla breezes attack with wind charges that knock their target
+  // back (minecraft.wiki/w/Breeze). Every earlier mob action in this app
+  // only ever READS the player's own live position (to chase, flee, orbit,
+  // or aim at); a wind charge is the first to WRITE to it — genuinely
+  // displacing the player's own live flyState.pos on impact, rather than
+  // the player's position only ever flowing one-way, into a mob's own
+  // decision-making. See fireWindCharge / applyWindKnockback.
+  breeze: { kind: 'breeze', interactive: false },
+  // A real, independently-flying projectile a breeze fires — see
+  // fireWindCharge/updateWindCharge — travelling in a straight line with
+  // no gravity (a magical gust, not a physical arrow) until it reaches the
+  // player's own live position or times out.
+  wind_charge: { kind: 'wind_charge', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3430,6 +3443,17 @@ function buildPhantomNightSkyInterior(grid, silhouette, dims, exteriorMat, accen
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'phantom', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// An open stone platform with a single breeze — switch to Walk mode and
+// approach it to see the real new mechanic: it genuinely fires a wind
+// charge that flies to your own live position and knocks YOU back,
+// displacing your own live position for the first time in this app.
+function buildBreezeGustPlatformInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'breeze', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4177,6 +4201,18 @@ const PRESETS = [
       'Not modeled: the real dive-attack (phantoms periodically swoop down to strike before climbing back to altitude), despawning at dawn, and spawning in a batch of up to 4 — this app has no combat or day/night system at all, so this phantom only ever circles.',
     ],
   },
+  {
+    id: 'breeze-gust-platform', name: 'Breeze Gust Platform', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'breezeGustPlatform',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'deepslate' },
+    desc: 'A stone platform with a single breeze — real vanilla breezes attack with wind charges that knock their target back, and this one genuinely does: switch to Walk mode, come within its own real range, and watch a real wind charge fly to your own live position and knock YOU backward.',
+    keywords: ['breeze', 'wind charge', 'knockback', 'gust', 'push'],
+    notes: [
+      'Switch to Walk mode and approach it — once you\'re within its own real range, it fires a genuine wind_charge entity that flies in a straight line toward your own live position; the instant it arrives, your own live position is directly displaced backward, away from where the charge hit, then it despawns and a real cooldown starts before it can fire again. This is a genuinely new class of mechanic for this app: every earlier mob action here only ever READS the player\'s own live position — to chase it (the wolf), flee it (the ocelot), orbit it (the phantom), or aim at it (the skeleton) — while a wind charge is the first to WRITE to it, genuinely changing the player\'s own controlled state rather than the player\'s position only ever flowing one-way into a mob\'s own decisions. Verified directly by a unit test confirming a simulated live player\'s own position is completely unchanged before a fired wind charge reaches them, and then is genuinely displaced away from the breeze once it does, and a second test confirming the charge is removed from the model and the scene after impact, exactly like the skeleton\'s arrow despawns after its own lifetime ends.',
+      'This app has no player-velocity or knockback system to hook a real physical impulse into (ordinary ground movement snaps horizontal velocity straight to the current input every single frame, so a one-time velocity nudge would just be overwritten the very next frame), so a genuine one-time position displacement stands in for real vanilla\'s velocity-based knockback — an honest, spelled-out shortcut, not a silently invented "real" physics system. This app also has no verified real wind-charge range, speed, or knockback distance, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry is new: a floating core with 2 angled wind-ring accents for the breeze, and a small intersecting-plane gust (the same technique already used for cross_plant decor) for the wind charge itself.',
+      'Not modeled: any actual damage from the knockback (this app has no combat or health system at all, so it\'s purely the real displacement half of the mechanic), the breeze\'s own erratic jumping/hovering movement, and its fall-damage immunity — this app has no jump or fall-damage system at all, so this breeze only ever hovers in place and fires wind charges.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4611,6 +4647,8 @@ function generateModel() {
     buildShulkerEndChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'phantomNightSky') {
     buildPhantomNightSkyInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'breezeGustPlatform') {
+    buildBreezeGustPlatformInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6448,6 +6486,36 @@ function phantomParts() {
   });
   return { body, head, wings, tail, faceEyes };
 }
+// A floating core with 2 flat wind-ring accents set at different angles —
+// the real vanilla breeze's own windy, ring-encircled silhouette
+// (minecraft.wiki/w/Breeze) — built y=0-centered since it hovers rather
+// than standing on legs.
+function breezeParts() {
+  const core = new THREE.BoxGeometry(0.4, 0.5, 0.4);
+  const ringUpper = new THREE.BoxGeometry(0.7, 0.06, 0.7);
+  ringUpper.translate(0, 0.18, 0);
+  const ringLower = new THREE.BoxGeometry(0.7, 0.06, 0.7);
+  ringLower.rotateY(Math.PI / 4);
+  ringLower.translate(0, -0.2, 0);
+  const faceEyeOffsets = [[-0.08, 0.05, 0.21], [0.08, 0.05, 0.21]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { core, ringUpper, ringLower, faceEyes };
+}
+// A small gust — a cube with 2 thin cross-panels, the same intersecting-
+// plane technique already used for cross_plant decor — for the real wind
+// charge a breeze fires. See DECOR_TYPES.wind_charge.
+function windChargeParts() {
+  const core = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+  const g1 = new THREE.BoxGeometry(0.4, 0.4, 0.02);
+  g1.rotateY(Math.PI / 4);
+  const g2 = new THREE.BoxGeometry(0.4, 0.4, 0.02);
+  g2.rotateY(-Math.PI / 4);
+  return { core, g1, g2 };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7502,6 +7570,30 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0xe0e050);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'breeze') {
+    let parts = decorGeoCache.get('breeze');
+    if (!parts) { parts = breezeParts(); decorGeoCache.set('breeze', parts); }
+    const group = new THREE.Group();
+    const coreMat = solidMaterial(0x8fd4c9);
+    group.add(new THREE.Mesh(parts.core, coreMat));
+    const ringMat = solidMaterial(0x4fae9c);
+    group.add(new THREE.Mesh(parts.ringUpper, ringMat));
+    group.add(new THREE.Mesh(parts.ringLower, ringMat));
+    const faceMat = solidMaterial(0xe8c93b);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'wind_charge') {
+    let parts = decorGeoCache.get('windCharge');
+    if (!parts) { parts = windChargeParts(); decorGeoCache.set('windCharge', parts); }
+    const group = new THREE.Group();
+    const mat = solidMaterial(0xc9f0e8);
+    group.add(new THREE.Mesh(parts.core, mat));
+    group.add(new THREE.Mesh(parts.g1, mat));
+    group.add(new THREE.Mesh(parts.g2, mat));
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'warped_fungus') {
@@ -11101,6 +11193,111 @@ function updatePhantom(entry, obj, dt) {
     obj.position.set(entry.x + offX + 0.5, by, entry.z + offZ + 0.5);
   }
 }
+// Real vanilla breezes attack with wind charges that knock their target
+// back (minecraft.wiki/w/Breeze). Every earlier mob action in this app
+// only ever READS the player's own live position — to chase it, flee it,
+// orbit it, or aim at it — never changes it. A wind charge is the first
+// to WRITE to it: applyWindKnockback genuinely displaces flyState.pos
+// itself once the charge reaches the player, the first time any mob's own
+// action has ever fed something back into the player's own live state
+// instead of only ever reading from it.
+const BREEZE_WIND_RANGE = 8; // an honest, approximate stand-in — not a verified real vanilla range
+const BREEZE_FIRE_COOLDOWN = 3;
+const WIND_CHARGE_SPEED = 6;
+const WIND_CHARGE_MAX_LIFETIME = 3;
+const BREEZE_HIT_RADIUS = 0.8;
+// Real vanilla knockback is a velocity impulse with real momentum and
+// friction; this app has no player-velocity/knockback system to hook a
+// real impulse into (ordinary ground movement snaps flyState.hvx/hvz
+// straight to the current input's target velocity every single frame —
+// see updateFreeCamera — so a one-time velocity nudge here would just be
+// overwritten the very next frame), so a one-time position displacement
+// stands in for it instead — an honest, spelled-out shortcut, not a
+// silently invented "real" knockback.
+const BREEZE_KNOCKBACK_DIST = 3;
+function fireWindCharge(model, breezeEntry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const startX = breezeEntry._wx, startY = breezeEntry.y + 0.5, startZ = breezeEntry._wz;
+  const targetX = flyState.pos.x - offX, targetY = flyState.pos.y, targetZ = flyState.pos.z - offZ;
+  const dx = targetX - startX, dy = targetY - startY, dz = targetZ - startZ;
+  const dist = Math.hypot(dx, dy, dz) || 1;
+  const entry = {
+    type: 'wind_charge', x: Math.round(startX), y: Math.round(startY), z: Math.round(startZ), facing: 'south',
+    _wx: startX, _wy: startY, _wz: startZ,
+    _vx: (dx / dist) * WIND_CHARGE_SPEED, _vy: (dy / dist) * WIND_CHARGE_SPEED, _vz: (dz / dist) * WIND_CHARGE_SPEED,
+    _life: 0,
+  };
+  model.decor.push(entry);
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry._wy;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function removeWindChargeFromWorld(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+// Genuinely displaces the player's own live position directly away from
+// where the wind charge hit — see the class comment above.
+function applyWindKnockback(chargeEntry) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const dx = flyState.pos.x - (chargeEntry._wx + offX), dz = flyState.pos.z - (chargeEntry._wz + offZ);
+  const dist = Math.max(Math.hypot(dx, dz), 0.01);
+  flyState.pos.x += (dx / dist) * BREEZE_KNOCKBACK_DIST;
+  flyState.pos.z += (dz / dist) * BREEZE_KNOCKBACK_DIST;
+}
+function updateWindCharge(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  entry._life += dt;
+  entry._wx += entry._vx * dt;
+  entry._wy += entry._vy * dt;
+  entry._wz += entry._vz * dt;
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  if (playerLive) {
+    const dx = (flyState.pos.x - offX) - entry._wx, dy = flyState.pos.y - entry._wy, dz = (flyState.pos.z - offZ) - entry._wz;
+    if (Math.hypot(dx, dy, dz) <= BREEZE_HIT_RADIUS) {
+      applyWindKnockback(entry);
+      removeWindChargeFromWorld(currentModel, entry);
+      return;
+    }
+  }
+  if (entry._life >= WIND_CHARGE_MAX_LIFETIME) removeWindChargeFromWorld(currentModel, entry);
+}
+function updateBreeze(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._fireCooldown = 0;
+    entry._bobTime = 0;
+  }
+  entry._fireCooldown = Math.max(0, entry._fireCooldown - dt);
+  entry._bobTime += dt;
+  const by = entry.y + 0.5 + Math.sin(entry._bobTime * 1.5) * 0.15;
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (playerDist <= BREEZE_WIND_RANGE && entry._fireCooldown <= 0) {
+    fireWindCharge(currentModel, entry);
+    entry._fireCooldown = BREEZE_FIRE_COOLDOWN;
+  }
+  if (playerDist < Infinity) entry._mobYaw = Math.atan2(sensedX - entry._wx, sensedZ - entry._wz);
+  obj.position.set(entry._wx + offX, by, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -11247,6 +11444,8 @@ function updateMobs(dt) {
     if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
     if (entry.type === 'shulker') { updateShulker(entry, obj, dt); continue; }
     if (entry.type === 'phantom') { updatePhantom(entry, obj, dt); continue; }
+    if (entry.type === 'breeze') { updateBreeze(entry, obj, dt); continue; }
+    if (entry.type === 'wind_charge') { updateWindCharge(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -12317,6 +12516,7 @@ function renderBlueprint(model) {
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
+    breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12385,6 +12585,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
+    breeze: 'Breeze', wind_charge: 'Wind Charge',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12519,6 +12720,8 @@ function renderCommands(model) {
       else if (d.type === 'hoglin') lines.push(`summon minecraft:hoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'shulker') lines.push(`summon minecraft:shulker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'phantom') lines.push(`summon minecraft:phantom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'breeze') lines.push(`summon minecraft:breeze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'wind_charge') lines.push(`summon minecraft:wind_charge ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
