@@ -2029,6 +2029,20 @@ const DECOR_TYPES = {
   // up and recoloured grey — real elder guardians are simply larger,
   // grey-toned guardians.
   elder_guardian: { kind: 'elder_guardian', interactive: false },
+  // Real vanilla zombie villagers can be cured back into ordinary
+  // villagers over several real minutes after being splashed with
+  // weakness and fed a golden apple, visibly shaking the whole time
+  // (minecraft.wiki/w/Zombie_Villager). Every earlier mob-type mutation
+  // here is INSTANT (shearing a mooshroom changes its type the very same
+  // frame); this is the first that takes real, observable TIME — an
+  // interaction that doesn't mutate the entry itself but instead starts a
+  // timer, with its own continuous shaking animation for as long as
+  // that's counting down, before the actual type change happens on its
+  // own once the timer runs out. See startCuringZombieVillager /
+  // updateZombieVillager / finishCuringZombieVillager. Reuses the
+  // villager's own humanoid geometry unchanged, recoloured with the same
+  // real zombie skin tone.
+  zombie_villager: { kind: 'zombie_villager', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3459,6 +3473,16 @@ function buildElderGuardianMonumentInterior(grid, silhouette, dims, exteriorMat,
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'elder_guardian', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A grass yard with a single zombie villager — switch to Interact mode
+// and right-click it to start its own real cure: it visibly shakes for a
+// real countdown, then genuinely becomes a plain villager on its own.
+function buildZombieVillagerCureYardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'zombie_villager', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4372,6 +4396,18 @@ const PRESETS = [
       'Not modeled: any actual damage or the real Mining Fatigue effect on mining/attack speed (this app has no combat, mining tools, or status-effect system at all, so the aura is purely a movement-speed stand-in), and ocean monuments\' own guardian escorts and gold-block core — this elder guardian simply floats in its own tank.',
     ],
   },
+  {
+    id: 'zombie-villager-cure-yard', name: 'Zombie Villager Cure Yard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'zombieVillagerCureYard',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An open grass yard with a single zombie villager — real vanilla zombie villagers can be cured back into ordinary villagers over several real minutes, visibly shaking the whole time, and this one genuinely does: switch to Interact mode, right-click it, and watch it shake for a real countdown before genuinely becoming a plain villager on its own.',
+    keywords: ['zombie villager', 'cure', 'villager', 'shake', 'transform', 'weakness'],
+    notes: [
+      'Switch to Interact mode and right-click the zombie villager — it starts a real countdown, visibly shaking (a small side-to-side jitter) every frame for the rest of it, and the INSTANT that countdown reaches zero, on its own, with no further interaction at all, its own entry genuinely becomes a plain villager and its geometry re-renders to match. Real vanilla zombie villagers splashed with weakness and fed a golden apple cure back into ordinary villagers over several real minutes, shaking visibly throughout (minecraft.wiki/w/Zombie_Villager). This is a genuinely new class of mechanic for this app: every earlier mob-type mutation happens INSTANTLY the moment it\'s triggered (shearing a mooshroom changes its own type that very same frame), while this is the first where the interaction only ever STARTS a real timer — the actual type change happens later, entirely on its own, once that timer finishes counting down. Verified directly by a unit test confirming right-clicking it genuinely starts a real countdown without changing its own type yet, that its own live position visibly jitters while curing, that re-triggering an already-curing zombie villager doesn\'t restart its own clock, and a second test confirming it\'s a genuine `villager` afterward — the exact same entry object reference, not a deletion followed by a new villager spawning in its place — once that timer actually reaches zero.',
+      'The real vanilla cure takes several real minutes; this app compresses it down to a much shorter figure so the effect is actually observable while simulating, the same kind of honest compression already used for the wandering trader\'s own departure timer and the goat\'s ram cooldown. This app has no potion or item-use system at all, so right-clicking it directly stands in for the real "splash with weakness, then feed a golden apple" sequence — an honest, spelled-out shortcut, not an invented "real" potion system. Completing the cure deliberately avoids a full scene rebuild (unlike the mooshroom\'s own shearing, which is safe to fully rebuild after since it only ever runs from a click handler): this one finishes from inside `updateZombieVillager`, itself called from inside `updateMobs`\' own per-frame loop, so `finishCuringZombieVillager` instead splices only this one mob\'s own stale mesh out and adds its freshly built villager mesh back in directly — the same technique already proven by the wandering trader\'s own timed departure and the breeze\'s wind charge. The geometry reuses the villager\'s own humanoid body plan completely unchanged — real zombie villagers share the villager\'s base model — recoloured with the same real zombie skin tone already used for the ordinary zombie.',
+      'Not modeled: the real requirement of first being splashed with a weakness potion before feeding it a golden apple, zombie villagers being a possible zombie-infection outcome of a villager killed by a zombie in the first place, and any of the real (small) chance of a profession/trade carrying over post-cure — this app has no potion, combat, or trading system at all, so this zombie villager only ever waits to be interacted with once, then cures.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4816,6 +4852,8 @@ function generateModel() {
     buildMooshroomFieldInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'elderGuardianMonument') {
     buildElderGuardianMonumentInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'zombieVillagerCureYard') {
+    buildZombieVillagerCureYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7842,6 +7880,29 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'zombie_villager') {
+    // Reuses the villager's own geometry unchanged (real zombie villagers
+    // share the villager's base model) — see hoglin's identical reuse of
+    // ravagerParts — recoloured with the same real zombie skin tone.
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0xa9a390);
+    const skinMat = solidMaterial(0x4c7a4c);
+    const apronMat = solidMaterial(0x7a4a2a);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x0f140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'zombie_villager';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'ravager') {
     let parts = decorGeoCache.get('ravager');
     if (!parts) { parts = ravagerParts(); decorGeoCache.set('ravager', parts); }
@@ -10288,6 +10349,107 @@ function updateVillager(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const ZOMBIE_VILLAGER_WANDER_MIN = 2, ZOMBIE_VILLAGER_WANDER_MAX = 5;
+const ZOMBIE_VILLAGER_WALK_SPEED = 1.0;
+// Real vanilla curing takes several real MINUTES; compressed down to a
+// much shorter figure so the effect is actually observable while
+// simulating, the same kind of honest compression already used for the
+// wandering trader's own departure timer and the goat's ram cooldown.
+const ZOMBIE_VILLAGER_CURE_TIME = 8;
+const ZOMBIE_VILLAGER_SHAKE_AMOUNT = 0.06, ZOMBIE_VILLAGER_SHAKE_SPEED = 18;
+// Starts the real cure countdown — this app's stand-in for "splashed with
+// weakness and fed a golden apple", since it has no potion or item-use
+// system to trigger this from. Deliberately does NOT touch the entry's
+// own `type` yet, and does NOT re-render anything: curing only ever
+// starts a timer, the actual mutation happens once that timer runs out,
+// inside updateZombieVillager itself. Guarded so re-interacting with an
+// already-curing zombie villager doesn't restart its own clock.
+function startCuringZombieVillager(entry) {
+  if (entry._curing) return;
+  entry._curing = true;
+  entry._cureTimer = ZOMBIE_VILLAGER_CURE_TIME;
+  entry._shakeTime = 0;
+}
+// Completes the cure — the same in-place entry mutation technique already
+// used for shearMooshroom (the exact same JS object becomes a villager,
+// not a deletion followed by a new villager spawning in its place), but
+// this one is called from INSIDE updateZombieVillager, which itself runs
+// from inside updateMobs' own per-frame loop — so, exactly like
+// departWanderingTrader, it deliberately avoids a full renderThree()
+// rebuild (which would reassign the shared mobObjects array out from
+// under that in-progress loop) and instead splices only this one mob's
+// own stale mesh/record out and adds its freshly-built villager mesh
+// back in directly, the same manual mesh-build-and-offset technique
+// fireWindCharge/spawnVexesFromEvoker already use for the same reason.
+function finishCuringZombieVillager(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  entry.type = 'villager';
+  delete entry._curing;
+  delete entry._cureTimer;
+  delete entry._shakeTime;
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function updateZombieVillager(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ZOMBIE_VILLAGER_WANDER_MIN + Math.random() * (ZOMBIE_VILLAGER_WANDER_MAX - ZOMBIE_VILLAGER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._curing) {
+    entry._cureTimer -= dt;
+    entry._shakeTime += dt;
+    if (entry._cureTimer <= 0) {
+      finishCuringZombieVillager(entry);
+      return;
+    }
+    const jitter = Math.sin(entry._shakeTime * ZOMBIE_VILLAGER_SHAKE_SPEED) * ZOMBIE_VILLAGER_SHAKE_AMOUNT;
+    obj.position.set(entry._wx + offX + jitter, entry.y, entry._wz + offZ);
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ZOMBIE_VILLAGER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ZOMBIE_VILLAGER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = ZOMBIE_VILLAGER_WANDER_MIN + Math.random() * (ZOMBIE_VILLAGER_WANDER_MAX - ZOMBIE_VILLAGER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 const WANDERING_TRADER_WANDER_MIN = 2, WANDERING_TRADER_WANDER_MAX = 5;
 const WANDERING_TRADER_WALK_SPEED = 1.0;
 // Real vanilla wandering traders that go untraded with for too long
@@ -12035,6 +12197,7 @@ function updateMobs(dt) {
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
     if (entry.type === 'fox') { updateFox(entry, obj, dt); continue; }
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
+    if (entry.type === 'zombie_villager') { updateZombieVillager(entry, obj, dt); continue; }
     if (entry.type === 'wandering_trader') { updateWanderingTrader(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
@@ -12682,6 +12845,7 @@ function attemptInteract(clientX, clientY, button) {
     }
     if (entry.type === 'axolotl') { captureAxolotlToBucket(currentModel, entry); return; }
     if (entry.type === 'mooshroom') { shearMooshroom(currentModel, entry); return; }
+    if (entry.type === 'zombie_villager') { startCuringZombieVillager(entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -13133,7 +13297,7 @@ function renderBlueprint(model) {
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
-    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'],
+    cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13202,7 +13366,7 @@ function renderBlueprint(model) {
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
-    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian',
+    breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13343,6 +13507,7 @@ function renderCommands(model) {
       else if (d.type === 'wandering_trader') lines.push(`summon minecraft:wandering_trader ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'mooshroom') lines.push(`summon minecraft:mooshroom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'elder_guardian') lines.push(`summon minecraft:elder_guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'zombie_villager') lines.push(`summon minecraft:zombie_villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
