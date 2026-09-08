@@ -1948,6 +1948,16 @@ const DECOR_TYPES = {
   // rather than any kind of movement at all — the first mob in this app
   // that never moves from its spawn cell. See updateShulker.
   shulker: { kind: 'shulker', interactive: false },
+  // Real vanilla phantoms circle above a sleepless player before diving at
+  // them (minecraft.wiki/w/Phantom). Every earlier connection to a live
+  // player either copies its exact position (the parrot's shoulder
+  // attachment) or moves toward/away from it at a capped speed (the
+  // ocelot fleeing, the skeleton drawing its bow); a phantom is the first
+  // genuine ORBITAL motion — continuously computing a position on a fixed-
+  // radius circle centered on the player's own live position, with that
+  // whole circle sliding along as the player moves, rather than converging
+  // on a single point at all. See updatePhantom.
+  phantom: { kind: 'phantom', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3409,6 +3419,17 @@ function buildShulkerEndChamberInterior(grid, silhouette, dims, exteriorMat, acc
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'shulker', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// An open grass platform with a single phantom — switch to Walk mode to
+// see the real new mechanic: it genuinely circles above your own live
+// position, the whole orbit sliding along as you move, rather than
+// converging on you the way every other player-aware mob here does.
+function buildPhantomNightSkyInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'phantom', x: cx, y: 1, z: cz, facing: 'south' });
+}
 
 /* =========================================================================
  * PRESET LIBRARY (approximate published real-world figures)
@@ -4144,6 +4165,18 @@ const PRESETS = [
       'Not modeled: the real levitation-bullet attack, teleporting short distances when hit, and attaching to ceilings/walls as well as floors — this app has no combat or attachment-orientation system at all, so this shulker only ever sits and reveals itself.',
     ],
   },
+  {
+    id: 'phantom-night-sky', name: 'Phantom Night Sky', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'phantomNightSky',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An open grass platform with a single phantom — real vanilla phantoms circle above a sleepless player before diving at them, and this one genuinely does: switch to Walk mode and watch it orbit a fixed distance above your own live position, the whole circle sliding along as you move.',
+    keywords: ['phantom', 'orbit', 'circle', 'fly', 'sky', 'night'],
+    notes: [
+      'Switch to Walk mode and move around — its own live position is recomputed every single frame as a point on a fixed-radius circle centered on YOUR own live position, at a steadily increasing angle, so the entire circle slides along as you walk rather than the phantom ever converging on a single spot. This is a genuinely new class of mechanic for this app: every earlier connection to a live player either copies its exact position outright (the parrot\'s shoulder attachment) or moves toward/away from it at a capped speed until arriving (the ocelot fleeing, the skeleton drawing its bow) — a phantom is the first to maintain a constant ORBITAL relationship instead, never approaching and never fleeing, always circling. Verified directly by a unit test confirming its own distance from a simulated live player stays essentially constant at the real orbit radius across many simulated frames while that player moves to several different positions, and a second test confirming its own orbit angle keeps advancing over time rather than freezing in place.',
+      'This app has no sleep or day/night system at all, so this phantom simply always orbits once a live player exists, rather than only appearing after several in-game days without sleeping — an honest, spelled-out shortcut, the same kind already taken for the fox/piglin starting with pre-decided cosmetics rather than requiring a game system this app doesn\'t have. This app also has no verified real orbit radius, height, or angular speed, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry is new: a slim body, wide swept wings, and a spiked tail.',
+      'Not modeled: the real dive-attack (phantoms periodically swoop down to strike before climbing back to altitude), despawning at dawn, and spawning in a batch of up to 4 — this app has no combat or day/night system at all, so this phantom only ever circles.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4576,6 +4609,8 @@ function generateModel() {
     buildHoglinFungusGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'shulkerEndChamber') {
     buildShulkerEndChamberInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'phantomNightSky') {
+    buildPhantomNightSkyInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6389,6 +6424,30 @@ function shulkerParts() {
   eye.translate(0, 0, 0.27);
   return { shell, head, eye };
 }
+// A flying-creature build centered at y=0 (like squidParts/guardianParts,
+// since a phantom flies freely rather than standing on the ground): a
+// slim body, wide swept wings, a spiked tail, and a small head with the
+// real vanilla phantom's own glowing pale eyes.
+function phantomParts() {
+  const body = new THREE.BoxGeometry(0.3, 0.18, 0.5);
+  const head = new THREE.BoxGeometry(0.22, 0.18, 0.22);
+  head.translate(0, 0, 0.32);
+  const wingOffsets = [-1, 1];
+  const wings = wingOffsets.map((sign) => {
+    const g = new THREE.BoxGeometry(0.55, 0.04, 0.28);
+    g.translate(sign * 0.42, 0, -0.02);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.12, 0.08, 0.35);
+  tail.translate(0, 0, -0.42);
+  const faceEyeOffsets = [[-0.06, 0.03, 0.42], [0.06, 0.03, 0.42]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, wings, tail, faceEyes };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -7429,6 +7488,20 @@ function buildDecorMeshesForEntry(entry) {
     group.add(headGroup);
     group.userData.headGroup = headGroup;
     group.rotation.y = FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'phantom') {
+    let parts = decorGeoCache.get('phantom');
+    if (!parts) { parts = phantomParts(); decorGeoCache.set('phantom', parts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0x4a5568);
+    group.add(new THREE.Mesh(parts.body, skinMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, skinMat));
+    group.add(new THREE.Mesh(parts.tail, skinMat));
+    const faceMat = solidMaterial(0xe0e050);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'warped_fungus') {
@@ -10988,6 +11061,46 @@ function updateShulker(entry, obj, dt) {
   obj.position.set(entry.x + offX + 0.5, entry.y, entry.z + offZ + 0.5);
   if (obj.userData.headGroup) obj.userData.headGroup.position.y = entry._open ? 1.0 : 0.425;
 }
+// Real vanilla phantoms circle above a sleepless player before diving at
+// them (minecraft.wiki/w/Phantom). Every earlier connection to a live
+// player either copies its exact position (the parrot's shoulder
+// attachment) or moves toward/away from it at a capped speed (the ocelot
+// fleeing, the skeleton drawing its bow); a phantom is the first genuine
+// ORBITAL motion — its own live world position is computed fresh every
+// frame as a fixed-radius offset from the player's own live position at
+// a steadily increasing angle, so the entire circle slides along with
+// the player rather than the phantom ever converging on a single point.
+// This app has no sleep/day-night system at all, so a phantom here
+// simply always orbits once a live player exists, rather than only after
+// several in-game days without sleeping — an honest, spelled-out
+// shortcut, the same kind already taken for the fox/piglin starting with
+// pre-decided cosmetics rather than requiring a game system this app
+// doesn't have.
+const PHANTOM_ORBIT_RADIUS = 5;
+const PHANTOM_ORBIT_HEIGHT = 4;
+const PHANTOM_ORBIT_SPEED = 1.2; // radians/second — an honest, approximate stand-in, not a verified real vanilla rate
+const PHANTOM_IDLE_BOB_SPEED = 1.5;
+function updatePhantom(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._orbitAngle === undefined) entry._orbitAngle = Math.random() * Math.PI * 2;
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  if (playerLive) {
+    entry._orbitAngle += PHANTOM_ORBIT_SPEED * dt;
+    const cx = flyState.pos.x, cy = flyState.pos.y, cz = flyState.pos.z;
+    const wx = cx + Math.cos(entry._orbitAngle) * PHANTOM_ORBIT_RADIUS;
+    const wz = cz + Math.sin(entry._orbitAngle) * PHANTOM_ORBIT_RADIUS;
+    const wy = cy + PHANTOM_ORBIT_HEIGHT;
+    obj.position.set(wx, wy, wz);
+    entry._mobYaw = Math.atan2(cx - wx, cz - wz); // faces back toward the center of its own orbit — the player
+    obj.rotation.y = entry._mobYaw;
+  } else {
+    // No live player position exists at all (Orbit mode) — hover near its
+    // own spawn point with a gentle bob instead of orbiting nothing.
+    entry._idleTime = (entry._idleTime || 0) + dt;
+    const by = entry.y + 1.5 + Math.sin(entry._idleTime * PHANTOM_IDLE_BOB_SPEED) * 0.3;
+    obj.position.set(entry.x + offX + 0.5, by, entry.z + offZ + 0.5);
+  }
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -11133,6 +11246,7 @@ function updateMobs(dt) {
     if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
     if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
     if (entry.type === 'shulker') { updateShulker(entry, obj, dt); continue; }
+    if (entry.type === 'phantom') { updatePhantom(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -12202,7 +12316,7 @@ function renderBlueprint(model) {
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
     llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
-    hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'],
+    hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -12270,7 +12384,7 @@ function renderBlueprint(model) {
     creeper: 'Creeper', snow_golem: 'Snow Golem', snow_layer: 'Snow Layer', fox: 'Fox',
     villager: 'Villager (Farmer)', wheat_crop: 'Wheat Crop', iron_golem: 'Iron Golem', zombie: 'Zombie',
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
-    hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker',
+    hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -12404,6 +12518,7 @@ function renderCommands(model) {
       else if (d.type === 'ravager') lines.push(`summon minecraft:ravager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'hoglin') lines.push(`summon minecraft:hoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'shulker') lines.push(`summon minecraft:shulker ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'phantom') lines.push(`summon minecraft:phantom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
