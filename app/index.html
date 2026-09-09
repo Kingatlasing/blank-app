@@ -2323,8 +2323,17 @@ function buildPyramidInterior(grid, silhouette, dims, accentMat, decorOut) {
   const base = Math.min(dims.sx, dims.sz);
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const cb = (v) => Math.max(1, Math.round(v));
-  const passageCross = cb(PYR.passageFrac * base);
-  const galleryH = cb(PYR.galleryHeightFrac * dims.sy);
+  // Passages, the Grand Gallery, and both chambers are all real WALKABLE
+  // spaces — at small scales, real-proportioned figures round down to a
+  // single block tall, which would carve a passage or room the player
+  // physically cannot fit inside no matter what scale was chosen. Every
+  // one of these SIZE values (not the position values below, which stay
+  // on the plain floor-1 cb) gets its own floor of 2 so the interior
+  // stays walkable regardless of scale, exactly like buildFloorsInterior's
+  // own bpf (blocks-per-floor) already floors at 2 for the same reason.
+  const cbSize = (v) => Math.max(2, Math.round(v));
+  const passageCross = cbSize(PYR.passageFrac * base);
+  const galleryH = cbSize(PYR.galleryHeightFrac * dims.sy);
 
   const entranceY = cb(PYR.entranceHFrac * dims.sy);
   const entranceX = Math.round(cx + PYR.entranceOffsetFrac * base);
@@ -2335,10 +2344,10 @@ function buildPyramidInterior(grid, silhouette, dims, accentMat, decorOut) {
 
   const kingY = cb(PYR.kingHFrac * dims.sy);
   const kingCx = Math.round(cx + PYR.kingOffsetFrac * base);
-  const kingSizeX = cb(PYR.kingLFrac * base), kingSizeZ = cb(PYR.kingWFrac * base), kingSizeY = cb(PYR.kingHeightFrac * dims.sy);
+  const kingSizeX = cbSize(PYR.kingLFrac * base), kingSizeZ = cbSize(PYR.kingWFrac * base), kingSizeY = cbSize(PYR.kingHeightFrac * dims.sy);
 
   const queenY = cb(PYR.queenHFrac * dims.sy);
-  const queenSizeX = cb(PYR.queenLFrac * base), queenSizeZ = cb(PYR.queenWFrac * base), queenSizeY = cb(PYR.queenHeightFrac * dims.sy);
+  const queenSizeX = cbSize(PYR.queenLFrac * base), queenSizeZ = cbSize(PYR.queenWFrac * base), queenSizeY = cbSize(PYR.queenHeightFrac * dims.sy);
 
   carveBox(grid, dims, entranceX - Math.ceil(passageCross / 2), entranceY, Math.max(0, entranceZ - 1),
                         entranceX + Math.floor(passageCross / 2), entranceY + passageCross - 1, entranceZ + 1, 0);
@@ -3091,9 +3100,20 @@ function buildGlowSquidCavernInterior(grid, silhouette, dims, exteriorMat, accen
     for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
     for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
   }
-  if (!decorOut) return;
+  // A single vertical shaft straight down through the ceiling, right above
+  // the water source — unlike a side-wall door, this doesn't touch the
+  // room's own x/z edges at all, so computeWaterFlow's own "enclosed on
+  // all 4 sides" check (which only ever looks at x/z boundaries, never y —
+  // see enclosedWaterPocket) still holds and the room still genuinely
+  // fills from this one source exactly as before; the shaft itself just
+  // becomes part of that same sealed pocket. A real ladder lines it so
+  // there's a genuine climbable way in and back out, the same technique
+  // already used for buildFloorsInterior's own stairwell gap.
   const cx = Math.floor(dims.sx / 2), cy = Math.floor(dims.sy / 2), cz = Math.floor(dims.sz / 2);
+  for (let y = 1; y < dims.sy; y++) grid[idx(cx, y, cz, dims)] = 0;
+  if (!decorOut) return;
   decorOut.push({ type: 'water', x: cx, y: cy, z: cz, source: true });
+  for (let y = 1; y < dims.sy - 1; y++) decorOut.push({ type: 'ladder', x: cx, y, z: cz, axis: 'x' });
   // Real vanilla glow squid spawn in schools of 4-6.
   const spots = [
     [Math.max(1, cx - 2), Math.max(1, cz - 2)], [Math.min(dims.sx - 2, cx + 2), Math.max(1, cz - 2)],
