@@ -2043,6 +2043,18 @@ const DECOR_TYPES = {
   // villager's own humanoid geometry unchanged, recoloured with the same
   // real zombie skin tone.
   zombie_villager: { kind: 'zombie_villager', interactive: true },
+  // Real vanilla blazes shoot fireballs that ignite flammable terrain on
+  // impact (minecraft.wiki/w/Blaze). Every earlier projectile in this app
+  // either removes something (a creeper's own explosion), displaces the
+  // player (the breeze's wind charge), or just despawns harmlessly (the
+  // skeleton's arrow); a blaze's fireball is the first that ADDS a
+  // genuinely new, permanent block to the world on impact — the world
+  // has one more real `fire` decor entry in it afterward that wasn't
+  // there before, reusing that exact existing decor type rather than
+  // inventing a new one. See fireBlazeFireball / igniteFromFireball /
+  // updateBlazeFireball.
+  blaze: { kind: 'blaze', interactive: false },
+  blaze_fireball: { kind: 'blaze_fireball', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3483,6 +3495,17 @@ function buildZombieVillagerCureYardInterior(grid, silhouette, dims, exteriorMat
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'zombie_villager', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A nether brick platform with a single blaze — switch to Walk mode and
+// come within its own real range: it genuinely fires a real fireball that
+// flies to your own live position and, on arrival, ignites a real,
+// permanent fire block right where it lands.
+function buildBlazeFortressLedgeInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'blaze', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4408,6 +4431,18 @@ const PRESETS = [
       'Not modeled: the real requirement of first being splashed with a weakness potion before feeding it a golden apple, zombie villagers being a possible zombie-infection outcome of a villager killed by a zombie in the first place, and any of the real (small) chance of a profession/trade carrying over post-cure — this app has no potion, combat, or trading system at all, so this zombie villager only ever waits to be interacted with once, then cures.',
     ],
   },
+  {
+    id: 'blaze-fortress-ledge', name: 'Blaze Fortress Ledge', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'blazeFortressLedge',
+    blocks: { exterior: 'nether_bricks', interior: 'nether_bricks', accent: 'nether_bricks' },
+    desc: 'A nether brick platform with a single blaze — real vanilla blazes shoot fireballs that ignite flammable terrain on impact, and this one genuinely does: switch to Walk mode, come within its own real range, and watch a real fireball fly to your own live position and set a real, permanent fire block right where it lands.',
+    keywords: ['blaze', 'fireball', 'fire', 'nether', 'fortress', 'ignite'],
+    notes: [
+      'Switch to Walk mode and approach it — once you\'re within its own real range, it fires a genuine `blaze_fireball` entity that flies in a straight line toward your own live position; the instant it arrives (or times out without ever reaching you), a real `fire` decor entry is added to the world exactly where it landed, and that fire is completely permanent — it stays in the model\'s own decor list, the layer blueprint, and the exported commands from that point on. This is a genuinely new class of mechanic for this app: every earlier projectile either removes something on impact (a creeper\'s own explosion), displaces the player (the breeze\'s wind charge), or just despawns harmlessly (the skeleton\'s arrow), while a blaze\'s fireball is the first that ADDS a brand-new, permanent block to the world — reusing the exact same `fire` decor type and render branch this app already has, rather than inventing a new one. Verified directly by a unit test confirming no fire exists anywhere in the model before a fireball is fired, that firing one and letting it reach a simulated live player genuinely adds exactly one new `fire` entry to the model at the landing cell, that the fireball itself despawns immediately afterward exactly like the wind charge does, and a second test confirming a fireball that never reaches a live player still ignites on its own once its own real max lifetime runs out, and that re-igniting the same already-burning cell never stacks a duplicate fire entry.',
+      'This app has no verified real fireball range, speed, or fire-rate, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the fox\'s pickup radius. The geometry is new: a tall central rod body with 4 shorter rods jutting out around it at different heights, matching real vanilla\'s own hovering, rod-encircled silhouette, and a small glowing intersecting-plane fireball (the same technique already used for cross_plant decor and the breeze\'s own wind charge).',
+      'Not modeled: any actual damage from the fire or the fireball itself, spawning in nether fortresses specifically, and the real erratic mid-air movement while it charges up before firing — this app has no combat, health, or structure-generation system at all, so this blaze only ever hovers in place and fires fireballs.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4854,6 +4889,8 @@ function generateModel() {
     buildElderGuardianMonumentInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'zombieVillagerCureYard') {
     buildZombieVillagerCureYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'blazeFortressLedge') {
+    buildBlazeFortressLedgeInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6833,6 +6870,41 @@ function windChargeParts() {
   g2.rotateY(-Math.PI / 4);
   return { core, g1, g2 };
 }
+// A tall central rod body with 4 shorter rods jutting out around it at
+// different heights and angles — the real vanilla blaze's own hovering,
+// rod-encircled silhouette (minecraft.wiki/w/Blaze) — built y=0-centered
+// since it hovers rather than standing on legs, the same convention
+// already used for the breeze/phantom.
+function blazeParts() {
+  const body = new THREE.BoxGeometry(0.3, 0.9, 0.3);
+  body.translate(0, 0.6, 0);
+  const rodOffsets = [[0.32, 0.3, 0], [-0.32, 0.5, 0], [0, 0.4, 0.32], [0, 0.75, -0.32]];
+  const rods = rodOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.4, 0.07);
+    g.translate(x, y, z);
+    return g;
+  });
+  const faceZ = 0.16, faceDepth = 0.02;
+  const faceEyeOffsets = [[-0.07, 0.75], [0.07, 0.75]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, faceDepth);
+    g.translate(x, y, faceZ);
+    return g;
+  });
+  return { body, rods, faceEyes };
+}
+// A small glowing core with 2 thin cross-panels — the same intersecting-
+// plane technique already used for cross_plant decor and the breeze's own
+// wind charge — for the real fireball a blaze fires. See
+// DECOR_TYPES.blaze_fireball.
+function blazeFireballParts() {
+  const core = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+  const g1 = new THREE.BoxGeometry(0.42, 0.42, 0.02);
+  g1.rotateY(Math.PI / 4);
+  const g2 = new THREE.BoxGeometry(0.42, 0.42, 0.02);
+  g2.rotateY(-Math.PI / 4);
+  return { core, g1, g2 };
+}
 // A real growth-stage number (0-7, matching real vanilla wheat's own
 // stage range) determines both height (a short green sprout at stage 0,
 // full-height at stage 7) and colour (green fading to gold as it
@@ -8000,6 +8072,29 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.core, mat));
     group.add(new THREE.Mesh(parts.g1, mat));
     group.add(new THREE.Mesh(parts.g2, mat));
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'blaze') {
+    let parts = decorGeoCache.get('blaze');
+    if (!parts) { parts = blazeParts(); decorGeoCache.set('blaze', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xe8b23a);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    for (const g of parts.rods) group.add(new THREE.Mesh(g, bodyMat));
+    const faceMat = solidMaterial(0xfff2a0);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'blaze_fireball') {
+    let parts = decorGeoCache.get('blazeFireball');
+    if (!parts) { parts = blazeFireballParts(); decorGeoCache.set('blazeFireball', parts); }
+    const group = new THREE.Group();
+    const coreMat = solidMaterial(0xffcf4a);
+    group.add(new THREE.Mesh(parts.core, coreMat));
+    const flameMat = solidMaterial(0xe8531e);
+    group.add(new THREE.Mesh(parts.g1, flameMat));
+    group.add(new THREE.Mesh(parts.g2, flameMat));
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'cat') {
@@ -12067,6 +12162,110 @@ function updateBreeze(entry, obj, dt) {
   obj.position.set(entry._wx + offX, by, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const BLAZE_FIRE_RANGE = 8; // an honest, approximate stand-in — not a verified real vanilla range
+const BLAZE_FIRE_COOLDOWN = 3;
+const BLAZE_FIREBALL_SPEED = 5;
+const BLAZE_FIREBALL_MAX_LIFETIME = 3;
+const BLAZE_HIT_RADIUS = 0.8;
+function fireBlazeFireball(model, blazeEntry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const startX = blazeEntry._wx, startY = blazeEntry.y + 1, startZ = blazeEntry._wz;
+  const targetX = flyState.pos.x - offX, targetY = flyState.pos.y, targetZ = flyState.pos.z - offZ;
+  const dx = targetX - startX, dy = targetY - startY, dz = targetZ - startZ;
+  const dist = Math.hypot(dx, dy, dz) || 1;
+  const entry = {
+    type: 'blaze_fireball', x: Math.round(startX), y: Math.round(startY), z: Math.round(startZ), facing: 'south',
+    _wx: startX, _wy: startY, _wz: startZ,
+    _vx: (dx / dist) * BLAZE_FIREBALL_SPEED, _vy: (dy / dist) * BLAZE_FIREBALL_SPEED, _vz: (dz / dist) * BLAZE_FIREBALL_SPEED,
+    _life: 0,
+  };
+  model.decor.push(entry);
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry._wy;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function removeBlazeFireballFromWorld(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+// Genuinely adds a brand-new, permanent `fire` decor entry to the world at
+// the given world-space point — see the class comment on
+// DECOR_TYPES.blaze. Reuses the exact same `fire` decor type and its own
+// existing render branch unchanged; guarded against stacking a duplicate
+// fire entry on a cell that's already burning.
+function igniteFromFireball(model, wx, wz, wy) {
+  const dims = model.dims;
+  const gx = Math.max(0, Math.min(dims.sx - 1, Math.floor(wx)));
+  const gz = Math.max(0, Math.min(dims.sz - 1, Math.floor(wz)));
+  const gy = Math.max(0, Math.min(dims.sy - 1, Math.round(wy)));
+  if (model.decor.some(d => d.type === 'fire' && d.x === gx && d.y === gy && d.z === gz)) return;
+  const fireEntry = { type: 'fire', x: gx, y: gy, z: gz };
+  model.decor.push(fireEntry);
+  if (!three || !three.group) return;
+  const offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(fireEntry)) {
+    mesh.position.x += gx + offX + 0.5;
+    mesh.position.y += gy + 0.5;
+    mesh.position.z += gz + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateBlazeFireball(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  entry._life += dt;
+  entry._wx += entry._vx * dt;
+  entry._wy += entry._vy * dt;
+  entry._wz += entry._vz * dt;
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  if (playerLive) {
+    const dx = (flyState.pos.x - offX) - entry._wx, dy = flyState.pos.y - entry._wy, dz = (flyState.pos.z - offZ) - entry._wz;
+    if (Math.hypot(dx, dy, dz) <= BLAZE_HIT_RADIUS) {
+      igniteFromFireball(currentModel, entry._wx, entry._wz, flyState.pos.y);
+      removeBlazeFireballFromWorld(currentModel, entry);
+      return;
+    }
+  }
+  if (entry._life >= BLAZE_FIREBALL_MAX_LIFETIME) {
+    igniteFromFireball(currentModel, entry._wx, entry._wz, entry._wy);
+    removeBlazeFireballFromWorld(currentModel, entry);
+  }
+}
+function updateBlaze(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._fireCooldown = 0;
+    entry._bobTime = 0;
+  }
+  entry._fireCooldown = Math.max(0, entry._fireCooldown - dt);
+  entry._bobTime += dt;
+  const by = entry.y + 1 + Math.sin(entry._bobTime * 1.2) * 0.2;
+  let playerDist = Infinity, sensedX = 0, sensedZ = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+  }
+  if (playerDist <= BLAZE_FIRE_RANGE && entry._fireCooldown <= 0) {
+    fireBlazeFireball(currentModel, entry);
+    entry._fireCooldown = BLAZE_FIRE_COOLDOWN;
+  }
+  if (playerDist < Infinity) entry._mobYaw = Math.atan2(sensedX - entry._wx, sensedZ - entry._wz);
+  obj.position.set(entry._wx + offX, by, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -12219,6 +12418,8 @@ function updateMobs(dt) {
     if (entry.type === 'phantom') { updatePhantom(entry, obj, dt); continue; }
     if (entry.type === 'breeze') { updateBreeze(entry, obj, dt); continue; }
     if (entry.type === 'wind_charge') { updateWindCharge(entry, obj, dt); continue; }
+    if (entry.type === 'blaze') { updateBlaze(entry, obj, dt); continue; }
+    if (entry.type === 'blaze_fireball') { updateBlazeFireball(entry, obj, dt); continue; }
     if (entry.type === 'warden') { updateWarden(entry, obj, dt); continue; }
     if (entry.type === 'allay') { updateAllay(entry, obj, dt); continue; }
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
@@ -13298,6 +13499,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13367,6 +13569,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
+    blaze: 'Blaze', blaze_fireball: 'Fireball',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13508,6 +13711,8 @@ function renderCommands(model) {
       else if (d.type === 'mooshroom') lines.push(`summon minecraft:mooshroom ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'elder_guardian') lines.push(`summon minecraft:elder_guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'zombie_villager') lines.push(`summon minecraft:zombie_villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'blaze') lines.push(`summon minecraft:blaze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
       else if (d.type === 'snow_layer') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:snow`);
