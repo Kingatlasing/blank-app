@@ -2055,6 +2055,20 @@ const DECOR_TYPES = {
   // updateBlazeFireball.
   blaze: { kind: 'blaze', interactive: false },
   blaze_fireball: { kind: 'blaze_fireball', interactive: false },
+  // Real vanilla witches drink potions of Fire Resistance when standing in
+  // fire or lava, instead of taking damage from it like anything else
+  // (minecraft.wiki/w/Witch). Every other hazard-aware mob here either
+  // ignores hazards completely (every ordinary ground mob has no fire-
+  // awareness at all) or actively FLEES one (the hoglin, the only other
+  // mob that reacts to a hazard at all, fleeing warped fungus outright);
+  // a witch is the first to perform a visible SELF-BUFF action in
+  // response to a hazard instead — genuinely holding up and drinking a
+  // potion for a real duration, then calmly continuing to wander right
+  // next to the exact same hazard afterward rather than avoiding it. See
+  // updateWitch / findNearbyFire. Reuses the villager's own humanoid
+  // geometry unchanged, plus its own new pointed-hat and held-potion
+  // parts.
+  witch: { kind: 'witch', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3526,6 +3540,19 @@ function buildBlazeFortressLedgeInterior(grid, silhouette, dims, exteriorMat, ac
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'blaze', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A flat platform with a single witch and a real, permanent fire block
+// placed nearby — the witch senses it immediately and genuinely drinks a
+// potion in place (see the DECOR_TYPES.witch citation comment), then
+// resumes wandering near it afterward instead of fleeing.
+function buildWitchFireHazardInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const fireX = Math.min(dims.sx - 1, cx + 2);
+  decorOut.push({ type: 'witch', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'fire', x: fireX, y: 1, z: cz });
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4463,6 +4490,18 @@ const PRESETS = [
       'Not modeled: any actual damage from the fire or the fireball itself, spawning in nether fortresses specifically, and the real erratic mid-air movement while it charges up before firing — this app has no combat, health, or structure-generation system at all, so this blaze only ever hovers in place and fires fireballs.',
     ],
   },
+  {
+    id: 'witch-fire-hazard', name: 'Witch Fire Hazard', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'witchFireHazard',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass platform with a single witch and a real, permanent fire block nearby — real vanilla witches drink a Fire Resistance potion when standing in fire or lava, and this one genuinely does: watch it sense the nearby fire immediately, drink in place for a real countdown, then calmly resume wandering right next to it instead of fleeing.',
+    keywords: ['witch', 'potion', 'fire resistance', 'hazard', 'brew', 'drink'],
+    notes: [
+      'The witch senses the real fire entry placed a few blocks away the instant it\'s generated, and genuinely starts drinking: it stops wandering, a small held-potion mesh appears in its own hand, and a real countdown runs down before it clears on its own, at which point the witch becomes fire-resistant for good and calmly resumes ordinary wandering right next to the fire, never fleeing it and never drinking a second time near that same fire. Real vanilla witches drink a Fire Resistance potion whenever they stand in fire or lava (minecraft.wiki/w/Witch). This is a genuinely new class of mechanic for this app: every earlier hazard-unaware mob simply ignores fire and lava entirely, and the only other hazard-AWARE mob here, the hoglin, FLEES a hazard (warped fungus) the instant it notices one — the witch is the first to react to a hazard with a visible self-buff instead, then deliberately keep tolerating it afterward. Verified directly by a unit test confirming a witch placed far from any fire never starts drinking, that one placed within its own real sense radius genuinely starts a countdown with a held-potion mesh added to its own geometry, that it stays frozen in place for the whole countdown, that it becomes fire-resistant and resumes wandering (with the potion mesh removed again) the instant that countdown reaches zero, and that it never re-triggers a second drink while still fire-resistant near that same fire.',
+      'This app has no potion-brewing or status-effect system at all, so "drinking a Fire Resistance potion" is honestly stood in for by a fixed timer plus a held-potion mesh appearing on the witch itself, and this app also has no verified real sense radius or drink duration, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s sense radius and the elder guardian\'s aura. Starting and finishing the drink deliberately avoids a full scene rebuild (the same reasoning as the zombie villager\'s own cure and the wandering trader\'s own departure): both run from inside `updateWitch`, itself called from inside `updateMobs`\' own per-frame loop, so `rebuildWitchMesh` instead splices only this one mob\'s own stale mesh out and adds its freshly built one back in directly. The geometry reuses the villager\'s own humanoid body plan completely unchanged, recoloured with a real vanilla witch\'s own dark robe and green skin tone, plus a new pointed witch hat and an optional held potion bottle that only appears while actively drinking.',
+      'Not modeled: any actual damage prevention from real fire or lava (this app has no health or damage system at all, so "fire resistance" here is purely cosmetic bookkeeping), witches\' own real potion-throwing attacks against players, and their real chance to spawn from a lightning strike hitting a villager — this witch only ever senses fire and drinks in response to it.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4911,6 +4950,8 @@ function generateModel() {
     buildZombieVillagerCureYardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'blazeFortressLedge') {
     buildBlazeFortressLedgeInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'witchFireHazard') {
+    buildWitchFireHazardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6257,6 +6298,24 @@ function villagerParts() {
   const heldGiftBloom = new THREE.BoxGeometry(0.1, 0.08, 0.1);
   heldGiftBloom.translate(-0.4, 0.74, 0.08);
   return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat, heldGiftStem, heldGiftBloom };
+}
+// A tall, tapering hat stacked from 3 progressively narrower boxes — real
+// vanilla witches wear a distinctive pointed hat, the single most
+// recognizable silhouette cue distinguishing one from the plain villager
+// body plan underneath it (minecraft.wiki/w/Witch) — plus a small held
+// potion bottle, only rendered while entry._drinking is true (see
+// updateWitch / the render branch), the visible proof of the real new
+// mechanic: a witch actually drinking rather than fleeing a hazard.
+function witchHatAndPotionParts() {
+  const hatBrim = new THREE.BoxGeometry(0.5, 0.06, 0.5);
+  hatBrim.translate(0, 1.58, 0);
+  const hatMid = new THREE.BoxGeometry(0.3, 0.22, 0.3);
+  hatMid.translate(0, 1.72, 0);
+  const hatTip = new THREE.BoxGeometry(0.12, 0.22, 0.12);
+  hatTip.translate(0, 1.92, 0);
+  const heldPotion = new THREE.BoxGeometry(0.1, 0.16, 0.1);
+  heldPotion.translate(0.36, 1.3, 0.05);
+  return { hatBrim, hatMid, hatTip, heldPotion };
 }
 // A tall, heavy humanoid with vastly oversized arms hanging past the
 // knees (the single most recognizable real vanilla silhouette cue) and 2
@@ -8115,6 +8174,35 @@ function buildDecorMeshesForEntry(entry) {
     const flameMat = solidMaterial(0xe8531e);
     group.add(new THREE.Mesh(parts.g1, flameMat));
     group.add(new THREE.Mesh(parts.g2, flameMat));
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'witch') {
+    // Reuses the villager's own geometry unchanged (real witches share the
+    // villager's base model) — see hoglin's identical reuse of
+    // ravagerParts — plus its own pointed-hat and held-potion parts.
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    let hatParts = decorGeoCache.get('witchHat');
+    if (!hatParts) { hatParts = witchHatAndPotionParts(); decorGeoCache.set('witchHat', hatParts); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x2c2438);
+    const skinMat = solidMaterial(0x4c7a4c);
+    const apronMat = solidMaterial(0x1c1622);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    group.add(new THREE.Mesh(hatParts.hatBrim, apronMat));
+    group.add(new THREE.Mesh(hatParts.hatMid, apronMat));
+    group.add(new THREE.Mesh(hatParts.hatTip, apronMat));
+    const faceMat = solidMaterial(0x0f140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    if (entry._drinking) {
+      group.add(new THREE.Mesh(hatParts.heldPotion, solidMaterial(0x7a2ab0)));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'cat') {
@@ -12286,6 +12374,113 @@ function updateBlaze(entry, obj, dt) {
   obj.position.set(entry._wx + offX, by, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const WITCH_WANDER_MIN = 2, WITCH_WANDER_MAX = 5;
+const WITCH_WALK_SPEED = 1.0;
+// An honest, approximate stand-in — not a verified real vanilla sense
+// radius or drink duration.
+const WITCH_FIRE_SENSE_RADIUS = 4;
+const WITCH_DRINK_TIME = 4;
+// Scans the model's own decor list for the nearest `fire` entry and
+// returns the distance to it (Infinity if none exist) — the same kind of
+// direct decor-list scan already used by findNearestGoldIngot.
+function findNearbyFireDistance(entry) {
+  let best = Infinity;
+  for (const d of currentModel.decor) {
+    if (d.type !== 'fire') continue;
+    const dist = Math.hypot((d.x + 0.5) - entry._wx, (d.z + 0.5) - entry._wz);
+    if (dist < best) best = dist;
+  }
+  return best;
+}
+// Rebuilds this witch's own mesh in place so its held-potion mesh can
+// appear/disappear as `entry._drinking` toggles. Called from inside
+// updateWitch, which itself runs from inside updateMobs' own per-frame
+// loop — so, exactly like finishCuringZombieVillager, this deliberately
+// avoids a full renderThree() rebuild (which would reassign the shared
+// mobObjects array out from under that in-progress loop) and instead
+// splices only this one mob's own stale mesh/record out and adds its
+// freshly-built mesh back in directly.
+function rebuildWitchMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// Real vanilla witches drink a Fire Resistance potion when standing in
+// fire or lava (minecraft.wiki/w/Witch). This is the first hazard-AWARE
+// mob to react to a hazard with a visible self-buff instead of fleeing it
+// — contrast the hoglin, the only other hazard-aware mob here, which
+// FLEES a hazard (warped fungus) rather than tolerating it. Once the
+// drink finishes, the witch becomes permanently fire-resistant for this
+// session and calmly resumes wandering near the fire instead of avoiding
+// it, and never re-triggers a second drink animation for it.
+function updateWitch(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = WITCH_WANDER_MIN + Math.random() * (WITCH_WANDER_MAX - WITCH_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._drinking) {
+    entry._drinkTimer -= dt;
+    if (entry._drinkTimer <= 0) {
+      entry._drinking = false;
+      entry._fireResistant = true;
+      entry._mobState = 'idle';
+      entry._mobTimer = WITCH_WANDER_MIN + Math.random() * (WITCH_WANDER_MAX - WITCH_WANDER_MIN);
+      rebuildWitchMesh(entry);
+      return;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    return;
+  }
+  if (!entry._fireResistant && findNearbyFireDistance(entry) <= WITCH_FIRE_SENSE_RADIUS) {
+    entry._drinking = true;
+    entry._drinkTimer = WITCH_DRINK_TIME;
+    rebuildWitchMesh(entry);
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = WITCH_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = WITCH_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = WITCH_WANDER_MIN + Math.random() * (WITCH_WANDER_MAX - WITCH_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -12418,6 +12613,7 @@ function updateMobs(dt) {
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
     if (entry.type === 'zombie_villager') { updateZombieVillager(entry, obj, dt); continue; }
     if (entry.type === 'wandering_trader') { updateWanderingTrader(entry, obj, dt); continue; }
+    if (entry.type === 'witch') { updateWitch(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
     if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
@@ -13519,7 +13715,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13589,7 +13785,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13732,6 +13928,7 @@ function renderCommands(model) {
       else if (d.type === 'elder_guardian') lines.push(`summon minecraft:elder_guardian ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'zombie_villager') lines.push(`summon minecraft:zombie_villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze') lines.push(`summon minecraft:blaze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'witch') lines.push(`summon minecraft:witch ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
