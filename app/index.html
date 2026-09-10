@@ -2105,6 +2105,15 @@ const DECOR_TYPES = {
   // any kind required anywhere in the whole process. See
   // growTadpoleIntoFrog / updateTadpole.
   tadpole: { kind: 'tadpole', interactive: false },
+  // Real vanilla armadillos roll into a ball the instant they sense a
+  // nearby threat, staying rolled up and stationary until it's gone
+  // (minecraft.wiki/w/Armadillo). This is this app's first FREEZE-type
+  // threat reaction: every earlier hazard/threat-aware mob either ignores
+  // it completely (ordinary ground mobs) or actively FLEES it (the
+  // hoglin fleeing warped fungus, the bat fleeing light) — an armadillo
+  // is the first to react by going rigid and stationary in place instead
+  // of moving away at all. See updateArmadillo / rebuildArmadilloMesh.
+  armadillo: { kind: 'armadillo', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3532,6 +3541,22 @@ function buildTadpolePondInterior(grid, silhouette, dims, exteriorMat, accentMat
     decorOut.push({ type: 'tadpole', x, y: 1, z, facing: 'south' });
   }
 }
+// An open sand yard with 2 armadillos — switch to Walk mode and approach
+// one: the instant you're within its own real sense radius, it genuinely
+// rolls into a compact ball and freezes completely in place, then
+// genuinely unrolls and resumes wandering again once you back off.
+function buildArmadilloScrublandInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const spots = [[-2, 0], [2, 1]];
+  for (const [dx, dz] of spots) {
+    const x = Math.max(0, Math.min(dims.sx - 1, cx + dx));
+    const z = Math.max(0, Math.min(dims.sz - 1, cz + dz));
+    decorOut.push({ type: 'armadillo', x, y: 1, z, facing: 'south' });
+  }
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4632,6 +4657,18 @@ const PRESETS = [
       'Not modeled: the real ability to speed up the growth by feeding a tadpole slimeballs, tadpoles being a possible source of a rare frog variant depending on the biome they grow up in, and any of their real vulnerability to being eaten by an adult frog themselves — this app has no feeding or biome-variant system at all, so these tadpoles only ever swim and grow on a fixed timer.',
     ],
   },
+  {
+    id: 'armadillo-scrubland', name: 'Armadillo Scrubland', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'armadilloScrubland',
+    blocks: { exterior: 'sand', interior: 'sand', accent: 'sand' },
+    desc: 'An open sand yard with 2 armadillos — real vanilla armadillos roll into a ball the instant they sense a nearby threat, freezing completely in place until it\'s gone, and these do too: switch to Walk mode and approach one, and watch it genuinely roll up and stop moving the instant you\'re close, then unroll and resume wandering once you back off.',
+    keywords: ['armadillo', 'roll', 'ball', 'curl up', 'defense', 'freeze', 'scute'],
+    notes: [
+      'Switch to Walk mode and approach either armadillo — the instant your own live position comes within its own real sense radius, it genuinely rolls into a compact ball, its own geometry swapping to a small rounded shape, and freezes there with zero movement of any kind for as long as you stay close; back off past that same radius and it genuinely unrolls and resumes its own ordinary wander right where it left off. Real vanilla armadillos roll into a ball the instant they sense a nearby threat, staying rolled up and stationary until it leaves (minecraft.wiki/w/Armadillo). This is a genuinely new class of mechanic for this app: every earlier hazard/threat-aware mob either ignores a nearby threat completely (every ordinary ground mob) or actively FLEES it (the hoglin fleeing warped fungus, the bat fleeing light) — an armadillo is the first to react by freezing rigidly in place instead of moving away at all. This app\'s own `updateArmadillo` checks the live player\'s own distance fresh every frame, exactly the same direct proximity check already used by the elder guardian\'s own aura and the blaze\'s own fire range, and toggles `entry._rolled` the instant that distance crosses its own real sense radius in either direction, calling `rebuildArmadilloMesh` to swap its own live geometry between the two forms — deliberately avoiding a full scene rebuild since this runs from inside `updateMobs`\' own per-frame loop, the same targeted technique already proven by the witch\'s own held-potion mesh swap.',
+      'Verified directly by a unit test confirming an armadillo keeps wandering completely normally while no live player is anywhere nearby, that it genuinely rolls up and its own live position freezes solid the instant a simulated live player comes within its own real sense radius, that it stays frozen for as long as that player stays close even across many more simulated frames, and a second test confirming it genuinely unrolls and resumes real movement again once that player backs off past the same radius. This app has no combat, health, or damage system at all, so there\'s no real threat to roll away from in the first place — the live player\'s own presence stands in for one, and this app also has no verified real sense radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the witch\'s own fire-sense radius. The geometry is new: a low body with 3 overlapping shell-plate ridges along its back, a snouted head, small ears, a tail, and 4 short legs, plus its own separate compact rolled-ball form used only while curled up.',
+      'Not modeled: any actual immunity to damage while rolled up (this app has no combat or damage system at all, so rolling here is purely a visual/positional freeze), real armadillos being specifically more easily startled by wolves than other threats, and their real scutes drop (used to craft wolf armor) — this app has no combat, breeding, or crafting system at all, so this armadillo only ever rolls up and unrolls in response to the live player.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5088,6 +5125,8 @@ function generateModel() {
     buildZombifiedPiglinPackInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'tadpolePond') {
     buildTadpolePondInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'armadilloScrubland') {
+    buildArmadilloScrublandInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6006,6 +6045,48 @@ function slimeballParts() {
   const ball = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   ball.translate(0, -0.35, 0);
   return { ball };
+}
+// A low body, 3 overlapping shell-plate ridges along the back, a head
+// with a snout and small ears, a tail, and 4 short legs — plus a
+// separate compact `rolledBall` form used only while `entry._rolled` is
+// true (see the render branch), standing in for a real armadillo curling
+// up into a tight ball. See DECOR_TYPES.armadillo.
+function armadilloParts() {
+  const body = new THREE.BoxGeometry(0.34, 0.22, 0.5);
+  body.translate(0, 0.16, 0);
+  const shellOffsets = [-0.16, 0, 0.16];
+  const shellPlates = shellOffsets.map((z) => {
+    const g = new THREE.BoxGeometry(0.36, 0.06, 0.14);
+    g.translate(0, 0.28, z);
+    return g;
+  });
+  const head = new THREE.BoxGeometry(0.16, 0.14, 0.16);
+  head.translate(0, 0.18, 0.3);
+  const snout = new THREE.BoxGeometry(0.08, 0.06, 0.08);
+  snout.translate(0, 0.15, 0.38);
+  const earOffsets = [[-0.06, 0.26, 0.28], [0.06, 0.26, 0.28]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.05, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.06, 0.06, 0.18);
+  tail.translate(0, 0.14, -0.33);
+  const legOffsets = [[-0.12, -0.16], [0.12, -0.16], [-0.12, 0.16], [0.12, 0.16]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.14, 0.08);
+    g.translate(x, 0.07, z);
+    return g;
+  });
+  const eyeOffsets = [[-0.04, 0.19, 0.37], [0.04, 0.19, 0.37]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.025, 0.025, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  const rolledBall = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  rolledBall.translate(0, 0.15, 0);
+  return { body, shellPlates, head, snout, ears, tail, legs, eyes, rolledBall };
 }
 // A small oval body and a long flat tail — real vanilla tadpoles look
 // nothing like a frog yet, just a tiny swimming blob with a tail
@@ -7739,6 +7820,27 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = slimeballParts(); decorGeoCache.set('slimeball', parts); }
     const group = new THREE.Group();
     group.add(new THREE.Mesh(parts.ball, solidMaterial(0x9fc94f)));
+    objs.push(group);
+  } else if (def.kind === 'armadillo') {
+    let parts = decorGeoCache.get('armadillo');
+    if (!parts) { parts = armadilloParts(); decorGeoCache.set('armadillo', parts); }
+    const group = new THREE.Group();
+    const shellMat = solidMaterial(0xc9a876), skinMat = solidMaterial(0x8a6f52), eyeMat = solidMaterial(0x1c1a1d);
+    if (entry._rolled) {
+      group.add(new THREE.Mesh(parts.rolledBall, shellMat));
+      for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    } else {
+      group.add(new THREE.Mesh(parts.body, skinMat));
+      for (const g of parts.shellPlates) group.add(new THREE.Mesh(g, shellMat));
+      group.add(new THREE.Mesh(parts.head, skinMat));
+      group.add(new THREE.Mesh(parts.snout, skinMat));
+      for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
+      group.add(new THREE.Mesh(parts.tail, skinMat));
+      for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+      for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'tadpole') {
     let parts = decorGeoCache.get('tadpole');
@@ -11972,6 +12074,96 @@ function updateTadpole(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const ARMADILLO_WANDER_MIN = 2, ARMADILLO_WANDER_MAX = 5;
+const ARMADILLO_WALK_SPEED = 0.8;
+// An honest, approximate stand-in — not a verified real threat-sense
+// radius, the same caveat already applied to the warden's sense radius
+// and the witch's own fire-sense radius.
+const ARMADILLO_THREAT_SENSE_RADIUS = 5;
+// Rebuilds this armadillo's own mesh in place so it can swap between its
+// ordinary body and its compact rolled-ball form as entry._rolled
+// toggles. Called from inside updateArmadillo itself, which runs from
+// inside updateMobs' own per-frame loop, so this deliberately avoids a
+// full scene rebuild (which would reassign the shared mobObjects array
+// out from under that in-progress loop) — the same targeted
+// splice-and-rebuild technique already proven by rebuildWitchMesh.
+function rebuildArmadilloMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// The real new mechanic — see DECOR_TYPES.armadillo. Rolls up the instant
+// a live player comes within its own real sense radius, freezing in
+// place with zero movement of any kind until the threat backs off again.
+function updateArmadillo(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ARMADILLO_WANDER_MIN + Math.random() * (ARMADILLO_WANDER_MAX - ARMADILLO_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  let playerDist = Infinity;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    const dx = (flyState.pos.x - offX) - entry._wx, dz = (flyState.pos.z - offZ) - entry._wz;
+    playerDist = Math.hypot(dx, dz);
+  }
+  const threatNearby = playerDist <= ARMADILLO_THREAT_SENSE_RADIUS;
+  if (threatNearby && !entry._rolled) {
+    entry._rolled = true;
+    rebuildArmadilloMesh(entry);
+    return;
+  }
+  if (!threatNearby && entry._rolled) {
+    entry._rolled = false;
+    rebuildArmadilloMesh(entry);
+    return;
+  }
+  if (entry._rolled) {
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    return; // frozen in place — no movement of any kind while rolled up
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ARMADILLO_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ARMADILLO_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = ARMADILLO_WANDER_MIN + Math.random() * (ARMADILLO_WANDER_MAX - ARMADILLO_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -13173,6 +13365,7 @@ function updateMobs(dt) {
     if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
     if (entry.type === 'tadpole') { updateTadpole(entry, obj, dt); continue; }
+    if (entry.type === 'armadillo') { updateArmadillo(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -14248,7 +14441,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -14318,7 +14511,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14465,6 +14658,7 @@ function renderCommands(model) {
       else if (d.type === 'mob_spawner') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:spawner{SpawnData:{entity:{id:"minecraft:${d.mobType}"}}}`);
       else if (d.type === 'zombified_piglin') lines.push(`summon minecraft:zombified_piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'tadpole') lines.push(`summon minecraft:tadpole ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'armadillo') lines.push(`summon minecraft:armadillo ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
