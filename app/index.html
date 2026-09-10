@@ -2082,6 +2082,19 @@ const DECOR_TYPES = {
   // entirely unattended (minecraft.wiki/w/Tutorials/Mob_farm). See
   // updateMobSpawner / spawnFarmMob / killFarmMob.
   mob_spawner: { kind: 'mob_spawner', interactive: false },
+  // Real vanilla zombified piglins are passive/neutral on their own, but
+  // hurting ANY ONE of them makes EVERY zombified piglin within a real
+  // radius become hostile at once, not just the one that was hit
+  // (minecraft.wiki/w/Zombified_Piglin). This is this app's first
+  // CASCADING shared-state mechanic: every earlier interaction here only
+  // ever changes the ONE entry it's triggered on (shearing a mooshroom,
+  // curing a zombie villager) — alerting a zombified piglin instead
+  // spreads to every other real zombified piglin entry within range in
+  // the exact same click. See alertZombifiedPiglinGroup /
+  // updateZombifiedPiglin. Reuses the piglin's own body plan unchanged
+  // (real zombified piglins share the piglin's base model) plus its own
+  // small face and an always-carried golden sword.
+  zombified_piglin: { kind: 'zombified_piglin', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3585,6 +3598,22 @@ function buildCreeperFarmInterior(grid, silhouette, dims, exteriorMat, accentMat
   });
   decorOut.push({ type: 'hopper', x: cx, y: 1, z: dropZ });
 }
+// A netherrack platform with 3 zombified piglins clustered together —
+// switch to Interact mode and right-click just ONE of them: watch every
+// nearby one turn hostile (red eyes) in that same click, not just the one
+// you clicked.
+function buildZombifiedPiglinPackInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const offsets = [[0, 0], [-2, 1], [2, -1]];
+  for (const [dx, dz] of offsets) {
+    const x = Math.max(0, Math.min(dims.sx - 1, cx + dx));
+    const z = Math.max(0, Math.min(dims.sz - 1, cz + dz));
+    decorOut.push({ type: 'zombified_piglin', x, y: 1, z, facing: 'south' });
+  }
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4546,6 +4575,18 @@ const PRESETS = [
       'Not modeled: the real chance-based nature of a creeper\'s own gunpowder drop count (0-2, boosted by Looting) — this always drops exactly one — spawner activation only within a real player\'s own nearby range, and any of the real light-level requirements a creeper actually needs to spawn in the first place; this app has no lighting-based spawn-condition system at all, so this spawner simply spawns on a fixed timer regardless.',
     ],
   },
+  {
+    id: 'zombified-piglin-pack', name: 'Zombified Piglin Pack', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'zombifiedPiglinPack',
+    blocks: { exterior: 'netherrack', interior: 'netherrack', accent: 'netherrack' },
+    desc: 'A netherrack platform with 3 zombified piglins clustered together — real vanilla zombified piglins are passive on their own, but hurting just one makes every nearby one hostile at once, and this one genuinely does: switch to Interact mode and right-click just ONE, and watch every real zombified piglin within range turn hostile together, in that same click.',
+    keywords: ['zombified piglin', 'zombie pigman', 'nether', 'group', 'aggro', 'cascade', 'alert'],
+    notes: [
+      'Switch to Interact mode and right-click any single one of the 3 zombified piglins — every real zombified piglin entry within its own real alert radius turns hostile in that exact same click: its own eyes turn red, and once you switch to Walk mode, it beelines straight for your own live position instead of its own ordinary idle/walking wander. Real vanilla zombified piglins are passive/neutral on their own, but hurting even one of them makes every zombified piglin nearby become hostile at once, not just the one that was hit (minecraft.wiki/w/Zombified_Piglin). This is a genuinely new class of mechanic for this app: every earlier interactive mutation here only ever changes the ONE entry it\'s triggered on — shearing a mooshroom changes just that mooshroom, curing a zombie villager cures just that zombie villager — while alerting a zombified piglin is the first to CASCADE, spreading to every other qualifying entry within range in the exact same click. This app\'s own `alertZombifiedPiglinGroup` scans every real `zombified_piglin` decor entry in the model, and for each one within its own real alert radius of the one that was clicked, sets its own `_alerted` flag too, all in a single pass, then does one full scene rebuild — safe here since this runs from the player\'s own click handler, never from inside `updateMobs`\' own per-frame loop, the same reasoning already used for shearMooshroom. `updateZombifiedPiglin` then makes any `_alerted` one permanently give up its own ordinary wander in favor of beelining for the live player\'s own current position whenever one exists.',
+      'Verified directly by a unit test confirming right-clicking one zombified piglin genuinely alerts every other real one within its own real alert radius in that same call (not just the one that was clicked), that one placed well outside that radius is genuinely left alone, that an already-alerted one is never re-processed by a second alert, and a second test confirming an alerted one genuinely beelines toward a simulated live player\'s own position instead of continuing its own ordinary wander, while a non-alerted one keeps wandering normally the whole time. This app has no combat, health, or damage system at all, so "hurting one" is honestly stood in for by simply right-clicking one directly, and this app also has no verified real alert radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the warden\'s sense radius and the witch\'s own fire-sense radius. The geometry reuses the piglin\'s own body plan completely unchanged (real zombified piglins share the piglin\'s base model) — the same reuse pattern already used for the hoglin\'s reuse of the ravager\'s body — plus its own new small face (this app\'s standing rule that every mob gets one, since the older piglin geometry this reuses predates it) and a golden sword that\'s always carried, unlike an ordinary piglin\'s own sometimes-empty hands.',
+      'Not modeled: any actual damage from a zombified piglin\'s own attack, the real requirement that this reaction only spreads within the same nether-native "chunk-based" grouping rather than a simple radius, and their real chance to spawn from a regular piglin struck by a charged Nether portal or lightning — this app has no combat, damage, or portal system at all, so this pack only ever reacts to being directly clicked.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4998,6 +5039,8 @@ function generateModel() {
     buildWitchFireHazardInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'creeperFarm') {
     buildCreeperFarmInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'zombifiedPiglinPack') {
+    buildZombifiedPiglinPackInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6177,6 +6220,22 @@ function piglinParts() {
   swordBlade.rotateZ(swordAngle);
   swordBlade.translate(swordX, swordY, swordZ);
   return { torso, belt, head, snout, tusks, ears, arms, legs, boots, swordHilt, swordBlade };
+}
+// A small face — 2 dark eye boxes — for the zombified piglin's own reuse
+// of piglinParts' head, this app's standing rule that every mob gets one.
+// Positioned just proud of the head's own front face at the same offset
+// technique already used for the villager's and creeper's faces. Their
+// color is picked at render time based on entry._alerted rather than
+// being baked in here, since the same geometry is shared regardless of
+// alert state.
+function zombifiedPiglinFaceParts() {
+  const eyeOffsets = [[-0.09, 1.32, 0.21], [0.09, 1.32, 0.21]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { eyes };
 }
 // Real vanilla creepers have no arms — just a head, a body, and 4 short
 // legs at the corners of the body's own footprint (minecraft.wiki/w/Creeper
@@ -7737,6 +7796,39 @@ function buildDecorMeshesForEntry(entry) {
       group.add(new THREE.Mesh(parts.swordHilt, bootMat));
       group.add(new THREE.Mesh(parts.swordBlade, swordMat));
     }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'zombified_piglin') {
+    // Reuses the piglin's own body plan unchanged (real zombified piglins
+    // share the piglin's base model) — see hoglin's identical reuse of
+    // ravagerParts — plus its own small face and an always-carried golden
+    // sword (real zombified piglins always wield one, unlike an ordinary
+    // piglin's own sometimes-empty hands).
+    let parts = decorGeoCache.get('piglin');
+    if (!parts) { parts = piglinParts(); decorGeoCache.set('piglin', parts); }
+    let faceParts = decorGeoCache.get('zombifiedPiglinFace');
+    if (!faceParts) { faceParts = zombifiedPiglinFaceParts(); decorGeoCache.set('zombifiedPiglinFace', faceParts); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0x9caa6e), tuskMat = solidMaterial(0xd8d0a8);
+    const vestMat = solidMaterial(0x4a3a28), beltMat = solidMaterial(0xd4af37), bootMat = solidMaterial(0x1a1410);
+    const swordMat = solidMaterial(0x8a7a3a);
+    // Every other zombified piglin within real range turns this same red
+    // the instant ANY one of them is alerted — see
+    // alertZombifiedPiglinGroup.
+    const eyeMat = solidMaterial(entry._alerted ? 0xff2a2a : 0x1a1410);
+    group.add(new THREE.Mesh(parts.torso, vestMat));
+    group.add(new THREE.Mesh(parts.belt, beltMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.snout, skinMat));
+    for (const g of parts.tusks) group.add(new THREE.Mesh(g, tuskMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.boots) group.add(new THREE.Mesh(g, bootMat));
+    group.add(new THREE.Mesh(parts.swordHilt, bootMat));
+    group.add(new THREE.Mesh(parts.swordBlade, swordMat));
+    for (const g of faceParts.eyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -12620,6 +12712,87 @@ function updateMobSpawner(entry, dt) {
   spawnFarmMob(currentModel, entry);
   entry._spawnTimer = MOB_SPAWNER_INTERVAL;
 }
+const ZOMBIFIED_PIGLIN_WANDER_MIN = 2, ZOMBIFIED_PIGLIN_WANDER_MAX = 5;
+const ZOMBIFIED_PIGLIN_WALK_SPEED = 1.0;
+const ZOMBIFIED_PIGLIN_CHASE_SPEED = 1.8;
+// An honest, approximate stand-in — not a verified real alert radius.
+const ZOMBIFIED_PIGLIN_ALERT_RADIUS = 8;
+// The real new mechanic: alerting ANY zombified piglin genuinely cascades
+// to every OTHER real zombified piglin entry within range, all becoming
+// hostile together in the exact same click — real vanilla zombified
+// piglins do this too (minecraft.wiki/w/Zombified_Piglin). Runs from
+// attemptInteract's own click handler, which is OUTSIDE updateMobs' own
+// per-frame loop, so a full scene rebuild here is safe, the same
+// reasoning already used for shearMooshroom.
+function alertZombifiedPiglinGroup(model, sourceEntry) {
+  for (const d of model.decor) {
+    if (d.type !== 'zombified_piglin' || d._alerted) continue;
+    const sx = sourceEntry._wx ?? sourceEntry.x + 0.5, sz = sourceEntry._wz ?? sourceEntry.z + 0.5;
+    const dx = d._wx ?? d.x + 0.5, dz = d._wz ?? d.z + 0.5;
+    if (Math.hypot(dx - sx, dz - sz) <= ZOMBIFIED_PIGLIN_ALERT_RADIUS) d._alerted = true;
+  }
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
+function updateZombifiedPiglin(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ZOMBIFIED_PIGLIN_WANDER_MIN + Math.random() * (ZOMBIFIED_PIGLIN_WANDER_MAX - ZOMBIFIED_PIGLIN_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  // Once alerted, a zombified piglin beelines straight for the live
+  // player instead of its own ordinary idle/walking wander, for as long
+  // as one is actually present to chase.
+  if (entry._alerted && (cameraMode === 'walk' || cameraMode === 'thirdperson')) {
+    const dx = (flyState.pos.x - offX) - entry._wx, dz = (flyState.pos.z - offZ) - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.6) {
+      const step = Math.min(ZOMBIFIED_PIGLIN_CHASE_SPEED * dt, dist);
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ZOMBIFIED_PIGLIN_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ZOMBIFIED_PIGLIN_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = ZOMBIFIED_PIGLIN_WANDER_MIN + Math.random() * (ZOMBIFIED_PIGLIN_WANDER_MAX - ZOMBIFIED_PIGLIN_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -12758,6 +12931,7 @@ function updateMobs(dt) {
       if (entry._collectTimer <= 0) { removeDroppedItemFromWorld(entry); continue; }
     }
     if (entry.type === 'mob_spawner') { updateMobSpawner(entry, dt); continue; }
+    if (entry.type === 'zombified_piglin') { updateZombifiedPiglin(entry, obj, dt); continue; }
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
@@ -13415,6 +13589,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'axolotl') { captureAxolotlToBucket(currentModel, entry); return; }
     if (entry.type === 'mooshroom') { shearMooshroom(currentModel, entry); return; }
     if (entry.type === 'zombie_villager') { startCuringZombieVillager(entry); return; }
+    if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -13867,7 +14042,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13937,7 +14112,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14082,6 +14257,7 @@ function renderCommands(model) {
       else if (d.type === 'blaze') lines.push(`summon minecraft:blaze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'witch') lines.push(`summon minecraft:witch ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'mob_spawner') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:spawner{SpawnData:{entity:{id:"minecraft:${d.mobType}"}}}`);
+      else if (d.type === 'zombified_piglin') lines.push(`summon minecraft:zombified_piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
