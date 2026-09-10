@@ -2130,6 +2130,20 @@ const DECOR_TYPES = {
   // zombie's base model), recoloured with a real drowned's own teal,
   // waterlogged skin tone.
   drowned: { kind: 'drowned', interactive: false },
+  // Real vanilla husks that stay submerged in water long enough
+  // genuinely convert into an ordinary zombie, losing their own desert
+  // immunity to sunlight in the process (minecraft.wiki/w/Husk). This is
+  // this app's first ENVIRONMENT-GATED automatic mutation: the tadpole's
+  // own growth is a pure timer that runs regardless of where it is, and
+  // the zombie villager's own cure needs a player click just to start —
+  // a husk's own conversion instead depends continuously on its real
+  // live surroundings, counting up only while it's actually still in
+  // real water and resetting the instant it isn't, with zero player
+  // interaction anywhere. See updateHusk / convertHuskToZombie. Reuses
+  // the zombie's own humanoid body plan completely unchanged (real husks
+  // share the zombie's base model), recoloured with a real husk's own
+  // sandy, desert-worn skin tone.
+  husk: { kind: 'husk', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3588,6 +3602,25 @@ function buildDrownedShorelineInterior(grid, silhouette, dims, exteriorMat, acce
   decorOut.push({ type: 'water', x: cx, y: 1, z: Math.max(0, cz - 3), source: true });
   decorOut.push({ type: 'drowned', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same glass-walled, single-water-source, open-topped tank shape
+// already proven on the Aquarium Chamber and Axolotl Tank presets, with
+// a husk placed directly in the water from the start — switch to Walk
+// mode and just wait: real vanilla husks that stay submerged long enough
+// genuinely convert into an ordinary zombie, and this one genuinely does
+// too, entirely on its own.
+function buildHuskWaterTrapInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'husk', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4712,6 +4745,18 @@ const PRESETS = [
       'Not modeled: a real drowned\'s own trident-throwing attack and melee damage, its real chance to spawn already holding a trident or nautilus shell, and converting a regular villager into a zombie villager the way a zombie can (this app has no combat, throwing, or NPC-conversion-by-drowned system at all) — this drowned only ever wanders between water and land.',
     ],
   },
+  {
+    id: 'husk-water-trap', name: 'Husk Water Trap', shape: 'box', category: 'Aquatic',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'huskWaterTrap',
+    blocks: { exterior: 'glass', interior: 'sand', accent: 'sand' },
+    desc: 'The same glass-walled, single-water-source tank already proven on the Aquarium Chamber and Axolotl Tank presets, with a husk placed directly in the water — real vanilla husks that stay submerged long enough genuinely convert into an ordinary zombie, and this one genuinely does too, entirely on its own with zero interaction of any kind.',
+    keywords: ['husk', 'zombie', 'convert', 'water', 'submerged', 'desert', 'automatic'],
+    notes: [
+      'Just wait — with zero interaction of any kind, the husk genuinely converts into a real, live zombie entry once it\'s been continuously submerged in the real water for long enough, right where it happens to be standing at the time. Real vanilla husks that stay submerged in water long enough genuinely convert into an ordinary zombie, losing their own desert immunity to sunlight in the process (minecraft.wiki/w/Husk). This is a genuinely new class of automatic mutation for this app: the tadpole\'s own growth timer is a pure timer that runs regardless of where it is, and the zombie villager\'s own cure needs a player click just to START its own timer — a husk\'s own conversion instead depends continuously on its real live surroundings, only counting up while it\'s genuinely still submerged this exact frame and resetting instantly the moment it isn\'t, entirely without any player interaction anywhere. This app\'s own `updateHusk` checks whether its current cell is real water fresh every single frame using the exact same `squidCellSwimmable` check the drowned\'s own amphibious wander already uses, accumulating a real wet-timer only while that\'s true; the instant it crosses its own real threshold, `convertHuskToZombie` changes the exact same live entry object\'s own `type` to `zombie` and rebuilds just its own mesh in place, deliberately avoiding a full scene rebuild since this runs from inside `updateMobs`\' own per-frame loop, the same targeted technique already proven by the zombie villager\'s own cure.',
+      'Verified directly by a unit test confirming a husk placed in real water genuinely converts into the identical entry object as a live `zombie` — not a deletion followed by a new zombie spawning in its place — once its own real wet-timer crosses its own threshold, that its own wet-timer counts up only while genuinely still submerged and never while it happens to be dry, and a second test confirming the real CONTINUOUS nature of the condition: briefly stepping out of the water and back in resets the timer back to zero rather than merely pausing it, so a husk that keeps dipping in and out never accumulates toward converting at all. This app has no verified real submersion duration, so the figure used is an honest, approximate stand-in, compressed the same way the zombie villager\'s own cure timer already is. The geometry reuses the zombie\'s own humanoid body plan completely unchanged (real husks share the zombie\'s base model), recoloured with a real husk\'s own sandy, desert-worn skin tone.',
+      'Not modeled: a real husk\'s own actual immunity to daylight burning while still a husk (this app has no day/night or burning system at all), its real Hunger-effect melee attack, and the real requirement that a husk specifically spawns in desert/badlands biomes — this app has no combat, status-effect, or biome-based spawn-condition system at all, so this husk only ever wanders and watches its own real wet-timer.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5172,6 +5217,8 @@ function generateModel() {
     buildArmadilloScrublandInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'drownedShoreline') {
     buildDrownedShorelineInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'huskWaterTrap') {
+    buildHuskWaterTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -8211,6 +8258,26 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
     const faceMat = solidMaterial(0x0a1410);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'husk') {
+    // Reuses the zombie's own geometry unchanged (real husks share the
+    // zombie's base model) — see hoglin's identical reuse of
+    // ravagerParts — recoloured with a real husk's own sandy, desert-worn
+    // skin tone.
+    let parts = decorGeoCache.get('zombie');
+    if (!parts) { parts = zombieParts(); decorGeoCache.set('zombie', parts); }
+    const group = new THREE.Group();
+    const shirtMat = solidMaterial(0xa88656);
+    const skinMat = solidMaterial(0xc9a86a);
+    const pantsMat = solidMaterial(0x8a6f45);
+    group.add(new THREE.Mesh(parts.torso, shirtMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
+    const faceMat = solidMaterial(0x1c140a);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -12314,6 +12381,84 @@ function updateDrowned(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const HUSK_WANDER_MIN = 2, HUSK_WANDER_MAX = 5;
+const HUSK_WALK_SPEED = 1.0;
+// Real vanilla husks take a genuine amount of real submerged time to
+// convert; compressed the same way the zombie villager's own cure timer
+// and the wandering trader's own departure timer already are.
+const HUSK_WATER_CONVERT_TIME = 6;
+// The real new mechanic — see DECOR_TYPES.husk. Called from inside
+// updateHusk itself, which runs from inside updateMobs' own per-frame
+// loop, so this deliberately avoids a full scene rebuild — the same
+// targeted splice-and-rebuild technique already proven by
+// finishCuringZombieVillager.
+function convertHuskToZombie(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  entry.type = 'zombie';
+  delete entry._wetTimer;
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function updateHusk(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = HUSK_WANDER_MIN + Math.random() * (HUSK_WANDER_MAX - HUSK_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._wetTimer = 0;
+  }
+  // Counts up only while genuinely still submerged this exact frame, and
+  // resets the instant it isn't — a real CONTINUOUS condition, not a
+  // cumulative one, matching real vanilla's own "stays in water" rule.
+  const inWaterNow = squidCellSwimmable(currentModel, Math.floor(entry._wx), entry.y, Math.floor(entry._wz));
+  if (inWaterNow) {
+    entry._wetTimer += dt;
+    if (entry._wetTimer >= HUSK_WATER_CONVERT_TIME) { convertHuskToZombie(entry); return; }
+  } else {
+    entry._wetTimer = 0;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = HUSK_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = HUSK_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = HUSK_WANDER_MIN + Math.random() * (HUSK_WANDER_MAX - HUSK_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -13517,6 +13662,7 @@ function updateMobs(dt) {
     if (entry.type === 'tadpole') { updateTadpole(entry, obj, dt); continue; }
     if (entry.type === 'armadillo') { updateArmadillo(entry, obj, dt); continue; }
     if (entry.type === 'drowned') { updateDrowned(entry, obj, dt); continue; }
+    if (entry.type === 'husk') { updateHusk(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -14592,7 +14738,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -14662,7 +14808,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14811,6 +14957,7 @@ function renderCommands(model) {
       else if (d.type === 'tadpole') lines.push(`summon minecraft:tadpole ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'armadillo') lines.push(`summon minecraft:armadillo ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'drowned') lines.push(`summon minecraft:drowned ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'husk') lines.push(`summon minecraft:husk ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
