@@ -2017,6 +2017,27 @@ const DECOR_TYPES = {
   // erroring. Reuses the llama's own geometry unchanged, recoloured into
   // a real trader llama's own paler coat, plus a small carried pack.
   trader_llama: { kind: 'trader_llama', interactive: false },
+  // Real vanilla endermen actively hunt down and attack any nearby
+  // endermite on sight (minecraft.wiki/w/Endermite). Every earlier
+  // multi-mob interaction here either only ever MOVES the other entry
+  // (the wolf's own pack cohesion, the trader llama's own bound-trader
+  // follow) or only ever CHANGES its own state (the zombified piglin's
+  // own group alert) — an enderman hunting an endermite is the first
+  // where reaching one live mob genuinely REMOVES a different, still-
+  // living one from the world entirely, a real predator/prey elimination
+  // rather than a state change or a chase that never actually connects.
+  // A new hook checked at the very top of updateMobs, before the shared
+  // generic wander block every other passive mob (including the
+  // enderman's own ordinary wander/teleport) runs through, lets an
+  // enderman with a live endermite within its own real hunt radius
+  // override its ordinary movement for just that frame and close in
+  // instead — see findNearestLiveEndermite / removeEndermiteFromWorld.
+  // The endermite itself has no mechanic of its own beyond being hunted:
+  // it reuses the exact same generic passive wander every other simple
+  // ground mob here already gets for free. New geometry: a smaller,
+  // more tightly segmented body than the silverfish's own, in a real
+  // endermite's own grayish-purple tone.
+  endermite: { kind: 'endermite', interactive: false },
   // Real vanilla shearing a mooshroom "turns it into a cow" permanently,
   // dropping mushrooms in the process (minecraft.wiki/w/Mooshroom). Every
   // earlier interactive removal here deletes the SAME entry outright (the
@@ -3567,6 +3588,21 @@ function buildTraderLlamaEscortInterior(grid, silhouette, dims, exteriorMat, acc
     _traderRef: trader,
   });
 }
+// A small end-stone platform with an enderman and 2 endermites — one
+// within its own real hunt radius, the other placed safely beyond it.
+// Switch to Walk mode and just watch: the enderman genuinely closes in
+// on the near endermite and it's genuinely gone from the world the
+// instant it actually arrives, while the far one is left completely
+// alone the whole time, safely out of range.
+function buildEndermiteHuntInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'enderman', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'endermite', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'endermite', x: Math.max(0, cx - Math.floor(ENDERMAN_HUNT_RADIUS) - 3), y: 1, z: cz, facing: 'south' });
+}
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
 // away from your live position rather than continuing to wander freely.
@@ -4905,7 +4941,7 @@ const PRESETS = [
     keywords: ['pillager', 'crossbow', 'line of sight', 'raid', 'outpost', 'ranged', 'wall'],
     notes: [
       'Switch to Walk mode and approach — the open pillager genuinely draws and fires a real arrow at you the instant your own live position comes within its own real range, exactly like a skeleton. The walled one, at a comparable real distance, stays completely silent the whole time you\'re still on the near side of the wall, even though you\'re well within its own real range too — walk around through the real gap left at one end of the wall into its own genuinely clear sightline, and the exact same pillager immediately starts drawing and fires, no different from the other one once its own path is actually clear. Real vanilla pillagers only fire their crossbow at a target they genuinely have a clear, unobstructed path to — hiding behind a solid wall stops them from shooting even while well within real range (minecraft.wiki/w/Pillager). This is this app\'s first mechanic gated by a real LINE-OF-SIGHT check: every earlier ranged or sensing mob (the skeleton\'s own shot, the blaze\'s own fire range, the witch\'s own fire-sense, the warden\'s own sense radius) reacts on distance alone, blind to whatever real blocks happen to sit in between — a pillager is the first to actually care. This app\'s own `hasLineOfSight` samples the real straight-line path between the pillager and the live player at small fixed steps against the model\'s own grid, returning false the instant any sampled point lands inside a real solid cell; `updatePillager` mirrors the skeleton\'s own idle/walking/drawing state machine exactly, except the transition into drawing requires a genuinely clear path, re-checked fresh every single frame, and a path that goes from clear to blocked WHILE already drawing genuinely cancels the shot instead of letting it fire blind through the wall it just failed. The actual shot itself reuses the skeleton\'s own `fireArrow` completely unchanged, since the real new mechanic here is entirely in the extra gating condition, not in how the projectile works.',
-      'Verified directly by a unit test confirming a simulated live player standing on the near side of the real wall, well within real range of the walled pillager, genuinely never triggers a shot no matter how many real frames pass, that moving the exact same simulated player to the far side (within the exact same range, on a straight unobstructed line) genuinely does trigger one, and a third test confirming a pillager already mid-draw whose own path becomes blocked before it actually fires genuinely cancels rather than shooting through the obstruction — proving the gate is a real, continuously-rechecked line-of-sight condition and not just a one-time check at the start of a wander cycle. This app has no verified real pillager shoot range or draw delay, so the figures used are honest, approximate stand-ins, the same caveat already applied to the skeleton\'s own range and delay this reuses unchanged. The geometry reuses the villager\'s own body plan completely unchanged (real pillagers share the villager\'s base model), recoloured into a real pillager\'s own dark, drab robe, plus a small always-held crossbow.',
+      'Verified directly by a unit test confirming a simulated live player standing on the near side of the real wall, well within real range of the walled pillager, genuinely never triggers a shot no matter how many real frames pass, that moving the exact same simulated player to the far side (within the exact same range, on a straight unobstructed line) genuinely does trigger one, and a third test confirming a pillager already mid-draw whose own path becomes blocked before it actually fires genuinely cancels rather than shooting through the obstruction — proving the gate is a real, continuously-rechecked line-of-sight condition and not just a one-time check at the start of a wander cycle. This app has no verified real pillager shoot range or draw delay, so the figures used are honest, approximate stand-ins, the same caveat already applied to the skeleton\'s own range and delay this reuses unchanged. The geometry reuses the villager\'s own body plan completely unchanged (real pillagers share the villager\'s base model), recoloured into a real pillager\'s own dark, drab robe, plus a small held crossbow that genuinely swaps between its own loaded (a visible nocked arrow) and unloaded (bare bow) forms — unloaded the instant it actually fires, loaded again only once it\'s genuinely reloaded — matching real vanilla\'s own separate loaded/unloaded crossbow item textures, verified by a further unit test confirming that exact swap happens on cue.',
       'Not modeled: a real pillager\'s own actual melee/ranged combat damage, its real participation in raids and patrols (this app has no raid, patrol, or day-based spawn-condition system at all), and captains\' real banner-wearing variant — this app has no combat or banner-decor system at all, so these pillagers only ever wander, aim, and genuinely miss firing when a wall is actually in the way.',
     ],
   },
@@ -4919,6 +4955,18 @@ const PRESETS = [
       'One trader llama starts right next to the wandering trader, already within its own real follow radius; the other starts well beyond it. Watch the far one: instead of picking a random wander target like every other mob here, it genuinely heads toward the trader\'s own live position until it\'s back within range, then wanders freely nearby just like the other one. Real vanilla trader llamas spawn already bound to the specific wandering trader they escort and stay close to it as it wanders (minecraft.wiki/w/Trader_Llama). Every earlier "track another mob" mechanic here targets either the live player (the zombified piglin\'s chase, the pillager\'s line-of-sight shot) or the NEAREST mob of its own SAME species (the wolf\'s own pack cohesion) — a trader llama is the first to follow one SPECIFIC mob of a DIFFERENT species, bound to that exact entry the moment it\'s placed rather than whichever wandering trader happens to be closest. This app\'s own `updateTraderLlama` mirrors the wolf\'s own cohesion state machine shape, but checks a real `_traderRef` object reference set once at placement time instead of searching for the nearest mob of its own type on every decision, and re-checks every single frame whether that exact bound trader is still a genuinely live tracked mob — since a real wandering trader can depart entirely on its own real timer — falling back to an ordinary free wander the instant it isn\'t, rather than chasing a stale reference into nothing.',
       'Verified directly by a unit test confirming a trader llama placed beyond its own real follow radius of its bound trader genuinely closes the distance to that trader\'s own live position over real simulated time, that one already within range wanders independently instead of being forced to sit still, and a second test confirming that once the bound trader entry is genuinely removed from the world (simulating its own real departure), the exact same llama stops trying to follow it and falls back to an ordinary free wander instead of erroring or freezing. This app has no verified real trader-llama follow radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the wolf\'s own pack leash radius. The geometry reuses the llama\'s own body plan completely unchanged, recoloured into a real trader llama\'s own paler coat, plus a small carried pack on its back.',
       'Not modeled: real trader llamas actually being leashed to the trader with a visible lead rather than just following its position, their real chance to spit at a player or wolf that gets too close, and the real "several trader llamas can escort the same trader" spawn group sizing — this app has no leash-rendering, combat, or spawn-group system at all, so these llamas only ever follow their bound trader\'s live position or wander freely nearby.',
+    ],
+  },
+  {
+    id: 'endermite-hunt', name: 'Endermite Hunt', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 21, baseZ: 9 }, interiorMode: 'endermiteHunt',
+    blocks: { exterior: 'end_stone', interior: 'end_stone', accent: 'end_stone' },
+    desc: 'A small end-stone platform with an enderman and 2 endermites — real vanilla endermen actively hunt down and attack any nearby endermite on sight, and this one genuinely does too: switch to Walk mode and watch it close in on the near one while leaving the far one, safely out of its own real hunt radius, completely alone.',
+    keywords: ['endermite', 'enderman', 'hunt', 'predator', 'prey', 'eliminate'],
+    notes: [
+      'Switch to Walk mode and just watch — the enderman genuinely overrides its own ordinary wander the instant a live endermite comes within its own real hunt radius, closing the distance to its exact live position instead of picking a random spot, and the moment it actually arrives, that endermite is genuinely gone from the world for good. The other endermite, placed safely beyond that same radius, is left completely alone the whole time — the enderman never even glances its way. Real vanilla endermen actively hunt down and attack any nearby endermite on sight (minecraft.wiki/w/Endermite). This is a genuinely new class of mechanic for this app: every earlier multi-mob interaction either only ever MOVES the other entry (the wolf\'s own pack cohesion, the trader llama\'s own bound-trader follow) or only ever CHANGES its own state (the zombified piglin\'s own group alert) — an enderman hunting an endermite is the first where reaching one live mob genuinely REMOVES a different, still-living one from the world entirely, a real predator/prey elimination rather than a state change or a chase that never actually connects. This app\'s own `findNearestLiveEndermite` is checked at the very top of `updateMobs`, before the shared generic wander block every other passive mob (including the enderman\'s own ordinary wander/teleport) runs through; the instant a live endermite is in range, `updateEndermanHunt` overrides the enderman\'s movement for just that frame and closes in, deliberately kept in the exact same `_mobState`/`_mobTimer` shape the generic shared block already expects so that unmodified block picks right back up the instant no endermite remains nearby, with zero changes to the enderman\'s own existing wander/teleport code.',
+      'Verified directly by a unit test confirming an enderman with a live endermite within its own real hunt radius genuinely closes the distance to it over real simulated time rather than wandering randomly, that the endermite is genuinely removed from both the model\'s own decor list and the live tracked mob list the instant the enderman\'s own live position actually reaches it, and a second test confirming an endermite placed beyond that same real radius is left completely untouched no matter how many real frames pass, proving the hunt is genuinely gated by real distance and not just "any endermite anywhere." This app has no combat or damage system at all, so a real "attack" is honestly stood in for by a direct removal the instant they actually meet, and this app also has no verified real hunt radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the wolf\'s own pack leash radius and the trader llama\'s own follow radius. The endermite has no mechanic of its own beyond being hunted — it reuses the exact same generic passive wander every other simple ground mob here already gets for free. The geometry is new: a smaller, more tightly segmented body than the silverfish\'s own, in a real endermite\'s own grayish-purple tone.',
+      'Not modeled: a real endermite\'s own actual attack against the player, its real chance to spawn from a player throwing an ender pearl (this app has no pearl-throwing or combat system at all), and its real automatic despawn after a fixed lifetime even if never hunted — this app has no timed despawn for it at all, so an endermite left alone simply wanders forever.',
     ],
   },
 ];
@@ -5389,6 +5437,8 @@ function generateModel() {
     buildPillagerOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'traderLlamaEscort') {
     buildTraderLlamaEscortInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'endermiteHunt') {
+    buildEndermiteHuntInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6628,6 +6678,26 @@ function silverfishParts() {
   });
   return { segments, antennae };
 }
+// A smaller, more tightly segmented body than the silverfish's own —
+// real endermites are noticeably smaller (minecraft.wiki/w/Endermite) —
+// reusing the exact same 3-box-segment-plus-antennae technique, just
+// scaled down and drawn closer together.
+function endermiteParts() {
+  const segOffsets = [-0.12, 0, 0.12];
+  const segments = segOffsets.map((z, i) => {
+    const w = i === 1 ? 0.15 : 0.11;
+    const g = new THREE.BoxGeometry(w, 0.1, 0.11);
+    g.translate(0, 0.06, z);
+    return g;
+  });
+  const antennaOffsets = [[-0.035, 0.1, 0.22], [0.035, 0.1, 0.22]];
+  const antennae = antennaOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.02, 0.02, 0.08);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { segments, antennae };
+}
 // A stocky boar-like torso wearing a real leather-look vest and gold
 // belt, a wide flattened head with a pig snout, 2 tusks, and 2 large
 // prominent ears, 2 arms/2 legs with dark boots, and an optional held
@@ -6877,7 +6947,12 @@ function villagerParts() {
 // the single most recognizable real vanilla silhouette cue distinguishing
 // a pillager from an ordinary villager (minecraft.wiki/w/Pillager), always
 // rendered (unlike the villager's own conditional held wheat/gift) since a
-// real pillager never appears without one.
+// real pillager never appears without one. A separate nocked-arrow overlay
+// (shaft + tip, resting along the same stock) is only added to the render
+// while `entry._loaded` is true (see the render branch / updatePillager) —
+// the visible proof that a pillager genuinely can't fire again until it's
+// actually reloaded, matching real vanilla's own loaded/unloaded crossbow
+// item textures.
 function pillagerCrossbowParts() {
   const stock = new THREE.BoxGeometry(0.06, 0.06, 0.32);
   stock.translate(0.4, 0.68, 0.1);
@@ -6887,7 +6962,13 @@ function pillagerCrossbowParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { stock, limbs };
+  const arrowShaft = new THREE.BoxGeometry(0.03, 0.03, 0.3);
+  arrowShaft.translate(0.4, 0.77, 0.08);
+  const arrowTip = new THREE.BoxGeometry(0.05, 0.05, 0.05);
+  arrowTip.translate(0.4, 0.77, -0.08);
+  const arrowFletch = new THREE.BoxGeometry(0.09, 0.05, 0.03);
+  arrowFletch.translate(0.4, 0.77, 0.22);
+  return { stock, limbs, arrowShaft, arrowTip, arrowFletch };
 }
 // A tall, tapering hat stacked from 3 progressively narrower boxes — real
 // vanilla witches wear a distinctive pointed hat, the single most
@@ -8303,6 +8384,16 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'endermite') {
+    let parts = decorGeoCache.get('endermite');
+    if (!parts) { parts = endermiteParts(); decorGeoCache.set('endermite', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x5a4a6e);
+    for (const g of parts.segments) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.antennae) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'piglin') {
     let parts = decorGeoCache.get('piglin');
     if (!parts) { parts = piglinParts(); decorGeoCache.set('piglin', parts); }
@@ -8475,7 +8566,11 @@ function buildDecorMeshesForEntry(entry) {
     // Reuses the villager's own geometry unchanged (real pillagers share
     // the villager's base humanoid model), recoloured into a real
     // pillager's own dark, drab robe, plus a small held crossbow — always
-    // rendered, since a real pillager never appears without one.
+    // rendered, since a real pillager never appears without one. The
+    // nocked-arrow overlay only renders while `entry._loaded` is true (see
+    // updatePillager) — false immediately after it actually fires, true
+    // again once it's actually reloaded — matching real vanilla's own
+    // separate loaded/unloaded crossbow item textures.
     let parts = decorGeoCache.get('villager');
     if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
     let crossbow = decorGeoCache.get('pillagerCrossbow');
@@ -8495,6 +8590,14 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.faceBrow, faceMat));
     group.add(new THREE.Mesh(crossbow.stock, crossbowMat));
     for (const g of crossbow.limbs) group.add(new THREE.Mesh(g, crossbowMat));
+    if (entry._loaded !== false) {
+      const arrowShaftMat = solidMaterial(0x8a6a4a);
+      const arrowTipMat = solidMaterial(0xb0b0b0);
+      const arrowFletchMat = solidMaterial(0xe8e4d8);
+      group.add(new THREE.Mesh(crossbow.arrowShaft, arrowShaftMat));
+      group.add(new THREE.Mesh(crossbow.arrowTip, arrowTipMat));
+      group.add(new THREE.Mesh(crossbow.arrowFletch, arrowFletchMat));
+    }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -9093,7 +9196,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -9185,6 +9288,73 @@ function pickWanderTarget(model, entry) {
     if (mobCellWalkable(model, tx, entry.y, tz)) return { x: tx, z: tz };
   }
   return null; // nowhere free nearby right now — stay put and try again next idle cycle
+}
+// Real vanilla endermen actively hunt down and attack any nearby
+// endermite (minecraft.wiki/w/Endermite). This app has no combat/damage
+// system at all, so "attack" is honestly stood in for by a genuine
+// removal the instant the enderman actually reaches it — a real
+// predator/prey elimination, the first case here where one still-living
+// mob's own arrival permanently removes a DIFFERENT still-living mob
+// from the world, rather than just changing its state or chasing it
+// without ever connecting. See the hook at the top of updateMobs.
+const ENDERMAN_HUNT_RADIUS = 6;
+const ENDERMAN_HUNT_SPEED = 1.3;
+const ENDERMAN_HUNT_CONTACT_RADIUS = 0.6;
+function findNearestLiveEndermite(entry) {
+  const ex = entry._wx !== undefined ? entry._wx : entry.x + 0.5;
+  const ez = entry._wz !== undefined ? entry._wz : entry.z + 0.5;
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'endermite') continue;
+    const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
+    const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
+    const dist = Math.hypot(ox - ex, oz - ez);
+    if (dist <= ENDERMAN_HUNT_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+function removeEndermiteFromWorld(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+// Overrides an enderman's ordinary wander/teleport for just this one
+// frame, closing in on the given live endermite instead — deliberately
+// keeps `entry._mobState`/`_mobTimer` in the exact same 'idle'/timer
+// shape the generic shared mob block above already expects, so the
+// instant no endermite remains in range, that unmodified generic block
+// picks right back up as if nothing had happened.
+function updateEndermanHunt(entry, obj, dt, prey) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._wx === undefined) {
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._wy = entry.y;
+  }
+  const preyWx = prey._wx !== undefined ? prey._wx : prey.x + 0.5;
+  const preyWz = prey._wz !== undefined ? prey._wz : prey.z + 0.5;
+  const dx = preyWx - entry._wx, dz = preyWz - entry._wz;
+  const dist = Math.hypot(dx, dz);
+  if (dist <= ENDERMAN_HUNT_CONTACT_RADIUS) {
+    removeEndermiteFromWorld(currentModel, prey);
+    entry._mobState = 'idle';
+    entry._mobTimer = MOB_IDLE_MIN + Math.random() * (MOB_IDLE_MAX - MOB_IDLE_MIN);
+  } else {
+    const step = ENDERMAN_HUNT_SPEED * dt;
+    entry._wx += (dx / dist) * step;
+    entry._wz += (dz / dist) * step;
+    entry.x = Math.floor(entry._wx);
+    entry.z = Math.floor(entry._wz);
+    entry._mobYaw = Math.atan2(dx, dz);
+    entry._mobState = 'idle';
+    entry._mobTimer = 0; // re-evaluate the hunt (or resume ordinary wander) next frame
+  }
+  obj.position.set(entry._wx + offX, (entry._wy !== undefined ? entry._wy : entry.y) + 0.5, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
 // A real bat (minecraft.wiki/w/Bat) doesn't wander the floor at all: it
 // "hangs upside down on the underside of a solid block when idle" and
@@ -14153,6 +14323,25 @@ const PILLAGER_WALK_SPEED = 1.0;
 const PILLAGER_SHOOT_RANGE = 10;
 const PILLAGER_DRAW_DELAY = 1;
 const PILLAGER_SHOOT_COOLDOWN = 3;
+// Swaps the held crossbow between its own loaded (arrow visible) and
+// unloaded (bare bow) forms — see updatePillager — the same reentrant-
+// loop-safe manual splice/rebuild technique already proven by
+// rebuildArmadilloMesh and rebuildWitchMesh, since this runs from inside
+// updateMobs' own per-frame loop.
+function rebuildPillagerMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
 // Mirrors updateSkeleton's own idle/walking/drawing state machine and
 // reuses its own fireArrow completely unchanged — the real new mechanic
 // is entirely the added hasLineOfSight gate, checked fresh both when
@@ -14169,6 +14358,13 @@ function updatePillager(entry, obj, dt) {
     entry._shootCooldown = 0;
   }
   entry._shootCooldown = Math.max(0, entry._shootCooldown - dt);
+  // The instant it's actually reloaded, swap the held crossbow back to
+  // its own loaded (arrow-visible) form.
+  if (entry._loaded === false && entry._shootCooldown <= 0) {
+    entry._loaded = true;
+    rebuildPillagerMesh(entry);
+    return;
+  }
   let sensedX = 0, sensedZ = 0, clearShot = false;
   if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
     sensedX = flyState.pos.x - offX;
@@ -14196,6 +14392,9 @@ function updatePillager(entry, obj, dt) {
       entry._shootCooldown = PILLAGER_SHOOT_COOLDOWN;
       entry._mobState = 'idle';
       entry._mobTimer = PILLAGER_WANDER_MIN + Math.random() * (PILLAGER_WANDER_MAX - PILLAGER_WANDER_MIN);
+      entry._loaded = false;
+      rebuildPillagerMesh(entry);
+      return;
     }
   } else if (entry._mobState === 'idle') {
     entry._mobTimer -= dt;
@@ -14246,6 +14445,15 @@ function updateMobs(dt) {
       if (entry._collectTimer <= 0) { removeDroppedItemFromWorld(entry); continue; }
     }
     if (entry.type === 'mob_spawner') { updateMobSpawner(entry, dt); continue; }
+    // A real enderman with a live endermite within its own real hunt
+    // radius overrides its ordinary wander/teleport for just this frame
+    // and closes in instead — checked before the shared generic mob
+    // block below so the enderman's own unmodified ordinary behavior
+    // resumes automatically the instant no endermite remains in range.
+    if (entry.type === 'enderman') {
+      const prey = findNearestLiveEndermite(entry);
+      if (prey) { updateEndermanHunt(entry, obj, dt, prey); continue; }
+    }
     if (entry.type === 'zombified_piglin') { updateZombifiedPiglin(entry, obj, dt); continue; }
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
@@ -15365,7 +15573,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -15435,7 +15643,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -15589,6 +15797,7 @@ function renderCommands(model) {
       else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
