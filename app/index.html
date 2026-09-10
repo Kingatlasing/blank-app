@@ -2069,6 +2069,19 @@ const DECOR_TYPES = {
   // geometry unchanged, plus its own new pointed-hat and held-potion
   // parts.
   witch: { kind: 'witch', interactive: false },
+  // A purely logical marker — the real spawner CAGE block already sits in
+  // the grid itself (the `spawner` material), so this decor entry has no
+  // geometry of its own. It exists only to be registered like a mob (the
+  // same "registered like a mob even though it never moves" approach
+  // already used for dropped_item) so its own periodic spawn-timer logic
+  // runs every frame from inside the shared updateMobs loop. This is this
+  // app's first genuinely AUTOMATIC production chain: no player click,
+  // approach, or trigger anywhere — real vanilla mob farms periodically
+  // spawn a mob from a spawner, automatically kill it (a fall, drowning,
+  // or similar passive kill method), and funnel its drop into a hopper,
+  // entirely unattended (minecraft.wiki/w/Tutorials/Mob_farm). See
+  // updateMobSpawner / spawnFarmMob / killFarmMob.
+  mob_spawner: { kind: 'mob_spawner', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3553,6 +3566,25 @@ function buildWitchFireHazardInterior(grid, silhouette, dims, exteriorMat, accen
   decorOut.push({ type: 'witch', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'fire', x: fireX, y: 1, z: cz });
 }
+// A real, automatic creeper farm: a real spawner cage block periodically
+// spawns a creeper right in front of it, which is automatically killed a
+// short beat later — this app's honest stand-in for a real kill method
+// like fall damage — dropping real gunpowder at a hopper on the far end,
+// entirely unattended. Switch to Walk mode and just watch; no interaction
+// anywhere in the whole cycle.
+function buildCreeperFarmInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2);
+  const cageZ = 1, spawnZ = Math.min(dims.sz - 1, cageZ + 1), dropZ = Math.max(0, dims.sz - 2);
+  grid[idx(cx, 1, cageZ, dims)] = MATERIAL_INDEX['spawner'] + 1;
+  if (!decorOut) return;
+  decorOut.push({
+    type: 'mob_spawner', mobType: 'creeper', x: cx, y: 1, z: cageZ,
+    spawnX: cx, spawnY: 1, spawnZ, dropX: cx, dropY: 1, dropZ,
+  });
+  decorOut.push({ type: 'hopper', x: cx, y: 1, z: dropZ });
+}
 // A dirt farm plot with a ravager and 6 real wheat_crop entries placed
 // directly along its cardinal wander directions — reusing the same
 // wheat_crop entries and dirt-plot shortcut already proven on the
@@ -4502,6 +4534,18 @@ const PRESETS = [
       'Not modeled: any actual damage prevention from real fire or lava (this app has no health or damage system at all, so "fire resistance" here is purely cosmetic bookkeeping), witches\' own real potion-throwing attacks against players, and their real chance to spawn from a lightning strike hitting a villager — this witch only ever senses fire and drinks in response to it.',
     ],
   },
+  {
+    id: 'creeper-farm', name: 'Creeper Farm', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'creeperFarm',
+    blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'stone_bricks' },
+    desc: 'A real, fully automatic creeper farm: a real spawner cage block periodically spawns a creeper, which is automatically killed a short beat later, dropping real gunpowder at a hopper on the far end — entirely unattended, no player interaction anywhere in the whole cycle.',
+    keywords: ['creeper farm', 'mob farm', 'spawner', 'gunpowder', 'automatic', 'hopper', 'kill chamber'],
+    notes: [
+      'Just switch to Walk mode and watch — every few real seconds, a real creeper appears in front of the spawner cage block, and shortly after, it\'s automatically removed and a real gunpowder item appears at the hopper on the far end, then vanishes again shortly after that, simulating the hopper sucking it up. Real vanilla mob farms work exactly this way: a spawner periodically spawns a mob, which is automatically killed by some passive method (a long fall, drowning, lava just out of the mob\'s own path, etc.) with zero further player involvement, and its drop is funneled by water into a hopper (minecraft.wiki/w/Tutorials/Mob_farm); a real vanilla creeper specifically drops gunpowder (minecraft.wiki/w/Creeper). This is this app\'s first genuinely AUTOMATIC production chain: every earlier item-producing interaction here needs either a direct player click (shearing a mooshroom) or a player\'s own live proximity (a piglin noticing a dropped gold ingot) — a creeper farm needs neither, running the exact same way with nobody anywhere nearby at all. This app\'s own `updateMobSpawner` counts its own real spawn timer down every frame, `spawnFarmMob` creates a genuine, fully live creeper entry tagged `_farmSpawned` the instant it fires (waiting instead if the spawner\'s own small cap of currently-alive farm creepers is already full, the same real "won\'t spawn if too crowded" vanilla rule), and a new pair of GENERIC checks at the very top of `updateMobs`\' own per-frame loop — not specific to creepers at all — automatically call `killFarmMob` once any `_farmSpawned` mob\'s own real kill timer runs out, and automatically remove any `_farmCollect` dropped item once its own real collection timer runs out, so any future farm mob type gets this exact same automatic kill/collect behavior for free.',
+      'Verified directly by a unit test confirming zero creepers or gunpowder exist anywhere before the first spawn timer fires, that a real, live creeper entry genuinely appears once it does, that it\'s automatically removed again and replaced by a real gunpowder item at the hopper once its own real kill timer runs out with nobody anywhere near it, that the gunpowder item itself is then automatically removed again once its own real collection timer runs out, and a second test confirming the spawner genuinely stops spawning more creepers once its own real active-mob cap is already reached, resuming again only once one is cleared. This app has no combat, health, or fluid-current system at all, so "a mob automatically dying" and "an item automatically reaching a hopper" are both honestly stood in for by fixed timers with no simulated fall, drowning, or water current anywhere in between — an honest, spelled-out shortcut, not an invented "real" kill or transport mechanism — and this app also has no verified real spawner delay, active-mob cap, or kill/collection timing, so the figures used are honest, approximate stand-ins, the same caveat already applied throughout this app\'s own other compressed timers. The spawner cage itself is real new geometry-free reuse: the `spawner` material block this app already had sits directly in the grid exactly like any other block, with a purely logical `mob_spawner` decor entry (no geometry of its own at all) tracking its own timer state, registered like a mob the same way a `dropped_item` already is even though neither one moves on its own.',
+      'Not modeled: the real chance-based nature of a creeper\'s own gunpowder drop count (0-2, boosted by Looting) — this always drops exactly one — spawner activation only within a real player\'s own nearby range, and any of the real light-level requirements a creeper actually needs to spawn in the first place; this app has no lighting-based spawn-condition system at all, so this spawner simply spawns on a fixed timer regardless.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -4952,6 +4996,8 @@ function generateModel() {
     buildBlazeFortressLedgeInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'witchFireHazard') {
     buildWitchFireHazardInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'creeperFarm') {
+    buildCreeperFarmInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5999,6 +6045,7 @@ const DROPPED_ITEM_COLORS = {
   gravel: 0x8a8478,
   feather: 0xf0ead6,
   red_mushroom: 0xc22b2b,
+  gunpowder: 0x8a8478,
 };
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
@@ -8203,6 +8250,12 @@ function buildDecorMeshesForEntry(entry) {
       group.add(new THREE.Mesh(hatParts.heldPotion, solidMaterial(0x7a2ab0)));
     }
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'mob_spawner') {
+    // No geometry at all — see the DECOR_TYPES.mob_spawner comment. Still
+    // registered like a mob so its own per-frame spawn-timer logic runs.
+    const group = new THREE.Group();
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'cat') {
@@ -12481,6 +12534,92 @@ function updateWitch(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// This app's own compressed stand-in for a real farmable mob's own real
+// vanilla loot — an honest, approximate single-item table, not a real
+// weighted drop count (see minecraft.wiki/w/Creeper's own gunpowder drop).
+const MOB_FARM_LOOT = { creeper: 'gunpowder' };
+// Honest, approximate stand-ins — not verified real spawner delay/cap
+// figures or a real kill-chamber travel time — compressed the same way
+// the zombie villager's own cure timer and the wandering trader's own
+// departure timer already are, so the whole cycle is actually observable
+// while simulating.
+const MOB_SPAWNER_INTERVAL = 4;
+const MOB_SPAWNER_MAX_ACTIVE = 2;
+const MOB_SPAWNER_KILL_DELAY = 1.5;
+const MOB_SPAWNER_COLLECT_DELAY = 1.5;
+// Spawns one real, live mob of the spawner's own configured type at its
+// own dedicated spawn cell (not inside the spawner cage block itself),
+// tagging it `_farmSpawned` so the shared updateMobs loop below
+// automatically kills it again after its own real kill delay, and
+// tagging it with where its own drop should appear once that happens.
+// Uses the exact same manual mesh-build-and-offset technique already
+// proven by fireBlazeFireball, since this runs from inside updateMobSpawner
+// — itself called from inside updateMobs' own per-frame loop.
+function spawnFarmMob(model, spawnerEntry) {
+  if (!three || !three.group) return;
+  const newEntry = {
+    type: spawnerEntry.mobType, x: spawnerEntry.spawnX, y: spawnerEntry.spawnY, z: spawnerEntry.spawnZ, facing: 'south',
+    _farmSpawned: true, _killTimer: MOB_SPAWNER_KILL_DELAY,
+    _farmDropX: spawnerEntry.dropX, _farmDropY: spawnerEntry.dropY, _farmDropZ: spawnerEntry.dropZ,
+  };
+  model.decor.push(newEntry);
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(newEntry)) {
+    mesh.position.x += newEntry.x + offX + 0.5;
+    mesh.position.y += newEntry.y;
+    mesh.position.z += newEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+// Automatically removes a farm-spawned mob (this app's honest stand-in for
+// a real vanilla kill method like fall damage or drowning, which this app
+// has no health/damage system to actually simulate) and produces its own
+// real loot item at the farm's own drop point, tagged `_farmCollect` so
+// the same shared loop automatically removes it again shortly after too,
+// simulating a hopper sucking it up — the exact same
+// splice-mesh-and-record-directly technique already used by
+// removeBlazeFireballFromWorld, since this also runs from inside the very
+// per-frame loop that's iterating mobObjects.
+function killFarmMob(model, entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const lootType = MOB_FARM_LOOT[entry.type];
+  if (!lootType || !three || !three.group) return;
+  const dropEntry = {
+    type: 'dropped_item', itemType: lootType,
+    x: entry._farmDropX, y: entry._farmDropY, z: entry._farmDropZ,
+    _farmCollect: true, _collectTimer: MOB_SPAWNER_COLLECT_DELAY,
+  };
+  model.decor.push(dropEntry);
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(dropEntry)) {
+    mesh.position.x += dropEntry.x + offX + 0.5;
+    mesh.position.y += dropEntry.y + 0.5;
+    mesh.position.z += dropEntry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+// Real vanilla mob farms periodically spawn a mob from a spawner, entirely
+// unattended (minecraft.wiki/w/Tutorials/Mob_farm) — this is this app's
+// first genuinely AUTOMATIC production chain: every earlier item-producing
+// interaction here needs either a player click (shearing a mooshroom) or a
+// player's own live proximity (a piglin's barter). Waits if it's already
+// at its own real cap of currently-alive farm-spawned mobs of its own
+// type, the same "simply doesn't spawn if too crowded" real vanilla rule.
+function updateMobSpawner(entry, dt) {
+  if (entry._spawnTimer === undefined) entry._spawnTimer = MOB_SPAWNER_INTERVAL;
+  entry._spawnTimer -= dt;
+  if (entry._spawnTimer > 0) return;
+  const activeCount = mobObjects.filter(m => m.entry.type === entry.mobType && m.entry._farmSpawned).length;
+  if (activeCount >= MOB_SPAWNER_MAX_ACTIVE) { entry._spawnTimer = 0.5; return; }
+  spawnFarmMob(currentModel, entry);
+  entry._spawnTimer = MOB_SPAWNER_INTERVAL;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -12606,6 +12745,19 @@ function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   for (const { obj, entry } of mobObjects) {
+    // Generic farm hooks, checked before the ordinary per-type dispatch
+    // below so ANY future farm mob type gets this automatic kill/collect
+    // behavior for free just by being tagged `_farmSpawned`/`_farmCollect`
+    // — see killFarmMob / updateMobSpawner.
+    if (entry._farmSpawned) {
+      entry._killTimer -= dt;
+      if (entry._killTimer <= 0) { killFarmMob(currentModel, entry); continue; }
+    }
+    if (entry.type === 'dropped_item' && entry._farmCollect) {
+      entry._collectTimer -= dt;
+      if (entry._collectTimer <= 0) { removeDroppedItemFromWorld(entry); continue; }
+    }
+    if (entry.type === 'mob_spawner') { updateMobSpawner(entry, dt); continue; }
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
     if (entry.type === 'snow_golem') { updateSnowGolem(entry, obj, dt); continue; }
@@ -13715,7 +13867,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -13785,7 +13937,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -13929,6 +14081,7 @@ function renderCommands(model) {
       else if (d.type === 'zombie_villager') lines.push(`summon minecraft:zombie_villager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze') lines.push(`summon minecraft:blaze ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'witch') lines.push(`summon minecraft:witch ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'mob_spawner') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:spawner{SpawnData:{entity:{id:"minecraft:${d.mobType}"}}}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
