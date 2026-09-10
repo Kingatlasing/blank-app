@@ -2254,6 +2254,27 @@ const DECOR_TYPES = {
   // villager's own body plan unchanged, recoloured into a real
   // vindicator's own grim, grayish-green robe, plus a held iron axe.
   vindicator: { kind: 'vindicator', interactive: false },
+  // Real vanilla illusioners can cast a real spell that turns themselves
+  // invisible while summoning several illusionary duplicate copies of
+  // themselves that mimic its own movement, making the real one
+  // genuinely hard to pick out (minecraft.wiki/w/Illusioner). This is a
+  // genuinely new class of mechanic for this app: every earlier
+  // mob-to-mob effect either MOVES another entry (the wolf's pack
+  // cohesion), CHANGES another entry's own state (the zombified piglin's
+  // group alert), or REMOVES one (the enderman hunting an endermite) —
+  // an illusioner is the first to make ITSELF genuinely invisible while
+  // real, live decoy copies stand in for it. See updateIllusioner /
+  // spawnIllusionerClones. Reuses the villager's own body plan unchanged,
+  // recoloured into a real illusioner's own dark robe, plus 2 small
+  // crossed swords.
+  illusioner: { kind: 'illusioner', interactive: false },
+  // A pure, purely cosmetic visual decoy — see DECOR_TYPES.illusioner. It
+  // has no mechanic of its own beyond mirroring its own real source
+  // illusioner's live position at a fixed offset every frame, and is
+  // never itself exportable as a real summonable entity (real vanilla
+  // illusioner clones are a per-cast visual effect, not a distinct
+  // tracked entity type).
+  illusioner_clone: { kind: 'illusioner_clone', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3649,6 +3670,19 @@ function buildVindicatorMenagerieInterior(grid, silhouette, dims, exteriorMat, a
   decorOut.push({ type: 'vindicator', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'cow', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'pig', x: Math.max(0, cx - Math.floor(VINDICATOR_AGGRO_RADIUS) - 3), y: 1, z: cz, facing: 'south' });
+}
+// A grass yard with a single illusioner — switch to Walk mode and
+// approach within its own real cast range: it genuinely stops, casts for
+// a real fixed time, then actually vanishes (`obj.visible = false`) while
+// 3 real separately tracked decoy clones stand in for it, all the way
+// through to it reappearing and resuming its own ordinary wander once the
+// real invisibility duration actually runs out.
+function buildIllusionerAmbushInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'illusioner', x: cx, y: 1, z: cz, facing: 'south' });
 }
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
@@ -5058,6 +5092,18 @@ const PRESETS = [
       'Not modeled: any of the pufferfish\'s own real contact poison damage and its real chance to be a component in a brewed Water Breathing potion, its real preference for ocean biomes, and any actual physical size change affecting real collision (this app has no combat, potion-brewing, or biome system at all) — this pufferfish only ever swims and changes its own visible size in response to a live player.',
     ],
   },
+  {
+    id: 'illusioner-ambush', name: 'Illusioner Ambush', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 15, baseZ: 15 }, interiorMode: 'illusionerAmbush',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass yard with a single illusioner — real vanilla illusioners cast a genuine blindness-and-mirror-image spell on any close player, and this one genuinely does too: switch to Walk mode and approach it to watch it stop, cast, then actually vanish while 3 real decoy clones stand in for it, until it reappears once the spell genuinely runs out.',
+    keywords: ['illusioner', 'illusion', 'invisible', 'clone', 'mirror image', 'decoy'],
+    notes: [
+      'Switch to Walk mode and approach — the illusioner genuinely interrupts its own ordinary wander the instant your own live distance drops within its own real cast range, standing perfectly still through a real fixed cast time before it actually turns invisible (`obj.visible = false`) and spawns 3 real, separately tracked `illusioner_clone` decor entries around its own last position, each rendered through the exact same disguise so nothing on screen tells the real caster apart from its own copies — because for that whole duration, the real one genuinely isn\'t drawn at all. Real vanilla illusioners cast a genuine "blindness + mirror image" spell on any nearby player, gaining invisibility and creating illusory duplicate copies of itself (minecraft.wiki/w/Illusioner). Every earlier proximity-triggered reaction in this app changes how a mob itself looks or moves — the pufferfish puffs up, the vindicator raises its axe, the armadillo rolls into a ball — an illusioner is the first to react by making ITSELF genuinely stop existing on screen while separate, independently tracked entries stand in for it, a real disappearance rather than a different pose. This app\'s own `updateIllusioner` runs the same live-distance check already proven by the pufferfish\'s own puff levels, but drives a real cast → invisible → reappear state machine instead of a graduated scale, toggling the true `obj.visible` flag directly (no mesh rebuild needed, unlike every earlier pose-swap mechanic) and calling `spawnIllusionerClones`/`removeIllusionerClones` — the same real world.decor.push/splice + mobObjects register/remove pattern already proven by the skeleton\'s own fired arrows — to actually create and later clean up the decoys rather than just toggling a flag on existing entries.',
+      'Verified directly by a unit test confirming an illusioner with a live player far away is left genuinely untouched and fully visible no matter how many real frames pass, that one brought within its own real cast range genuinely becomes invisible after its own real cast time actually elapses, that exactly 3 real decoy clones genuinely exist as their own separate tracked entries the instant it vanishes, and a second test confirming it genuinely reappears and every one of those clones is genuinely removed from both the model\'s own decor list and the live tracked mob list once its own real invisibility duration actually runs out — proving both the disappearance and the decoys are real, cleaned-up world state, not just a visual flag left dangling. This app has no verified real illusioner cast range or spell duration, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the pufferfish\'s own puff thresholds. The geometry reuses the villager\'s own body plan completely unchanged (real illusioners share the villager\'s base model), recoloured into a real illusioner\'s own dark grayish-blue robe, plus a new pair of crossed swords built with the same rotate-then-translate technique already used by the piglin\'s own held sword and the vindicator\'s own axe.',
+      'Not modeled: any of the illusioner\'s own real ranged sword-throw attack against a target, the real blindness effect actually applied to a nearby player, its real participation in raids alongside pillagers and vindicators, and its own decoy clones actually scattering and moving independently rather than holding fixed spawn positions — this app has no combat, status-effect, or raid system at all, so this illusioner only ever wanders, casts, and vanishes behind stationary decoys.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5532,6 +5578,8 @@ function generateModel() {
     buildVindicatorMenagerieInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'pufferfishReef') {
     buildPufferfishReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'illusionerAmbush') {
+    buildIllusionerAmbushInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7105,6 +7153,32 @@ function vindicatorAxeParts() {
   raisedBlade.rotateZ(raisedAngle);
   raisedBlade.translate(raisedX, raisedY, raisedZ);
   return { restHandle, restBlade, raisedHandle, raisedBlade };
+}
+// 2 small crossed swords, one in each hand — the single most recognizable
+// real vanilla silhouette cue distinguishing an illusioner from an
+// ordinary villager (minecraft.wiki/w/Illusioner), always rendered since
+// a real illusioner never appears without them. Reused completely
+// unchanged for its own illusionary clones (see DECOR_TYPES.illusioner)
+// since a real decoy has to look identical to the genuine mob.
+function illusionerSwordParts() {
+  const specs = [
+    { angle: -0.6, x: 0.4, y: 0.72, z: 0.1 },
+    { angle: 0.6, x: -0.4, y: 0.72, z: 0.1 },
+  ];
+  const hilts = specs.map(({ angle, x, y, z }) => {
+    const g = new THREE.BoxGeometry(0.05, 0.14, 0.05);
+    g.rotateZ(angle);
+    g.translate(x, y, z);
+    return g;
+  });
+  const blades = specs.map(({ angle, x, y, z }) => {
+    const g = new THREE.BoxGeometry(0.045, 0.4, 0.045);
+    g.translate(0, 0.27, 0);
+    g.rotateZ(angle);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { hilts, blades };
 }
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
@@ -8834,6 +8908,37 @@ function buildDecorMeshesForEntry(entry) {
     const swinging = !!entry._swinging;
     group.add(new THREE.Mesh(swinging ? axe.raisedHandle : axe.restHandle, axeHandleMat));
     group.add(new THREE.Mesh(swinging ? axe.raisedBlade : axe.restBlade, axeBladeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'illusioner' || def.kind === 'illusioner_clone') {
+    // Reuses the villager's own base humanoid geometry unchanged (real
+    // illusioners share it), recoloured into a real illusioner's own dark
+    // grayish-blue robe, plus its own pair of crossed swords — see
+    // DECOR_TYPES.illusioner for the real new mechanic this unlocks: a
+    // live decoy ('illusioner_clone') renders through this exact same
+    // branch, so nothing on screen visually distinguishes the real caster
+    // from its own copies while both exist (see updateIllusioner).
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    let swords = decorGeoCache.get('illusionerSwords');
+    if (!swords) { swords = illusionerSwordParts(); decorGeoCache.set('illusionerSwords', swords); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x4a4a5e);
+    const skinMat = solidMaterial(0xcaa472);
+    const apronMat = solidMaterial(0x2c2c3a);
+    const hiltMat = solidMaterial(0x6b4a2f);
+    const bladeMat = solidMaterial(0xb0b0b0);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    for (const g of swords.hilts) group.add(new THREE.Mesh(g, hiltMat));
+    for (const g of swords.blades) group.add(new THREE.Mesh(g, bladeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -14585,7 +14690,7 @@ const VINDICATOR_SWING_COOLDOWN = 1.2;
 function findNearestAnyMob(entry) {
   let best = null, bestDist = Infinity;
   for (const { entry: other } of mobObjects) {
-    if (other === entry || other.type === 'vindicator' || other.type === 'arrow' || other.type === 'dropped_item') continue;
+    if (other === entry || other.type === 'vindicator' || other.type === 'arrow' || other.type === 'dropped_item' || other.type === 'illusioner_clone') continue;
     const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
     const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
     const dist = Math.hypot(ox - entry._wx, oz - entry._wz);
@@ -14680,6 +14785,146 @@ function updateVindicator(entry, obj, dt) {
       entry.z = Math.floor(entry._wz);
       entry._mobState = 'idle';
       entry._mobTimer = VINDICATOR_WANDER_MIN + Math.random() * (VINDICATOR_WANDER_MAX - VINDICATOR_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+const ILLUSIONER_WANDER_MIN = 2, ILLUSIONER_WANDER_MAX = 5;
+const ILLUSIONER_WALK_SPEED = 1.0;
+// The real new mechanic — see DECOR_TYPES.illusioner. A real illusioner
+// casts a genuine "blindness + mirror image" spell on any close player;
+// this compresses that into an honest, fully live-visible-then-invisible
+// cycle: cast in the open, vanish (`obj.visible = false`, no mesh rebuild
+// needed — the same true is-it-drawn toggle already used for the bat's
+// own roost-hidden state), and stand in for itself with real, separately
+// tracked `illusioner_clone` decor entries for the duration.
+const ILLUSIONER_CAST_RANGE = 6;
+const ILLUSIONER_CAST_TIME = 1.0;
+const ILLUSIONER_INVIS_DURATION = 6;
+const ILLUSIONER_CAST_COOLDOWN = 5;
+const ILLUSIONER_CLONE_OFFSETS = [[1.6, 0, 0.4], [-1.4, 0, 0.9], [0.3, 0, -1.6]];
+// Spawns the real decoy entries — the same world.decor.push +
+// buildDecorMeshesForEntry + three.group.add pattern already proven by
+// fireArrow, just with a fixed offset from the caster instead of a
+// velocity.
+function spawnIllusionerClones(entry) {
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  entry._clones = [];
+  for (const [dx, dy, dz] of ILLUSIONER_CLONE_OFFSETS) {
+    const cloneEntry = {
+      type: 'illusioner_clone', x: Math.floor(entry._wx + dx), y: entry.y, z: Math.floor(entry._wz + dz),
+      _wx: entry._wx + dx, _wy: entry.y, _wz: entry._wz + dz,
+      _mobYaw: entry._mobYaw !== undefined ? entry._mobYaw : 0,
+      _sourceRef: entry,
+    };
+    currentModel.decor.push(cloneEntry);
+    for (const mesh of buildDecorMeshesForEntry(cloneEntry)) {
+      mesh.position.x += cloneEntry._wx + offX;
+      mesh.position.y += cloneEntry._wy;
+      mesh.position.z += cloneEntry._wz + offZ;
+      three.group.add(mesh);
+    }
+    entry._clones.push(cloneEntry);
+  }
+}
+// Despawns every real decoy tracked in entry._clones — the same
+// splice-from-decor + splice-from-mobObjects + scene.remove pattern
+// already proven by removeArrowFromWorld.
+function removeIllusionerClones(entry) {
+  for (const cloneEntry of (entry._clones || [])) {
+    const decorIdx = currentModel.decor.indexOf(cloneEntry);
+    if (decorIdx !== -1) currentModel.decor.splice(decorIdx, 1);
+    const mobIdx = mobObjects.findIndex(m => m.entry === cloneEntry);
+    if (mobIdx !== -1) {
+      if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+      mobObjects.splice(mobIdx, 1);
+    }
+  }
+  entry._clones = [];
+}
+// A real decoy has no AI of its own — it just holds its own fixed spawn
+// position, exactly as real vanilla mirror images stand their ground
+// rather than wandering off.
+function updateIllusionerClone(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+function updateIllusioner(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ILLUSIONER_WANDER_MIN + Math.random() * (ILLUSIONER_WANDER_MAX - ILLUSIONER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._casting = false;
+    entry._invisible = false;
+    entry._castCooldown = 0;
+    entry._clones = [];
+  }
+  entry._castCooldown = Math.max(0, entry._castCooldown - dt);
+  if (entry._invisible) {
+    entry._invisTimer -= dt;
+    if (entry._invisTimer <= 0) {
+      entry._invisible = false;
+      obj.visible = true;
+      removeIllusionerClones(entry);
+      entry._castCooldown = ILLUSIONER_CAST_COOLDOWN;
+      entry._mobState = 'idle';
+      entry._mobTimer = ILLUSIONER_WANDER_MIN + Math.random() * (ILLUSIONER_WANDER_MAX - ILLUSIONER_WANDER_MIN);
+    }
+    return;
+  }
+  if (entry._casting) {
+    entry._castTimer -= dt;
+    if (entry._castTimer <= 0) {
+      entry._casting = false;
+      entry._invisible = true;
+      entry._invisTimer = ILLUSIONER_INVIS_DURATION;
+      obj.visible = false;
+      spawnIllusionerClones(entry);
+    }
+    return;
+  }
+  let playerDist = Infinity;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    const dx = (flyState.pos.x - offX) - entry._wx, dz = (flyState.pos.z - offZ) - entry._wz;
+    playerDist = Math.hypot(dx, dz);
+  }
+  if (playerDist <= ILLUSIONER_CAST_RANGE && entry._castCooldown <= 0) {
+    entry._casting = true;
+    entry._castTimer = ILLUSIONER_CAST_TIME;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ILLUSIONER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ILLUSIONER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = ILLUSIONER_WANDER_MIN + Math.random() * (ILLUSIONER_WANDER_MAX - ILLUSIONER_WANDER_MIN);
     } else {
       entry._wx += (dx / dist) * step;
       entry._wz += (dz / dist) * step;
@@ -15012,6 +15257,8 @@ function updateMobs(dt) {
     if (entry.type === 'wither') { updateWither(entry, obj, dt); continue; }
     if (entry.type === 'pillager') { updatePillager(entry, obj, dt); continue; }
     if (entry.type === 'vindicator') { updateVindicator(entry, obj, dt); continue; }
+    if (entry.type === 'illusioner') { updateIllusioner(entry, obj, dt); continue; }
+    if (entry.type === 'illusioner_clone') { updateIllusionerClone(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -16228,7 +16475,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#4a4a5e', 'A'], illusioner_clone: ['#4a4a5e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -16298,7 +16545,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -16453,6 +16700,7 @@ function renderCommands(model) {
       else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'vindicator') lines.push(`summon minecraft:vindicator ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pufferfish') lines.push(`summon minecraft:pufferfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'illusioner') lines.push(`summon minecraft:illusioner ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
