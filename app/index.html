@@ -2265,7 +2265,8 @@ const DECOR_TYPES = {
   // an illusioner is the first to make ITSELF genuinely invisible while
   // real, live decoy copies stand in for it. See updateIllusioner /
   // spawnIllusionerClones. Reuses the villager's own body plan unchanged,
-  // recoloured into a real illusioner's own steel-blue robe, plus a held
+  // recoloured into a real illusioner's own steel-blue robe, plus a real
+  // separate blue helmet worn over its ordinary skin-toned head and a held
   // bow with a nocked arrow (checked against real reference screenshots).
   illusioner: { kind: 'illusioner', interactive: false },
   // A pure, purely cosmetic visual decoy — see DECOR_TYPES.illusioner. It
@@ -7210,6 +7211,19 @@ function illusionerBowParts() {
   nockedArrowFletch.translate(0.4, 1.0, -0.15);
   return { bowGrip, bowLimbs, nockedArrowShaft, nockedArrowTip, nockedArrowFletch };
 }
+// A real separate blue HELMET worn over the villager's own plain head —
+// not just the head recoloured, which read as a flat blue face rather
+// than a real worn piece — sized slightly larger than the head and
+// pulled back in Z so it wraps the top, back, and sides like a real hood
+// while leaving the head's own front face (skin tone, nose, eyes) still
+// visibly exposed in front of it, the same "smaller part pokes out in
+// front of a bigger one" layering already used for the nose itself.
+// Corrected after a direct check against real reference screenshots.
+function illusionerHelmetParts() {
+  const helmet = new THREE.BoxGeometry(0.48, 0.48, 0.34);
+  helmet.translate(0, 1.35, -0.04);
+  return { helmet };
+}
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
 // a pillager from an ordinary villager (minecraft.wiki/w/Pillager), always
@@ -8959,19 +8973,22 @@ function buildDecorMeshesForEntry(entry) {
   } else if (def.kind === 'illusioner' || def.kind === 'illusioner_clone') {
     // Reuses the villager's own base humanoid geometry unchanged (real
     // illusioners share it), recoloured into a real illusioner's own steel-
-    // blue robe AND a matching blue helmet/hood covering the whole head
-    // (only the nose and eyes still show as separate face features) — a
-    // detail confirmed directly against real reference screenshots, which
-    // is also what caught an earlier version of this branch wrongly giving
-    // it crossed swords instead of its real held bow. See
-    // DECOR_TYPES.illusioner for the real new mechanic this unlocks: a
-    // live decoy ('illusioner_clone') renders through this exact same
-    // branch, so nothing on screen visually distinguishes the real caster
-    // from its own copies while both exist (see updateIllusioner).
+    // blue robe, plus a real separate blue HELMET worn over the ordinary
+    // skin-toned head (not the head itself recoloured, which read as a
+    // flat blue face rather than a real worn piece) — a detail confirmed
+    // directly against real reference screenshots, which is also what
+    // caught an earlier version of this branch wrongly giving it crossed
+    // swords instead of its real held bow. See DECOR_TYPES.illusioner for
+    // the real new mechanic this unlocks: a live decoy ('illusioner_clone')
+    // renders through this exact same branch, so nothing on screen
+    // visually distinguishes the real caster from its own copies while
+    // both exist (see updateIllusioner).
     let parts = decorGeoCache.get('villager');
     if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
     let bow = decorGeoCache.get('illusionerBow');
     if (!bow) { bow = illusionerBowParts(); decorGeoCache.set('illusionerBow', bow); }
+    let helmet = decorGeoCache.get('illusionerHelmet');
+    if (!helmet) { helmet = illusionerHelmetParts(); decorGeoCache.set('illusionerHelmet', helmet); }
     const group = new THREE.Group();
     const robeMat = solidMaterial(0x2e4f7a);
     const helmetMat = solidMaterial(0x2e4f7a);
@@ -8979,7 +8996,8 @@ function buildDecorMeshesForEntry(entry) {
     const apronMat = solidMaterial(0x1f3a5c);
     const bowMat = solidMaterial(0x6b4a2f);
     group.add(new THREE.Mesh(parts.robe, robeMat));
-    group.add(new THREE.Mesh(parts.head, helmetMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(helmet.helmet, helmetMat));
     group.add(new THREE.Mesh(parts.nose, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
     group.add(new THREE.Mesh(parts.apron, apronMat));
