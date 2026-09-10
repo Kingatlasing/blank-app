@@ -6344,8 +6344,18 @@ function pufferfishParts() {
     [0.14, 0.1, 0.08], [-0.14, 0.1, 0.08], [0.14, -0.1, 0.08], [-0.14, -0.1, 0.08],
     [0.1, 0.14, -0.08], [-0.1, 0.14, -0.08], [0.1, -0.14, -0.08], [-0.1, -0.14, -0.08],
   ];
+  // ConeGeometry's own local axis always points along +Y regardless of
+  // where it's translated to — left as a plain translate, every spike
+  // would end up pointing straight up instead of radially outward from
+  // the body. Rotating each one from +Y to its own real outward
+  // direction FIRST (then translating along that same direction) makes
+  // every spike genuinely point away from the body's own center, the way
+  // a real puffed-up spike actually does.
   const spikes = spikeOffsets.map(([x, y, z]) => {
     const g = new THREE.ConeGeometry(0.03, 0.09, 4);
+    const dir = new THREE.Vector3(x, y, z).normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    g.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(quat));
     g.translate(x, y, z);
     return g;
   });
