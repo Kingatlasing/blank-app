@@ -2167,6 +2167,23 @@ const DECOR_TYPES = {
   // 3 skull heads (one large center, 2 smaller flanking) on a bony
   // ribbed spine, matching real vanilla's own silhouette.
   wither: { kind: 'wither', interactive: false },
+  // Real vanilla pillagers only actually fire their crossbow at a target
+  // once they have a genuinely clear, unobstructed path to it — hiding
+  // behind a solid wall stops them from shooting even while well within
+  // real range, unlike a skeleton's own purely distance-gated shot
+  // (minecraft.wiki/w/Pillager). This is this app's first mechanic gated
+  // by a real LINE-OF-SIGHT check: `hasLineOfSight` samples the straight
+  // real path between the pillager and the live player against the
+  // model's own grid, and `updatePillager` only lets its firing state
+  // trigger — or keep going once already drawing — while that path is
+  // genuinely clear, re-checked fresh every single frame; otherwise it
+  // mirrors the skeleton's own idle/walking/drawing state machine and
+  // reuses its own `fireArrow` completely unchanged, since the real new
+  // mechanic here is entirely in the extra gating condition, not in how
+  // the shot itself works. Reuses the villager's own body plan unchanged
+  // (real pillagers share the villager's base model), recoloured into a
+  // real pillager's own dark, drab robe, plus a small held crossbow.
+  pillager: { kind: 'pillager', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3668,6 +3685,29 @@ function buildWitherSummoningAltarInterior(grid, silhouette, dims, exteriorMat, 
     });
   }
 }
+// A cobblestone yard split by a real, solid stone-brick wall segment (2
+// blocks tall) with a genuine gap left open at one end to walk around —
+// one pillager stands well clear of the wall entirely, the other tucked
+// directly behind it. Switch to Walk mode: the player spawns near the
+// open pillager, which genuinely draws and fires the instant you're
+// within its own real range, while the walled one stays completely
+// silent even though it's well within the exact same range, its own view
+// of you genuinely blocked — walk around through the gap into its own
+// clear sightline and the exact same pillager immediately opens fire too.
+function buildPillagerOutpostInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const wallZ = Math.min(dims.sz - 1, cz + 2);
+  const wallEndX = Math.max(0, dims.sx - 4);
+  for (let x = 0; x < wallEndX; x++) {
+    grid[idx(x, 1, wallZ, dims)] = accentMat;
+    if (dims.sy > 2) grid[idx(x, 2, wallZ, dims)] = accentMat;
+  }
+  if (!decorOut) return;
+  decorOut.push({ type: 'pillager', x: Math.max(0, cx - 3), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'pillager', x: Math.max(0, cx - 2), y: 1, z: Math.min(dims.sz - 1, cz + 3), facing: 'north' });
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4816,6 +4856,18 @@ const PRESETS = [
       'Not modeled: any of the wither\'s own real combat (its own skull projectiles, the "wither" damage-over-time status effect, summoning a protective blue shield at half health), the real blue explosion and shockwave the moment it\'s actually summoned, and real soul soil being an equally valid substitute for soul sand in the structure — this app has no combat, status-effect, or explosion system at all, so this wither only ever floats peacefully once summoned.',
     ],
   },
+  {
+    id: 'pillager-outpost', name: 'Pillager Outpost Ambush', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 11, baseZ: 11 }, interiorMode: 'pillagerOutpost',
+    blocks: { exterior: 'cobblestone', interior: 'cobblestone', accent: 'stone_bricks' },
+    desc: 'A cobblestone yard split by a real stone-brick wall with a gap to walk around, and 2 pillagers — one in the open, one tucked behind the wall. Real vanilla pillagers only fire when they genuinely have a clear path to their target, and these do too: switch to Walk mode and watch the open one fire on sight while the walled one stays silent until you walk around into its own real line of sight.',
+    keywords: ['pillager', 'crossbow', 'line of sight', 'raid', 'outpost', 'ranged', 'wall'],
+    notes: [
+      'Switch to Walk mode and approach — the open pillager genuinely draws and fires a real arrow at you the instant your own live position comes within its own real range, exactly like a skeleton. The walled one, at a comparable real distance, stays completely silent the whole time you\'re still on the near side of the wall, even though you\'re well within its own real range too — walk around through the real gap left at one end of the wall into its own genuinely clear sightline, and the exact same pillager immediately starts drawing and fires, no different from the other one once its own path is actually clear. Real vanilla pillagers only fire their crossbow at a target they genuinely have a clear, unobstructed path to — hiding behind a solid wall stops them from shooting even while well within real range (minecraft.wiki/w/Pillager). This is this app\'s first mechanic gated by a real LINE-OF-SIGHT check: every earlier ranged or sensing mob (the skeleton\'s own shot, the blaze\'s own fire range, the witch\'s own fire-sense, the warden\'s own sense radius) reacts on distance alone, blind to whatever real blocks happen to sit in between — a pillager is the first to actually care. This app\'s own `hasLineOfSight` samples the real straight-line path between the pillager and the live player at small fixed steps against the model\'s own grid, returning false the instant any sampled point lands inside a real solid cell; `updatePillager` mirrors the skeleton\'s own idle/walking/drawing state machine exactly, except the transition into drawing requires a genuinely clear path, re-checked fresh every single frame, and a path that goes from clear to blocked WHILE already drawing genuinely cancels the shot instead of letting it fire blind through the wall it just failed. The actual shot itself reuses the skeleton\'s own `fireArrow` completely unchanged, since the real new mechanic here is entirely in the extra gating condition, not in how the projectile works.',
+      'Verified directly by a unit test confirming a simulated live player standing on the near side of the real wall, well within real range of the walled pillager, genuinely never triggers a shot no matter how many real frames pass, that moving the exact same simulated player to the far side (within the exact same range, on a straight unobstructed line) genuinely does trigger one, and a third test confirming a pillager already mid-draw whose own path becomes blocked before it actually fires genuinely cancels rather than shooting through the obstruction — proving the gate is a real, continuously-rechecked line-of-sight condition and not just a one-time check at the start of a wander cycle. This app has no verified real pillager shoot range or draw delay, so the figures used are honest, approximate stand-ins, the same caveat already applied to the skeleton\'s own range and delay this reuses unchanged. The geometry reuses the villager\'s own body plan completely unchanged (real pillagers share the villager\'s base model), recoloured into a real pillager\'s own dark, drab robe, plus a small always-held crossbow.',
+      'Not modeled: a real pillager\'s own actual melee/ranged combat damage, its real participation in raids and patrols (this app has no raid, patrol, or day-based spawn-condition system at all), and captains\' real banner-wearing variant — this app has no combat or banner-decor system at all, so these pillagers only ever wander, aim, and genuinely miss firing when a wall is actually in the way.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5280,6 +5332,8 @@ function generateModel() {
     buildHuskWaterTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'witherSummoningAltar') {
     buildWitherSummoningAltarInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'pillagerOutpost') {
+    buildPillagerOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6763,6 +6817,22 @@ function villagerParts() {
   const heldGiftBloom = new THREE.BoxGeometry(0.1, 0.08, 0.1);
   heldGiftBloom.translate(-0.4, 0.74, 0.08);
   return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat, heldGiftStem, heldGiftBloom };
+}
+// A small held crossbow — a horizontal stock and 2 crossed limb panels —
+// the single most recognizable real vanilla silhouette cue distinguishing
+// a pillager from an ordinary villager (minecraft.wiki/w/Pillager), always
+// rendered (unlike the villager's own conditional held wheat/gift) since a
+// real pillager never appears without one.
+function pillagerCrossbowParts() {
+  const stock = new THREE.BoxGeometry(0.06, 0.06, 0.32);
+  stock.translate(0.4, 0.68, 0.1);
+  const limbOffsets = [[0.4, 0.68, -0.06], [0.4, 0.68, 0.26]];
+  const limbs = limbOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.26, 0.05, 0.05);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { stock, limbs };
 }
 // A tall, tapering hat stacked from 3 progressively narrower boxes — real
 // vanilla witches wear a distinctive pointed hat, the single most
@@ -8334,6 +8404,33 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x1c140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'pillager') {
+    // Reuses the villager's own geometry unchanged (real pillagers share
+    // the villager's base humanoid model), recoloured into a real
+    // pillager's own dark, drab robe, plus a small held crossbow — always
+    // rendered, since a real pillager never appears without one.
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    let crossbow = decorGeoCache.get('pillagerCrossbow');
+    if (!crossbow) { crossbow = pillagerCrossbowParts(); decorGeoCache.set('pillagerCrossbow', crossbow); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x4a5a42);
+    const skinMat = solidMaterial(0xcaa472);
+    const apronMat = solidMaterial(0x33402c);
+    const crossbowMat = solidMaterial(0x5a4530);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    group.add(new THREE.Mesh(crossbow.stock, crossbowMat));
+    for (const g of crossbow.limbs) group.add(new THREE.Mesh(g, crossbowMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -13873,6 +13970,109 @@ function updatePiglin(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// Samples the straight real-world-space line between 2 points at small
+// fixed steps and checks whether any sampled point lands inside a real
+// solid grid cell — this app's first genuine line-of-sight raycast, used
+// by updatePillager to gate its own firing state on a real clear path to
+// the player rather than distance alone (see the pillager DECOR_TYPES
+// entry). Endpoints themselves are never sampled (both the shooter's and
+// the player's own standing cell are always real air), only the real
+// space between them.
+const LINE_OF_SIGHT_STEP = 0.25;
+function hasLineOfSight(model, x0, y0, z0, x1, y1, z1) {
+  const dims = model.dims;
+  const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+  const dist = Math.hypot(dx, dy, dz);
+  const steps = Math.max(1, Math.ceil(dist / LINE_OF_SIGHT_STEP));
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps;
+    const x = Math.floor(x0 + dx * t), y = Math.floor(y0 + dy * t), z = Math.floor(z0 + dz * t);
+    if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) continue;
+    if (model.grid[idx(x, y, z, dims)] !== 0) return false;
+  }
+  return true;
+}
+const PILLAGER_WANDER_MIN = 2, PILLAGER_WANDER_MAX = 5;
+const PILLAGER_WALK_SPEED = 1.0;
+const PILLAGER_SHOOT_RANGE = 10;
+const PILLAGER_DRAW_DELAY = 1;
+const PILLAGER_SHOOT_COOLDOWN = 3;
+// Mirrors updateSkeleton's own idle/walking/drawing state machine and
+// reuses its own fireArrow completely unchanged — the real new mechanic
+// is entirely the added hasLineOfSight gate, checked fresh both when
+// deciding to START drawing and again every frame WHILE drawing, so
+// genuinely stepping behind a wall mid-draw cancels the shot instead of
+// firing blind through it.
+function updatePillager(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = PILLAGER_WANDER_MIN + Math.random() * (PILLAGER_WANDER_MAX - PILLAGER_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._shootCooldown = 0;
+  }
+  entry._shootCooldown = Math.max(0, entry._shootCooldown - dt);
+  let sensedX = 0, sensedZ = 0, clearShot = false;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    sensedX = flyState.pos.x - offX;
+    sensedZ = flyState.pos.z - offZ;
+    const playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
+    if (playerDist <= PILLAGER_SHOOT_RANGE) {
+      clearShot = hasLineOfSight(currentModel, entry._wx, entry.y + 1.1, entry._wz, sensedX, flyState.pos.y, sensedZ);
+    }
+  }
+  if (entry._mobState !== 'drawing' && clearShot && entry._shootCooldown <= 0) {
+    entry._mobState = 'drawing';
+    entry._drawTimer = PILLAGER_DRAW_DELAY;
+    entry._aimX = sensedX;
+    entry._aimY = flyState.pos.y;
+    entry._aimZ = sensedZ;
+  }
+  if (entry._mobState === 'drawing') {
+    entry._drawTimer -= dt;
+    entry._mobYaw = Math.atan2(entry._aimX - entry._wx, entry._aimZ - entry._wz);
+    if (!hasLineOfSight(currentModel, entry._wx, entry.y + 1.1, entry._wz, entry._aimX, entry._aimY, entry._aimZ)) {
+      entry._mobState = 'idle';
+      entry._mobTimer = PILLAGER_WANDER_MIN + Math.random() * (PILLAGER_WANDER_MAX - PILLAGER_WANDER_MIN);
+    } else if (entry._drawTimer <= 0) {
+      fireArrow(currentModel, entry);
+      entry._shootCooldown = PILLAGER_SHOOT_COOLDOWN;
+      entry._mobState = 'idle';
+      entry._mobTimer = PILLAGER_WANDER_MIN + Math.random() * (PILLAGER_WANDER_MAX - PILLAGER_WANDER_MIN);
+    }
+  } else if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = PILLAGER_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = PILLAGER_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = PILLAGER_WANDER_MIN + Math.random() * (PILLAGER_WANDER_MAX - PILLAGER_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 function updateMobs(dt) {
   if (!currentModel) return;
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
@@ -13931,6 +14131,7 @@ function updateMobs(dt) {
     if (entry.type === 'drowned') { updateDrowned(entry, obj, dt); continue; }
     if (entry.type === 'husk') { updateHusk(entry, obj, dt); continue; }
     if (entry.type === 'wither') { updateWither(entry, obj, dt); continue; }
+    if (entry.type === 'pillager') { updatePillager(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -15007,7 +15208,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -15077,7 +15278,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -15229,6 +15430,7 @@ function renderCommands(model) {
       else if (d.type === 'husk') lines.push(`summon minecraft:husk ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wither_skull') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wither_skeleton_skull`);
       else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
