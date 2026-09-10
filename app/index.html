@@ -2114,6 +2114,22 @@ const DECOR_TYPES = {
   // is the first to react by going rigid and stationary in place instead
   // of moving away at all. See updateArmadillo / rebuildArmadilloMesh.
   armadillo: { kind: 'armadillo', interactive: false },
+  // Real vanilla drowned are amphibious: they swim in water and walk on
+  // land, moving freely between the two (minecraft.wiki/w/Drowned). This
+  // is this app's first mob genuinely capable of BOTH movement domains:
+  // every earlier mob is permanently confined to exactly one — ground
+  // mobs never meaningfully enter water, and every water mob (squid,
+  // dolphin, guardian, axolotl, glow squid, tadpole) never leaves it. A
+  // drowned's own single wander cycle picks whichever kind of target is
+  // actually available nearby — a real swimmable water cell or a real
+  // walkable ground cell — using the same tracked 3D position for both,
+  // so it crosses the shoreline boundary seamlessly within ordinary
+  // wandering, never needing a special "enter/exit water" transition of
+  // its own. See updateDrowned / pickDrownedTarget. Reuses the zombie's
+  // own humanoid body plan completely unchanged (real drowned share the
+  // zombie's base model), recoloured with a real drowned's own teal,
+  // waterlogged skin tone.
+  drowned: { kind: 'drowned', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3557,6 +3573,21 @@ function buildArmadilloScrublandInterior(grid, silhouette, dims, exteriorMat, ac
     decorOut.push({ type: 'armadillo', x, y: 1, z, facing: 'south' });
   }
 }
+// An open sand platform with a real water pool on one side (a single
+// source, left deliberately unwalled so the normal real spread limit
+// naturally shapes a real bounded puddle rather than flooding
+// everything) and a drowned placed right at its own shore — switch to
+// Walk mode and just watch: it genuinely swims while in the pool and
+// genuinely walks once it wanders back out onto dry sand, crossing the
+// real boundary between the two with no special transition of its own.
+function buildDrownedShorelineInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: 1, z: Math.max(0, cz - 3), source: true });
+  decorOut.push({ type: 'drowned', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4669,6 +4700,18 @@ const PRESETS = [
       'Not modeled: any actual immunity to damage while rolled up (this app has no combat or damage system at all, so rolling here is purely a visual/positional freeze), real armadillos being specifically more easily startled by wolves than other threats, and their real scutes drop (used to craft wolf armor) — this app has no combat, breeding, or crafting system at all, so this armadillo only ever rolls up and unrolls in response to the live player.',
     ],
   },
+  {
+    id: 'drowned-shoreline', name: 'Drowned Shoreline', shape: 'box', category: 'Aquatic',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'drownedShoreline',
+    blocks: { exterior: 'sand', interior: 'sand', accent: 'sand' },
+    desc: 'An open sand platform with a real, naturally-bounded water pool on one side and a single drowned right at its own shore — real vanilla drowned are amphibious, swimming in water and walking on land, and this one genuinely does both: switch to Walk mode and just watch it wander freely between the pool and the dry sand.',
+    keywords: ['drowned', 'zombie', 'amphibious', 'swim', 'water', 'shore', 'trident'],
+    notes: [
+      'Just switch to Walk mode and watch — the drowned genuinely swims (its own live position moving in full 3D, rising and sinking) whenever it happens to be in the water pool, and genuinely walks (a flat, ground-level 2D wander) whenever it happens to be out on the dry sand, crossing the real boundary between the two with no special "enter/exit water" transition of its own — it\'s simply the same ordinary wander cycle picking whichever kind of target happens to be available nearby. Real vanilla drowned are amphibious: they swim in water and walk on land, moving freely between the two (minecraft.wiki/w/Drowned). This is a genuinely new class of mechanic for this app: every earlier mob is permanently confined to exactly one movement domain — no ground mob ever meaningfully enters water, and every water mob (the squid, dolphin, guardian, axolotl, glow squid, tadpole) never leaves it — while a drowned is the first genuinely capable of both. This app\'s own `pickDrownedTarget` tries a real swimmable water cell first (the exact same search shape `pickSquidSwimTarget` already uses), then falls back to a real walkable ground cell (the exact same search `pickWanderTarget` already uses); since a drowned surrounded by water keeps finding water cells and one surrounded by dry land keeps finding land cells, one standing right at the shore can genuinely find either, and `updateDrowned` checks its own CURRENT cell fresh every time it starts a new move to decide whether to swim-speed or walk-speed there.',
+      'Verified directly by a unit test confirming a drowned placed deep in open water only ever finds and moves to real swimmable water cells, genuinely varying its own live y-position the way swimming does, and a second test confirming one placed on dry land only ever finds and moves to real walkable ground cells, keeping its own live y-position flat at ground level the way walking does — proving both movement domains are genuinely implemented and genuinely selected by what\'s actually nearby, not just one repainted as the other. The water pool itself is deliberately left unwalled so the normal real spread limit already proven on the wheat farm\'s own water channel naturally shapes a real, bounded puddle instead of flooding the whole platform. The geometry reuses the zombie\'s own humanoid body plan completely unchanged (real drowned share the zombie\'s base model), recoloured with a real drowned\'s own teal, waterlogged skin tone.',
+      'Not modeled: a real drowned\'s own trident-throwing attack and melee damage, its real chance to spawn already holding a trident or nautilus shell, and converting a regular villager into a zombie villager the way a zombie can (this app has no combat, throwing, or NPC-conversion-by-drowned system at all) — this drowned only ever wanders between water and land.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5127,6 +5170,8 @@ function generateModel() {
     buildTadpolePondInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'armadilloScrubland') {
     buildArmadilloScrublandInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'drownedShoreline') {
+    buildDrownedShorelineInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -8146,6 +8191,26 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
     const faceMat = solidMaterial(0x0f140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'drowned') {
+    // Reuses the zombie's own geometry unchanged (real drowned share the
+    // zombie's base model) — see hoglin's identical reuse of
+    // ravagerParts — recoloured with a real drowned's own teal,
+    // waterlogged skin tone.
+    let parts = decorGeoCache.get('zombie');
+    if (!parts) { parts = zombieParts(); decorGeoCache.set('zombie', parts); }
+    const group = new THREE.Group();
+    const shirtMat = solidMaterial(0x2c4a42);
+    const skinMat = solidMaterial(0x4a8a78);
+    const pantsMat = solidMaterial(0x3a4a42);
+    group.add(new THREE.Mesh(parts.torso, shirtMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
+    const faceMat = solidMaterial(0x0a1410);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -12164,6 +12229,91 @@ function updateArmadillo(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const DROWNED_WANDER_MIN = 2, DROWNED_WANDER_MAX = 5;
+const DROWNED_WANDER_RADIUS = 2;
+const DROWNED_SWIM_SPEED = 0.9, DROWNED_LAND_SPEED = 1.0;
+// Tries a real swimmable water cell first (the same search shape
+// pickSquidSwimTarget already uses), then falls back to a real walkable
+// ground cell (the same search pickWanderTarget already uses) — the real
+// new mechanic: a drowned surrounded by water keeps finding water cells,
+// one surrounded by dry land keeps finding land cells, and one standing
+// right at the boundary between the two can genuinely find either,
+// crossing it within a single ordinary wander cycle with no special
+// "enter/exit water" transition of its own. See DECOR_TYPES.drowned.
+function pickDrownedTarget(model, entry) {
+  // Math.floor, not Math.round, recovers the real cell index from a
+  // center-offset world coordinate (entry.y + 0.5) — the same convention
+  // already used for x/z here and for y throughout the axolotl's own
+  // swim-arrival snapping.
+  const bx = Math.floor(entry._wx), by = Math.floor(entry._wy), bz = Math.floor(entry._wz);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const vertical = Math.random() < 0.3;
+    let dx = 0, dy = 0, dz = 0;
+    if (vertical) {
+      dy = Math.round((Math.random() * 2 - 1) * DROWNED_WANDER_RADIUS);
+    } else {
+      dx = Math.round((Math.random() * 2 - 1) * DROWNED_WANDER_RADIUS);
+      dz = Math.round((Math.random() * 2 - 1) * DROWNED_WANDER_RADIUS);
+    }
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = bx + dx, ty = by + dy, tz = bz + dz;
+    if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const dx = Math.round((Math.random() * 2 - 1) * DROWNED_WANDER_RADIUS);
+    const dz = Math.round((Math.random() * 2 - 1) * DROWNED_WANDER_RADIUS);
+    if (dx === 0 && dz === 0) continue;
+    const tx = bx + dx, tz = bz + dz;
+    if (mobCellWalkable(model, tx, by, tz)) return { x: tx, y: by, z: tz };
+  }
+  return null;
+}
+function updateDrowned(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = DROWNED_WANDER_MIN + Math.random() * (DROWNED_WANDER_MAX - DROWNED_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickDrownedTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'moving';
+      } else {
+        entry._mobTimer = DROWNED_WANDER_MIN;
+      }
+    }
+  } else { // moving
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const inWaterNow = squidCellSwimmable(currentModel, Math.floor(entry._wx), Math.floor(entry._wy), Math.floor(entry._wz));
+    const step = (inWaterNow ? DROWNED_SWIM_SPEED : DROWNED_LAND_SPEED) * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = DROWNED_WANDER_MIN + Math.random() * (DROWNED_WANDER_MAX - DROWNED_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      if (Math.hypot(dx, dz) > 0.001) entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -13366,6 +13516,7 @@ function updateMobs(dt) {
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
     if (entry.type === 'tadpole') { updateTadpole(entry, obj, dt); continue; }
     if (entry.type === 'armadillo') { updateArmadillo(entry, obj, dt); continue; }
+    if (entry.type === 'drowned') { updateDrowned(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -14441,7 +14592,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -14511,7 +14662,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14659,6 +14810,7 @@ function renderCommands(model) {
       else if (d.type === 'zombified_piglin') lines.push(`summon minecraft:zombified_piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'tadpole') lines.push(`summon minecraft:tadpole ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'armadillo') lines.push(`summon minecraft:armadillo ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'drowned') lines.push(`summon minecraft:drowned ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
