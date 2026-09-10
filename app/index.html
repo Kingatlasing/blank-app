@@ -6118,12 +6118,18 @@ function cowParts() {
   body.translate(0, 0.15, 0);
   const head = new THREE.BoxGeometry(0.32, 0.32, 0.3);
   head.translate(0, 0.2, 0.6);
+  // A small pink udder hanging under the rear of the body — real vanilla's
+  // own single most distinguishing part from a generic quadruped
+  // (minecraft.wiki/w/Cow), missing from an earlier version of this
+  // geometry (also reused unchanged by the mooshroom, a real cow variant).
+  const udder = new THREE.BoxGeometry(0.18, 0.1, 0.22);
+  udder.translate(0, -0.11, 0.18);
   const legs = [[-0.18, -0.3], [0.18, -0.3], [-0.18, 0.3], [0.18, 0.3]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.12, 0.4, 0.12);
     g.translate(x, -0.3, z);
     return g;
   });
-  return { body, head, legs };
+  return { body, head, udder, legs };
 }
 // A real mooshroom's own body/head/legs are the exact same as a cow's —
 // see DECOR_TYPES.mooshroom — plus 3 small red-and-white mushroom bumps
@@ -6160,12 +6166,18 @@ function pigParts() {
   body.translate(0, 0.1, 0);
   const head = new THREE.BoxGeometry(0.28, 0.26, 0.22);
   head.translate(0, 0.12, 0.42);
+  // A flat rectangular snout on the front of the head — real vanilla's own
+  // single most recognizable identifier for a pig (minecraft.wiki/w/Pig),
+  // missing from an earlier version of this geometry (the head alone was
+  // rendered, with no distinct snout shape at all).
+  const snout = new THREE.BoxGeometry(0.14, 0.1, 0.05);
+  snout.translate(0, 0.07, 0.55);
   const legs = [[-0.15, -0.22], [0.15, -0.22], [-0.15, 0.22], [0.15, 0.22]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.11, 0.28, 0.11);
     g.translate(x, -0.24, z);
     return g;
   });
-  return { body, head, legs };
+  return { body, head, snout, legs };
 }
 // Same recipe again, bulkier (the wool) with a darker separate head — see
 // DECOR_TYPES.sheep.
@@ -6279,7 +6291,18 @@ function spiderParts() {
     g.translate(x, 0.1, z);
     return g;
   });
-  return { abdomen, thorax, legs };
+  // A pair of small glowing red eyes on the front of the thorax — real
+  // vanilla's own single most recognizable identifier, especially visible
+  // at night (minecraft.wiki/w/Spider), missing from an earlier version of
+  // this geometry (the whole body was rendered as one flat dark color with
+  // no eyes at all).
+  const faceEyeOffsets = [[-0.08, 0.17, 0.37], [0.08, 0.17, 0.37]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { abdomen, thorax, legs, faceEyes };
 }
 // A large cube body (real vanilla ghasts are a genuine 4x4x4) with a
 // handful of thin hanging tentacle boxes below — real vanilla has nine;
@@ -6489,13 +6512,19 @@ function snifferParts() {
   snout.translate(0, 0.22, 0.58);
   const tail = new THREE.BoxGeometry(0.2, 0.18, 0.35);
   tail.translate(0, 0.28, -0.55);
+  // A flat green fern-like "sail" running along the back — real vanilla's
+  // own single most recognizable identifier from any other big tan
+  // quadruped (minecraft.wiki/w/Sniffer), missing from an earlier version
+  // of this geometry (the body alone was rendered with no sail at all).
+  const sail = new THREE.BoxGeometry(0.5, 0.14, 0.7);
+  sail.translate(0, 0.64, 0);
   const legOffsets = [[-0.28, 0.28], [0.28, 0.28], [-0.28, -0.28], [0.28, -0.28]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.16, 0.32, 0.16);
     g.translate(x, -0.09, z);
     return g;
   });
-  return { body, snout, tail, legs };
+  return { body, snout, tail, sail, legs };
 }
 // A thin stem with a small flame-orange bloom on top, standing in for a
 // real torchflower — no torchflower texture/model exists in this app,
@@ -8241,8 +8270,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = cowParts(); decorGeoCache.set('cow', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x5c3d21), headMat = solidMaterial(0xd8cdb8);
+    const udderMat = solidMaterial(0xe0a0ae);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, headMat));
+    group.add(new THREE.Mesh(parts.udder, udderMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -8257,8 +8288,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!bumps) { bumps = mooshroomBumpParts(); decorGeoCache.set('mooshroomBumps', bumps); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x8a2323), headMat = solidMaterial(0xd8cdb8);
+    const udderMat = solidMaterial(0xe0a0ae);
     group.add(new THREE.Mesh(cowGeo.body, bodyMat));
     group.add(new THREE.Mesh(cowGeo.head, headMat));
+    group.add(new THREE.Mesh(cowGeo.udder, udderMat));
     for (const g of cowGeo.legs) group.add(new THREE.Mesh(g, bodyMat));
     const stemMat = solidMaterial(0xd8cdb8), capMat = solidMaterial(0xc22b2b), dotMat = solidMaterial(0xf0ead6);
     for (const g of bumps.stems) group.add(new THREE.Mesh(g, stemMat));
@@ -8278,6 +8311,7 @@ function buildDecorMeshesForEntry(entry) {
     const bodyMat = solidMaterial(0xf0a9b8), snoutMat = solidMaterial(0xd88a9c);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.snout, snoutMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, snoutMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -8322,7 +8356,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('bat');
     if (!parts) { parts = batParts(); decorGeoCache.set('bat', parts); }
     const group = new THREE.Group();
-    const furMat = solidMaterial(0x3b3a3e), wingMat = solidMaterial(0x232226);
+    const furMat = solidMaterial(0x2b2b2b), wingMat = solidMaterial(0x3d2d52);
     group.add(new THREE.Mesh(parts.body, furMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, wingMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
@@ -8347,9 +8381,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = spiderParts(); decorGeoCache.set('spider', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x1c1a1d);
+    const eyeMat = solidMaterial(0xd91f1f);
     group.add(new THREE.Mesh(parts.abdomen, bodyMat));
     group.add(new THREE.Mesh(parts.thorax, bodyMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0; // pitched flat against the wall while climbing
     registerMob(group, entry);
@@ -8423,7 +8459,7 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const glowMat = glowSquidMaterial();
     group.add(new THREE.Mesh(parts.mantle, glowMat));
-    for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0x0d3b38)));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0xd9455a)));
     for (const g of parts.tentacles) group.add(new THREE.Mesh(g, glowMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -8434,7 +8470,7 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xd9c66a);
     const finMat = solidMaterial(0xc9a94a);
-    const eyeMat = solidMaterial(0x14140f);
+    const eyeMat = solidMaterial(0x3a6ea8);
     const spikeMat = solidMaterial(0x8a7a3a);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
@@ -8501,9 +8537,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = snifferParts(); decorGeoCache.set('sniffer', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xc9a876), snoutMat = solidMaterial(0x9c7a52);
+    const sailMat = solidMaterial(0x5a8a3a);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.snout, snoutMat));
     group.add(new THREE.Mesh(parts.tail, bodyMat));
+    group.add(new THREE.Mesh(parts.sail, sailMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -8586,7 +8624,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('goat');
     if (!parts) { parts = goatParts(); decorGeoCache.set('goat', parts); }
     const group = new THREE.Group();
-    const bodyMat = solidMaterial(0xd8cdb8), hornMat = solidMaterial(0x3a352f);
+    const bodyMat = solidMaterial(0xd8cdb8), hornMat = solidMaterial(0x8a7f6a);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
     group.add(new THREE.Mesh(parts.snout, hornMat));
@@ -8614,7 +8652,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('allay');
     if (!parts) { parts = allayParts(); decorGeoCache.set('allay', parts); }
     const group = new THREE.Group();
-    const bodyMat = solidMaterial(0x4a6ee0);
+    const bodyMat = solidMaterial(0xa8c4de);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, allayWingMaterial()));
@@ -8894,7 +8932,7 @@ function buildDecorMeshesForEntry(entry) {
     if (!axe) { axe = vindicatorAxeParts(); decorGeoCache.set('vindicatorAxe', axe); }
     const group = new THREE.Group();
     const robeMat = solidMaterial(0x5a6e52);
-    const skinMat = solidMaterial(0xcaa472);
+    const skinMat = solidMaterial(0x9a9a92);
     const apronMat = solidMaterial(0x3a4a34);
     const axeHandleMat = solidMaterial(0x6b4a2f);
     const axeBladeMat = solidMaterial(0x9a9a9a);
@@ -8903,9 +8941,15 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.nose, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
     group.add(new THREE.Mesh(parts.apron, apronMat));
-    const faceMat = solidMaterial(0x1c140f);
-    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
-    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    // Real vanilla vindicators are the only illager with blue eyes — the
+    // single most reliable way to tell one apart from a pillager or
+    // illusioner sharing this same body plan (minecraft.wiki/w/Vindicator)
+    // — an earlier version of this branch wrongly gave it the same dark
+    // eyes as every other villager-based mob here.
+    const eyeMat = solidMaterial(0x3a6ecf);
+    const browMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.faceBrow, browMat));
     const swinging = !!entry._swinging;
     group.add(new THREE.Mesh(swinging ? axe.raisedHandle : axe.restHandle, axeHandleMat));
     group.add(new THREE.Mesh(swinging ? axe.raisedBlade : axe.restBlade, axeBladeMat));
@@ -8975,7 +9019,7 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const shirtMat = solidMaterial(0x35618a);
     const skinMat = solidMaterial(0x4c7a4c);
-    const pantsMat = solidMaterial(0x5a4a3a);
+    const pantsMat = solidMaterial(0x4a3a5e);
     group.add(new THREE.Mesh(parts.torso, shirtMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
@@ -9014,7 +9058,7 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = zombieParts(); decorGeoCache.set('zombie', parts); }
     const group = new THREE.Group();
     const shirtMat = solidMaterial(0xa88656);
-    const skinMat = solidMaterial(0xc9a86a);
+    const skinMat = solidMaterial(0x8a8578);
     const pantsMat = solidMaterial(0x8a6f45);
     group.add(new THREE.Mesh(parts.torso, shirtMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
@@ -9038,7 +9082,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('wither');
     if (!parts) { parts = witherParts(); decorGeoCache.set('wither', parts); }
     const group = new THREE.Group();
-    const boneMat = solidMaterial(0x2b2b2b), eyeMat = solidMaterial(0xd94c3a);
+    const boneMat = solidMaterial(0x2b2b2b), eyeMat = solidMaterial(0xf5f5f0);
     group.add(new THREE.Mesh(parts.spine, boneMat));
     for (const g of parts.ribs) group.add(new THREE.Mesh(g, boneMat));
     for (const g of parts.necks) group.add(new THREE.Mesh(g, boneMat));
@@ -9144,15 +9188,20 @@ function buildDecorMeshesForEntry(entry) {
     objs.push(group);
   } else if (def.kind === 'trader_llama') {
     // Reuses the llama's own geometry completely unchanged, recoloured
-    // into a real trader llama's own paler coat, plus a small carried
-    // pack on its back.
+    // into a real trader llama's own paler coat, plus a small blue carried
+    // decoration standing in for the real vanilla trader llama's own
+    // exclusive blue diamond-patterned rug — its ONLY reliable visual
+    // identifier once separated from its trader (minecraft.wiki/w/Trader_Llama);
+    // an earlier version of this branch wrongly coloured it brown, which
+    // read as an ordinary saddlebag rather than that real distinguishing
+    // decoration.
     let parts = decorGeoCache.get('llama');
     if (!parts) { parts = llamaParts(); decorGeoCache.set('llama', parts); }
     let pack = decorGeoCache.get('traderLlamaPack');
     if (!pack) { pack = traderLlamaPackParts(); decorGeoCache.set('traderLlamaPack', pack); }
     const group = new THREE.Group();
     const woolMat = solidMaterial(0xe6ddc8);
-    const packMat = solidMaterial(0x8a4a2f);
+    const packMat = solidMaterial(0x3a5fcd);
     group.add(new THREE.Mesh(parts.body, woolMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, woolMat));
     group.add(new THREE.Mesh(parts.neck, woolMat));
@@ -9230,8 +9279,8 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('evoker');
     if (!parts) { parts = evokerParts(); decorGeoCache.set('evoker', parts); }
     const group = new THREE.Group();
-    const robeMat = solidMaterial(0x35314a);
-    const collarMat = solidMaterial(0xb9b6c9);
+    const robeMat = solidMaterial(0x1c1a24);
+    const collarMat = solidMaterial(0xe0c14a);
     const skinMat = solidMaterial(0xcfa987);
     group.add(new THREE.Mesh(parts.robe, robeMat));
     group.add(new THREE.Mesh(parts.collar, collarMat));
@@ -9248,7 +9297,7 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('guardian');
     if (!parts) { parts = guardianParts(); decorGeoCache.set('guardian', parts); }
     const group = new THREE.Group();
-    const skinMat = solidMaterial(0xb8c453);
+    const skinMat = solidMaterial(0x4fae9c);
     group.add(new THREE.Mesh(parts.body, skinMat));
     for (const g of parts.spikes) group.add(new THREE.Mesh(g, skinMat));
     group.add(new THREE.Mesh(parts.tailFin, skinMat));
@@ -9313,7 +9362,7 @@ function buildDecorMeshesForEntry(entry) {
     const hornMat = solidMaterial(0xcfc0a0);
     for (const g of parts.horns) group.add(new THREE.Mesh(g, hornMat));
     group.add(new THREE.Mesh(parts.tail, hideMat));
-    const faceMat = solidMaterial(0xd9401f);
+    const faceMat = solidMaterial(0x5a8a3a);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -9380,9 +9429,9 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('breeze');
     if (!parts) { parts = breezeParts(); decorGeoCache.set('breeze', parts); }
     const group = new THREE.Group();
-    const coreMat = solidMaterial(0x8fd4c9);
+    const coreMat = solidMaterial(0x6a4fc4);
     group.add(new THREE.Mesh(parts.core, coreMat));
-    const ringMat = solidMaterial(0x4fae9c);
+    const ringMat = solidMaterial(0xe8ddf5);
     group.add(new THREE.Mesh(parts.ringUpper, ringMat));
     group.add(new THREE.Mesh(parts.ringLower, ringMat));
     const faceMat = solidMaterial(0xe8c93b);
@@ -16482,11 +16531,11 @@ function renderBlueprint(model) {
     creeper: ['#3fae44', 'A'], snow_golem: ['#f5fbfb', 'A'], snow_layer: ['#f5fbfb', 'L'], fox: ['#c9622a', 'A'],
     villager: ['#a9a390', 'A'], wheat_crop: ['#dcc35e', 'W'], iron_golem: ['#a8a89e', 'A'], zombie: ['#35618a', 'A'],
     skeleton: ['#e4ddc8', 'A'], arrow: ['#8a6a4a', 'V'], wolf: ['#8a8a86', 'A'], ocelot: ['#dcb35a', 'A'],
-    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#35314a', 'A'], guardian: ['#b8c453', 'A'], ravager: ['#5c5044', 'A'],
+    llama: ['#d8c9a8', 'A'], camel: ['#d9a05b', 'A'], parrot: ['#c23b2e', 'A'], axolotl: ['#efc3d6', 'A'], evoker: ['#1c1a24', 'A'], guardian: ['#4fae9c', 'A'], ravager: ['#5c5044', 'A'],
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
