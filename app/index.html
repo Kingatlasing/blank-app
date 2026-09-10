@@ -6178,7 +6178,18 @@ function armadilloParts() {
   });
   const rolledBall = new THREE.BoxGeometry(0.3, 0.3, 0.3);
   rolledBall.translate(0, 0.15, 0);
-  return { body, shellPlates, head, snout, ears, tail, legs, eyes, rolledBall };
+  // Its own separate eye pair for the rolled-ball form, sitting right on
+  // that ball's own front surface (z=0.15) — the ordinary `eyes` above
+  // are positioned against the much longer unrolled body's own snout
+  // (z=0.37) and would float in empty space well in front of the
+  // compact ball if reused here unchanged.
+  const rolledEyeOffsets = [[-0.05, 0.19, 0.151], [0.05, 0.19, 0.151]];
+  const rolledEyes = rolledEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, shellPlates, head, snout, ears, tail, legs, eyes, rolledBall, rolledEyes };
 }
 // A small oval body and a long flat tail — real vanilla tadpoles look
 // nothing like a frog yet, just a tiny swimming blob with a tail
@@ -6707,8 +6718,14 @@ function ironGolemParts() {
 function zombieParts() {
   const torso = new THREE.BoxGeometry(0.5, 0.7, 0.3);
   torso.translate(0, 0.75, 0);
+  // Head sits flush on top of the torso (head bottom = torso top =
+  // 1.1) rather than leaving a visible gap between them — a 0.09-unit
+  // gap here doesn't look like much as a raw number, but against a
+  // plain background it reads as a genuinely disconnected, floating
+  // head, especially on every mob that reuses this geometry unchanged
+  // (the zombie itself, the drowned, and the husk).
   const head = new THREE.BoxGeometry(0.42, 0.42, 0.42);
-  head.translate(0, 1.4, 0);
+  head.translate(0, 1.31, 0);
   const armOffsets = [[-0.34, 1.0], [0.34, 1.0]];
   const arms = armOffsets.map(([x, y]) => {
     const g = new THREE.BoxGeometry(0.16, 0.16, 0.6);
@@ -6724,7 +6741,7 @@ function zombieParts() {
   // A minimal face — 2 small dark, sunken eyes, the same flat-panel
   // technique already used for every other mob's face here.
   const faceZ = 0.215, faceDepth = 0.02;
-  const faceEyeOffsets = [[-0.09, 1.44], [0.09, 1.44]];
+  const faceEyeOffsets = [[-0.09, 1.35], [0.09, 1.35]];
   const faceEyes = faceEyeOffsets.map(([x, y]) => {
     const g = new THREE.BoxGeometry(0.07, 0.06, faceDepth);
     g.translate(x, y, faceZ);
@@ -7920,7 +7937,7 @@ function buildDecorMeshesForEntry(entry) {
     const shellMat = solidMaterial(0xc9a876), skinMat = solidMaterial(0x8a6f52), eyeMat = solidMaterial(0x1c1a1d);
     if (entry._rolled) {
       group.add(new THREE.Mesh(parts.rolledBall, shellMat));
-      for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+      for (const g of parts.rolledEyes) group.add(new THREE.Mesh(g, eyeMat));
     } else {
       group.add(new THREE.Mesh(parts.body, skinMat));
       for (const g of parts.shellPlates) group.add(new THREE.Mesh(g, shellMat));
@@ -12344,6 +12361,17 @@ function updateDrowned(entry, obj, dt) {
     entry._wy = entry.y + 0.5;
     entry._wz = entry.z + 0.5;
   }
+  // Checked once per frame, before either branch below, since it's
+  // needed both to pick a walk/swim speed and to pick how this frame
+  // actually renders (see the render line at the bottom): zombieParts'
+  // own geometry (reused unchanged for a drowned) assumes the group's
+  // own origin sits AT the floor, exactly like an ordinary zombie's own
+  // render, so a drowned that's genuinely walking must render at the
+  // flat `entry.y`, not the center-offset `entry._wy` (which is only
+  // meaningful while actually swimming) — using `_wy` unconditionally
+  // used to visibly float the whole model half a block above the floor
+  // while walking.
+  const inWaterNow = squidCellSwimmable(currentModel, Math.floor(entry._wx), Math.floor(entry._wy), Math.floor(entry._wz));
   if (entry._mobState === 'idle') {
     entry._mobTimer -= dt;
     if (entry._mobTimer <= 0) {
@@ -12360,7 +12388,6 @@ function updateDrowned(entry, obj, dt) {
   } else { // moving
     const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
     const dist = Math.hypot(dx, dy, dz);
-    const inWaterNow = squidCellSwimmable(currentModel, Math.floor(entry._wx), Math.floor(entry._wy), Math.floor(entry._wz));
     const step = (inWaterNow ? DROWNED_SWIM_SPEED : DROWNED_LAND_SPEED) * dt;
     if (dist <= step) {
       entry._wx = entry._targetX;
@@ -12378,7 +12405,7 @@ function updateDrowned(entry, obj, dt) {
       if (Math.hypot(dx, dz) > 0.001) entry._mobYaw = Math.atan2(dx, dz);
     }
   }
-  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  obj.position.set(entry._wx + offX, inWaterNow ? entry._wy : entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
 const HUSK_WANDER_MIN = 2, HUSK_WANDER_MAX = 5;
