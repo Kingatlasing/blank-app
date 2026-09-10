@@ -2265,8 +2265,8 @@ const DECOR_TYPES = {
   // an illusioner is the first to make ITSELF genuinely invisible while
   // real, live decoy copies stand in for it. See updateIllusioner /
   // spawnIllusionerClones. Reuses the villager's own body plan unchanged,
-  // recoloured into a real illusioner's own dark robe, plus 2 small
-  // crossed swords.
+  // recoloured into a real illusioner's own steel-blue robe, plus a held
+  // bow with a nocked arrow (checked against real reference screenshots).
   illusioner: { kind: 'illusioner', interactive: false },
   // A pure, purely cosmetic visual decoy — see DECOR_TYPES.illusioner. It
   // has no mechanic of its own beyond mirroring its own real source
@@ -5100,8 +5100,8 @@ const PRESETS = [
     keywords: ['illusioner', 'illusion', 'invisible', 'clone', 'mirror image', 'decoy'],
     notes: [
       'Switch to Walk mode and approach — the illusioner genuinely interrupts its own ordinary wander the instant your own live distance drops within its own real cast range, standing perfectly still through a real fixed cast time before it actually turns invisible (`obj.visible = false`) and spawns 3 real, separately tracked `illusioner_clone` decor entries around its own last position, each rendered through the exact same disguise so nothing on screen tells the real caster apart from its own copies — because for that whole duration, the real one genuinely isn\'t drawn at all. Real vanilla illusioners cast a genuine "blindness + mirror image" spell on any nearby player, gaining invisibility and creating illusory duplicate copies of itself (minecraft.wiki/w/Illusioner). Every earlier proximity-triggered reaction in this app changes how a mob itself looks or moves — the pufferfish puffs up, the vindicator raises its axe, the armadillo rolls into a ball — an illusioner is the first to react by making ITSELF genuinely stop existing on screen while separate, independently tracked entries stand in for it, a real disappearance rather than a different pose. This app\'s own `updateIllusioner` runs the same live-distance check already proven by the pufferfish\'s own puff levels, but drives a real cast → invisible → reappear state machine instead of a graduated scale, toggling the true `obj.visible` flag directly (no mesh rebuild needed, unlike every earlier pose-swap mechanic) and calling `spawnIllusionerClones`/`removeIllusionerClones` — the same real world.decor.push/splice + mobObjects register/remove pattern already proven by the skeleton\'s own fired arrows — to actually create and later clean up the decoys rather than just toggling a flag on existing entries.',
-      'Verified directly by a unit test confirming an illusioner with a live player far away is left genuinely untouched and fully visible no matter how many real frames pass, that one brought within its own real cast range genuinely becomes invisible after its own real cast time actually elapses, that exactly 3 real decoy clones genuinely exist as their own separate tracked entries the instant it vanishes, and a second test confirming it genuinely reappears and every one of those clones is genuinely removed from both the model\'s own decor list and the live tracked mob list once its own real invisibility duration actually runs out — proving both the disappearance and the decoys are real, cleaned-up world state, not just a visual flag left dangling. This app has no verified real illusioner cast range or spell duration, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the pufferfish\'s own puff thresholds. The geometry reuses the villager\'s own body plan completely unchanged (real illusioners share the villager\'s base model), recoloured into a real illusioner\'s own dark grayish-blue robe, plus a new pair of crossed swords built with the same rotate-then-translate technique already used by the piglin\'s own held sword and the vindicator\'s own axe.',
-      'Not modeled: any of the illusioner\'s own real ranged sword-throw attack against a target, the real blindness effect actually applied to a nearby player, its real participation in raids alongside pillagers and vindicators, and its own decoy clones actually scattering and moving independently rather than holding fixed spawn positions — this app has no combat, status-effect, or raid system at all, so this illusioner only ever wanders, casts, and vanishes behind stationary decoys.',
+      'Verified directly by a unit test confirming an illusioner with a live player far away is left genuinely untouched and fully visible no matter how many real frames pass, that one brought within its own real cast range genuinely becomes invisible after its own real cast time actually elapses, that exactly 3 real decoy clones genuinely exist as their own separate tracked entries the instant it vanishes, and a second test confirming it genuinely reappears and every one of those clones is genuinely removed from both the model\'s own decor list and the live tracked mob list once its own real invisibility duration actually runs out — proving both the disappearance and the decoys are real, cleaned-up world state, not just a visual flag left dangling. This app has no verified real illusioner cast range or spell duration, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the pufferfish\'s own puff thresholds. The geometry reuses the villager\'s own body plan completely unchanged (real illusioners share the villager\'s base model), recoloured into a real illusioner\'s own steel-blue robe, plus a held bow with a nocked arrow — corrected after checking real reference screenshots directly, which caught an earlier version of this mob wrongly wielding crossed swords instead of the bow a real illusioner actually carries.',
+      'Not modeled: any of the illusioner\'s own real bow-and-arrow attack actually firing and damaging a target, the real blindness effect actually applied to a nearby player, its real participation in raids alongside pillagers and vindicators, and its own decoy clones actually scattering and moving independently rather than holding fixed spawn positions — this app has no combat, status-effect, or raid system at all, so this illusioner only ever wanders, casts, and vanishes behind stationary decoys.',
     ],
   },
 ];
@@ -7154,31 +7154,32 @@ function vindicatorAxeParts() {
   raisedBlade.translate(raisedX, raisedY, raisedZ);
   return { restHandle, restBlade, raisedHandle, raisedBlade };
 }
-// 2 small crossed swords, one in each hand — the single most recognizable
-// real vanilla silhouette cue distinguishing an illusioner from an
-// ordinary villager (minecraft.wiki/w/Illusioner), always rendered since
-// a real illusioner never appears without them. Reused completely
+// A held bow with a nocked arrow, raised and drawn — the single most
+// recognizable real vanilla silhouette cue distinguishing an illusioner
+// from an ordinary villager (minecraft.wiki/w/Illusioner: a real
+// illusioner "wields a bow" and fires real arrows at its target),
+// corrected from an earlier crossed-swords design that didn't match —
+// verified directly against real reference screenshots — always rendered
+// since a real illusioner never appears without one. Reused completely
 // unchanged for its own illusionary clones (see DECOR_TYPES.illusioner)
 // since a real decoy has to look identical to the genuine mob.
-function illusionerSwordParts() {
-  const specs = [
-    { angle: -0.6, x: 0.4, y: 0.72, z: 0.1 },
-    { angle: 0.6, x: -0.4, y: 0.72, z: 0.1 },
-  ];
-  const hilts = specs.map(({ angle, x, y, z }) => {
-    const g = new THREE.BoxGeometry(0.05, 0.14, 0.05);
-    g.rotateZ(angle);
-    g.translate(x, y, z);
+function illusionerBowParts() {
+  const bowGrip = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+  bowGrip.translate(0.4, 1.0, 0.14);
+  const bowLimbSpecs = [{ y: 1.18, rot: 0.5 }, { y: 0.82, rot: -0.5 }];
+  const bowLimbs = bowLimbSpecs.map(({ y, rot }) => {
+    const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+    g.rotateZ(rot);
+    g.translate(0.4, y, 0.14);
     return g;
   });
-  const blades = specs.map(({ angle, x, y, z }) => {
-    const g = new THREE.BoxGeometry(0.045, 0.4, 0.045);
-    g.translate(0, 0.27, 0);
-    g.rotateZ(angle);
-    g.translate(x, y, z);
-    return g;
-  });
-  return { hilts, blades };
+  const nockedArrowShaft = new THREE.BoxGeometry(0.025, 0.025, 0.28);
+  nockedArrowShaft.translate(0.4, 1.0, -0.02);
+  const nockedArrowTip = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+  nockedArrowTip.translate(0.4, 1.0, 0.12);
+  const nockedArrowFletch = new THREE.BoxGeometry(0.07, 0.04, 0.03);
+  nockedArrowFletch.translate(0.4, 1.0, -0.15);
+  return { bowGrip, bowLimbs, nockedArrowShaft, nockedArrowTip, nockedArrowFletch };
 }
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
@@ -8913,22 +8914,23 @@ function buildDecorMeshesForEntry(entry) {
     objs.push(group);
   } else if (def.kind === 'illusioner' || def.kind === 'illusioner_clone') {
     // Reuses the villager's own base humanoid geometry unchanged (real
-    // illusioners share it), recoloured into a real illusioner's own dark
-    // grayish-blue robe, plus its own pair of crossed swords — see
+    // illusioners share it), recoloured into a real illusioner's own steel-
+    // blue robe, plus a held bow with a nocked arrow — checked directly
+    // against real reference screenshots, which is what caught an earlier
+    // version of this branch wrongly giving it crossed swords instead. See
     // DECOR_TYPES.illusioner for the real new mechanic this unlocks: a
     // live decoy ('illusioner_clone') renders through this exact same
     // branch, so nothing on screen visually distinguishes the real caster
     // from its own copies while both exist (see updateIllusioner).
     let parts = decorGeoCache.get('villager');
     if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
-    let swords = decorGeoCache.get('illusionerSwords');
-    if (!swords) { swords = illusionerSwordParts(); decorGeoCache.set('illusionerSwords', swords); }
+    let bow = decorGeoCache.get('illusionerBow');
+    if (!bow) { bow = illusionerBowParts(); decorGeoCache.set('illusionerBow', bow); }
     const group = new THREE.Group();
-    const robeMat = solidMaterial(0x4a4a5e);
+    const robeMat = solidMaterial(0x2e4f7a);
     const skinMat = solidMaterial(0xcaa472);
-    const apronMat = solidMaterial(0x2c2c3a);
-    const hiltMat = solidMaterial(0x6b4a2f);
-    const bladeMat = solidMaterial(0xb0b0b0);
+    const apronMat = solidMaterial(0x1f3a5c);
+    const bowMat = solidMaterial(0x6b4a2f);
     group.add(new THREE.Mesh(parts.robe, robeMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
     group.add(new THREE.Mesh(parts.nose, skinMat));
@@ -8937,8 +8939,14 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x1c140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.faceBrow, faceMat));
-    for (const g of swords.hilts) group.add(new THREE.Mesh(g, hiltMat));
-    for (const g of swords.blades) group.add(new THREE.Mesh(g, bladeMat));
+    group.add(new THREE.Mesh(bow.bowGrip, bowMat));
+    for (const g of bow.bowLimbs) group.add(new THREE.Mesh(g, bowMat));
+    const arrowShaftMat = solidMaterial(0x8a6a4a);
+    const arrowTipMat = solidMaterial(0xb0b0b0);
+    const arrowFletchMat = solidMaterial(0xe8e4d8);
+    group.add(new THREE.Mesh(bow.nockedArrowShaft, arrowShaftMat));
+    group.add(new THREE.Mesh(bow.nockedArrowTip, arrowTipMat));
+    group.add(new THREE.Mesh(bow.nockedArrowFletch, arrowFletchMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -16475,7 +16483,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#4a4a5e', 'A'], illusioner_clone: ['#4a4a5e', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
