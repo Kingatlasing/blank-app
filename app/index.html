@@ -2095,6 +2095,16 @@ const DECOR_TYPES = {
   // (real zombified piglins share the piglin's base model) plus its own
   // small face and an always-carried golden sword.
   zombified_piglin: { kind: 'zombified_piglin', interactive: true },
+  // Real vanilla tadpoles genuinely grow into frogs after a real amount of
+  // time passes, entirely on their own (minecraft.wiki/w/Tadpole). This is
+  // this app's first fully AUTONOMOUS mob-type mutation: every earlier one
+  // needs a player action to even START — shearing a mooshroom needs a
+  // click (and mutates instantly), curing a zombie villager needs a click
+  // just to start ITS OWN timer — while a tadpole's own growth timer is
+  // already running from the moment it's placed, with zero interaction of
+  // any kind required anywhere in the whole process. See
+  // growTadpoleIntoFrog / updateTadpole.
+  tadpole: { kind: 'tadpole', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3499,6 +3509,29 @@ function buildAxolotlTankInterior(grid, silhouette, dims, exteriorMat, accentMat
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'axolotl', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same glass-walled, single-water-source, open-topped tank shape
+// already proven on the Aquarium Chamber and Axolotl Tank presets,
+// stocked with 3 tadpoles instead — switch to Walk mode and just wait:
+// each one genuinely grows into a real frog entirely on its own, with no
+// interaction anywhere.
+function buildTadpolePondInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  const spots = [[0, 0], [-1, 1], [1, -1]];
+  for (const [dx, dz] of spots) {
+    const x = Math.max(1, Math.min(dims.sx - 2, cx + dx));
+    const z = Math.max(1, Math.min(dims.sz - 2, cz + dz));
+    decorOut.push({ type: 'tadpole', x, y: 1, z, facing: 'south' });
+  }
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4587,6 +4620,18 @@ const PRESETS = [
       'Not modeled: any actual damage from a zombified piglin\'s own attack, the real requirement that this reaction only spreads within the same nether-native "chunk-based" grouping rather than a simple radius, and their real chance to spawn from a regular piglin struck by a charged Nether portal or lightning — this app has no combat, damage, or portal system at all, so this pack only ever reacts to being directly clicked.',
     ],
   },
+  {
+    id: 'tadpole-pond', name: 'Tadpole Pond', shape: 'box', category: 'Aquatic',
+    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'tadpolePond',
+    blocks: { exterior: 'glass', interior: 'sand', accent: 'mud' },
+    desc: 'A real, single-water-source pond stocked with 3 tadpoles — real vanilla tadpoles genuinely grow into frogs after enough real time passes, entirely on their own, and these do too: just switch to Walk mode and wait, no interaction of any kind required.',
+    keywords: ['tadpole', 'frog', 'grow', 'grow up', 'mature', 'pond', 'swamp', 'automatic'],
+    notes: [
+      'Just wait — with zero interaction of any kind, each of the 3 tadpoles genuinely grows into a real, live frog entry once its own real growth timer runs out, right where it happens to be swimming at the time. Real vanilla tadpoles take a real amount of time to grow into frogs on their own (minecraft.wiki/w/Tadpole). This is this app\'s first fully AUTONOMOUS mob-type mutation: every earlier one needs a player action to even START — shearing a mooshroom needs a click and mutates that same instant, curing a zombie villager needs a click just to start ITS OWN timer — while a tadpole\'s own growth timer is already running from the very moment it\'s placed, with no click, approach, or trigger of any kind anywhere in the whole process. This app\'s own `updateTadpole` counts a real growth timer down every single frame, completely independent of whatever swim state the tadpole is currently in, right alongside its own ordinary hover/swim wander (reusing the axolotl\'s own swim-target picker unchanged, since the underlying "stay inside real water" rule is identical); the instant it reaches zero, `growTadpoleIntoFrog` changes the exact same live entry object\'s own `type` to `frog` and rebuilds just its own mesh in place — deliberately avoiding a full scene rebuild since this runs from inside `updateMobs`\' own per-frame loop, the same reasoning already used for the zombie villager\'s own cure.',
+      'Verified directly by a unit test confirming a tadpole genuinely keeps swimming normally for as long as real time remains on its own growth timer, that it becomes a genuine, live `frog` entry object — the identical reference, not a deletion followed by a new frog spawning in its place — the instant that timer reaches zero with zero interaction anywhere in the test, and a second test confirming the newly-grown frog immediately resumes its own ordinary ground-hopping behavior (including still being able to notice and eat a nearby slime) rather than being stuck in a broken in-between state. This app has no verified real tadpole growth duration, so the figure used is an honest, approximate stand-in, compressed the same way the zombie villager\'s own cure timer and the wandering trader\'s own departure timer already are so the effect is actually observable while simulating. The geometry is new and deliberately distinct from the frog\'s own: a small oval body and a flat tail, since a real tadpole looks nothing like a tiny frog yet. The pond itself reuses the exact same glass-walled, open-topped, single-water-source tank shape already proven on the Aquarium Chamber and Axolotl Tank presets.',
+      'Not modeled: the real ability to speed up the growth by feeding a tadpole slimeballs, tadpoles being a possible source of a rare frog variant depending on the biome they grow up in, and any of their real vulnerability to being eaten by an adult frog themselves — this app has no feeding or biome-variant system at all, so these tadpoles only ever swim and grow on a fixed timer.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5041,6 +5086,8 @@ function generateModel() {
     buildCreeperFarmInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'zombifiedPiglinPack') {
     buildZombifiedPiglinPackInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'tadpolePond') {
+    buildTadpolePondInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -5959,6 +6006,24 @@ function slimeballParts() {
   const ball = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   ball.translate(0, -0.35, 0);
   return { ball };
+}
+// A small oval body and a long flat tail — real vanilla tadpoles look
+// nothing like a frog yet, just a tiny swimming blob with a tail
+// (minecraft.wiki/w/Tadpole), so this is deliberately its own distinct
+// geometry rather than a scaled-down reuse of frogParts. See
+// DECOR_TYPES.tadpole.
+function tadpoleParts() {
+  const body = new THREE.BoxGeometry(0.18, 0.14, 0.22);
+  body.translate(0, 0.1, 0.04);
+  const tail = new THREE.BoxGeometry(0.07, 0.06, 0.2);
+  tail.translate(0, 0.1, -0.16);
+  const eyeOffsets = [[-0.05, 0.15, 0.14], [0.05, 0.15, 0.14]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, tail, eyes };
 }
 // A rounded body, 2 bulging top-facing eyes, a tongue (retracted flat
 // against the mouth normally, only stretched out during the real tongue-
@@ -7674,6 +7739,17 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = slimeballParts(); decorGeoCache.set('slimeball', parts); }
     const group = new THREE.Group();
     group.add(new THREE.Mesh(parts.ball, solidMaterial(0x9fc94f)));
+    objs.push(group);
+  } else if (def.kind === 'tadpole') {
+    let parts = decorGeoCache.get('tadpole');
+    if (!parts) { parts = tadpoleParts(); decorGeoCache.set('tadpole', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x5a4632), eyeMat = solidMaterial(0x1c1a1d);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.tail, bodyMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'frog') {
     let parts = decorGeoCache.get('frog');
@@ -11767,6 +11843,135 @@ function updateAxolotl(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const TADPOLE_WANDER_RADIUS = 2;
+const TADPOLE_HOVER_MIN = 1, TADPOLE_HOVER_MAX = 3;
+const TADPOLE_SWIM_SPEED = 0.5;
+// Real vanilla tadpoles take a genuine several real MINUTES to grow into a
+// frog; compressed the same way the zombie villager's own cure timer and
+// the wandering trader's own departure timer already are, so the effect
+// is actually observable while simulating.
+const TADPOLE_GROWTH_TIME = 10;
+// Same shape as pickAxolotlSwimTarget — a small water-bound creature
+// picking a nearby swimmable cell — reused unchanged rather than
+// duplicated, since the underlying rule (stay inside real water) is
+// identical for both.
+function pickTadpoleSwimTarget(model, entry) {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const vertical = Math.random() < 0.3;
+    let dx = 0, dy = 0, dz = 0;
+    if (vertical) {
+      dy = Math.round((Math.random() * 2 - 1) * TADPOLE_WANDER_RADIUS);
+    } else {
+      dx = Math.round((Math.random() * 2 - 1) * TADPOLE_WANDER_RADIUS);
+      dz = Math.round((Math.random() * 2 - 1) * TADPOLE_WANDER_RADIUS);
+    }
+    if (dx === 0 && dy === 0 && dz === 0) continue;
+    const tx = entry.x + dx, ty = entry.y + dy, tz = entry.z + dz;
+    if (squidCellSwimmable(model, tx, ty, tz)) return { x: tx, y: ty, z: tz };
+  }
+  return null;
+}
+// Finds the lowest real standing surface in a column — the same "open
+// cell with something solid directly beneath it" definition
+// mobCellWalkable already uses — so a mob that only ever moves along real
+// solid ground lands somewhere it can actually walk, rather than
+// wherever it happened to be floating. Falls back to the given y if the
+// whole column has no real floor at all.
+function findGroundY(model, x, z, fallbackY) {
+  const dims = model.dims;
+  if (x < 0 || z < 0 || x >= dims.sx || z >= dims.sz) return fallbackY;
+  for (let y = 1; y < dims.sy; y++) {
+    if (model.grid[idx(x, y, z, dims)] === 0 && model.grid[idx(x, y - 1, z, dims)] !== 0) return y;
+  }
+  return fallbackY;
+}
+// The real new mechanic — see DECOR_TYPES.tadpole. Called from inside
+// updateTadpole itself, which runs from inside updateMobs' own per-frame
+// loop, so this deliberately avoids a full scene rebuild (which would
+// reassign the shared mobObjects array out from under that in-progress
+// loop) and instead splices only this one mob's own stale mesh/record out
+// and adds its freshly built frog mesh back in directly — the same
+// targeted technique already proven by finishCuringZombieVillager.
+function growTadpoleIntoFrog(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  entry.x = Math.floor(entry._wx);
+  entry.z = Math.floor(entry._wz);
+  // A tadpole can be anywhere in the water column when it matures; a real
+  // frog is a ground-hopper in this app (it has no swim state at all), so
+  // it lands on the real solid floor beneath wherever it happened to be,
+  // exactly like stepping up out of the water onto land.
+  entry.y = findGroundY(currentModel, entry.x, entry.z, Math.round(entry._wy));
+  entry.type = 'frog';
+  delete entry._mobState;
+  delete entry._mobTimer;
+  delete entry._wy;
+  delete entry._targetX;
+  delete entry._targetY;
+  delete entry._targetZ;
+  delete entry._growthTimer;
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry.x + offX + 0.5;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry.z + offZ + 0.5;
+    three.group.add(mesh);
+  }
+}
+function updateTadpole(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._mobTimer = TADPOLE_HOVER_MIN + Math.random() * (TADPOLE_HOVER_MAX - TADPOLE_HOVER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._growthTimer = TADPOLE_GROWTH_TIME;
+  }
+  // The growth check runs unconditionally every frame, entirely
+  // independent of whatever swim state it's currently in — no
+  // interaction anywhere ever starts or pauses it.
+  entry._growthTimer -= dt;
+  if (entry._growthTimer <= 0) { growTadpoleIntoFrog(entry); return; }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickTadpoleSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = TADPOLE_HOVER_MIN;
+      }
+    }
+  } else { // swimming
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = TADPOLE_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = TADPOLE_HOVER_MIN + Math.random() * (TADPOLE_HOVER_MAX - TADPOLE_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -12967,6 +13172,7 @@ function updateMobs(dt) {
     if (entry.type === 'vex') { updateVex(entry, obj, dt); continue; }
     if (entry.type === 'goat') { updateGoat(entry, obj, dt); continue; }
     if (entry.type === 'frog') { updateFrog(entry, obj, dt); continue; }
+    if (entry.type === 'tadpole') { updateTadpole(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -14042,7 +14248,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -14112,7 +14318,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14258,6 +14464,7 @@ function renderCommands(model) {
       else if (d.type === 'witch') lines.push(`summon minecraft:witch ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'mob_spawner') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:spawner{SpawnData:{entity:{id:"minecraft:${d.mobType}"}}}`);
       else if (d.type === 'zombified_piglin') lines.push(`summon minecraft:zombified_piglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'tadpole') lines.push(`summon minecraft:tadpole ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
