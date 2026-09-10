@@ -8915,9 +8915,11 @@ function buildDecorMeshesForEntry(entry) {
   } else if (def.kind === 'illusioner' || def.kind === 'illusioner_clone') {
     // Reuses the villager's own base humanoid geometry unchanged (real
     // illusioners share it), recoloured into a real illusioner's own steel-
-    // blue robe, plus a held bow with a nocked arrow — checked directly
-    // against real reference screenshots, which is what caught an earlier
-    // version of this branch wrongly giving it crossed swords instead. See
+    // blue robe AND a matching blue helmet/hood covering the whole head
+    // (only the nose and eyes still show as separate face features) — a
+    // detail confirmed directly against real reference screenshots, which
+    // is also what caught an earlier version of this branch wrongly giving
+    // it crossed swords instead of its real held bow. See
     // DECOR_TYPES.illusioner for the real new mechanic this unlocks: a
     // live decoy ('illusioner_clone') renders through this exact same
     // branch, so nothing on screen visually distinguishes the real caster
@@ -8928,11 +8930,12 @@ function buildDecorMeshesForEntry(entry) {
     if (!bow) { bow = illusionerBowParts(); decorGeoCache.set('illusionerBow', bow); }
     const group = new THREE.Group();
     const robeMat = solidMaterial(0x2e4f7a);
+    const helmetMat = solidMaterial(0x2e4f7a);
     const skinMat = solidMaterial(0xcaa472);
     const apronMat = solidMaterial(0x1f3a5c);
     const bowMat = solidMaterial(0x6b4a2f);
     group.add(new THREE.Mesh(parts.robe, robeMat));
-    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.head, helmetMat));
     group.add(new THREE.Mesh(parts.nose, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
     group.add(new THREE.Mesh(parts.apron, apronMat));
