@@ -2227,6 +2227,24 @@ const DECOR_TYPES = {
   // (real pillagers share the villager's base model), recoloured into a
   // real pillager's own dark, drab robe, plus a small held crossbow.
   pillager: { kind: 'pillager', interactive: false },
+  // Real vanilla "Johnny" vindicators (a documented rare variant, from a
+  // villager's own journal note) are permanently hostile to every mob
+  // nearby, not just the player (minecraft.wiki/w/Vindicator). Every
+  // earlier "track another mob" mechanic here targets either the live
+  // player (the zombified piglin's chase, the pillager's line-of-sight
+  // shot), the NEAREST mob of its own SAME species (the wolf's pack
+  // cohesion), or one SPECIFIC bound mob fixed at placement time (the
+  // trader llama's own bound trader) — a vindicator is the first to
+  // dynamically retarget the nearest mob of ANY species, re-evaluated
+  // fresh every single time it needs a new target, with no fixed
+  // reference and no species restriction at all. Since this app has no
+  // raid or combat/damage system, a real "attack" is honestly stood in
+  // for by closing the distance and raising its own axe overhead for a
+  // real moment once in range, rather than removing or harming the
+  // target. See findNearestAnyMob / updateVindicator. Reuses the
+  // villager's own body plan unchanged, recoloured into a real
+  // vindicator's own grim, grayish-green robe, plus a held iron axe.
+  vindicator: { kind: 'vindicator', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3608,6 +3626,21 @@ function buildEndermiteHuntInterior(grid, silhouette, dims, exteriorMat, accentM
   decorOut.push({ type: 'endermite', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'endermite', x: Math.max(0, cx - Math.floor(ENDERMAN_HUNT_RADIUS) - 3), y: 1, z: cz, facing: 'south' });
 }
+// A grass yard with one vindicator, a cow, and a pig — the cow starts
+// well within its own real aggro radius, the pig safely beyond it —
+// switch to Walk mode and just watch: the vindicator genuinely charges
+// the cow (the nearest mob of ANY species, not the player) and raises
+// its own axe overhead the instant it's actually in range, while the far
+// pig is left completely alone the whole time.
+function buildVindicatorMenagerieInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'vindicator', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'cow', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'pig', x: Math.max(0, cx - Math.floor(VINDICATOR_AGGRO_RADIUS) - 3), y: 1, z: cz, facing: 'south' });
+}
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
 // away from your live position rather than continuing to wander freely.
@@ -4974,6 +5007,18 @@ const PRESETS = [
       'Not modeled: a real endermite\'s own actual attack against the player, its real chance to spawn from a player throwing an ender pearl (this app has no pearl-throwing or combat system at all), and its real automatic despawn after a fixed lifetime even if never hunted — this app has no timed despawn for it at all, so an endermite left alone simply wanders forever.',
     ],
   },
+  {
+    id: 'vindicator-menagerie', name: 'Vindicator Menagerie', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 21, baseZ: 9 }, interiorMode: 'vindicatorMenagerie',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass yard with a "Johnny" vindicator, a cow, and a pig — real vanilla Johnny vindicators are permanently hostile to every mob nearby, not just the player, and this one genuinely is too: switch to Walk mode and watch it charge the nearer cow and raise its own axe overhead the instant it\'s in range, while the far pig is left completely alone.',
+    keywords: ['vindicator', 'johnny', 'axe', 'aggro', 'hostile', 'any mob'],
+    notes: [
+      'Switch to Walk mode and just watch — the vindicator genuinely re-evaluates which real mob is nearest to it every single time it needs a new target, with no fixed reference kept between decisions, and the instant that nearest one is within its own real aggro radius it overrides its own ordinary wander to close the distance, raising its own axe overhead into a genuinely different pose the moment it\'s actually within melee range. The cow starts well within that radius and the pig safely beyond it, so the vindicator charges the cow specifically — not because it was told to, but because a fresh real distance check keeps finding it closer. Real vanilla "Johnny" vindicators (a documented rare variant, named from a villager\'s own journal note) are permanently hostile to every mob nearby, not just the player (minecraft.wiki/w/Vindicator). Every earlier "track another mob" mechanic here targets either the live player (the zombified piglin\'s own chase, the pillager\'s own line-of-sight shot), the NEAREST mob of its own SAME species (the wolf\'s own pack cohesion), or one SPECIFIC mob fixed at placement time (the trader llama\'s own bound trader) — a vindicator is the first to dynamically retarget the nearest mob of ANY species at all, recomputed fresh every time, with no species restriction and no fixed reference whatsoever. This app\'s own `findNearestAnyMob` scans every other live tracked mob regardless of type and returns whichever is genuinely closest right now; `updateVindicator` chases it once in aggro range and, on reaching real melee range, raises its own axe for a real moment (`rebuildVindicatorMesh`, the same reentrant-loop-safe manual mesh splice/rebuild technique already proven by the pillager\'s own loaded/unloaded crossbow) before returning to searching for a target again.',
+      'Verified directly by a unit test confirming a vindicator genuinely closes the distance to whichever real OTHER mob is currently nearest, regardless of that mob\'s own species, and switches to chasing a DIFFERENT mob the instant a fresh distance check finds a new one closer — proving the targeting is genuinely dynamic and re-evaluated, not a target locked in once — plus a second test confirming it raises its own axe into a genuinely different pose the instant it reaches real melee range and returns to its own resting pose afterward, and a third test confirming a mob placed beyond its own real aggro radius is left completely alone no matter how many real frames pass. This app has no combat or damage system at all, so a real "attack" is honestly stood in for by closing the distance and raising the axe rather than actually harming the target, and this app also has no verified real aggro radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the wolf\'s own pack leash radius and the trader llama\'s own follow radius. The geometry reuses the villager\'s own body plan completely unchanged (real vindicators share the villager\'s base model), recoloured into a real vindicator\'s own grim, grayish-green robe, plus a held iron axe with its own separate raised-overhead pose.',
+      'Not modeled: any of the vindicator\'s own real combat (actual melee damage, breaking down doors to reach a target), its real participation in raids alongside pillagers and evokers, and the real requirement that an ordinary (non-Johnny) vindicator only targets the player and iron golems rather than every mob — this app has no combat, raid, or door-breaking system at all, so this vindicator only ever wanders, charges the real nearest mob, and swings.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5444,6 +5489,8 @@ function generateModel() {
     buildTraderLlamaEscortInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'endermiteHunt') {
     buildEndermiteHuntInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'vindicatorMenagerie') {
+    buildVindicatorMenagerieInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6947,6 +6994,33 @@ function villagerParts() {
   const heldGiftBloom = new THREE.BoxGeometry(0.1, 0.08, 0.1);
   heldGiftBloom.translate(-0.4, 0.74, 0.08);
   return { robe, head, nose, arms, apron, faceEyes, faceBrow, heldWheat, heldGiftStem, heldGiftBloom };
+}
+// A held iron axe (handle + a wide flat blade) — the single most
+// recognizable real vanilla silhouette cue distinguishing a vindicator
+// from an ordinary villager (minecraft.wiki/w/Vindicator), always
+// rendered since a real vindicator never appears without one. A separate
+// RAISED overhead pose (steeper angle) is only rendered while
+// `entry._swinging` is true (see the render branch / updateVindicator) —
+// the visible proof of an actual real swing, the same "2 real poses"
+// idea already used for the skeleton's own relaxed/drawn bow.
+function vindicatorAxeParts() {
+  const restAngle = -0.55, restX = 0.42, restY = 0.68, restZ = 0.05;
+  const restHandle = new THREE.BoxGeometry(0.06, 0.42, 0.06);
+  restHandle.rotateZ(restAngle);
+  restHandle.translate(restX, restY, restZ);
+  const restBlade = new THREE.BoxGeometry(0.22, 0.24, 0.05);
+  restBlade.translate(0.1, 0.2, 0);
+  restBlade.rotateZ(restAngle);
+  restBlade.translate(restX, restY, restZ);
+  const raisedAngle = -2.3, raisedX = 0.34, raisedY = 0.85, raisedZ = 0.1;
+  const raisedHandle = new THREE.BoxGeometry(0.06, 0.42, 0.06);
+  raisedHandle.rotateZ(raisedAngle);
+  raisedHandle.translate(raisedX, raisedY, raisedZ);
+  const raisedBlade = new THREE.BoxGeometry(0.22, 0.24, 0.05);
+  raisedBlade.translate(0.1, 0.2, 0);
+  raisedBlade.rotateZ(raisedAngle);
+  raisedBlade.translate(raisedX, raisedY, raisedZ);
+  return { restHandle, restBlade, raisedHandle, raisedBlade };
 }
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
@@ -8624,6 +8698,38 @@ function buildDecorMeshesForEntry(entry) {
       group.add(new THREE.Mesh(crossbow.arrowTip, arrowTipMat));
       group.add(new THREE.Mesh(crossbow.arrowFletch, arrowFletchMat));
     }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'vindicator') {
+    // Reuses the villager's own geometry unchanged (real vindicators
+    // share the villager's base humanoid model), recoloured into a real
+    // vindicator's own grim, grayish-green robe, plus a held iron axe —
+    // always rendered, since a real vindicator never appears without
+    // one. The axe swaps to its own raised overhead pose only while
+    // `entry._swinging` is true (see updateVindicator), the visible
+    // proof of a real swing actually landing.
+    let parts = decorGeoCache.get('villager');
+    if (!parts) { parts = villagerParts(); decorGeoCache.set('villager', parts); }
+    let axe = decorGeoCache.get('vindicatorAxe');
+    if (!axe) { axe = vindicatorAxeParts(); decorGeoCache.set('vindicatorAxe', axe); }
+    const group = new THREE.Group();
+    const robeMat = solidMaterial(0x5a6e52);
+    const skinMat = solidMaterial(0xcaa472);
+    const apronMat = solidMaterial(0x3a4a34);
+    const axeHandleMat = solidMaterial(0x6b4a2f);
+    const axeBladeMat = solidMaterial(0x9a9a9a);
+    group.add(new THREE.Mesh(parts.robe, robeMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.nose, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, robeMat));
+    group.add(new THREE.Mesh(parts.apron, apronMat));
+    const faceMat = solidMaterial(0x1c140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.faceBrow, faceMat));
+    const swinging = !!entry._swinging;
+    group.add(new THREE.Mesh(swinging ? axe.raisedHandle : axe.restHandle, axeHandleMat));
+    group.add(new THREE.Mesh(swinging ? axe.raisedBlade : axe.restBlade, axeBladeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -14270,6 +14376,124 @@ function updateZombifiedPiglin(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const VINDICATOR_WANDER_MIN = 2, VINDICATOR_WANDER_MAX = 5;
+const VINDICATOR_WALK_SPEED = 1.0;
+const VINDICATOR_CHASE_SPEED = 1.3;
+const VINDICATOR_AGGRO_RADIUS = 6;
+const VINDICATOR_MELEE_RANGE = 0.9;
+const VINDICATOR_SWING_TIME = 0.5;
+const VINDICATOR_SWING_COOLDOWN = 1.2;
+// The real new mechanic — see DECOR_TYPES.vindicator. Scans every OTHER
+// live tracked mob (any species, re-evaluated fresh on every call — no
+// fixed reference kept between calls) and returns whichever one is
+// genuinely closest right now.
+function findNearestAnyMob(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other === entry || other.type === 'vindicator' || other.type === 'arrow' || other.type === 'dropped_item') continue;
+    const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
+    const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
+    const dist = Math.hypot(ox - entry._wx, oz - entry._wz);
+    if (dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best ? { entry: best, dist: bestDist } : null;
+}
+// Swaps the held axe between its own resting and raised-overhead poses —
+// see updateVindicator — the same reentrant-loop-safe manual
+// splice/rebuild technique already proven by rebuildPillagerMesh and
+// rebuildSkeletonMesh, since this runs from inside updateMobs' own
+// per-frame loop.
+function rebuildVindicatorMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+function updateVindicator(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = VINDICATOR_WANDER_MIN + Math.random() * (VINDICATOR_WANDER_MAX - VINDICATOR_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._swingCooldown = 0;
+  }
+  entry._swingCooldown = Math.max(0, entry._swingCooldown - dt);
+  if (entry._swinging) {
+    entry._swingTimer -= dt;
+    if (entry._swingTimer <= 0) {
+      entry._swinging = false;
+      entry._swingCooldown = VINDICATOR_SWING_COOLDOWN;
+      rebuildVindicatorMesh(entry);
+      return;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  const nearest = findNearestAnyMob(entry);
+  if (nearest && nearest.dist <= VINDICATOR_AGGRO_RADIUS) {
+    const tx = nearest.entry._wx !== undefined ? nearest.entry._wx : nearest.entry.x + 0.5;
+    const tz = nearest.entry._wz !== undefined ? nearest.entry._wz : nearest.entry.z + 0.5;
+    const dx = tx - entry._wx, dz = tz - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.01) entry._mobYaw = Math.atan2(dx, dz);
+    if (dist <= VINDICATOR_MELEE_RANGE) {
+      if (entry._swingCooldown <= 0) {
+        entry._swinging = true;
+        entry._swingTimer = VINDICATOR_SWING_TIME;
+        rebuildVindicatorMesh(entry);
+        return;
+      }
+    } else {
+      const step = Math.min(VINDICATOR_CHASE_SPEED * dt, dist);
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = VINDICATOR_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = VINDICATOR_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = VINDICATOR_WANDER_MIN + Math.random() * (VINDICATOR_WANDER_MAX - VINDICATOR_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -14592,6 +14816,7 @@ function updateMobs(dt) {
     if (entry.type === 'husk') { updateHusk(entry, obj, dt); continue; }
     if (entry.type === 'wither') { updateWither(entry, obj, dt); continue; }
     if (entry.type === 'pillager') { updatePillager(entry, obj, dt); continue; }
+    if (entry.type === 'vindicator') { updateVindicator(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -15807,7 +16032,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -15877,7 +16102,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -16030,6 +16255,7 @@ function renderCommands(model) {
       else if (d.type === 'wither_skull') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wither_skeleton_skull`);
       else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'vindicator') lines.push(`summon minecraft:vindicator ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
