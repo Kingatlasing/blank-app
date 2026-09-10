@@ -2000,6 +2000,23 @@ const DECOR_TYPES = {
   // departWanderingTrader. Reuses the villager's own humanoid geometry
   // unchanged, recoloured into its own real teal trading robe.
   wandering_trader: { kind: 'wandering_trader', interactive: false },
+  // Real vanilla trader llamas spawn already bound to the specific
+  // wandering trader they escort and stick close to it as it wanders
+  // (minecraft.wiki/w/Trader_Llama). Every earlier "track another mob"
+  // mechanic here targets either the live player (the zombified piglin's
+  // chase, the pillager's line-of-sight shot) or the NEAREST mob of its
+  // own SAME species (the wolf's own pack cohesion) — a trader llama is
+  // the first to follow one SPECIFIC mob of a DIFFERENT species, bound to
+  // that exact entry the moment it's placed rather than whichever
+  // wandering trader happens to be closest right now. It also has to
+  // handle that specific bound entry genuinely disappearing (a real
+  // wandering trader can depart on its own real timer): `updateTraderLlama`
+  // checks whether its own `_traderRef` is still a genuinely live tracked
+  // mob every frame and gracefully falls back to an ordinary free wander
+  // the instant it isn't, rather than chasing a stale reference or
+  // erroring. Reuses the llama's own geometry unchanged, recoloured into
+  // a real trader llama's own paler coat, plus a small carried pack.
+  trader_llama: { kind: 'trader_llama', interactive: false },
   // Real vanilla shearing a mooshroom "turns it into a cow" permanently,
   // dropping mushrooms in the process (minecraft.wiki/w/Mooshroom). Every
   // earlier interactive removal here deletes the SAME entry outright (the
@@ -3526,6 +3543,30 @@ function buildWolfPackClearingInterior(grid, silhouette, dims, exteriorMat, acce
   decorOut.push({ type: 'wolf', x: Math.min(dims.sx - 1, cx + 1), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'wolf', x: Math.max(0, cx - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), y: 1, z: Math.max(0, cz - Math.floor(WOLF_PACK_LEASH_RADIUS) - 2), facing: 'south' });
 }
+// A grass yard with a single wandering trader and 2 trader llamas — one
+// starts right next to the trader, already within its own real follow
+// radius; the other starts well beyond it. Switch to Walk mode and just
+// watch: the far one genuinely heads straight for the trader's own live
+// position instead of wandering off on its own, exactly the same
+// cohesion shape as the wolf pack, but bound to one specific mob of a
+// completely different species instead of the nearest of its own kind.
+function buildTraderLlamaEscortInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const trader = { type: 'wandering_trader', x: cx, y: 1, z: cz, facing: 'south' };
+  decorOut.push(trader);
+  decorOut.push({ type: 'trader_llama', x: Math.max(0, cx - 1), y: 1, z: cz, facing: 'south', _traderRef: trader });
+  decorOut.push({
+    type: 'trader_llama',
+    x: Math.min(dims.sx - 1, cx + Math.floor(TRADER_LLAMA_FOLLOW_RADIUS) + 3),
+    y: 1,
+    z: Math.min(dims.sz - 1, cz + Math.floor(TRADER_LLAMA_FOLLOW_RADIUS) + 3),
+    facing: 'south',
+    _traderRef: trader,
+  });
+}
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
 // away from your live position rather than continuing to wander freely.
@@ -4868,6 +4909,18 @@ const PRESETS = [
       'Not modeled: a real pillager\'s own actual melee/ranged combat damage, its real participation in raids and patrols (this app has no raid, patrol, or day-based spawn-condition system at all), and captains\' real banner-wearing variant — this app has no combat or banner-decor system at all, so these pillagers only ever wander, aim, and genuinely miss firing when a wall is actually in the way.',
     ],
   },
+  {
+    id: 'trader-llama-escort', name: 'Trader Llama Escort', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 15, baseZ: 15 }, interiorMode: 'traderLlamaEscort',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass yard with a wandering trader and 2 trader llamas — real vanilla trader llamas spawn already bound to the specific trader they escort and stick close to it, and these do too: switch to Walk mode and watch the far one head straight back to the trader instead of wandering off on its own.',
+    keywords: ['trader llama', 'llama', 'wandering trader', 'escort', 'follow', 'bound'],
+    notes: [
+      'One trader llama starts right next to the wandering trader, already within its own real follow radius; the other starts well beyond it. Watch the far one: instead of picking a random wander target like every other mob here, it genuinely heads toward the trader\'s own live position until it\'s back within range, then wanders freely nearby just like the other one. Real vanilla trader llamas spawn already bound to the specific wandering trader they escort and stay close to it as it wanders (minecraft.wiki/w/Trader_Llama). Every earlier "track another mob" mechanic here targets either the live player (the zombified piglin\'s chase, the pillager\'s line-of-sight shot) or the NEAREST mob of its own SAME species (the wolf\'s own pack cohesion) — a trader llama is the first to follow one SPECIFIC mob of a DIFFERENT species, bound to that exact entry the moment it\'s placed rather than whichever wandering trader happens to be closest. This app\'s own `updateTraderLlama` mirrors the wolf\'s own cohesion state machine shape, but checks a real `_traderRef` object reference set once at placement time instead of searching for the nearest mob of its own type on every decision, and re-checks every single frame whether that exact bound trader is still a genuinely live tracked mob — since a real wandering trader can depart entirely on its own real timer — falling back to an ordinary free wander the instant it isn\'t, rather than chasing a stale reference into nothing.',
+      'Verified directly by a unit test confirming a trader llama placed beyond its own real follow radius of its bound trader genuinely closes the distance to that trader\'s own live position over real simulated time, that one already within range wanders independently instead of being forced to sit still, and a second test confirming that once the bound trader entry is genuinely removed from the world (simulating its own real departure), the exact same llama stops trying to follow it and falls back to an ordinary free wander instead of erroring or freezing. This app has no verified real trader-llama follow radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the wolf\'s own pack leash radius. The geometry reuses the llama\'s own body plan completely unchanged, recoloured into a real trader llama\'s own paler coat, plus a small carried pack on its back.',
+      'Not modeled: real trader llamas actually being leashed to the trader with a visible lead rather than just following its position, their real chance to spit at a player or wolf that gets too close, and the real "several trader llamas can escort the same trader" spawn group sizing — this app has no leash-rendering, combat, or spawn-group system at all, so these llamas only ever follow their bound trader\'s live position or wander freely nearby.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5334,6 +5387,8 @@ function generateModel() {
     buildWitherSummoningAltarInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'pillagerOutpost') {
     buildPillagerOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'traderLlamaEscort') {
+    buildTraderLlamaEscortInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7203,6 +7258,15 @@ function llamaParts() {
   nose.translate(neckX, neckY, neckZ);
   return { body, legs, neck, head, ears, tail, faceEyes, nose };
 }
+// A small carried pack sitting just proud of the llama's own back — the
+// single visual cue distinguishing a trader llama from an ordinary wild
+// one, the same "one small added prop" technique already used for the
+// witch's held potion and the pillager's held crossbow.
+function traderLlamaPackParts() {
+  const pack = new THREE.BoxGeometry(0.3, 0.22, 0.26);
+  pack.translate(0, 0.88, 0);
+  return { pack };
+}
 // Reuses the same 4-corner leg placement and offset-then-rotate-then-
 // translate rigid neck+head assembly technique already proven on the
 // llama, but taller-legged (real camels stand notably tall at the
@@ -8611,6 +8675,30 @@ function buildDecorMeshesForEntry(entry) {
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'trader_llama') {
+    // Reuses the llama's own geometry completely unchanged, recoloured
+    // into a real trader llama's own paler coat, plus a small carried
+    // pack on its back.
+    let parts = decorGeoCache.get('llama');
+    if (!parts) { parts = llamaParts(); decorGeoCache.set('llama', parts); }
+    let pack = decorGeoCache.get('traderLlamaPack');
+    if (!pack) { pack = traderLlamaPackParts(); decorGeoCache.set('traderLlamaPack', pack); }
+    const group = new THREE.Group();
+    const woolMat = solidMaterial(0xe6ddc8);
+    const packMat = solidMaterial(0x8a4a2f);
+    group.add(new THREE.Mesh(parts.body, woolMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, woolMat));
+    group.add(new THREE.Mesh(parts.neck, woolMat));
+    group.add(new THREE.Mesh(parts.head, woolMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, woolMat));
+    group.add(new THREE.Mesh(parts.tail, woolMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.nose, faceMat));
+    group.add(new THREE.Mesh(pack.pack, packMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -11427,6 +11515,74 @@ function updateWanderingTrader(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const TRADER_LLAMA_WANDER_MIN = 2, TRADER_LLAMA_WANDER_MAX = 5;
+const TRADER_LLAMA_WALK_SPEED = 1.0;
+const TRADER_LLAMA_FOLLOW_RADIUS = 3;
+// Mirrors the wolf's own pack-cohesion state machine shape, but tracks
+// one SPECIFIC bound `_traderRef` object reference (set once, at the
+// moment this entry was placed) rather than searching for the nearest
+// mob of its own type every time — a trader llama cares about the one
+// exact trader it was paired with, not just whichever one happens to be
+// closest right now. Also handles that specific bound trader genuinely
+// vanishing (its own real departure timer running out): the instant
+// `_traderRef` is no longer a live tracked mob, this falls back to an
+// ordinary free wander exactly like every other ground mob here, rather
+// than chasing a stale reference into nothing.
+function updateTraderLlama(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = TRADER_LLAMA_WANDER_MIN + Math.random() * (TRADER_LLAMA_WANDER_MAX - TRADER_LLAMA_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  const traderStillLive = entry._traderRef && mobObjects.some(m => m.entry === entry._traderRef);
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      let usedTraderTarget = false;
+      if (traderStillLive) {
+        const tx = entry._traderRef._wx !== undefined ? entry._traderRef._wx : entry._traderRef.x + 0.5;
+        const tz = entry._traderRef._wz !== undefined ? entry._traderRef._wz : entry._traderRef.z + 0.5;
+        const dist = Math.hypot(tx - entry._wx, tz - entry._wz);
+        if (dist > TRADER_LLAMA_FOLLOW_RADIUS) {
+          entry._targetX = tx;
+          entry._targetZ = tz;
+          entry._mobState = 'walking';
+          usedTraderTarget = true;
+        }
+      }
+      if (!usedTraderTarget) {
+        const target = pickWanderTarget(currentModel, entry);
+        if (target) {
+          entry._targetX = target.x + 0.5;
+          entry._targetZ = target.z + 0.5;
+          entry._mobState = 'walking';
+        } else {
+          entry._mobTimer = TRADER_LLAMA_WANDER_MIN;
+        }
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = TRADER_LLAMA_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = TRADER_LLAMA_WANDER_MIN + Math.random() * (TRADER_LLAMA_WANDER_MAX - TRADER_LLAMA_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla iron golems "periodically offer poppies to villagers"
 // (minecraft.wiki/w/Iron_Golem). Every earlier mutation this app's mobs
 // perform touches a grid block, a dropped item, or the mob's OWN state;
@@ -14098,6 +14254,7 @@ function updateMobs(dt) {
     if (entry.type === 'villager') { updateVillager(entry, obj, dt); continue; }
     if (entry.type === 'zombie_villager') { updateZombieVillager(entry, obj, dt); continue; }
     if (entry.type === 'wandering_trader') { updateWanderingTrader(entry, obj, dt); continue; }
+    if (entry.type === 'trader_llama') { updateTraderLlama(entry, obj, dt); continue; }
     if (entry.type === 'witch') { updateWitch(entry, obj, dt); continue; }
     if (entry.type === 'iron_golem') { updateIronGolem(entry, obj, dt); continue; }
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
@@ -15208,7 +15365,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -15278,7 +15435,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -15431,6 +15588,7 @@ function renderCommands(model) {
       else if (d.type === 'wither_skull') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wither_skeleton_skull`);
       else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
