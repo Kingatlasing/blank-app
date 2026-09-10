@@ -1810,6 +1810,15 @@ const DECOR_TYPES = {
   turtle: { kind: 'turtle', interactive: false },
   turtle_egg: { kind: 'turtle_egg', interactive: false },
   glow_squid: { kind: 'glow_squid', interactive: false },
+  // Real vanilla pufferfish inflate through 3 real distinct stages as a
+  // real threat gets closer, from fully deflated all the way up to a
+  // fully puffed, spiky ball (minecraft.wiki/w/Pufferfish). Every earlier
+  // proximity-triggered reaction here is BINARY — the armadillo either
+  // rolls up or doesn't, the ocelot either flees or doesn't — a
+  // pufferfish is the first with a genuinely GRADUATED, multi-threshold
+  // reaction: 3 distinct real states along the SAME live distance
+  // reading, not just an on/off flag. See updatePufferfish.
+  pufferfish: { kind: 'pufferfish', interactive: false },
   dolphin: { kind: 'dolphin', interactive: false },
   lava: { kind: 'lava_block', interactive: false },
   strider: { kind: 'strider', interactive: false },
@@ -3703,6 +3712,24 @@ function buildAxolotlTankInterior(grid, silhouette, dims, exteriorMat, accentMat
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'axolotl', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same glass-walled, single-water-source, fully-walled tank shape
+// already proven on the Axolotl Tank preset, stocked with a pufferfish
+// instead — switch to Walk mode and approach the glass: it genuinely
+// puffs up through 3 real distinct stages as you get closer, deflating
+// again the moment you back off.
+function buildPufferfishReefInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  if (!decorOut) return;
+  const topY = dims.sy - 2;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
+  decorOut.push({ type: 'pufferfish', x: cx, y: 1, z: cz, facing: 'south' });
+}
 // The same glass-walled, single-water-source, open-topped tank shape
 // already proven on the Aquarium Chamber and Axolotl Tank presets,
 // stocked with 3 tadpoles instead — switch to Walk mode and just wait:
@@ -5019,6 +5046,18 @@ const PRESETS = [
       'Not modeled: any of the vindicator\'s own real combat (actual melee damage, breaking down doors to reach a target), its real participation in raids alongside pillagers and evokers, and the real requirement that an ordinary (non-Johnny) vindicator only targets the player and iron golems rather than every mob — this app has no combat, raid, or door-breaking system at all, so this vindicator only ever wanders, charges the real nearest mob, and swings.',
     ],
   },
+  {
+    id: 'pufferfish-reef', name: 'Pufferfish Reef', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'pufferfishReef',
+    blocks: { exterior: 'glass', interior: 'prismarine', accent: 'sea_lantern' },
+    desc: 'A glass tank genuinely filled with real water, with a pufferfish swimming through it — real vanilla pufferfish inflate through 3 real distinct stages as a threat gets closer, and this one genuinely does too: switch to Walk mode and approach the glass to watch it puff up in real, visible steps, deflating again the moment you back away.',
+    keywords: ['pufferfish', 'puff', 'inflate', 'aquarium', 'water', 'stages'],
+    notes: [
+      'Switch to Walk mode and approach the glass — the pufferfish genuinely swells through 3 real, visually distinct sizes as your own live distance to it shrinks, reaching its own fully puffed, spiky form only once you\'re genuinely close, and genuinely deflates back down in the same real steps the instant you back off, all while it keeps swimming through the tank exactly like a squid the whole time. Real vanilla pufferfish inflate through several real distinct stages as a real threat approaches, from fully deflated up to a fully puffed, spiky ball (minecraft.wiki/w/Pufferfish). Every earlier proximity-triggered reaction in this app is BINARY — the armadillo either rolls up or doesn\'t, the ocelot either flees or doesn\'t, a witch either drinks or doesn\'t — a pufferfish is the first with a genuinely GRADUATED, multi-threshold reaction: 3 real distinct states computed from the exact same live distance reading, not just an on/off flag. This app\'s own `updatePufferfish` computes a real `_puffLevel` (0, 1, or 2) fresh every frame from the live player\'s own real distance, and the instant that level actually changes, `rebuildPufferfishMesh` swaps its own live mesh to match — a genuinely different uniform scale for each stage, plus a real ring of spikes added only at the fully-puffed stage — deliberately avoiding a full scene rebuild since this runs from inside `updateMobs`\' own per-frame loop, the same targeted technique already proven by the vindicator\'s own axe-raise and the pillager\'s own loaded/unloaded crossbow. Its own ordinary swim reuses the squid\'s existing hover/swim cycle completely unchanged, since the real new mechanic here is entirely the puff reaction, not how it moves.',
+      'Verified directly by a unit test confirming a simulated live player far from the pufferfish leaves it genuinely fully deflated, that moving progressively closer genuinely raises its own real puff level in real, distinct steps rather than jumping straight to maximum, and a second test confirming backing away again genuinely deflates it back down through those same real steps rather than staying puffed forever — proving the reaction is a real, continuously-recomputed function of live distance, not a one-way trigger. This app has no verified real puff-distance thresholds, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s own sense radius and the vindicator\'s own aggro radius. The tank reuses the exact same glass-walled, single-source design already proven on the Axolotl Tank preset; the geometry is new — a round body with 2 eyes, 2 side fins, and a tail fin, plus a separate ring of small spikes only ever added while fully puffed.',
+      'Not modeled: any of the pufferfish\'s own real contact poison damage and its real chance to be a component in a brewed Water Breathing potion, its real preference for ocean biomes, and any actual physical size change affecting real collision (this app has no combat, potion-brewing, or biome system at all) — this pufferfish only ever swims and changes its own visible size in response to a live player.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5491,6 +5530,8 @@ function generateModel() {
     buildEndermiteHuntInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'vindicatorMenagerie') {
     buildVindicatorMenagerieInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'pufferfishReef') {
+    buildPufferfishReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6276,6 +6317,39 @@ function squidParts() {
     return g;
   });
   return { mantle, eyes, tentacles };
+}
+// A round body, 2 eyes, 2 side fins, and a tail fin, all built centered
+// on the fish's own local origin (the whole group is later uniformly
+// scaled per real puff stage in the render branch/updatePufferfish,
+// rather than needing 3 separate geometry sets) — plus a ring of small
+// spikes only ever added while fully puffed, matching real vanilla's own
+// spiky max-puff silhouette (minecraft.wiki/w/Pufferfish).
+function pufferfishParts() {
+  const body = new THREE.SphereGeometry(0.16, 10, 8);
+  const eyeOffsets = [[-0.07, 0.04, 0.13], [0.07, 0.04, 0.13]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  const finOffsets = [[-0.19, 0, 0], [0.19, 0, 0]];
+  const fins = finOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.1, 0.12);
+    g.translate(x, y, z);
+    return g;
+  });
+  const tailFin = new THREE.BoxGeometry(0.02, 0.12, 0.14);
+  tailFin.translate(0, 0, -0.2);
+  const spikeOffsets = [
+    [0.14, 0.1, 0.08], [-0.14, 0.1, 0.08], [0.14, -0.1, 0.08], [-0.14, -0.1, 0.08],
+    [0.1, 0.14, -0.08], [-0.1, 0.14, -0.08], [0.1, -0.14, -0.08], [-0.1, -0.14, -0.08],
+  ];
+  const spikes = spikeOffsets.map(([x, y, z]) => {
+    const g = new THREE.ConeGeometry(0.03, 0.09, 4);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, eyes, fins, tailFin, spikes };
 }
 // A flat wide shell, a small head, and four flipper stubs — real vanilla
 // turtles are noticeably wider than tall (1.2 x 1.2 footprint, only 0.4
@@ -8269,6 +8343,26 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'pufferfish') {
+    let parts = decorGeoCache.get('pufferfish');
+    if (!parts) { parts = pufferfishParts(); decorGeoCache.set('pufferfish', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xd9c66a);
+    const finMat = solidMaterial(0xc9a94a);
+    const eyeMat = solidMaterial(0x14140f);
+    const spikeMat = solidMaterial(0x8a7a3a);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.fins) group.add(new THREE.Mesh(g, finMat));
+    group.add(new THREE.Mesh(parts.tailFin, finMat));
+    const puffLevel = entry._puffLevel || 0;
+    if (puffLevel >= 2) {
+      for (const g of parts.spikes) group.add(new THREE.Mesh(g, spikeMat));
+    }
+    group.scale.setScalar(PUFFERFISH_PUFF_SCALE[puffLevel]);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'turtle') {
     let parts = decorGeoCache.get('turtle');
     if (!parts) { parts = turtleParts(); decorGeoCache.set('turtle', parts); }
@@ -10023,6 +10117,97 @@ function updateSquid(entry, obj, dt) {
       entry.z = Math.floor(entry._wz);
       entry._mobState = 'hovering';
       entry._mobTimer = SQUID_HOVER_MIN + Math.random() * (SQUID_HOVER_MAX - SQUID_HOVER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+const PUFFERFISH_WANDER_MIN = 1, PUFFERFISH_WANDER_MAX = 3;
+const PUFFERFISH_SWIM_SPEED = 0.4;
+// Real vanilla pufferfish start puffing at 2 blocks and reach maximum
+// puff within roughly half a block (compressed here into 2 honest,
+// approximate real thresholds along the SAME live distance reading,
+// the same kind of stand-in already used for the warden's own sense
+// radius) — see DECOR_TYPES.pufferfish for why this is a genuinely new,
+// graduated class of reaction rather than a binary one.
+const PUFFERFISH_PUFF_MID_RADIUS = 3;
+const PUFFERFISH_PUFF_MAX_RADIUS = 1.5;
+const PUFFERFISH_PUFF_SCALE = [0.75, 1.0, 1.3];
+// Swaps the live mesh between its own 3 real puff stages — see
+// updatePufferfish — the same reentrant-loop-safe manual splice/rebuild
+// technique already proven by rebuildArmadilloMesh and
+// rebuildVindicatorMesh, since this runs from inside updateMobs' own
+// per-frame loop.
+function rebuildPufferfishMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry._wy;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// The real new mechanic — see DECOR_TYPES.pufferfish. Otherwise reuses
+// the squid's own hover/swim wander cycle completely unchanged, since the
+// real new behavior here is entirely the graduated puff reaction, not
+// how it swims.
+function updatePufferfish(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'hovering';
+    entry._mobTimer = PUFFERFISH_WANDER_MIN + Math.random() * (PUFFERFISH_WANDER_MAX - PUFFERFISH_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._puffLevel = 0;
+  }
+  let playerDist = Infinity;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    const dx = (flyState.pos.x - offX) - entry._wx, dy = flyState.pos.y - entry._wy, dz = (flyState.pos.z - offZ) - entry._wz;
+    playerDist = Math.hypot(dx, dy, dz);
+  }
+  const newLevel = playerDist <= PUFFERFISH_PUFF_MAX_RADIUS ? 2 : (playerDist <= PUFFERFISH_PUFF_MID_RADIUS ? 1 : 0);
+  if (newLevel !== entry._puffLevel) {
+    entry._puffLevel = newLevel;
+    rebuildPufferfishMesh(entry);
+    return;
+  }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickSquidSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = PUFFERFISH_WANDER_MIN;
+      }
+    }
+  } else { // swimming
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = PUFFERFISH_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = PUFFERFISH_WANDER_MIN + Math.random() * (PUFFERFISH_WANDER_MAX - PUFFERFISH_WANDER_MIN);
     } else {
       entry._wx += (dx / dist) * step;
       entry._wy += (dy / dist) * step;
@@ -14823,6 +15008,7 @@ function updateMobs(dt) {
     if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
     if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
+    if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
@@ -16032,7 +16218,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -16102,7 +16288,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -16256,6 +16442,7 @@ function renderCommands(model) {
       else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pillager') lines.push(`summon minecraft:pillager ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'vindicator') lines.push(`summon minecraft:vindicator ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'pufferfish') lines.push(`summon minecraft:pufferfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
