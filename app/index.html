@@ -279,6 +279,11 @@
             <label for="build-toggle" style="margin:0;" title="Left-click a face to place a block there; right-click (or shift-click) a block to remove it — build anything, block by block">Build mode</label>
           </span>
           <select id="build-block-select" disabled title="Block placed by Build mode"></select>
+          <select id="held-item-select" title="Item held by the player in Walk/Third-person mode — hold right-click to draw, release to fire">
+            <option value="none">No held item</option>
+            <option value="bow">Bow</option>
+            <option value="crossbow">Crossbow</option>
+          </select>
           <span id="camera-hint" class="hint" style="margin:0;"></span>
         </div>
         <div id="three-container">
@@ -7089,7 +7094,12 @@ function skeletonParts() {
   });
   // A simplified bow — 2 angled limbs meeting at a grip — held out to one
   // side, a stylized stand-in rather than a pixel-perfect copy of the real
-  // curved bow texture.
+  // curved bow texture. A separate DRAWN form (limbs bent back further,
+  // plus a nocked arrow overlay) is only rendered while `entry._mobState
+  // === 'drawing'` (see the render branch / updateSkeleton), matching
+  // real vanilla's own visibly different relaxed-vs-pulled bow textures
+  // — the same "loaded/unloaded" idea already used for the pillager's
+  // own crossbow.
   const bowGrip = new THREE.BoxGeometry(0.05, 0.24, 0.05);
   bowGrip.translate(0.32, 0.8, 0.18);
   const bowLimbSpecs = [{ y: 0.98, rot: 0.5 }, { y: 0.62, rot: -0.5 }];
@@ -7099,6 +7109,19 @@ function skeletonParts() {
     g.translate(0.32, y, 0.18);
     return g;
   });
+  const bowLimbDrawnSpecs = [{ y: 0.98, rot: 0.85 }, { y: 0.62, rot: -0.85 }];
+  const bowLimbsDrawn = bowLimbDrawnSpecs.map(({ y, rot }) => {
+    const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
+    g.rotateZ(rot);
+    g.translate(0.32, y, 0.18);
+    return g;
+  });
+  const nockedArrowShaft = new THREE.BoxGeometry(0.025, 0.025, 0.28);
+  nockedArrowShaft.translate(0.32, 0.8, 0.02);
+  const nockedArrowTip = new THREE.BoxGeometry(0.04, 0.04, 0.04);
+  nockedArrowTip.translate(0.32, 0.8, 0.16);
+  const nockedArrowFletch = new THREE.BoxGeometry(0.07, 0.04, 0.03);
+  nockedArrowFletch.translate(0.32, 0.8, -0.11);
   const faceZ = 0.185, faceDepth = 0.02;
   const faceEyeOffsets = [[-0.08, 1.4], [0.08, 1.4]];
   const faceEyes = faceEyeOffsets.map(([x, y]) => {
@@ -7106,7 +7129,10 @@ function skeletonParts() {
     g.translate(x, y, faceZ);
     return g;
   });
-  return { torso, head, arms, legs, bowGrip, bowLimbs, faceEyes };
+  return {
+    torso, head, arms, legs, bowGrip, bowLimbs, bowLimbsDrawn,
+    nockedArrowShaft, nockedArrowTip, nockedArrowFletch, faceEyes,
+  };
 }
 // A thin shaft, a conical tip, and a flat fletching — built along local
 // +Z so the caller can orient the whole assembly to match its own live
@@ -8706,7 +8732,16 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.arms) group.add(new THREE.Mesh(g, boneMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, boneMat));
     group.add(new THREE.Mesh(parts.bowGrip, bowMat));
-    for (const g of parts.bowLimbs) group.add(new THREE.Mesh(g, bowMat));
+    const drawn = entry._mobState === 'drawing';
+    for (const g of (drawn ? parts.bowLimbsDrawn : parts.bowLimbs)) group.add(new THREE.Mesh(g, bowMat));
+    if (drawn) {
+      const arrowShaftMat = solidMaterial(0x8a6a4a);
+      const arrowTipMat = solidMaterial(0xb0b0b0);
+      const arrowFletchMat = solidMaterial(0xe8e4d8);
+      group.add(new THREE.Mesh(parts.nockedArrowShaft, arrowShaftMat));
+      group.add(new THREE.Mesh(parts.nockedArrowTip, arrowTipMat));
+      group.add(new THREE.Mesh(parts.nockedArrowFletch, arrowFletchMat));
+    }
     const faceMat = solidMaterial(0x1c1c1c);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
@@ -12007,6 +12042,20 @@ const SKELETON_SHOOT_COOLDOWN = 3;
 const ARROW_SPEED = 6;
 const ARROW_GRAVITY = 9;
 const ARROW_MAX_LIFETIME = 3;
+// Real vanilla arrows that hit a block genuinely stick there, staying
+// visible for a real while before they eventually despawn, rather than
+// passing straight through or vanishing the instant they touch it — an
+// honest, compressed stand-in for real vanilla's own much longer stuck-
+// arrow despawn timer, the same kind of compression already used for the
+// wandering trader's own departure timer.
+const ARROW_STUCK_LIFETIME = 3;
+// Samples several points along this single frame's own real straight-
+// line movement (not just the final position) so a fast-moving arrow
+// can't tunnel clean through a thin, one-block obstacle between 2
+// frames — the same small-fixed-step sampling idea `hasLineOfSight`
+// already uses, applied here to a moving projectile instead of a static
+// sightline check.
+const ARROW_COLLISION_STEP = 0.2;
 function removeArrowFromWorld(model, arrowEntry) {
   const decorIdx = model.decor.indexOf(arrowEntry);
   if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
@@ -12040,10 +12089,27 @@ function fireArrow(model, skeletonEntry) {
 function updateArrow(entry, obj, dt) {
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   entry._age += dt;
+  // A real stuck arrow stays frozen exactly where it embedded — no more
+  // gravity, no more movement — until its own real stuck timer runs out.
+  if (entry._stuck) {
+    if (entry._age - entry._stuckAge >= ARROW_STUCK_LIFETIME) removeArrowFromWorld(currentModel, entry);
+    return;
+  }
   entry._vy -= ARROW_GRAVITY * dt;
-  entry._wx += entry._vx * dt;
-  entry._wy += entry._vy * dt;
-  entry._wz += entry._vz * dt;
+  const nx = entry._wx + entry._vx * dt, ny = entry._wy + entry._vy * dt, nz = entry._wz + entry._vz * dt;
+  const stepDist = Math.hypot(nx - entry._wx, ny - entry._wy, nz - entry._wz);
+  const steps = Math.max(1, Math.ceil(stepDist / ARROW_COLLISION_STEP));
+  let hit = false;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const sx = entry._wx + (nx - entry._wx) * t, sy = entry._wy + (ny - entry._wy) * t, sz = entry._wz + (nz - entry._wz) * t;
+    if (isSolidAtWorld(sx + offX, sy, sz + offZ)) {
+      entry._wx = sx; entry._wy = sy; entry._wz = sz;
+      hit = true;
+      break;
+    }
+  }
+  if (!hit) { entry._wx = nx; entry._wy = ny; entry._wz = nz; }
   entry.x = Math.floor(entry._wx);
   entry.y = Math.floor(entry._wy);
   entry.z = Math.floor(entry._wz);
@@ -12053,8 +12119,32 @@ function updateArrow(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   obj.rotation.y = entry._yaw;
   obj.rotation.x = entry._pitch;
+  if (hit) {
+    entry._stuck = true;
+    entry._stuckAge = entry._age;
+    return;
+  }
   if (entry._age >= ARROW_MAX_LIFETIME || entry._wy <= 0) {
     removeArrowFromWorld(currentModel, entry);
+  }
+}
+// Swaps the held bow between its own relaxed and drawn (bent-back limbs
+// + a visible nocked arrow) forms — see updateSkeleton — the same
+// reentrant-loop-safe manual splice/rebuild technique already proven by
+// rebuildArmadilloMesh, rebuildWitchMesh, and rebuildPillagerMesh, since
+// this runs from inside updateMobs' own per-frame loop.
+function rebuildSkeletonMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
   }
 }
 function updateSkeleton(entry, obj, dt) {
@@ -12079,6 +12169,9 @@ function updateSkeleton(entry, obj, dt) {
     entry._aimX = sensedX;
     entry._aimY = flyState.pos.y;
     entry._aimZ = sensedZ;
+    entry._mobYaw = Math.atan2(entry._aimX - entry._wx, entry._aimZ - entry._wz);
+    rebuildSkeletonMesh(entry);
+    return;
   }
   if (entry._mobState === 'drawing') {
     entry._drawTimer -= dt;
@@ -12088,6 +12181,8 @@ function updateSkeleton(entry, obj, dt) {
       entry._shootCooldown = SKELETON_SHOOT_COOLDOWN;
       entry._mobState = 'idle';
       entry._mobTimer = SKELETON_WANDER_MIN + Math.random() * (SKELETON_WANDER_MAX - SKELETON_WANDER_MIN);
+      rebuildSkeletonMesh(entry);
+      return;
     }
   } else if (entry._mobState === 'idle') {
     entry._mobTimer -= dt;
@@ -14970,6 +15065,123 @@ const pressedKeys = new Set();
 const flyState = { pos: new THREE.Vector3(), yaw: 0, pitch: 0, vy: 0, grounded: false };
 const dragLook = { active: false, lastX: 0, lastY: 0 };
 
+/* =========================================================================
+ * PLAYER HELD ITEM — the same real loaded/unloaded crossbow idea already
+ * proven on the pillager (and the drawn/undrawn bow idea proven on the
+ * skeleton) applied to the live player itself: hold right-click in
+ * Walk/Third-person mode to draw, release to fire a genuine arrow that
+ * flies and collides exactly like every mob-fired one (same fireArrow/
+ * updateArrow). A crossbow additionally shows unloaded and needs a real
+ * short reload before it can be drawn again, exactly like the pillager's
+ * own; a bow can be redrawn immediately, exactly like the skeleton's own.
+ * ==================================================================== */
+let heldItemType = 'none'; // 'none' | 'bow' | 'crossbow'
+let heldItemDrawing = false;
+let heldItemLoaded = true; // crossbow only — always true for a bow
+let heldItemReloadTimer = 0;
+let heldItemGroup = null;
+const PLAYER_HELD_ITEM_RANGE = 20;
+const PLAYER_CROSSBOW_RELOAD_TIME = 1.5;
+function rebuildHeldItemDisplay() {
+  if (heldItemGroup) {
+    if (heldItemGroup.parent) heldItemGroup.parent.remove(heldItemGroup);
+    heldItemGroup = null;
+  }
+  if (heldItemType === 'none' || !three) return;
+  if (cameraMode !== 'walk' && cameraMode !== 'thirdperson') return;
+  // These geometries carry a real baked-in offset from when translate()
+  // first built them (a hand position on a roughly human-sized body, e.g.
+  // x~0.3-0.4, y~0.7-0.8) — meaningless in Walk mode, which has no
+  // visible player body to hold anything relative to, so `propGroup` is
+  // built first and only recentered on its own real bounding-box center
+  // there (see below); Third-person reuses those same raw offsets
+  // completely unchanged since the player marker IS a similarly
+  // proportioned body, the same reasoning already used for reusing full
+  // mob geometry unchanged elsewhere in this app.
+  const propGroup = new THREE.Group();
+  if (heldItemType === 'bow') {
+    let parts = decorGeoCache.get('skeleton');
+    if (!parts) { parts = skeletonParts(); decorGeoCache.set('skeleton', parts); }
+    const bowMat = solidMaterial(0x6b4a2f);
+    propGroup.add(new THREE.Mesh(parts.bowGrip, bowMat));
+    for (const g of (heldItemDrawing ? parts.bowLimbsDrawn : parts.bowLimbs)) propGroup.add(new THREE.Mesh(g, bowMat));
+    if (heldItemDrawing) {
+      propGroup.add(new THREE.Mesh(parts.nockedArrowShaft, solidMaterial(0x8a6a4a)));
+      propGroup.add(new THREE.Mesh(parts.nockedArrowTip, solidMaterial(0xb0b0b0)));
+      propGroup.add(new THREE.Mesh(parts.nockedArrowFletch, solidMaterial(0xe8e4d8)));
+    }
+  } else if (heldItemType === 'crossbow') {
+    let parts = decorGeoCache.get('pillagerCrossbow');
+    if (!parts) { parts = pillagerCrossbowParts(); decorGeoCache.set('pillagerCrossbow', parts); }
+    const crossbowMat = solidMaterial(0x5a4530);
+    propGroup.add(new THREE.Mesh(parts.stock, crossbowMat));
+    for (const g of parts.limbs) propGroup.add(new THREE.Mesh(g, crossbowMat));
+    if (heldItemLoaded) {
+      propGroup.add(new THREE.Mesh(parts.arrowShaft, solidMaterial(0x8a6a4a)));
+      propGroup.add(new THREE.Mesh(parts.arrowTip, solidMaterial(0xb0b0b0)));
+      propGroup.add(new THREE.Mesh(parts.arrowFletch, solidMaterial(0xe8e4d8)));
+    }
+  }
+  const outer = new THREE.Group();
+  if (cameraMode === 'thirdperson') {
+    outer.add(propGroup);
+    outer.position.set(-0.32, 0.05, 0.18);
+    getPlayerMarker().add(outer);
+  } else {
+    // Recenter the whole prop on its own real geometric center (computed
+    // from its own actual bounding box, not guessed), THEN place that
+    // centered prop at a fixed screen-space spot in camera-local space —
+    // the same idea real vanilla uses for its own first-person held-item
+    // view.
+    const box = new THREE.Box3().setFromObject(propGroup);
+    const center = box.getCenter(new THREE.Vector3());
+    propGroup.position.set(-center.x, -center.y, -center.z);
+    outer.add(propGroup);
+    outer.position.set(0.35, -0.28, -0.6);
+    outer.scale.setScalar(1.4);
+    three.camera.add(outer);
+  }
+  heldItemGroup = outer;
+}
+function updateHeldItem(dt) {
+  if (heldItemType !== 'crossbow' || heldItemLoaded) return;
+  heldItemReloadTimer -= dt;
+  if (heldItemReloadTimer <= 0) {
+    heldItemLoaded = true;
+    rebuildHeldItemDisplay();
+  }
+}
+function firePlayerHeldItem() {
+  if (!currentModel || !three) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const dir = dirFromYawPitch(flyState.yaw, flyState.pitch);
+  const originGridX = flyState.pos.x - offX, originGridZ = flyState.pos.z - offZ;
+  const eyeY = flyState.pos.y + PLAYER_EYE_HEIGHT;
+  const shooter = {
+    _wx: originGridX, _wz: originGridZ, y: eyeY - 1.1,
+    _aimX: originGridX + dir.x * PLAYER_HELD_ITEM_RANGE,
+    _aimY: eyeY + dir.y * PLAYER_HELD_ITEM_RANGE,
+    _aimZ: originGridZ + dir.z * PLAYER_HELD_ITEM_RANGE,
+  };
+  fireArrow(currentModel, shooter);
+}
+function startDrawingHeldItem() {
+  if (heldItemType === 'none' || heldItemDrawing) return;
+  if (heldItemType === 'crossbow' && !heldItemLoaded) return;
+  heldItemDrawing = true;
+  rebuildHeldItemDisplay();
+}
+function releaseHeldItem() {
+  if (!heldItemDrawing) return;
+  heldItemDrawing = false;
+  firePlayerHeldItem();
+  if (heldItemType === 'crossbow') {
+    heldItemLoaded = false;
+    heldItemReloadTimer = PLAYER_CROSSBOW_RELOAD_TIME;
+  }
+  rebuildHeldItemDisplay();
+}
+
 function dirFromYawPitch(yaw, pitch) {
   const cp = Math.cos(pitch);
   return new THREE.Vector3(-Math.sin(yaw) * cp, Math.sin(pitch), -Math.cos(yaw) * cp);
@@ -15069,6 +15281,11 @@ function initThree() {
 
   const group = new THREE.Group();
   scene.add(group);
+  // Lets a held-item mesh be parented directly to the camera (see
+  // rebuildHeldItemDisplay) and still actually render — a Three.js child
+  // of the camera only appears if the camera itself is part of the scene
+  // graph the renderer is told to draw.
+  scene.add(camera);
 
   const clock = new THREE.Clock();
   function animate() {
@@ -15082,6 +15299,7 @@ function initThree() {
     updateInteractiveAnimations(dt);
     updateMobs(dt);
     updateWaterAnimations(dt);
+    updateHeldItem(dt);
     renderer.render(scene, camera);
   }
   animate();
@@ -15243,16 +15461,22 @@ function wireCameraInput(container) {
     pointerDownPos = { x: e.clientX, y: e.clientY };
     if (cameraMode === 'orbit') return;
     dragLook.active = true; dragLook.lastX = e.clientX; dragLook.lastY = e.clientY;
+    if (e.button === 2 && heldItemType !== 'none' && (cameraMode === 'walk' || cameraMode === 'thirdperson') && !el('build-toggle').checked && !el('interact-toggle').checked) {
+      startDrawingHeldItem();
+    }
   });
   window.addEventListener('pointerup', (e) => {
     dragLook.active = false;
-    if (pointerDownPos && Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) < 5) {
+    if (e.button === 2 && heldItemDrawing) {
+      releaseHeldItem();
+    } else if (pointerDownPos && Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y) < 5) {
       if (el('build-toggle').checked) { if (e.button === 0) attemptBuild(e.clientX, e.clientY, false); }
       else attemptInteract(e.clientX, e.clientY, e.button);
     }
     pointerDownPos = null;
   });
   container.addEventListener('contextmenu', (e) => {
+    if (heldItemType !== 'none' && (cameraMode === 'walk' || cameraMode === 'thirdperson') && !el('build-toggle').checked && !el('interact-toggle').checked) { e.preventDefault(); return; }
     if (el('interact-toggle').checked) { e.preventDefault(); return; } // handled on pointerup instead
     if (!el('build-toggle').checked) return;
     e.preventDefault();
@@ -15403,11 +15627,21 @@ function setCameraMode(mode) {
       hint.textContent = (mode === 'thirdperson' ? 'Third-person: ' : 'First-person: ') +
         'drag to look, WASD to move, Space to jump — you\'ll fall in from above.' +
         (el('interact-toggle').checked ? ' Click a door/lever/button/plate to use it.' : '') +
-        (el('build-toggle').checked ? ' Left-click a face to place a block, right-click a block to remove it.' : '');
+        (el('build-toggle').checked ? ' Left-click a face to place a block, right-click a block to remove it.' : '') +
+        (heldItemType !== 'none' && !el('interact-toggle').checked && !el('build-toggle').checked ? ' Hold right-click to draw, release to fire.' : '');
     }
   }
+  rebuildHeldItemDisplay();
 }
 el('camera-mode').addEventListener('change', (e) => setCameraMode(e.target.value));
+el('held-item-select').addEventListener('change', (e) => {
+  heldItemType = e.target.value;
+  heldItemDrawing = false;
+  heldItemLoaded = true;
+  heldItemReloadTimer = 0;
+  rebuildHeldItemDisplay();
+  setCameraMode(cameraMode); // refresh the hint text
+});
 
 function updateCutaway() {
   const enabled = el('cutaway-toggle').checked;
