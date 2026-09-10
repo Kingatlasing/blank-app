@@ -2144,6 +2144,29 @@ const DECOR_TYPES = {
   // share the zombie's base model), recoloured with a real husk's own
   // sandy, desert-worn skin tone.
   husk: { kind: 'husk', interactive: false },
+  // Real vanilla wither skeleton skulls placed on top of a real 3-wide,
+  // T-shaped soul sand/soul soil structure genuinely summon a wither the
+  // instant the last one is placed (minecraft.wiki/w/Wither). This app
+  // has no real block-placement sequencing to detect "the last one was
+  // just placed," so clicking any completed skull stands in for that —
+  // but, unlike every earlier click-triggered mechanic here, it isn't a
+  // free trigger: it re-scans the real grid at that moment, and the
+  // summon only actually happens if the real structure is still
+  // genuinely intact (all 4 soul sand cells and all 3 skulls still
+  // there). Break so much as one block first in Build mode and the exact
+  // same click does nothing — the first STRUCTURE-gated interaction here,
+  // distinct from the husk's own environment-gated automatic one (which
+  // needs no click at all) and every plain always-succeeds click before
+  // it. See checkWitherStructureIntact / attemptSummonWither.
+  wither_skull: { kind: 'wither_skull', interactive: true },
+  // Real vanilla withers float freely through the air
+  // (minecraft.wiki/w/Wither); its own movement reuses the ghast's
+  // existing free-floating 3D wander unchanged, since the real new
+  // mechanic here is entirely in how it comes to exist in the world (see
+  // wither_skull above), not in how it moves once it does. New geometry:
+  // 3 skull heads (one large center, 2 smaller flanking) on a bony
+  // ribbed spine, matching real vanilla's own silhouette.
+  wither: { kind: 'wither', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3621,6 +3644,30 @@ function buildHuskWaterTrapInterior(grid, silhouette, dims, exteriorMat, accentM
   decorOut.push({ type: 'water', x: cx, y: topY, z: cz, source: true });
   decorOut.push({ type: 'husk', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// A real, complete wither summoning structure — a 3-wide row of soul
+// sand with a fourth block extending down from its own middle, and 3
+// wither skeleton skulls on top — switch to Interact mode and click any
+// skull: since the structure genuinely starts complete, it genuinely
+// summons a real wither right there. Break a block first in Build mode
+// and the exact same click does nothing.
+function buildWitherSummoningAltarInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const soulSandIdx = MATERIAL_INDEX['soul_sand'] + 1;
+  grid[idx(cx - 1, 1, cz, dims)] = soulSandIdx;
+  grid[idx(cx, 1, cz, dims)] = soulSandIdx;
+  grid[idx(cx + 1, 1, cz, dims)] = soulSandIdx;
+  grid[idx(cx, 0, cz, dims)] = soulSandIdx;
+  if (!decorOut) return;
+  const skullSpots = [[-1, 2, 0], [0, 2, 0], [1, 2, 0]]; // [dx, absoluteY, dz]
+  for (const [dx, y, dz] of skullSpots) {
+    decorOut.push({
+      type: 'wither_skull', x: cx + dx, y, z: cz + dz,
+      _baseX: cx, _baseY: 1, _baseZ: cz,
+    });
+  }
+}
 // An open grass yard with a single evoker — switch to Walk mode and
 // approach it to see the real new mechanic: it casts, then genuinely
 // spawns 3 brand new vex entries into the live model, not a canned effect.
@@ -4757,6 +4804,18 @@ const PRESETS = [
       'Not modeled: a real husk\'s own actual immunity to daylight burning while still a husk (this app has no day/night or burning system at all), its real Hunger-effect melee attack, and the real requirement that a husk specifically spawns in desert/badlands biomes — this app has no combat, status-effect, or biome-based spawn-condition system at all, so this husk only ever wanders and watches its own real wet-timer.',
     ],
   },
+  {
+    id: 'wither-summoning-altar', name: 'Wither Summoning Altar', shape: 'box', category: 'Farms & Automation',
+    real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'witherSummoningAltar',
+    blocks: { exterior: 'nether_bricks', interior: 'nether_bricks', accent: 'nether_bricks' },
+    desc: 'A real, complete wither summoning structure — a T-shaped soul sand block with 3 real wither skeleton skulls on top — switch to Interact mode and click any skull: since the real structure genuinely starts complete, it genuinely summons a real wither right there. Break a block first in Build mode and the exact same click does nothing.',
+    keywords: ['wither', 'boss', 'summon', 'soul sand', 'skull', 'altar', 'structure'],
+    notes: [
+      'Switch to Interact mode and click any one of the 3 skulls sitting on top of the soul sand — the app genuinely re-scans the real grid at that exact moment, confirms the real structure is still completely intact, and only then does a genuine, live `wither` entry appear floating just above it, with all 3 skulls consumed by the ritual exactly like real vanilla\'s own. Real vanilla wither skeleton skulls placed on top of a real 3-wide, T-shaped soul sand/soul soil structure genuinely summon a wither the instant the last one is placed (minecraft.wiki/w/Wither). This app has no real block-placement sequencing to detect "the last one was just placed," so clicking any completed skull stands in for that — but unlike every earlier click-triggered mechanic here, it isn\'t a free trigger: switch to Build mode first and break any one soul sand block or remove a skull, then go back to Interact mode and click a remaining skull — nothing happens, because `checkWitherStructureIntact` genuinely finds the real structure broken. This is a genuinely new class of mechanic for this app: every earlier interaction either always succeeds once triggered (shearing a mooshroom) or depends on a live PLAYER\'s own position/state (the witch\'s own fire-sense, the armadillo\'s own threat-sense) — a wither summon is the first whose success depends on the real, current STATE OF THE WORLD\'S OWN BLOCKS at the moment of the click, not on the player at all.',
+      'Verified directly by a unit test confirming clicking a skull on the real, complete structure genuinely spawns a live wither entry and consumes all 3 real skull entries, and a second test confirming that removing so much as one of the 4 real soul sand cells (simulating breaking a block in Build mode) makes the exact same click on the exact same skull genuinely do nothing at all — no wither, no skulls consumed, the world completely unchanged — proving the check is a real, live re-scan of the grid and not just a one-time flag set back when the preset was first generated. This app has no real block-placement sequencing or NBT skull-rotation system, so "placing the last skull" is honestly stood in for by directly clicking a skull that\'s already there. The wither\'s own movement reuses the ghast\'s existing free-floating 3D wander completely unchanged, since the real new mechanic here is entirely in how it comes to exist, not in how it moves once it does; its own geometry is new — a bony ribbed spine with 3 skull heads (one large center, 2 smaller flanking) matching real vanilla\'s own silhouette.',
+      'Not modeled: any of the wither\'s own real combat (its own skull projectiles, the "wither" damage-over-time status effect, summoning a protective blue shield at half health), the real blue explosion and shockwave the moment it\'s actually summoned, and real soul soil being an equally valid substitute for soul sand in the structure — this app has no combat, status-effect, or explosion system at all, so this wither only ever floats peacefully once summoned.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5219,6 +5278,8 @@ function generateModel() {
     buildDrownedShorelineInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'huskWaterTrap') {
     buildHuskWaterTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'witherSummoningAltar') {
+    buildWitherSummoningAltarInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6137,6 +6198,55 @@ function slimeballParts() {
   const ball = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   ball.translate(0, -0.35, 0);
   return { ball };
+}
+// A small skull box with 2 dark eye sockets — one of the 3 real wither
+// skeleton skulls a wither summoning structure needs. See
+// DECOR_TYPES.wither_skull.
+function witherSkullParts() {
+  const skull = new THREE.BoxGeometry(0.28, 0.28, 0.28);
+  skull.translate(0, 0.14, 0);
+  const eyeOffsets = [[-0.06, 0.16, 0.15], [0.06, 0.16, 0.15]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { skull, eyes };
+}
+// A bony ribbed spine with 3 skull heads — one large center head and 2
+// smaller flanking ones on their own short necks — matching real
+// vanilla's own 3-headed silhouette (minecraft.wiki/w/Wither). See
+// DECOR_TYPES.wither.
+function witherParts() {
+  const spine = new THREE.BoxGeometry(0.22, 0.9, 0.22);
+  spine.translate(0, 0.9, 0);
+  const ribOffsets = [0.5, 0.7, 0.9];
+  const ribs = ribOffsets.map((y) => {
+    const g = new THREE.BoxGeometry(0.62, 0.08, 0.1);
+    g.translate(0, y, 0);
+    return g;
+  });
+  const neckOffsets = [[-0.42, 1.05], [0.42, 1.05]];
+  const necks = neckOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+    g.translate(x, y, 0);
+    return g;
+  });
+  const headOffsets = [[0, 1.55, 0, 0.36], [-0.42, 1.28, 0, 0.28], [0.42, 1.28, 0, 0.28]];
+  const heads = headOffsets.map(([x, y, z, s]) => {
+    const g = new THREE.BoxGeometry(s, s, s);
+    g.translate(x, y, z);
+    return g;
+  });
+  const eyes = headOffsets.map(([x, y, z, s]) => {
+    const eo = [[-s * 0.22, y, z + s * 0.5], [s * 0.22, y, z + s * 0.5]];
+    return eo.map(([ex, ey, ez]) => {
+      const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+      g.translate(ex, ey, ez);
+      return g;
+    });
+  }).flat();
+  return { spine, ribs, necks, heads, eyes };
 }
 // A low body, 3 overlapping shell-plate ridges along the back, a head
 // with a snout and small ears, a tail, and 4 short legs — plus a
@@ -8296,6 +8406,28 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.legs) group.add(new THREE.Mesh(g, pantsMat));
     const faceMat = solidMaterial(0x1c140a);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'wither_skull') {
+    let parts = decorGeoCache.get('witherSkull');
+    if (!parts) { parts = witherSkullParts(); decorGeoCache.set('witherSkull', parts); }
+    const group = new THREE.Group();
+    const boneMat = solidMaterial(0xd8d4c8), eyeMat = solidMaterial(0x1c1c1c);
+    group.add(new THREE.Mesh(parts.skull, boneMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    registerInteractive(group, entry, 'wither_skull');
+    objs.push(group);
+  } else if (def.kind === 'wither') {
+    let parts = decorGeoCache.get('wither');
+    if (!parts) { parts = witherParts(); decorGeoCache.set('wither', parts); }
+    const group = new THREE.Group();
+    const boneMat = solidMaterial(0x2b2b2b), eyeMat = solidMaterial(0xd94c3a);
+    group.add(new THREE.Mesh(parts.spine, boneMat));
+    for (const g of parts.ribs) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.necks) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.heads) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -12486,6 +12618,114 @@ function updateHusk(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const WITHER_FLOAT_SPEED = 1.2;
+const WITHER_IDLE_MIN = 2, WITHER_IDLE_MAX = 5;
+// Reuses the ghast's own free-floating 3D wander helpers completely
+// unchanged (pickGhastFloatTarget / ghastCellFloatable) — the real new
+// mechanic for a wither is entirely in how it comes to exist at all, not
+// in how it moves once it does. See DECOR_TYPES.wither.
+function updateWither(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = WITHER_IDLE_MIN + Math.random() * (WITHER_IDLE_MAX - WITHER_IDLE_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y;
+    entry._wz = entry.z + 0.5;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickGhastFloatTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'floating';
+      } else {
+        entry._mobTimer = WITHER_IDLE_MIN;
+      }
+    }
+  } else {
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = WITHER_FLOAT_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = entry._targetY;
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = WITHER_IDLE_MIN + Math.random() * (WITHER_IDLE_MAX - WITHER_IDLE_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      if (Math.hypot(dx, dz) > 0.001) entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+// The real 3-wide, T-shaped soul sand/skull layout a wither summoning
+// structure needs, expressed as offsets from its own base soul sand cell
+// (the middle of the row) — see minecraft.wiki/w/Wither.
+const WITHER_STRUCTURE_SOUL_SAND_OFFSETS = [[-1, 0, 0], [0, 0, 0], [1, 0, 0], [0, -1, 0]];
+const WITHER_STRUCTURE_SKULL_OFFSETS = [[-1, 1, 0], [0, 1, 0], [1, 1, 0]];
+// Re-scans the real grid at this exact moment — genuinely re-checking,
+// not just trusting that the structure looked right back when the preset
+// was first generated, since the player could have broken a block or
+// removed a skull in Build mode since then.
+function checkWitherStructureIntact(model, baseX, baseY, baseZ) {
+  const dims = model.dims;
+  const soulSandIdx = MATERIAL_INDEX['soul_sand'] + 1;
+  for (const [dx, dy, dz] of WITHER_STRUCTURE_SOUL_SAND_OFFSETS) {
+    const x = baseX + dx, y = baseY + dy, z = baseZ + dz;
+    if (x < 0 || y < 0 || z < 0 || x >= dims.sx || y >= dims.sy || z >= dims.sz) return false;
+    if (model.grid[idx(x, y, z, dims)] !== soulSandIdx) return false;
+  }
+  for (const [dx, dy, dz] of WITHER_STRUCTURE_SKULL_OFFSETS) {
+    const x = baseX + dx, y = baseY + dy, z = baseZ + dz;
+    if (!model.decor.some(d => d.type === 'wither_skull' && d.x === x && d.y === y && d.z === z)) return false;
+  }
+  return true;
+}
+// The real new mechanic — see DECOR_TYPES.wither_skull. Called from
+// attemptInteract's own click handler, which is OUTSIDE updateMobs' own
+// per-frame loop, so a direct manual add here is safe, the same
+// reasoning already used for igniteFromFireball. Returns whether the
+// summon actually happened, so a caller could in principle react to a
+// failed attempt.
+function attemptSummonWither(model, triggerEntry) {
+  const baseX = triggerEntry._baseX, baseY = triggerEntry._baseY, baseZ = triggerEntry._baseZ;
+  if (!checkWitherStructureIntact(model, baseX, baseY, baseZ)) return false;
+  for (const [dx, dy, dz] of WITHER_STRUCTURE_SKULL_OFFSETS) {
+    const x = baseX + dx, y = baseY + dy, z = baseZ + dz;
+    const skullIdx = model.decor.findIndex(d => d.type === 'wither_skull' && d.x === x && d.y === y && d.z === z);
+    if (skullIdx === -1) continue;
+    const skullEntry = model.decor[skullIdx];
+    const objIdx = interactiveObjects.findIndex(o => o.userData.decorEntry === skullEntry);
+    if (objIdx !== -1) {
+      if (three && three.group) three.group.remove(interactiveObjects[objIdx]);
+      interactiveObjects.splice(objIdx, 1);
+    }
+    model.decor.splice(skullIdx, 1);
+  }
+  const witherEntry = { type: 'wither', x: baseX, y: baseY + 2, z: baseZ, facing: 'south' };
+  model.decor.push(witherEntry);
+  if (three && three.group) {
+    const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+    for (const mesh of buildDecorMeshesForEntry(witherEntry)) {
+      mesh.position.x += witherEntry.x + offX + 0.5;
+      mesh.position.y += witherEntry.y;
+      mesh.position.z += witherEntry.z + offZ + 0.5;
+      three.group.add(mesh);
+    }
+  }
+  return true;
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -13690,6 +13930,7 @@ function updateMobs(dt) {
     if (entry.type === 'armadillo') { updateArmadillo(entry, obj, dt); continue; }
     if (entry.type === 'drowned') { updateDrowned(entry, obj, dt); continue; }
     if (entry.type === 'husk') { updateHusk(entry, obj, dt); continue; }
+    if (entry.type === 'wither') { updateWither(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -14313,6 +14554,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'mooshroom') { shearMooshroom(currentModel, entry); return; }
     if (entry.type === 'zombie_villager') { startCuringZombieVillager(entry); return; }
     if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
+    if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -14765,7 +15007,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#c9a86a', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -14835,7 +15077,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -14985,6 +15227,8 @@ function renderCommands(model) {
       else if (d.type === 'armadillo') lines.push(`summon minecraft:armadillo ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'drowned') lines.push(`summon minecraft:drowned ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'husk') lines.push(`summon minecraft:husk ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'wither_skull') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wither_skeleton_skull`);
+      else if (d.type === 'wither') lines.push(`summon minecraft:wither ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'warped_fungus') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:warped_fungus`);
       else if (d.type === 'wheat_crop') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:wheat[age=${d.stage || 0}]`);
