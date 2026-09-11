@@ -7948,7 +7948,12 @@ function horseParts() {
   // own offset FROM that pivot before the shared rotateX(neckAngle), so they
   // all lean forward together consistently (a positive angle tips anything
   // above the pivot toward +Z, this app's established "front" direction).
-  const neckAngle = 0.3, neckX = 0, neckY = 0.92, neckZ = 0.36;
+  // neckY is deliberately set low enough that the neck's own rotated bottom
+  // face sinks INTO the body's top surface (body top is at y=0.87) rather
+  // than merely touching it — a rotated box's bottom face is a slanted
+  // quad, not flat, so anything placed flush with the body surface still
+  // leaves part of that quad hovering above it with a visible gap.
+  const neckAngle = 0.3, neckX = 0, neckY = 0.8, neckZ = 0.36;
   const neckLen = 0.5;
   const neck = new THREE.BoxGeometry(0.22, neckLen, 0.22);
   neck.translate(0, neckLen / 2, 0);
