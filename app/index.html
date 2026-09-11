@@ -2322,6 +2322,14 @@ const DECOR_TYPES = {
   // vindicator's, ravager's), or an item/distance trust check (the
   // ocelot's, horse's).
   polar_bear: { kind: 'polar_bear', interactive: false },
+  // A real vanilla magma cube splits into smaller copies of itself when
+  // killed, all the way down to a tiny size that just vanishes for good
+  // (minecraft.wiki/w/Magma_Cube) — the first click here that REMOVES the
+  // clicked mob AND, unlike the axolotl's plain bucket-capture removal,
+  // REPLACES it with multiple brand-new smaller live mobs of the exact
+  // same type, chained down through a real size tier rather than ending
+  // in one single new state. See attemptSplitMagmaCube / updateMagmaCube.
+  magma_cube: { kind: 'magma_cube', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3787,6 +3795,18 @@ function buildPolarBearDenInterior(grid, silhouette, dims, exteriorMat, accentMa
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'polar_bear', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'polar_bear', x: Math.min(dims.sx - 2, cx + 1), y: 1, z: cz, facing: 'south', _cub: true });
+}
+// A netherrack floor with a single big real magma cube — switch to
+// Interact mode and click it: it's genuinely removed and replaced by 2
+// brand-new smaller live magma cubes, hopping off independently on their
+// own; click one of those, and the same thing happens again down to the
+// smallest real size, which finally just vanishes for good.
+function buildMagmaCubeCavernInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'magma_cube', x: cx, y: 1, z: cz, facing: 'south', size: 4 });
 }
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
@@ -5256,6 +5276,18 @@ const PRESETS = [
       'Not modeled: real polar bears actually hunting foxes and salmon, a cub\'s own real extra aggression toward foxes specifically, real polar bear swimming (matching the player\'s own swim speed, making them hard to escape in water), and the real wider warning radius other adults elsewhere in the world get when either the cub or an adult near it is actually attacked — this app has no fox-hunting, swimming-mob, or player-damage system at all, so only the one adult standing directly next to its own cub here ever charges, and only while the player stays on foot within its own real ground-based aggro range.',
     ],
   },
+  {
+    id: 'magma-cube-cavern', name: 'Magma Cube Cavern', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 10, baseZ: 10 }, interiorMode: 'magmaCubeCavern',
+    blocks: { exterior: 'netherrack', interior: 'netherrack', accent: 'netherrack' },
+    desc: 'A single big magma cube on a netherrack floor — real vanilla magma cubes split into smaller copies of themselves when killed, all the way down to a tiny size that finally vanishes for good. Turn on Interact mode and click it (and its children, and theirs) to watch that real chain play out live.',
+    keywords: ['magma cube', 'nether', 'split', 'lava', 'jump', 'slime'],
+    notes: [
+      'Turn on Interact mode and click the magma cube — it\'s genuinely removed and replaced by 2 brand-new, smaller, fully independent live magma cubes hopping off on their own from that exact spot; click one of THOSE, and the same thing happens again at the next real size down; click one of the resulting smallest ones, and it just vanishes for good, exactly like real vanilla. Real vanilla magma cubes split into smaller magma cubes when killed, all the way down to a tiny size that disappears "like other mobs" once it dies (minecraft.wiki/w/Magma_Cube). This app\'s own `attemptSplitMagmaCube` is the first click-interaction here that REPLACES a removed mob with MULTIPLE brand-new live mobs of its own same type rather than just deleting it outright (the axolotl\'s own bucket-capture) or advancing one shared entry through a fixed state list (the armor stand\'s tier, the horse\'s temper). Also watch the size difference in how high each one jumps: real vanilla magma cubes jump higher the BIGGER they are (a big one 4 blocks, a small one 2, a tiny one 1) — the exact opposite of this app\'s own slime, which jumps the same fixed 1-block height no matter its size (see the Slime Chunk Cavern preset) — so `magmaCubeJumpHeight` scales the arc directly off `entry.size` instead of using a fixed constant.',
+      'Verified directly by a unit test confirming clicking a big (size 4) magma cube genuinely removes it and adds exactly 2 new size-2 magma cubes at its old position, that clicking one of THOSE genuinely produces 2 new size-1 magma cubes in turn, and that clicking a size-1 (tiny) magma cube removes it with no replacement at all, and a second test confirming `magmaCubeJumpHeight` genuinely returns a real, strictly larger arc for a bigger size than a smaller one, unlike the slime\'s own fixed-height rule. This app has no verified real split count (vanilla splits into a random 2-4), so a fixed, deterministic 2 is used instead, the same honest-approximation caveat already applied to the vindicator\'s own aggro radius and the horse\'s own temper figures. The geometry is new: an opaque, segmented orange cube with dark cracks and a glowing core, deliberately nothing like the slime\'s own smooth translucent jelly look, even though both share the same real vanilla "scales by entry.size" convention.',
+      'Not modeled: real magma cube contact damage, their real immunity specifically to fire and lava damage (already modeled once, on the strider), their real inability to path around obstacles or avoid ledges (this one still respects the grid exactly like a slime does), and their real random 2-4 split count — this app has no combat/damage system at all, so this magma cube only ever hops, and only ever splits by a direct player click, never by taking damage.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5740,6 +5772,8 @@ function generateModel() {
     buildHorsePaddockInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
+    buildMagmaCubeCavernInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -6520,6 +6554,30 @@ function slimeParts() {
     return g;
   });
   return { outer, inner, eyes };
+}
+// Real vanilla magma cubes render as an OPAQUE, segmented orange cube
+// with dark cracks between plates and a lighter glowing core peeking
+// through — nothing shared with slimeParts' smooth translucent jelly
+// look, even though the overall silhouette (a single cube scaled by
+// entry.size) follows the same real vanilla convention: "dimensions
+// [are] the same as a slime of the same size" (minecraft.wiki/w/Magma_Cube).
+// Built at size-1 dimensions; scaled by entry.size at render time exactly
+// like the slime. See DECOR_TYPES.magma_cube.
+function magmaCubeParts() {
+  const body = new THREE.BoxGeometry(0.51, 0.51, 0.51);
+  const core = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+  const crackOffsets = [-0.13, 0.13];
+  const cracks = crackOffsets.map((y) => {
+    const g = new THREE.BoxGeometry(0.52, 0.03, 0.52);
+    g.translate(0, y, 0);
+    return g;
+  });
+  const eyes = [[-0.09, 0.06], [0.09, 0.06]].map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.07, 0.02);
+    g.translate(x, y, 0.26);
+    return g;
+  });
+  return { body, core, cracks, eyes };
 }
 // An almost-full-cell translucent cube — this app has no real fluid
 // simulation, so a "water" cell is a decor marker layered over an air
@@ -8826,6 +8884,26 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._yaw !== undefined ? entry._yaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'magma_cube') {
+    let parts = decorGeoCache.get('magma_cube');
+    if (!parts) { parts = magmaCubeParts(); decorGeoCache.set('magma_cube', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.body, solidMaterial(0xcc5a2a)));
+    group.add(new THREE.Mesh(parts.core, solidMaterial(0xffcf4a)));
+    for (const g of parts.cracks) group.add(new THREE.Mesh(g, solidMaterial(0x2b1a12)));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0x1a1a1a)));
+    group.scale.setScalar(entry.size || 4);
+    group.rotation.y = entry._yaw !== undefined ? entry._yaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.magma_cube: click-to-split needs the same
+    // click-detection userData tag registerInteractive sets on
+    // levers/buttons/doors, even though it's driven by registerMob's own
+    // bespoke updateMagmaCube per-frame hop rather than a real on/off
+    // state those use — the same technique already proven by the
+    // horse's own interactive tag.
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'magma_cube';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'water_block') {
     let parts = decorGeoCache.get('water_block');
     if (!parts) { parts = waterBlockParts(); decorGeoCache.set('water_block', parts); }
@@ -10585,6 +10663,101 @@ function updateSlime(entry, obj, dt) {
   const halfHeight = size * 0.255; // half of 0.51 * size — sits flush on the floor at any size
   obj.position.set(entry._wx + offX, entry.y + halfHeight + entry._hopHeight, entry._wz + offZ);
   obj.rotation.y = entry._yaw;
+}
+// Real vanilla magma cubes hop almost continuously, with barely any real
+// pause between hops — the opposite of a slime's own noticeable grounded
+// wait — and, unlike a slime's own fixed 1-block jump height regardless of
+// size, a magma cube's real jump height genuinely SCALES with its own
+// size: "a large magma cube jumps 4 blocks in height... a small magma
+// cube jumps 2 blocks... a tiny magma cube jumps 1 block"
+// (minecraft.wiki/w/Magma_Cube) — directly contrasting SLIME_JUMP_HEIGHT.
+const MAGMA_CUBE_HOP_WAIT_MIN = 0.05, MAGMA_CUBE_HOP_WAIT_MAX = 0.2;
+const MAGMA_CUBE_DIR_CHANGE_MIN = 2, MAGMA_CUBE_DIR_CHANGE_MAX = 5;
+const MAGMA_CUBE_HOP_DURATION = 0.3;
+function magmaCubeJumpHeight(size) {
+  if (size >= 4) return 4;
+  if (size >= 2) return 2;
+  return 1;
+}
+function updateMagmaCube(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const size = entry.size || 4;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'grounded';
+    entry._hopTimer = MAGMA_CUBE_HOP_WAIT_MIN + Math.random() * (MAGMA_CUBE_HOP_WAIT_MAX - MAGMA_CUBE_HOP_WAIT_MIN);
+    entry._dirTimer = MAGMA_CUBE_DIR_CHANGE_MIN + Math.random() * (MAGMA_CUBE_DIR_CHANGE_MAX - MAGMA_CUBE_DIR_CHANGE_MIN);
+    entry._yaw = Math.random() * Math.PI * 2;
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._hopHeight = 0;
+  }
+  entry._dirTimer -= dt;
+  if (entry._dirTimer <= 0) {
+    entry._yaw = Math.random() * Math.PI * 2;
+    entry._dirTimer = MAGMA_CUBE_DIR_CHANGE_MIN + Math.random() * (MAGMA_CUBE_DIR_CHANGE_MAX - MAGMA_CUBE_DIR_CHANGE_MIN);
+  }
+  if (entry._mobState === 'grounded') {
+    entry._hopHeight = 0;
+    entry._hopTimer -= dt;
+    if (entry._hopTimer <= 0) {
+      const dist = 0.51 * size * 1.15;
+      const tx = entry._wx + Math.sin(entry._yaw) * dist;
+      const tz = entry._wz + Math.cos(entry._yaw) * dist;
+      if (mobCellWalkable(currentModel, Math.floor(tx), entry.y, Math.floor(tz))) {
+        entry._hopStartX = entry._wx; entry._hopStartZ = entry._wz;
+        entry._hopTargetX = tx; entry._hopTargetZ = tz;
+        entry._hopElapsed = 0;
+        entry._mobState = 'hopping';
+      } else {
+        entry._yaw = Math.random() * Math.PI * 2;
+        entry._hopTimer = MAGMA_CUBE_HOP_WAIT_MIN + Math.random() * (MAGMA_CUBE_HOP_WAIT_MAX - MAGMA_CUBE_HOP_WAIT_MIN);
+      }
+    }
+  } else { // hopping
+    entry._hopElapsed += dt;
+    const t = Math.min(1, entry._hopElapsed / MAGMA_CUBE_HOP_DURATION);
+    entry._wx = entry._hopStartX + (entry._hopTargetX - entry._hopStartX) * t;
+    entry._wz = entry._hopStartZ + (entry._hopTargetZ - entry._hopStartZ) * t;
+    entry._hopHeight = Math.sin(t * Math.PI) * magmaCubeJumpHeight(size);
+    if (t >= 1) {
+      entry._mobState = 'grounded';
+      entry._hopHeight = 0;
+      entry._hopTimer = MAGMA_CUBE_HOP_WAIT_MIN + Math.random() * (MAGMA_CUBE_HOP_WAIT_MAX - MAGMA_CUBE_HOP_WAIT_MIN);
+    }
+  }
+  const halfHeight = size * 0.255;
+  obj.position.set(entry._wx + offX, entry.y + halfHeight + entry._hopHeight, entry._wz + offZ);
+  obj.rotation.y = entry._yaw;
+}
+// The real new mechanic — see DECOR_TYPES.magma_cube. Removes the clicked
+// magma cube outright and, if it wasn't already the smallest real size,
+// replaces it with 2 brand-new smaller live magma cubes at that same
+// spot — the first click-interaction here that REPLACES a removed mob
+// with MULTIPLE new ones of its own same type, rather than just deleting
+// it for good (the axolotl's own bucket-capture) or advancing ONE shared
+// entry through a state list (the armor stand, the horse).
+const MAGMA_CUBE_SPLIT_COUNT = 2; // real vanilla splits into a random 2-4; this app picks a fixed, deterministic 2
+function attemptSplitMagmaCube(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const size = entry.size || 4;
+  if (size > 1) { // a real tiny magma cube just vanishes for good on death, exactly like a real tiny slime
+    const childSize = size / 2;
+    const wx = entry._wx !== undefined ? entry._wx : entry.x + 0.5;
+    const wz = entry._wz !== undefined ? entry._wz : entry.z + 0.5;
+    for (let i = 0; i < MAGMA_CUBE_SPLIT_COUNT; i++) {
+      const angle = (i / MAGMA_CUBE_SPLIT_COUNT) * Math.PI * 2;
+      model.decor.push({
+        type: 'magma_cube', x: entry.x, y: entry.y, z: entry.z, facing: entry.facing || 'south',
+        size: childSize, _wx: wx + Math.cos(angle) * 0.3, _wz: wz + Math.sin(angle) * 0.3,
+      });
+    }
+  }
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
 }
 // Real vanilla water either falls straight down through open air from a
 // source, or spreads outward from a source (or from wherever a fall
@@ -16029,6 +16202,7 @@ function updateMobs(dt) {
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
+    if (entry.type === 'magma_cube') { updateMagmaCube(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
@@ -16771,6 +16945,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'horse') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'magma_cube') { attemptSplitMagmaCube(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -17239,7 +17414,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -17309,7 +17484,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -17407,6 +17582,7 @@ function renderCommands(model) {
       else if (d.type === 'flower') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:poppy`);
       else if (d.type === 'dandelion') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:dandelion`);
       else if (d.type === 'slime') lines.push(`summon minecraft:slime ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Size:${(d.size || 2) - 1}}`);
+      else if (d.type === 'magma_cube') lines.push(`summon minecraft:magma_cube ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Size:${(d.size || 4) - 1}}`);
       else if (d.type === 'water') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:water`);
       else if (d.type === 'squid') lines.push(`summon minecraft:squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'glow_squid') lines.push(`summon minecraft:glow_squid ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
