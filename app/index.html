@@ -2461,6 +2461,18 @@ const DECOR_TYPES = {
   // real named color variants rather than the full 2,700-combination
   // system.
   tropical_fish: { kind: 'tropical_fish', interactive: false },
+  // Real vanilla salmon "are unable to survive out of water" and, once
+  // outside it, "flop around... flip around on their sides"
+  // (minecraft.wiki/w/Salmon). Every earlier mob confined to a substance
+  // (the squid, the tropical fish) has its own wander logic simply never
+  // let it leave water to begin with, so this situation never arises for
+  // them; a salmon is the first here that can genuinely be found OUTSIDE
+  // its own required medium at all and reacts to it with a visible
+  // periodic motion in place, rather than fleeing a hazard outright (the
+  // hoglin's own real flee) or being unaffected. See updateSalmon. Reuses
+  // the squid's own pickSquidSwimTarget/squidCellSwimmable completely
+  // unchanged for its in-water wander.
+  salmon: { kind: 'salmon', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3484,6 +3496,32 @@ function buildTropicalFishSchoolInterior(grid, silhouette, dims, exteriorMat, ac
   for (const [sx, sy, sz] of spots) {
     decorOut.push({ type: 'tropical_fish', x: sx, y: sy, z: sz, facing: 'south', _schoolId: 'a' });
   }
+}
+// An open grass bank with a real river-width water strip along one edge —
+// real vanilla salmon are the only vanilla fish found in rivers at all —
+// with one salmon placed IN that water (swims normally, exactly like a
+// squid) and a second placed on the dry grass bank instead: watch it
+// genuinely flop in place forever, never trying to swim back. The dry
+// bank's own floor sits a genuine block higher than the river floor — the
+// same real elevation-step technique already used to contain water on the
+// Sea Turtle Beach preset — so a real source column genuinely spreads
+// (computeWaterFlow strips any non-source water entry, so this can't just
+// paint the pool directly) and then physically can't spread any farther
+// than the pool itself, with no walls needed.
+function buildSalmonRiverbankInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  const poolWidth = Math.max(3, Math.floor(dims.sx / 3));
+  for (let z = 0; z < dims.sz; z++) {
+    for (let x = 0; x < dims.sx; x++) {
+      const floorY = x < poolWidth ? 0 : 1;
+      grid[idx(x, floorY, z, dims)] = exteriorMat;
+    }
+  }
+  if (!decorOut) return;
+  for (let z = 0; z < dims.sz; z++) decorOut.push({ type: 'water', x: 0, y: 1, z, source: true });
+  const cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'salmon', x: 1, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'salmon', x: dims.sx - 2, y: 2, z: cz, facing: 'south' });
 }
 // A sand floor with a real elevation step between the two halves — the
 // dry beach sits a genuine block higher than the ocean floor, exactly
@@ -5645,6 +5683,18 @@ const PRESETS = [
       'Not modeled: the real full 2,700-combination shape/pattern/color variant system (this app picks from a small representative handful instead), a real school\'s maximum size of 9 (this app\'s own school of 5 is just for a clear, uncluttered demo), and tropical fish being able to swim against real water current — this app has no held-item/inventory or true fluid-current-resistance system at all, so this school only ever schools and swims.',
     ],
   },
+  {
+    id: 'salmon-riverbank', name: 'Salmon Riverbank', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 14, baseZ: 10 }, interiorMode: 'salmonRiverbank',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A real river-width water strip running along one edge of an open grass bank, with 2 salmon — one placed in the water, swimming normally, and one placed on the dry grass instead: real vanilla salmon "are unable to survive out of water" and genuinely "flop around" once outside it, and this one does exactly that.',
+    keywords: ['salmon', 'fish', 'river', 'flop', 'water', 'land'],
+    notes: [
+      'Just look at the 2 salmon side by side: the one sitting in the river water swims around inside it exactly like a squid does, while the one placed on the dry grass bank genuinely flops in place — flipping visibly from side to side, over and over, forever, never once attempting to swim back toward the water. Real vanilla salmon "are unable to survive out of water," and once outside it, they genuinely "flop around... flip around on their sides" (minecraft.wiki/w/Salmon). Every earlier mob confined to a substance here (the squid, the tropical fish) has its own wander logic that simply never lets it leave water in the first place, so this exact situation never arises for either of them; `updateSalmon` is the first here that can genuinely be found OUTSIDE its own required medium at all, checking `squidCellSwimmable` (completely unchanged) exactly once, the very first time each entry is ever updated, to decide which of the 2 real states it starts in.',
+      'Verified directly by a unit test confirming a salmon placed inside a real water cell genuinely swims (reusing the squid\'s own `pickSquidSwimTarget` unchanged), that a salmon placed OUTSIDE any water cell instead enters a real flopping state and stays in it, that a flopping salmon\'s own visible side-to-side rotation genuinely alternates over real time rather than freezing in one pose, and that a flopping salmon never gains real world-position movement of any kind while flopping (its own `_wx`/`_wz` stay exactly fixed) — it never tries to path back to water on its own. This app has no verified single documented exact real flop cadence, so the interval used is an honest, approximate stand-in, the same caveat already applied to the vindicator\'s own aggro radius. The geometry is a new, slightly longer, unpatterned single-color body plan, distinct from the tropical fish\'s smaller, colorful, patterned one — matching real salmon\'s own plainer look.',
+      'Not modeled: a real flopping salmon eventually suffocating and dying (this app has no health/damage/death system at all, so this one just flops in place forever instead), a player rescuing it back into water with a bucket (no inventory/held-item system here either), and salmon genuinely leaping 4-5 blocks up real waterfalls (this app has no waterfall-climb mechanic) — this app\'s salmon only ever swims in water or flops on land, whichever it started in.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6017,6 +6067,8 @@ function generateModel() {
     buildAquariumInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'tropicalFishSchool') {
     buildTropicalFishSchoolInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'salmonRiverbank') {
+    buildSalmonRiverbankInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'seaTurtleBeach') {
     buildSeaTurtleBeachInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'glowSquidCavern') {
@@ -7036,6 +7088,24 @@ function tropicalFishParts() {
   const tailFin = new THREE.BoxGeometry(0.02, 0.1, 0.12);
   tailFin.translate(0, 0, -0.21);
   const eyeOffsets = [[-0.06, 0.02, 0.14], [0.06, 0.02, 0.14]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, topFin, tailFin, eyes };
+}
+// A slightly longer, plainer body than a tropical fish — real vanilla
+// salmon are a single, larger, unpatterned real-world silvery-pink, unlike
+// a tropical fish's small, colorful, patterned variety
+// (minecraft.wiki/w/Salmon).
+function salmonParts() {
+  const body = new THREE.BoxGeometry(0.18, 0.14, 0.38);
+  const topFin = new THREE.BoxGeometry(0.02, 0.1, 0.12);
+  topFin.translate(0, 0.11, 0.02);
+  const tailFin = new THREE.BoxGeometry(0.02, 0.12, 0.14);
+  tailFin.translate(0, 0, -0.27);
+  const eyeOffsets = [[-0.07, 0.02, 0.18], [0.07, 0.02, 0.18]];
   const eyes = eyeOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.03, 0.03, 0.02);
     g.translate(x, y, z);
@@ -9486,6 +9556,24 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'salmon') {
+    let parts = decorGeoCache.get('salmon');
+    if (!parts) { parts = salmonParts(); decorGeoCache.set('salmon', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x9a7472);
+    const finMat = solidMaterial(0x6b4e4c);
+    const eyeMat = solidMaterial(0x14140f);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.topFin, finMat));
+    group.add(new THREE.Mesh(parts.tailFin, finMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.salmon/updateSalmon: rotation.z is set live, every
+    // frame, only while actually flopping outside water — never baked
+    // into this geometry itself.
+    if (entry._mobState === 'flopping') group.rotation.z = entry._flopped ? Math.PI * 0.42 : -Math.PI * 0.42;
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'turtle') {
     let parts = decorGeoCache.get('turtle');
     if (!parts) { parts = turtleParts(); decorGeoCache.set('turtle', parts); }
@@ -11905,6 +11993,83 @@ function updateTropicalFish(entry, obj, dt) {
       entry._mobYaw = Math.atan2(dx, dz);
     }
   }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+const SALMON_WANDER_MIN = 1, SALMON_WANDER_MAX = 3;
+const SALMON_SWIM_SPEED = 0.8;
+const SALMON_FLOP_INTERVAL = 0.4; // an honest, approximate stand-in for a real flop cadence — not a verified exact vanilla figure
+// The real new mechanic — see DECOR_TYPES.salmon. Checked once, the first
+// time this exact entry is ever updated, against the real cell it was
+// actually placed in: `squidCellSwimmable` (unchanged) decides whether it
+// starts confined to water like every earlier aquatic mob here, or
+// genuinely stranded outside it — a state no squid or tropical fish here
+// can ever end up in, since their own wander logic never lets them leave
+// water to begin with.
+function updateSalmon(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._wx = entry.x + 0.5;
+    entry._wy = entry.y + 0.5;
+    entry._wz = entry.z + 0.5;
+    if (squidCellSwimmable(currentModel, entry.x, entry.y, entry.z)) {
+      entry._mobState = 'hovering';
+      entry._mobTimer = SALMON_WANDER_MIN + Math.random() * (SALMON_WANDER_MAX - SALMON_WANDER_MIN);
+    } else {
+      entry._mobState = 'flopping';
+      entry._mobTimer = SALMON_FLOP_INTERVAL;
+    }
+  }
+  if (entry._mobState === 'flopping') {
+    // Real vanilla salmon "flop around... flip around on their sides" once
+    // outside water, aimlessly, forever (this app has no bucket/rescue
+    // mechanic to ever return one to water) — a periodic side-to-side
+    // rotation IN PLACE rather than any actual movement, since it
+    // genuinely cannot swim on dry land.
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      entry._flopped = !entry._flopped;
+      entry._mobTimer = SALMON_FLOP_INTERVAL;
+    }
+    obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+    obj.rotation.z = entry._flopped ? Math.PI * 0.42 : -Math.PI * 0.42;
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'hovering') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickSquidSwimTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetY = target.y + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'swimming';
+      } else {
+        entry._mobTimer = SALMON_WANDER_MIN;
+      }
+    }
+  } else { // swimming
+    const dx = entry._targetX - entry._wx, dy = entry._targetY - entry._wy, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = SALMON_SWIM_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wy = entry._targetY;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.y = Math.floor(entry._wy);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'hovering';
+      entry._mobTimer = SALMON_WANDER_MIN + Math.random() * (SALMON_WANDER_MAX - SALMON_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.rotation.z = 0;
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
@@ -17745,6 +17910,7 @@ function updateMobs(dt) {
     if (entry.type === 'turtle') { updateTurtle(entry, obj, dt); continue; }
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'tropical_fish') { updateTropicalFish(entry, obj, dt); continue; }
+    if (entry.type === 'salmon') { updateSalmon(entry, obj, dt); continue; }
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'magma_cube') { updateMagmaCube(entry, obj, dt); continue; }
@@ -18971,7 +19137,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -19041,7 +19207,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -19171,6 +19337,7 @@ function renderCommands(model) {
       else if (d.type === 'zoglin') lines.push(`summon minecraft:zoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'mule') lines.push(`summon minecraft:mule ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'tropical_fish') lines.push(`summon minecraft:tropical_fish ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
