@@ -2276,6 +2276,20 @@ const DECOR_TYPES = {
   // illusioner clones are a per-cast visual effect, not a distinct
   // tracked entity type).
   illusioner_clone: { kind: 'illusioner_clone', interactive: false },
+  // The first mob here whose movement genuinely depends on the live
+  // camera's own facing direction, not just distance — every earlier
+  // "does it notice the player" check (the endermite hunt, the pufferfish
+  // puff, the vindicator aggro) only ever reads live POSITION; a real
+  // vanilla creaking is completely unable to move while an actual player
+  // is looking directly at it, and creeps toward one that isn't
+  // (minecraft.wiki/w/Creaking). This app's own `isCreakingWatched` reads
+  // `three.camera.getWorldDirection()` and checks the real angle to the
+  // creaking against a real cone, plus `hasLineOfSight` so a wall between
+  // them genuinely breaks the "watched" state — the same line-of-sight
+  // check already proven by the pillager's own line-of-sight shot, reused
+  // here for a completely different purpose (freezing movement, not
+  // firing). See updateCreaking.
+  creaking: { kind: 'creaking', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3684,6 +3698,18 @@ function buildIllusionerAmbushInterior(grid, silhouette, dims, exteriorMat, acce
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'illusioner', x: cx, y: 1, z: cz, facing: 'south' });
+}
+// A grass clearing with a single creaking — switch to Walk mode and look
+// straight at it from within its own real watch range: it genuinely
+// freezes solid the instant your own live camera direction actually
+// lines up with it, then genuinely creeps toward you again the moment
+// you look away.
+function buildCreakingGroveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'creaking', x: cx, y: 1, z: cz, facing: 'south' });
 }
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
@@ -5105,6 +5131,18 @@ const PRESETS = [
       'Not modeled: any of the illusioner\'s own real bow-and-arrow attack actually firing and damaging a target, the real blindness effect actually applied to a nearby player, its real participation in raids alongside pillagers and vindicators, and its own decoy clones actually scattering and moving independently rather than holding fixed spawn positions — this app has no combat, status-effect, or raid system at all, so this illusioner only ever wanders, casts, and vanishes behind stationary decoys.',
     ],
   },
+  {
+    id: 'creaking-grove', name: 'Creaking Grove', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 15, baseZ: 15 }, interiorMode: 'creakingGrove',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass clearing with a single creaking — real vanilla creakings are genuinely unable to move while an actual player is looking directly at them, and this one genuinely is too: switch to Walk mode, look straight at it, and watch it freeze solid the instant your own live view actually lines up with it, then creep toward you again the moment you look away.',
+    keywords: ['creaking', 'pale oak', 'freeze', 'watched', 'camera direction', 'stalker'],
+    notes: [
+      'Switch to Walk mode and look straight at it from within its own real watch range — the creaking genuinely stops dead, mid-stride if it was moving, the instant its own live check finds your own actual camera direction pointed at it; look away (or step behind a wall) and it genuinely resumes creeping toward you within moments. Real vanilla creakings are a plant-golem-like hostile mob that is completely unable to move while being watched by any player, and creeps toward one that isn\'t (minecraft.wiki/w/Creaking). Every earlier "does it notice the player" mechanic in this app — the endermite hunt, the pufferfish\'s puff levels, the vindicator\'s aggro radius — only ever reads live POSITION; a creaking is the first to react to the live camera\'s own actual FACING DIRECTION instead, a genuinely new class of check no earlier mob here needed. This app\'s own `isCreakingWatched` reads `three.camera.getWorldDirection()` every frame, checks the real angle between that direction and the vector to the creaking against a real cone, and also requires genuine `hasLineOfSight` so a wall between the player and the creaking correctly breaks the "watched" state — the same line-of-sight check already proven by the pillager\'s own line-of-sight shot, reused here for a completely different purpose (freezing movement instead of firing an arrow). `updateCreaking` skips every movement branch entirely for a frame where it\'s watched, then creeps toward the live player\'s own position (falling back to an ordinary free wander once no player is within its own real aggro range) the instant it genuinely isn\'t.',
+      'Verified directly by a unit test confirming a creaking with the live camera pointed directly at it from within real range genuinely stays frozen in place no matter how many real frames pass, that the exact same creaking genuinely starts closing the distance the instant the simulated camera direction is turned away from it, and a second test confirming one with a wall genuinely placed between it and the camera stays frozen — proving the "watched" state is a real function of live camera facing AND line of sight, not just raw distance to the player. This app has no verified real creaking watch angle or range, so the figures used are honest, approximate stand-ins, the same caveat already applied to the warden\'s own sense radius and the vindicator\'s own aggro radius. The geometry is new: a tall, thin, gangly wooden humanoid with long twiggy arms and legs in a real pale-oak tone, plus a single dark crack detail and 2 small glowing orange eyes — this app\'s block palette has no real pale oak texture, so the closest available wood tone stands in for it, the same kind of honest substitution already used for curved rail.',
+      'Not modeled: any of the creaking\'s own real combat (it only actually attacks and can only actually be destroyed by first breaking its bound Creaking Heart block while the creaking itself is far enough away, a whole linked-block mechanic this app has no equivalent system for), its real total invulnerability to damage outside that specific window, and its real spawn tie to the Creaking Heart and pale garden biome — this app has no combat, block-linking, or biome system at all, so this creaking only ever freezes when watched and creeps when it isn\'t.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5581,6 +5619,8 @@ function generateModel() {
     buildPufferfishReefInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'illusionerAmbush') {
     buildIllusionerAmbushInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'creakingGrove') {
+    buildCreakingGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7223,6 +7263,43 @@ function illusionerHelmetParts() {
   const helmet = new THREE.BoxGeometry(0.48, 0.48, 0.34);
   helmet.translate(0, 1.35, -0.04);
   return { helmet };
+}
+// A tall, gangly wooden humanoid — a thin torso and head with long,
+// twiggy arms and legs, built from the same box-per-part recipe as every
+// other biped here but noticeably thinner and taller — the real vanilla
+// creaking's own distinctive silhouette (minecraft.wiki/w/Creaking), a
+// walking pale-oak branch rather than a normal creature body plan. A pair
+// of small glowing orange eyes are its only real facial feature.
+function creakingParts() {
+  // Legs (0 to 0.56), torso (0.56 to 1.18), and head (1.18 to 1.48) are
+  // deliberately built to butt flush against each other end-to-end — an
+  // earlier version of this geometry left a visible gap between the legs
+  // and torso, since their own numbers simply didn't meet.
+  const legOffsets = [[-0.08, 0], [0.08, 0]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.56, 0.1);
+    g.translate(x, 0.28, z);
+    return g;
+  });
+  const torso = new THREE.BoxGeometry(0.26, 0.62, 0.18);
+  torso.translate(0, 0.87, 0);
+  const head = new THREE.BoxGeometry(0.28, 0.3, 0.28);
+  head.translate(0, 1.33, 0);
+  const armOffsets = [[-0.19, 0.87], [0.19, 0.87]];
+  const arms = armOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.09, 0.6, 0.09);
+    g.translate(x, y, 0);
+    return g;
+  });
+  const crack = new THREE.BoxGeometry(0.05, 0.36, 0.02);
+  crack.translate(0.02, 0.87, 0.1);
+  const faceEyeOffsets = [[-0.07, 1.36], [0.07, 1.36]];
+  const faceEyes = faceEyeOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.03);
+    g.translate(x, y, 0.15);
+    return g;
+  });
+  return { torso, head, arms, legs, crack, faceEyes };
 }
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
@@ -9012,6 +9089,22 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(bow.nockedArrowShaft, arrowShaftMat));
     group.add(new THREE.Mesh(bow.nockedArrowTip, arrowTipMat));
     group.add(new THREE.Mesh(bow.nockedArrowFletch, arrowFletchMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'creaking') {
+    let parts = decorGeoCache.get('creaking');
+    if (!parts) { parts = creakingParts(); decorGeoCache.set('creaking', parts); }
+    const group = new THREE.Group();
+    const woodMat = solidMaterial(0xd9c9a3);
+    const crackMat = solidMaterial(0x3a2c1e);
+    const eyeMat = solidMaterial(0xff8c3a);
+    group.add(new THREE.Mesh(parts.torso, woodMat));
+    group.add(new THREE.Mesh(parts.head, woodMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, woodMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, woodMat));
+    group.add(new THREE.Mesh(parts.crack, crackMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -15012,6 +15105,110 @@ function updateIllusioner(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const CREAKING_WANDER_MIN = 2, CREAKING_WANDER_MAX = 5;
+const CREAKING_WANDER_SPEED = 0.6;
+const CREAKING_CREEP_SPEED = 0.9;
+const CREAKING_AGGRO_RANGE = 12;
+const CREAKING_WATCH_RANGE = 10;
+// A real cone half-angle of 35 degrees around the live camera's own
+// forward direction — an honest, approximate stand-in for "the player is
+// actually looking at it," the same kind of stand-in this app already
+// uses for other unverified real thresholds (the warden's sense radius,
+// the vindicator's aggro radius).
+const CREAKING_WATCH_COS_HALF_ANGLE = Math.cos(35 * Math.PI / 180);
+// The real new mechanic — see DECOR_TYPES.creaking. Reads the live
+// camera's own actual forward direction (`three.camera.getWorldDirection`)
+// rather than just live position, the first check in this app to do so;
+// every earlier "does it notice the player" check here (endermite hunt,
+// pufferfish puff, vindicator aggro) only ever reads distance. Also
+// requires genuine `hasLineOfSight` so a wall between the player and the
+// creaking correctly breaks the "watched" state, the same line-of-sight
+// check already proven by the pillager's own line-of-sight shot.
+function isCreakingWatched(entry) {
+  if (!three || !three.camera || !currentModel) return false;
+  if (cameraMode !== 'walk' && cameraMode !== 'thirdperson') return false;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const px = flyState.pos.x - offX, py = flyState.pos.y, pz = flyState.pos.z - offZ;
+  const mx = entry._wx, my = entry.y + 0.9, mz = entry._wz;
+  const dx = mx - px, dy = my - py, dz = mz - pz;
+  const dist = Math.hypot(dx, dy, dz);
+  if (dist > CREAKING_WATCH_RANGE || dist < 0.001) return false;
+  // dx/dy/dz is a DIFFERENCE between 2 points in the same (grid) space, so
+  // it's identical to the real vector between them in world space too —
+  // the constant offX/offZ shift cancels out — which is what makes it
+  // valid to compare directly against the camera's own real world-space
+  // forward direction below.
+  const camDir = three.camera.getWorldDirection(new THREE.Vector3());
+  const toMob = new THREE.Vector3(dx, dy, dz).normalize();
+  if (camDir.dot(toMob) < CREAKING_WATCH_COS_HALF_ANGLE) return false;
+  return hasLineOfSight(currentModel, mx, my, mz, px, py, pz);
+}
+function updateCreaking(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._wx === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = CREAKING_WANDER_MIN + Math.random() * (CREAKING_WANDER_MAX - CREAKING_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  entry._watched = isCreakingWatched(entry);
+  if (entry._watched) {
+    // A real creaking is completely unable to move while genuinely being
+    // watched — frozen rigid mid-stride, not just slowed — so this skips
+    // every movement branch below entirely for this frame.
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  let playerDist = Infinity, px = 0, pz = 0;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    px = flyState.pos.x - offX;
+    pz = flyState.pos.z - offZ;
+    playerDist = Math.hypot(px - entry._wx, pz - entry._wz);
+  }
+  if (playerDist <= CREAKING_AGGRO_RANGE) {
+    const dx = px - entry._wx, dz = pz - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.05) {
+      const step = Math.min(CREAKING_CREEP_SPEED * dt, dist);
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+    entry.x = Math.floor(entry._wx);
+    entry.z = Math.floor(entry._wz);
+  } else if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = CREAKING_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = CREAKING_WANDER_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = CREAKING_WANDER_MIN + Math.random() * (CREAKING_WANDER_MAX - CREAKING_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Real vanilla piglins have a genuine "bartering" trade: give one a gold
 // ingot and, after "6 seconds (121 ticks)," it consumes the ingot and
 // tosses back exactly one item drawn from a real weighted loot table —
@@ -15337,6 +15534,7 @@ function updateMobs(dt) {
     if (entry.type === 'vindicator') { updateVindicator(entry, obj, dt); continue; }
     if (entry.type === 'illusioner') { updateIllusioner(entry, obj, dt); continue; }
     if (entry.type === 'illusioner_clone') { updateIllusionerClone(entry, obj, dt); continue; }
+    if (entry.type === 'creaking') { updateCreaking(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
@@ -16553,7 +16751,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -16623,7 +16821,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -16779,6 +16977,7 @@ function renderCommands(model) {
       else if (d.type === 'vindicator') lines.push(`summon minecraft:vindicator ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pufferfish') lines.push(`summon minecraft:pufferfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'illusioner') lines.push(`summon minecraft:illusioner ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'creaking') lines.push(`summon minecraft:creaking ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
