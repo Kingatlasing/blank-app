@@ -2342,6 +2342,23 @@ const DECOR_TYPES = {
   // again, matching a real chest's own real permanence. See
   // updateDonkey / DONKEY_CHEST_SCAN_RADIUS.
   donkey: { kind: 'donkey', interactive: true },
+  // A real "skeleton trap" horse spawns from a fraction of natural
+  // lightning strikes and just stands there — triggered the instant a
+  // player gets within a real 10-block radius, transforming into a
+  // skeleton horseman AND spawning 3 MORE skeleton horsemen nearby, all
+  // at once; if nobody ever gets close, it silently despawns after a
+  // real 15 minutes instead (minecraft.wiki/w/Skeleton_Horse). The first
+  // mob here whose own trigger is mere player PROXIMITY racing against a
+  // real despawn timer — every earlier proximity-gated event here either
+  // needs the player to stay in range for a real delay first (the
+  // evoker's own cast, the guardian's own beam lock-on) or has no
+  // despawn clock running against it at all. See updateSkeletonHorseTrap
+  // / triggerSkeletonHorseTrap.
+  skeleton_horse_trap: { kind: 'skeleton_horse_trap', interactive: false },
+  // The triggered result of a skeleton_horse_trap — a real skeleton
+  // riding a real skeleton horse, reusing both existing body plans
+  // completely unchanged, just combined and stacked for the first time.
+  skeleton_horseman: { kind: 'skeleton_horseman', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3808,6 +3825,18 @@ function buildDonkeyPackPostInterior(grid, silhouette, dims, exteriorMat, accent
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'donkey', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'dropped_item', itemType: 'chest', x: Math.min(dims.sx - 2, cx + 2), y: 1, z: cz });
+}
+// A single dormant skeleton horse trap standing in an open field —
+// switch to Walk mode and approach: it genuinely ignores you until
+// you're actually within its own real 10-block trigger radius, then
+// transforms and spawns 3 more skeleton horsemen nearby all at once. If
+// you never get close, it silently despawns on its own real timer instead.
+function buildSkeletonHorseTrapInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'skeleton_horse_trap', x: cx, y: 1, z: cz, facing: 'south' });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5325,6 +5354,18 @@ const PRESETS = [
       'Not modeled: a donkey\'s own real inventory contents (this app has no item-storage/UI system at all, so the chest is purely a permanent visual, never functional storage), breeding a donkey with a horse to get a real mule, and a foal\'s real inability to be chested or saddled at all — this app has no breeding or age/growth system, so every donkey here spawns as a full adult.',
     ],
   },
+  {
+    id: 'skeleton-horse-trap', name: 'Skeleton Horse Trap', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 14, baseZ: 14 }, interiorMode: 'skeletonHorseTrap',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A single dormant skeleton horse standing alone — real vanilla "trap" horses spawn this way from rare lightning strikes, then either trigger the instant a player gets close (transforming into 4 mounted skeleton horsemen at once) or silently despawn on their own real timer if nobody ever does.',
+    keywords: ['skeleton horse', 'horseman', 'lightning', 'trap', 'despawn', 'skeleton'],
+    notes: [
+      'Switch to Walk mode and approach it — it genuinely ignores you at a real distance, then the instant you\'re actually within its own real 10-block radius, it\'s replaced by 4 brand-new, fully independent skeleton horsemen (a skeleton riding a skeleton horse) appearing around that same spot all at once. A real "skeleton trap" horse spawns from a small fraction of natural lightning strikes and stands dormant until a player gets within 10 blocks of it, at which point it\'s struck by its own lightning, transforms into a skeleton horseman, and spawns 3 MORE skeleton horsemen nearby — or, if nobody ever gets close, it despawns after a real 15 minutes instead (minecraft.wiki/w/Skeleton_Horse). This app\'s own `triggerSkeletonHorseTrap` reuses the exact "manually pre-position this frame\'s meshes so nothing flashes at the origin" technique already proven by the evoker\'s own `spawnVexesFromEvoker`, but is the first to also REMOVE the triggering mob itself in that same call — every earlier "one mob\'s own AI adds new mobs" mechanic here (the evoker\'s vex cast) leaves the original caster standing right there afterward.',
+      'Verified directly by a unit test confirming a trap horse with the player genuinely far away is left completely untouched, that the exact same trap horse is genuinely removed and replaced by exactly 4 new live skeleton_horseman entries the instant the player enters its own real trigger radius, and a second test confirming a trap horse given a very short real despawn timer and no nearby player is genuinely removed on its own once that timer runs out, with no horsemen appearing at all. This app has no verified real spawn chance or trigger mechanics beyond the radius and despawn timer, and no lightning/weather system at all, so the "struck by lightning" moment itself is honestly just an instant transformation with no bolt, fire, or storm rendered. The geometry is entirely reused, unchanged: a real skeleton horse recolors the exact same horse body plan bone-gray instead of white, and a skeleton horseman simply layers the existing skeleton body plan on top of that same horse, seated at a fixed height rather than with a real bent-knee riding pose.',
+      'Not modeled: any of the resulting skeleton horsemen actually chasing or shooting at the player afterward (this app has no combat system, and every horseman here just stands in place once spawned, the same intentional simplification already used for the illusioner\'s own decoy clone), the real chance-based nature of which lightning strikes actually spawn a trap horse at all (this preset always spawns one, deliberately, so the mechanic is actually visible), and real vanilla\'s own distinction between a trap-spawned horse (already tamed) and an ordinary wild skeleton horse (needing real temper-based taming) — every skeleton horse here is a trap horse.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5809,6 +5850,8 @@ function generateModel() {
     buildHorsePaddockInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'donkeyPackPost') {
     buildDonkeyPackPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'skeletonHorseTrap') {
+    buildSkeletonHorseTrapInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -9921,6 +9964,67 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.userData.decorEntry = entry;
     group.userData.decorKind = 'donkey';
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'skeleton_horse_trap') {
+    let parts = decorGeoCache.get('horse');
+    if (!parts) { parts = horseParts(); decorGeoCache.set('horse', parts); }
+    const group = new THREE.Group();
+    // A real skeleton horse reads as a pale, bleached bone-gray, distinct
+    // from a living horse's warmer white coat (minecraft.wiki/w/Skeleton_Horse).
+    const boneMat = solidMaterial(0xcfcabe);
+    const darkBoneMat = solidMaterial(0x8f8a7c);
+    group.add(new THREE.Mesh(parts.body, boneMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.hooves) group.add(new THREE.Mesh(g, darkBoneMat));
+    group.add(new THREE.Mesh(parts.neck, boneMat));
+    group.add(new THREE.Mesh(parts.head, boneMat));
+    group.add(new THREE.Mesh(parts.muzzle, boneMat));
+    group.add(new THREE.Mesh(parts.mane, darkBoneMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, boneMat));
+    group.add(new THREE.Mesh(parts.tail, darkBoneMat));
+    const eyeMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'skeleton_horseman') {
+    let horseGeo = decorGeoCache.get('horse');
+    if (!horseGeo) { horseGeo = horseParts(); decorGeoCache.set('horse', horseGeo); }
+    let riderGeo = decorGeoCache.get('skeleton');
+    if (!riderGeo) { riderGeo = skeletonParts(); decorGeoCache.set('skeleton', riderGeo); }
+    const group = new THREE.Group();
+    const boneMat = solidMaterial(0xcfcabe);
+    const darkBoneMat = solidMaterial(0x8f8a7c);
+    group.add(new THREE.Mesh(horseGeo.body, boneMat));
+    for (const g of horseGeo.legs) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of horseGeo.hooves) group.add(new THREE.Mesh(g, darkBoneMat));
+    group.add(new THREE.Mesh(horseGeo.neck, boneMat));
+    group.add(new THREE.Mesh(horseGeo.head, boneMat));
+    group.add(new THREE.Mesh(horseGeo.muzzle, boneMat));
+    group.add(new THREE.Mesh(horseGeo.mane, darkBoneMat));
+    for (const g of horseGeo.ears) group.add(new THREE.Mesh(g, boneMat));
+    group.add(new THREE.Mesh(horseGeo.tail, darkBoneMat));
+    const eyeMat = solidMaterial(0x14140f);
+    for (const g of horseGeo.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    // The rider sits directly over the horse's own saddle spot, its legs
+    // keeping their ordinary standing pose rather than a real bent-knee
+    // riding pose — an honest simplification, the same kind already
+    // applied wherever this app reuses a body plan as-is.
+    const riderGroup = new THREE.Group();
+    const riderBoneMat = solidMaterial(0xe4ddc8);
+    const bowMat = solidMaterial(0x6b4a2f);
+    riderGroup.add(new THREE.Mesh(riderGeo.torso, riderBoneMat));
+    riderGroup.add(new THREE.Mesh(riderGeo.head, riderBoneMat));
+    for (const g of riderGeo.arms) riderGroup.add(new THREE.Mesh(g, riderBoneMat));
+    for (const g of riderGeo.legs) riderGroup.add(new THREE.Mesh(g, riderBoneMat));
+    riderGroup.add(new THREE.Mesh(riderGeo.bowGrip, bowMat));
+    for (const g of riderGeo.bowLimbs) riderGroup.add(new THREE.Mesh(g, bowMat));
+    const riderFaceMat = solidMaterial(0x1c1c1c);
+    for (const g of riderGeo.faceEyes) riderGroup.add(new THREE.Mesh(g, riderFaceMat));
+    riderGroup.position.set(0, 0.35, -0.02);
+    group.add(riderGroup);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'polar_bear') {
@@ -16158,6 +16262,60 @@ function rebuildDonkeyMesh(entry) {
     three.group.add(mesh);
   }
 }
+// The real new mechanic — see DECOR_TYPES.skeleton_horse_trap. Removes
+// the dormant trap horse and spawns SKELETON_HORSEMAN_COUNT brand-new
+// skeleton_horseman entries nearby all at once — the exact same
+// "manually pre-position this frame's meshes so nothing flashes at the
+// origin for a frame" technique already proven by spawnVexesFromEvoker,
+// reused here for a mob that also REMOVES itself in the same call,
+// which spawnVexesFromEvoker's own evoker never does.
+const SKELETON_HORSEMAN_COUNT = 4; // real vanilla: the trap horse's own transformation plus 3 more nearby
+function despawnSkeletonHorseTrap(model, entry) {
+  const decorIdx = model.decor.indexOf(entry);
+  if (decorIdx !== -1) model.decor.splice(decorIdx, 1);
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  if (mobIdx !== -1) {
+    if (three && three.group) three.group.remove(mobObjects[mobIdx].obj);
+    mobObjects.splice(mobIdx, 1);
+  }
+}
+function triggerSkeletonHorseTrap(model, trapEntry) {
+  if (!three || !three.group) return;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const wx = trapEntry._wx, wz = trapEntry._wz, y = trapEntry.y;
+  despawnSkeletonHorseTrap(model, trapEntry);
+  for (let i = 0; i < SKELETON_HORSEMAN_COUNT; i++) {
+    const angle = (i / SKELETON_HORSEMAN_COUNT) * Math.PI * 2;
+    const hx = Math.max(0, Math.min(dims.sx - 1, Math.round(wx + Math.cos(angle) * 2 - 0.5)));
+    const hz = Math.max(0, Math.min(dims.sz - 1, Math.round(wz + Math.sin(angle) * 2 - 0.5)));
+    const entry = { type: 'skeleton_horseman', x: hx, y, z: hz, facing: 'south' };
+    model.decor.push(entry);
+    for (const mesh of buildDecorMeshesForEntry(entry)) {
+      mesh.position.x += entry.x + offX + 0.5;
+      mesh.position.y += entry.y;
+      mesh.position.z += entry.z + offZ + 0.5;
+      three.group.add(mesh);
+    }
+  }
+}
+const SKELETON_HORSE_TRAP_DESPAWN = 40; // real vanilla: 15 real minutes, compressed like every other long timer here
+const SKELETON_HORSE_TRAP_TRIGGER_RADIUS = 10; // real vanilla figure, used directly (minecraft.wiki/w/Skeleton_Horse)
+function updateSkeletonHorseTrap(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._wx === undefined) {
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._despawnTimer = SKELETON_HORSE_TRAP_DESPAWN;
+  }
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  if (playerLive) {
+    const dist = Math.hypot((flyState.pos.x - offX) - entry._wx, (flyState.pos.z - offZ) - entry._wz);
+    if (dist <= SKELETON_HORSE_TRAP_TRIGGER_RADIUS) { triggerSkeletonHorseTrap(currentModel, entry); return; }
+  }
+  entry._despawnTimer -= dt;
+  if (entry._despawnTimer <= 0) { despawnSkeletonHorseTrap(currentModel, entry); return; }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+}
 // Samples the straight real-world-space line between 2 points at small
 // fixed steps and checks whether any sampled point lands inside a real
 // solid grid cell — this app's first genuine line-of-sight raycast, used
@@ -16387,6 +16545,7 @@ function updateMobs(dt) {
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'magma_cube') { updateMagmaCube(entry, obj, dt); continue; }
+    if (entry.type === 'skeleton_horse_trap') { updateSkeletonHorseTrap(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
@@ -17599,7 +17758,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -17669,7 +17828,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -17847,6 +18006,8 @@ function renderCommands(model) {
         if (d._chested) tags.push('ChestedHorse:1b');
         lines.push(`summon minecraft:donkey ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${tags.length ? ` {${tags.join(',')}}` : ''}`);
       }
+      else if (d.type === 'skeleton_horse_trap') lines.push(`summon minecraft:skeleton_horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Tame:1b}`);
+      else if (d.type === 'skeleton_horseman') lines.push(`summon minecraft:skeleton_horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Tame:1b,Passengers:[{id:"minecraft:skeleton"}]}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
