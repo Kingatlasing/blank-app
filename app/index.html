@@ -2429,6 +2429,22 @@ const DECOR_TYPES = {
   // performs. Reuses the hoglin's own ravagerParts geometry unchanged, just
   // recolored a pale, rotten hide.
   zoglin: { kind: 'zoglin', interactive: false },
+  // A real mule is produced by breeding a tamed horse with a tamed donkey,
+  // fed a golden apple or golden carrot (minecraft.wiki/w/Mule). Every
+  // earlier tamed-equine mechanic here changes ONE existing entry (a
+  // horse's own repeated-click temper, a donkey's own automatic chest
+  // pickup); a mule is the first mob here CREATED FROM 2 DIFFERENT
+  // existing tamed mob entries at once, rather than mutating one of them.
+  // This app has no held-item/inventory system, so the real feeding step
+  // is honestly simplified: clicking an already-tamed horse or donkey in
+  // Interact mode while a tamed opposite-species partner stands within a
+  // short real range breeds them, exactly once each — reusing the exact
+  // same click dispatch the horse and donkey already use for taming. See
+  // breedMule / findNearestTamedOppositeEquine. Like a donkey, it can also
+  // be equipped with a permanent chest via the same automatic nearby-item
+  // pickup. Reuses the donkey's own body plan unchanged, recolored a
+  // horse-like chestnut coat.
+  mule: { kind: 'mule', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3965,6 +3981,17 @@ function buildZoglinTransformationInterior(grid, silhouette, dims, exteriorMat, 
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'hoglin', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east', _zoglinTimer: 0 });
   decorOut.push({ type: 'pig', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'west' });
+}
+// An already-tamed horse standing right next to an already-tamed donkey —
+// switch to Interact mode and click either one: they genuinely breed into
+// a brand-new mule standing between them.
+function buildMuleBreedingPenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'horse', x: Math.max(0, cx - 1), y: 1, z: cz, facing: 'east', _tamed: true });
+  decorOut.push({ type: 'donkey', x: Math.min(dims.sx - 1, cx + 1), y: 1, z: cz, facing: 'west', _tamed: true });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5553,6 +5580,18 @@ const PRESETS = [
       'Not modeled: a real zoglin\'s own fire and lava immunity, its real inability to breed, and the real Nausea effect it briefly gets for 10 seconds right after transforming — this app has no fire/lava-damage, breeding, or status-effect system at all, so this zoglin only ever wanders, chases, and lunges once it exists.',
     ],
   },
+  {
+    id: 'mule-breeding-pen', name: 'Mule Breeding Pen', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 12 }, interiorMode: 'muleBreedingPen',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An already-tamed horse standing right next to an already-tamed donkey — switch to Interact mode and click either one: they genuinely breed into a brand-new mule standing between them, exactly once.',
+    keywords: ['mule', 'horse', 'donkey', 'breeding', 'hybrid', 'pen'],
+    notes: [
+      'Switch to Interact mode and click either the horse or the donkey — since both are already tamed and standing within real breeding range of each other, a brand-new mule entry appears right between them instead of just registering another mount attempt. Click either parent again afterward, and nothing further happens — both are permanently marked as having already bred. A real mule is produced by breeding a tamed horse with a tamed donkey, fed a golden apple or golden carrot (minecraft.wiki/w/Mule). Every earlier tamed-equine interaction here changes fields on the ONE entry it\'s clicked on — a horse\'s own repeated-click temper, a donkey\'s own automatic chest pickup — `breedMule` is the first to CREATE a brand-new decor entry out of 2 DIFFERENT existing ones at once, found by the new `findNearestTamedOppositeEquine`. This app has no held-item/inventory system at all, so the real golden-apple feeding step is honestly simplified straight into the click itself.',
+      'Verified directly by a unit test confirming clicking either an untamed horse or donkey still just registers an ordinary taming attempt exactly as before (breeding never fires on an untamed animal), that clicking a tamed horse or donkey with no tamed opposite-species partner within real range also just re-attempts nothing further (already tamed, so no-op), that clicking a tamed horse WITH a tamed donkey genuinely within range creates exactly one new mule entry positioned between them and permanently marks both parents `_bred`, and that clicking either original parent again afterward creates no second mule. This app has no verified real vanilla breeding-proximity radius, so the exact range used is an honest, approximate stand-in, the same caveat already applied to the vindicator\'s own aggro radius. The geometry reuses the donkey\'s own body plan completely unchanged, recolored a horse-like chestnut coat while keeping the donkey\'s own darker ears/tail for a visible hybrid look; like a donkey, a mule can also be automatically, permanently equipped with a nearby dropped chest, reusing that exact same mechanic unchanged.',
+      'Not modeled: a real bred mule still needing its own individual repeated-mount taming despite being bred (this app spawns it already tame, for simplicity), mules being sterile and unable to produce further offspring of their own (there is no further breeding path wired to a mule here to even attempt), and the real cross-species genetics/coat-inheritance Minecraft doesn\'t actually simulate either — this app has no inventory/held-item system at all, so the real golden-apple feeding trigger is a simplified click rather than an invented item system.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6049,6 +6088,8 @@ function generateModel() {
     buildPiglinBruteOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'zoglinTransformation') {
     buildZoglinTransformationInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'muleBreedingPen') {
+    buildMuleBreedingPenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -10349,6 +10390,40 @@ function buildDecorMeshesForEntry(entry) {
     group.userData.decorKind = 'donkey';
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'mule') {
+    // Reuses the donkey's own body plan entirely unchanged (a real mule
+    // shares the donkey's model dimensions) — recolored a horse-like
+    // chestnut coat while keeping the donkey's own darker ears/tail/muzzle
+    // contrast, a visible nod to being a genuine hybrid of the 2.
+    let parts = decorGeoCache.get('donkey');
+    if (!parts) { parts = donkeyParts(); decorGeoCache.set('donkey', parts); }
+    const group = new THREE.Group();
+    const coatMat = solidMaterial(0x6b4423);
+    const muzzleMat = solidMaterial(0xc4ab97);
+    const hoofMat = solidMaterial(0x2a2018);
+    const darkMat = solidMaterial(0x3a2f26);
+    group.add(new THREE.Mesh(parts.body, coatMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, coatMat));
+    for (const g of parts.hooves) group.add(new THREE.Mesh(g, hoofMat));
+    group.add(new THREE.Mesh(parts.neck, coatMat));
+    group.add(new THREE.Mesh(parts.head, coatMat));
+    group.add(new THREE.Mesh(parts.muzzle, muzzleMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, darkMat));
+    group.add(new THREE.Mesh(parts.tail, darkMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.saddle, solidMaterial(0x6b4a2f)));
+    // See DECOR_TYPES.mule: like a donkey, once equipped a real chest can
+    // never be removed again.
+    if (entry._chested) {
+      const chestMat = solidMaterial(0x8a5a2f);
+      for (const g of parts.chestSides) group.add(new THREE.Mesh(g, chestMat));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'mule';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'skeleton_horse_trap') {
     let parts = decorGeoCache.get('horse');
     if (!parts) { parts = horseParts(); decorGeoCache.set('horse', parts); }
@@ -10827,7 +10902,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey', 'mule']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -15082,6 +15157,51 @@ function attemptTameHorse(entry) {
     entry._tamed = true;
   }
 }
+const MULE_BREED_RADIUS = 3; // an honest, approximate stand-in for real vanilla's own short breeding proximity — not a verified exact figure
+// The real new mechanic — see DECOR_TYPES.mule. Scans currentModel.decor
+// (not the live mobObjects, since this can fire the moment after a fresh
+// generate, before any frame has run) for the opposite species (a donkey
+// for a horse, a horse for a donkey) that is genuinely tamed and hasn't
+// already bred, within a short real range.
+function findNearestTamedOppositeEquine(entry) {
+  if (!currentModel) return null;
+  const wantType = entry.type === 'horse' ? 'donkey' : 'horse';
+  const ex = entry._wx !== undefined ? entry._wx : entry.x + 0.5;
+  const ez = entry._wz !== undefined ? entry._wz : entry.z + 0.5;
+  let best = null, bestDist = Infinity;
+  for (const d of currentModel.decor) {
+    if (d.type !== wantType || !d._tamed || d._bred) continue;
+    const dx = d._wx !== undefined ? d._wx : d.x + 0.5;
+    const dz = d._wz !== undefined ? d._wz : d.z + 0.5;
+    const dist = Math.hypot(dx - ex, dz - ez);
+    if (dist <= MULE_BREED_RADIUS && dist < bestDist) { best = d; bestDist = dist; }
+  }
+  return best;
+}
+// The real new mechanic — see DECOR_TYPES.mule. Every earlier tamed-mob
+// interaction here changes fields on the ONE entry it's clicked on; this
+// is the first to CREATE a brand-new decor entry out of 2 DIFFERENT
+// existing ones, permanently marking both parents `_bred` so neither can
+// ever produce a second mule. This app has no held-item/inventory system,
+// so the real golden-apple feeding step is honestly simplified into the
+// click itself.
+function breedMule(model, parentA, parentB) {
+  parentA._bred = true;
+  parentB._bred = true;
+  const dims = model.dims;
+  const ax = parentA._wx !== undefined ? parentA._wx : parentA.x + 0.5;
+  const az = parentA._wz !== undefined ? parentA._wz : parentA.z + 0.5;
+  const bx = parentB._wx !== undefined ? parentB._wx : parentB.x + 0.5;
+  const bz = parentB._wz !== undefined ? parentB._wz : parentB.z + 0.5;
+  const mx = Math.max(0, Math.min(dims.sx - 1, Math.round((ax + bx) / 2 - 0.5)));
+  const mz = Math.max(0, Math.min(dims.sz - 1, Math.round((az + bz) / 2 - 0.5)));
+  model.decor.push({ type: 'mule', x: mx, y: parentA.y, z: mz, facing: parentA.facing || 'south', _tamed: true });
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -17332,7 +17452,7 @@ function updateMobs(dt) {
     // shared generic wander below so it can equip mid-wander without
     // interrupting it, and skipped on the very first frame before
     // entry._wx even exists yet (initialized by that generic block).
-    if (entry.type === 'donkey' && entry._tamed && !entry._chested && entry._wx !== undefined) {
+    if ((entry.type === 'donkey' || entry.type === 'mule') && entry._tamed && !entry._chested && entry._wx !== undefined) {
       const chest = findNearestDroppedChest(entry);
       if (chest) {
         removeDroppedItemFromWorld(chest);
@@ -18154,8 +18274,13 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
-    if (entry.type === 'horse') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
-    if (entry.type === 'donkey') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'horse' || entry.type === 'donkey') {
+      if (entry._tamed && !entry._bred) {
+        const partner = findNearestTamedOppositeEquine(entry);
+        if (partner) { breedMule(currentModel, entry, partner); return; }
+      }
+      attemptTameHorse(entry); renderThree(currentModel, true); return;
+    }
     if (entry.type === 'bogged') { attemptShearBogged(currentModel, entry); return; }
     if (entry.type === 'magma_cube') { attemptSplitMagmaCube(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
@@ -18630,7 +18755,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -18700,7 +18825,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -18828,6 +18953,7 @@ function renderCommands(model) {
       else if (d.type === 'bogged') lines.push(`summon minecraft:bogged ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'piglin_brute') lines.push(`summon minecraft:piglin_brute ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'zoglin') lines.push(`summon minecraft:zoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'mule') lines.push(`summon minecraft:mule ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
