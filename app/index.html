@@ -2398,6 +2398,21 @@ const DECOR_TYPES = {
   // that drops a real item and then just keeps being itself, permanently
   // missing only that one cosmetic prop. See attemptShearBogged.
   bogged: { kind: 'bogged', interactive: true },
+  // Real vanilla piglin brutes always attack the player on sight, no matter
+  // what they're wearing — unlike an ordinary piglin, calmed by gold armor
+  // — and, on top of that, they also attack any nearby wither or wither
+  // skeleton (minecraft.wiki/w/Piglin_Brute). This is this app's first mob
+  // whose own aggro target can genuinely be EITHER the live player OR
+  // another specific mob species, picking whichever is actually closer
+  // right now: the wither skeleton's own updateWitherSkeleton only ever
+  // targets the player, and the vindicator's own findNearestAnyMob targets
+  // the nearest mob of ANY species regardless of who it is — a piglin
+  // brute is the first to weigh 2 specific, named possibilities against
+  // each other every frame. See updatePiglinBrute / findNearestWitherSkeleton.
+  // Reuses the piglin's own body plan unchanged, recolored, with its
+  // optional sword replaced by an always-carried golden axe built on the
+  // vindicator's own rest/raised 2-pose axe geometry.
+  piglin_brute: { kind: 'piglin_brute', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3908,6 +3923,19 @@ function buildBoggedSwampInterior(grid, silhouette, dims, exteriorMat, accentMat
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'bogged', x: cx, y: 1, z: cz, facing: 'south' });
+}
+// A piglin brute on open blackstone with a real wither skeleton placed a
+// few blocks away, already within its own real aggro range — watch it
+// charge the wither skeleton immediately, with zero player involvement, and
+// then switch targets to you once you approach close enough to be the
+// genuinely closer target instead.
+function buildPiglinBruteOutpostInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'piglin_brute', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east' });
+  decorOut.push({ type: 'wither_skeleton', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'west' });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5472,6 +5500,18 @@ const PRESETS = [
       'Not modeled: real Poison\'s own actual damage-over-time on the player (this app has no health/damage system at all), a bogged\'s real spawn tie to the swamp biome and ranged mob trial spawners, and its real 4-less-health stat compared to an ordinary skeleton — this app has no biome, trial-chamber, or health system at all, so this bogged only ever wanders, shoots, and can be sheared exactly once.',
     ],
   },
+  {
+    id: 'piglin-brute-outpost', name: 'Piglin Brute Outpost', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 12 }, interiorMode: 'piglinBruteOutpost',
+    blocks: { exterior: 'blackstone', interior: 'blackstone', accent: 'gilded_blackstone' },
+    desc: 'A piglin brute on open blackstone with a real wither skeleton placed a few blocks away — real vanilla piglin brutes always attack the player on sight (unlike an ordinary piglin, calmed by gold armor) and also attack any nearby wither or wither skeleton. Watch the brute charge the wither skeleton with zero player involvement, then switch to Walk mode and get closer than it is: the brute genuinely retargets you instead.',
+    keywords: ['piglin brute', 'piglin', 'wither skeleton', 'axe', 'nether', 'bastion'],
+    notes: [
+      'The moment this model starts simulating, the piglin brute is already within its own real aggro range of the placed wither skeleton and genuinely charges it, no player nearby required — then switch to Walk mode and approach close enough to become the genuinely closer target, and it retargets you instead, mid-chase, purely because the real distances changed. Real vanilla piglin brutes are a stronger, always-hostile piglin variant found in bastion remnants: they attack the player on sight regardless of gold armor (which calms an ordinary piglin), never barter, and additionally attack any nearby wither or wither skeleton (minecraft.wiki/w/Piglin_Brute). This app\'s own `updatePiglinBrute` is the first mob here whose own aggro target can genuinely be EITHER the live player OR another specific mob species, picking whichever is actually closer right now: `updateWitherSkeleton` only ever targets the player, and the vindicator\'s own `findNearestAnyMob` targets the nearest mob of ANY species regardless of who it is — a piglin brute is the first to weigh 2 specific, named possibilities against each other every single frame via the new `findNearestWitherSkeleton`.',
+      'Verified directly by a unit test confirming a piglin brute with neither a nearby wither skeleton nor a live player in range stays in its own ordinary wander, that it genuinely closes distance on a placed wither skeleton once that wither skeleton alone is within its own real aggro range, that it genuinely retargets to the live player instead once the player becomes the closer of the 2 real candidates, and that it stops and enters a real swinging state once in actual melee range of whichever target it\'s currently chasing. This app has no verified real piglin brute aggro range, melee range, or swing timing, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the wither skeleton\'s own melee figures. The geometry reuses the exact same piglin body plan completely unchanged, recolored a darker, grayer skin tone, with its optional sword replaced by an always-carried golden axe built on the exact same rest/raised 2-pose technique already proven by the vindicator\'s own axe.',
+      'Not modeled: a real piglin brute\'s own conversion into a zombified piglin after spending too long in the Overworld or the End, its real immunity to golden items/armor (it can\'t be pacified or given anything), and its real chance to drop its own golden axe on death — this app has no transformation/conversion timer or death/loot system at all, so this piglin brute only ever wanders, chases, and swings.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5964,6 +6004,8 @@ function generateModel() {
     buildWitherSkeletonFortressInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'boggedSwamp') {
     buildBoggedSwampInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'piglinBruteOutpost') {
+    buildPiglinBruteOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -10039,6 +10081,36 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.userData.decorEntry = entry;
     group.userData.decorKind = 'bogged';
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'piglin_brute') {
+    // Reuses piglinParts' body plan entirely unchanged (real piglin brutes
+    // share the piglin's own base model) — see zombified_piglin's identical
+    // reuse — recolored a darker, grayer skin tone, always armed with a
+    // golden axe built on the vindicator's own rest/raised axe geometry
+    // rather than the piglin's optional sword, since a real piglin brute
+    // never goes unarmed (minecraft.wiki/w/Piglin_Brute).
+    let parts = decorGeoCache.get('piglin');
+    if (!parts) { parts = piglinParts(); decorGeoCache.set('piglin', parts); }
+    let axe = decorGeoCache.get('vindicatorAxe');
+    if (!axe) { axe = vindicatorAxeParts(); decorGeoCache.set('vindicatorAxe', axe); }
+    const group = new THREE.Group();
+    const skinMat = solidMaterial(0x8a7568), tuskMat = solidMaterial(0xe8dcc0);
+    const vestMat = solidMaterial(0x3f2c22), beltMat = solidMaterial(0x1a1410), bootMat = solidMaterial(0x1a1410);
+    group.add(new THREE.Mesh(parts.torso, vestMat));
+    group.add(new THREE.Mesh(parts.belt, beltMat));
+    group.add(new THREE.Mesh(parts.head, skinMat));
+    group.add(new THREE.Mesh(parts.snout, skinMat));
+    for (const g of parts.tusks) group.add(new THREE.Mesh(g, tuskMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, skinMat));
+    for (const g of parts.boots) group.add(new THREE.Mesh(g, bootMat));
+    const axeHandleMat = solidMaterial(0x4a3325), axeBladeMat = solidMaterial(0xe6c229);
+    const swinging = entry._swinging;
+    group.add(new THREE.Mesh(swinging ? axe.raisedHandle : axe.restHandle, axeHandleMat));
+    group.add(new THREE.Mesh(swinging ? axe.raisedBlade : axe.restBlade, axeBladeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'arrow') {
@@ -16756,6 +16828,139 @@ function updateWitherSkeleton(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const PIGLIN_BRUTE_WANDER_MIN = 2, PIGLIN_BRUTE_WANDER_MAX = 5;
+const PIGLIN_BRUTE_WALK_SPEED = 1.0;
+const PIGLIN_BRUTE_CHASE_SPEED = 1.3;
+const PIGLIN_BRUTE_AGGRO_RANGE = 8;
+const PIGLIN_BRUTE_MELEE_RANGE = 0.9;
+const PIGLIN_BRUTE_SWING_TIME = 0.5;
+const PIGLIN_BRUTE_SWING_COOLDOWN = 1.2;
+// Scans every OTHER tracked wither_skeleton mob, re-evaluated fresh every
+// call like the vindicator's own findNearestAnyMob, but filtered to that
+// one specific species rather than any mob at all — see
+// DECOR_TYPES.piglin_brute.
+function findNearestWitherSkeleton(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'wither_skeleton') continue;
+    const ox = other._wx !== undefined ? other._wx : other.x + 0.5;
+    const oz = other._wz !== undefined ? other._wz : other.z + 0.5;
+    const dist = Math.hypot(ox - entry._wx, oz - entry._wz);
+    if (dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best ? { entry: best, dist: bestDist } : null;
+}
+// Reentrant-loop-safe rebuild — same manual splice/rebuild technique as
+// rebuildVindicatorMesh/rebuildWitherSkeletonMesh, needed here because
+// swapping the held axe between rest/raised poses changes entry._swinging
+// mid-frame, from inside updateMobs' own per-frame loop.
+function rebuildPiglinBruteMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// The real new mechanic — see DECOR_TYPES.piglin_brute. Weighs 2 real,
+// specifically-named possible targets against each other every frame — the
+// live player and the nearest wither_skeleton mob — and chases/swings at
+// whichever one is genuinely closer right now, rather than only ever the
+// player (updateWitherSkeleton) or the nearest mob of any species at all
+// (updateVindicator's own findNearestAnyMob).
+function updatePiglinBrute(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = PIGLIN_BRUTE_WANDER_MIN + Math.random() * (PIGLIN_BRUTE_WANDER_MAX - PIGLIN_BRUTE_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+    entry._swingCooldown = 0;
+  }
+  entry._swingCooldown = Math.max(0, entry._swingCooldown - dt);
+  if (entry._swinging) {
+    entry._swingTimer -= dt;
+    if (entry._swingTimer <= 0) {
+      entry._swinging = false;
+      entry._swingCooldown = PIGLIN_BRUTE_SWING_COOLDOWN;
+      rebuildPiglinBruteMesh(entry);
+      return;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  let targetX, targetZ, targetDist = Infinity;
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  if (playerLive) {
+    const px = flyState.pos.x - offX, pz = flyState.pos.z - offZ;
+    const d = Math.hypot(px - entry._wx, pz - entry._wz);
+    if (d < targetDist) { targetDist = d; targetX = px; targetZ = pz; }
+  }
+  const nearestWS = findNearestWitherSkeleton(entry);
+  if (nearestWS && nearestWS.dist < targetDist) {
+    targetDist = nearestWS.dist;
+    targetX = nearestWS.entry._wx !== undefined ? nearestWS.entry._wx : nearestWS.entry.x + 0.5;
+    targetZ = nearestWS.entry._wz !== undefined ? nearestWS.entry._wz : nearestWS.entry.z + 0.5;
+  }
+  if (targetDist <= PIGLIN_BRUTE_AGGRO_RANGE) {
+    const dx = targetX - entry._wx, dz = targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.01) entry._mobYaw = Math.atan2(dx, dz);
+    if (dist <= PIGLIN_BRUTE_MELEE_RANGE) {
+      if (entry._swingCooldown <= 0) {
+        entry._swinging = true;
+        entry._swingTimer = PIGLIN_BRUTE_SWING_TIME;
+        rebuildPiglinBruteMesh(entry);
+        return;
+      }
+    } else {
+      const step = Math.min(PIGLIN_BRUTE_CHASE_SPEED * dt, dist);
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = PIGLIN_BRUTE_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = PIGLIN_BRUTE_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = PIGLIN_BRUTE_WANDER_MIN + Math.random() * (PIGLIN_BRUTE_WANDER_MAX - PIGLIN_BRUTE_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 // Samples the straight real-world-space line between 2 points at small
 // fixed steps and checks whether any sampled point lands inside a real
 // solid grid cell — this app's first genuine line-of-sight raycast, used
@@ -16944,6 +17149,7 @@ function updateMobs(dt) {
     if (entry.type === 'stray') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'bogged') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'wither_skeleton') { updateWitherSkeleton(entry, obj, dt); continue; }
+    if (entry.type === 'piglin_brute') { updatePiglinBrute(entry, obj, dt); continue; }
     if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
     if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
     if (entry.type === 'ocelot') { updateOcelot(entry, obj, dt); continue; }
@@ -18206,7 +18412,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -18276,7 +18482,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -18402,6 +18608,7 @@ function renderCommands(model) {
       else if (d.type === 'stray') lines.push(`summon minecraft:stray ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wither_skeleton') lines.push(`summon minecraft:wither_skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'bogged') lines.push(`summon minecraft:bogged ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'piglin_brute') lines.push(`summon minecraft:piglin_brute ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
