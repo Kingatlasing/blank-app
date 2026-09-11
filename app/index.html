@@ -2311,6 +2311,17 @@ const DECOR_TYPES = {
   // no bespoke per-frame AI of its own beyond that generic wander/look,
   // since the real new mechanic here is entirely in the click handler).
   horse: { kind: 'horse', interactive: true },
+  // A real vanilla polar bear is neutral, not simply hostile or passive:
+  // an adult with no cub nearby ignores the player entirely, but the same
+  // adult with a cub nearby genuinely charges any player who gets close,
+  // even one who never attacked it (minecraft.wiki/w/Polar_Bear). See
+  // updatePolarBear / isPolarBearDefensive — the first mob here whose
+  // aggression toward the PLAYER is gated by the live proximity of a
+  // DIFFERENT tracked entity of its own species, rather than by its own
+  // state (the creaking's watched-freeze), a fixed radius alone (the
+  // vindicator's, ravager's), or an item/distance trust check (the
+  // ocelot's, horse's).
+  polar_bear: { kind: 'polar_bear', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3765,6 +3776,18 @@ function buildHorsePaddockInterior(grid, silhouette, dims, exteriorMat, accentMa
   decorOut.push({ type: 'horse', x: Math.max(1, Math.floor(dims.sx / 2) - 2), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'horse', x: Math.min(dims.sx - 2, Math.floor(dims.sx / 2) + 2), y: 1, z: cz, facing: 'south' });
 }
+// A snowy den with an adult polar bear standing right next to its own real
+// cub — switch to Walk mode and approach: the adult genuinely ignores you
+// until you're actually close, then charges, purely because that cub is
+// genuinely nearby, not because you did anything to provoke it.
+function buildPolarBearDenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'polar_bear', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'polar_bear', x: Math.min(dims.sx - 2, cx + 1), y: 1, z: cz, facing: 'south', _cub: true });
+}
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
 // away from your live position rather than continuing to wander freely.
@@ -5218,7 +5241,19 @@ const PRESETS = [
     notes: [
       'Turn on Interact mode and click a horse — nothing happens on the very first try, or the next few, exactly as real vanilla intends: each click is a real, separate, failed mount attempt that genuinely raises the horse\'s own live `_temper` stat by a random amount, with a real chance to succeed proportional to how high that stat has actually climbed, guaranteed once it actually reaches its own real cap. Real vanilla horses track a hidden "temper" value that rises on every failed mount attempt and taming becomes certain once it reaches its own real maximum (minecraft.wiki/w/Horse). Every earlier tameable or trust-building mob here — the ocelot\'s own real flee-until-fed-fish behavior, every "approach it enough times" mechanic — ultimately still boils down to a live distance-and-item check; a horse is the first tamed by a real repeated discrete CLICK event accumulating its own separate stat across tries, with no item, feeding, or distance check involved at all. This app\'s own `attemptTameHorse` mirrors that same real temper-then-chance formula directly, and the instant `entry._tamed` actually flips true, the very next render genuinely adds a real saddle mesh to that exact horse — visible, permanent proof the state actually changed, the same "one small added prop as real proof" technique already used for the trader llama\'s own carried pack.',
       'Verified directly by a unit test confirming a fresh horse\'s own temper genuinely starts at 0 and actually climbs with every real failed attempt, that forcing it to its own real cap and trying once more guarantees real taming on that exact try, that repeated real attempts from scratch eventually genuinely succeed within a bounded number of tries (never stuck wild forever), and that only a genuinely tamed horse ever renders the real saddle mesh. This app has no verified real horse temper-gain range or cap, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the warden\'s own sense radius. The geometry reuses the exact same 4-leg-plus-neck-and-head assembly technique already proven on the llama and camel, angled into a horse\'s own forward-leaning neck carriage with a dark mane ridge and flowing tail — its own single most recognizable real silhouette detail next to those 2 mobs.',
-      'Not modeled: any of the real riding/steering/jumping mechanics once actually mounted, real coat-color and marking variants (this app renders one representative coat, the same intentional simplification already used for the llama\'s and parrot\'s own color variants), real horse armor, and real breeding — this app has no player-mounted camera, dye, or breeding system at all, so a tamed horse here only ever shows its own real saddle and otherwise keeps wandering exactly like before.',
+      'Not modeled: any of the real riding/steering/jumping mechanics once actually mounted, the other 6 real coat colors and 4 real marking patterns (this app models the real white base coat only, matching the wiki\'s own reference image), real horse armor, and real breeding — this app has no player-mounted camera, dye, or breeding system at all, so a tamed horse here only ever shows its own real saddle and otherwise keeps wandering exactly like before.',
+    ],
+  },
+  {
+    id: 'polar-bear-den', name: 'Polar Bear Den', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 12 }, interiorMode: 'polarBearDen',
+    blocks: { exterior: 'snow_block', interior: 'snow_block', accent: 'snow_block' },
+    desc: 'An adult polar bear standing right next to its own real cub — real vanilla polar bears are neutral, not simply hostile: an adult alone ignores the player entirely, but the exact same adult with a cub nearby genuinely charges any player who gets close, even one who never actually attacked it.',
+    keywords: ['polar bear', 'bear', 'cub', 'neutral', 'snow', 'ice', 'arctic'],
+    notes: [
+      'Switch to Walk mode and approach the adult while its cub is still standing nearby — it genuinely ignores you at a real distance, then switches the instant you\'re actually within its own real aggro range, closing the distance at a real charge speed faster than its ordinary wander. Real vanilla polar bears are neutral: an adult with no cub nearby stays peaceful unless the player actually attacks it, but the same adult with a cub genuinely nearby defends it aggressively against any player who merely gets close (minecraft.wiki/w/Polar_Bear). This app\'s own `isPolarBearDefensive` re-scans every OTHER tracked mob fresh on every call — the same "no fixed reference kept between calls" technique already proven by the vindicator\'s own `findNearestAnyMob` — but checks one SPECIFIC other mob\'s type and live position (a `polar_bear` entry with `_cub` set) purely to gate whether THIS adult targets the player at all, not to pick which mob to chase. Every earlier "another entity\'s presence changes this mob\'s behavior" mechanic here is either about the SAME mob\'s own state (the creaking\'s watched-freeze depends on the CAMERA, not another mob) or targets whichever mob is nearest regardless of species (the vindicator) — a polar bear is the first whose aggression toward the player is gated by a specific OTHER mob of its own species being nearby.',
+      'Verified directly by a unit test confirming an adult with no cub anywhere nearby never charges the player no matter how close they get, that the exact same adult DOES charge once a cub is placed within its own real protective radius and the player enters aggro range, that a cub itself never charges the player under any circumstance (real cubs are only ever aggressive toward foxes, which this app has no fox-hunting system for), and that a charging adult\'s own real walk state resets cleanly once the player leaves range again. This app has no verified real cub-protection radius, aggro range, or charge speed, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the horse\'s own temper figures. The cub renders as a genuinely smaller model (not just a visual scale trick layered on top) by uniformly scaling the whole rigid group from its own shared ground origin, keeping its feet on the floor exactly like the adult\'s.',
+      'Not modeled: real polar bears actually hunting foxes and salmon, a cub\'s own real extra aggression toward foxes specifically, real polar bear swimming (matching the player\'s own swim speed, making them hard to escape in water), and the real wider warning radius other adults elsewhere in the world get when either the cub or an adult near it is actually attacked — this app has no fox-hunting, swimming-mob, or player-damage system at all, so only the one adult standing directly next to its own cub here ever charges, and only while the player stays on foot within its own real ground-based aggro range.',
     ],
   },
 ];
@@ -5703,6 +5738,8 @@ function generateModel() {
     buildArmorTierRackInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'horsePaddock') {
     buildHorsePaddockInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'polarBearDen') {
+    buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -8006,6 +8043,45 @@ function horseParts() {
   saddle.translate(0, 0.9, -0.02);
   return { body, legs, neck, head, mane, ears, tail, faceEyes, muzzle, hooves, saddle };
 }
+// A real polar bear has almost no visible neck at all — its blocky head
+// sits nearly flush against the front of its body — unlike the horse,
+// llama and camel above, so this build deliberately skips the shared
+// neck-hinge technique entirely and attaches the head directly.
+function polarBearParts() {
+  const body = new THREE.BoxGeometry(0.56, 0.5, 0.95);
+  body.translate(0, 0.55, 0);
+  const legOffsets = [[-0.18, -0.34], [0.18, -0.34], [-0.18, 0.34], [0.18, 0.34]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.17, 0.42, 0.17);
+    g.translate(x, 0.21, z);
+    return g;
+  });
+  const pawOffsets = legOffsets;
+  const paws = pawOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.19, 0.08, 0.19);
+    g.translate(x, 0.04, z);
+    return g;
+  });
+  const head = new THREE.BoxGeometry(0.36, 0.32, 0.36);
+  head.translate(0, 0.84, 0.53);
+  const snout = new THREE.BoxGeometry(0.18, 0.16, 0.16);
+  snout.translate(0, 0.76, 0.76);
+  const nose = new THREE.BoxGeometry(0.08, 0.06, 0.03);
+  nose.translate(0, 0.76, 0.85);
+  const earOffsets = [[-0.13, 1.03, 0.48], [0.13, 1.03, 0.48]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.08, 0.04);
+    g.translate(x, y, z);
+    return g;
+  });
+  const faceEyeOffsets = [[-0.1, 0.86, 0.71], [0.1, 0.86, 0.71]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, legs, paws, head, snout, nose, ears, faceEyes };
+}
 // A small bird build — nothing here is shared with any earlier mob's
 // geometry, since a parrot's real proportions (tiny body, short legs, a
 // prominent curved beak, wide flat wings/tail for its silhouette) aren't
@@ -9631,6 +9707,29 @@ function buildDecorMeshesForEntry(entry) {
     // same technique already proven by the axolotl's own interactive tag.
     group.userData.decorEntry = entry;
     group.userData.decorKind = 'horse';
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'polar_bear') {
+    let parts = decorGeoCache.get('polar_bear');
+    if (!parts) { parts = polarBearParts(); decorGeoCache.set('polar_bear', parts); }
+    const group = new THREE.Group();
+    const furMat = solidMaterial(0xf0efe6);
+    const noseMat = solidMaterial(0x14140f);
+    const pawMat = solidMaterial(0x3a3a38);
+    group.add(new THREE.Mesh(parts.body, furMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, furMat));
+    for (const g of parts.paws) group.add(new THREE.Mesh(g, pawMat));
+    group.add(new THREE.Mesh(parts.head, furMat));
+    group.add(new THREE.Mesh(parts.snout, furMat));
+    group.add(new THREE.Mesh(parts.nose, noseMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, noseMat));
+    // A real cub is a genuinely smaller model, not just the adult
+    // shrunk visually — scaling the whole rigid group from the shared
+    // ground origin (y=0, where every leg/paw already sits) keeps its
+    // feet on the floor instead of sinking it or floating it.
+    if (entry._cub) group.scale.set(0.55, 0.55, 0.55);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'parrot') {
@@ -15271,6 +15370,86 @@ function updateVindicator(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+const POLAR_BEAR_WANDER_MIN = 2, POLAR_BEAR_WANDER_MAX = 5;
+const POLAR_BEAR_WALK_SPEED = 0.9;
+const POLAR_BEAR_CHARGE_SPEED = 1.6;
+const POLAR_BEAR_CUB_PROTECT_RADIUS = 8;
+const POLAR_BEAR_AGGRO_RANGE = 6;
+// The real new mechanic — see DECOR_TYPES.polar_bear. True only when a
+// DIFFERENT tracked polar_bear cub is currently within real protective
+// range of this exact adult — re-scanned fresh every call, like the
+// vindicator's own findNearestAnyMob, but checking one specific OTHER
+// mob's live position to gate THIS mob's own aggression, not to pick a
+// target.
+function isPolarBearDefensive(entry) {
+  for (const { entry: other } of mobObjects) {
+    if (other === entry || other.type !== 'polar_bear' || !other._cub) continue;
+    const dist = Math.hypot(other._wx - entry._wx, other._wz - entry._wz);
+    if (dist <= POLAR_BEAR_CUB_PROTECT_RADIUS) return true;
+  }
+  return false;
+}
+function updatePolarBear(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = POLAR_BEAR_WANDER_MIN + Math.random() * (POLAR_BEAR_WANDER_MAX - POLAR_BEAR_WANDER_MIN);
+    entry._wx = entry.x + 0.5;
+    entry._wz = entry.z + 0.5;
+  }
+  const playerLive = cameraMode === 'walk' || cameraMode === 'thirdperson';
+  // A cub never charges (real cubs are only aggressive toward foxes, which
+  // this app has no fox-hunting system for); only an adult with a real
+  // cub nearby ever targets the player at all — an adult alone stays
+  // neutral and just wanders, exactly like real vanilla.
+  if (!entry._cub && playerLive) {
+    const px = flyState.pos.x - offX, pz = flyState.pos.z - offZ;
+    const dx = px - entry._wx, dz = pz - entry._wz;
+    const playerDist = Math.hypot(dx, dz);
+    if (playerDist <= POLAR_BEAR_AGGRO_RANGE && isPolarBearDefensive(entry)) {
+      if (playerDist > 0.01) {
+        entry._mobYaw = Math.atan2(dx, dz);
+        const step = Math.min(POLAR_BEAR_CHARGE_SPEED * dt, playerDist);
+        entry._wx += (dx / playerDist) * step;
+        entry._wz += (dz / playerDist) * step;
+      }
+      obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+      if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+      return;
+    }
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const target = pickWanderTarget(currentModel, entry);
+      if (target) {
+        entry._targetX = target.x + 0.5;
+        entry._targetZ = target.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = POLAR_BEAR_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = POLAR_BEAR_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = POLAR_BEAR_WANDER_MIN + Math.random() * (POLAR_BEAR_WANDER_MAX - POLAR_BEAR_WANDER_MIN);
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
 const ILLUSIONER_WANDER_MIN = 2, ILLUSIONER_WANDER_MAX = 5;
 const ILLUSIONER_WALK_SPEED = 1.0;
 // The real new mechanic — see DECOR_TYPES.illusioner. A real illusioner
@@ -15842,6 +16021,7 @@ function updateMobs(dt) {
     if (entry.type === 'illusioner_clone') { updateIllusionerClone(entry, obj, dt); continue; }
     if (entry.type === 'creaking') { updateCreaking(entry, obj, dt); continue; }
     if (entry.type === 'panda') { updatePanda(entry, obj, dt); continue; }
+    if (entry.type === 'polar_bear') { updatePolarBear(entry, obj, dt); continue; }
     if (entry.type === 'sniffer') { updateSniffer(entry, obj, dt); continue; }
     if (entry.type === 'strider') { updateStrider(entry, obj, dt); continue; }
     if (entry.type === 'dolphin') { updateDolphin(entry, obj, dt); continue; }
@@ -17059,7 +17239,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#8b5a2b', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -17129,7 +17309,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -17299,6 +17479,7 @@ function renderCommands(model) {
         if (d._tamed) lines.push(`summon minecraft:horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Tame:1b,SaddleItem:{id:"minecraft:saddle",Count:1b}}`);
         else lines.push(`summon minecraft:horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       }
+      else if (d.type === 'polar_bear') lines.push(`summon minecraft:polar_bear ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._cub ? ' {Age:-24000}' : ''}`);
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
