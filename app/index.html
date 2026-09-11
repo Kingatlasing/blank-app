@@ -7942,32 +7942,41 @@ function horseParts() {
     g.translate(x, 0.31, z);
     return g;
   });
-  const neckAngle = -0.5, neckX = 0, neckY = 0.92, neckZ = 0.36;
-  const neck = new THREE.BoxGeometry(0.22, 0.5, 0.22);
+  // The neck, head, mane, ears and eyes all hinge together as one rigid
+  // assembly around a SINGLE shared pivot (neckX, neckY, neckZ) — the point
+  // where the neck attaches to the body. Each part is pre-translated to its
+  // own offset FROM that pivot before the shared rotateX(neckAngle), so they
+  // all lean forward together consistently (a positive angle tips anything
+  // above the pivot toward +Z, this app's established "front" direction).
+  const neckAngle = 0.3, neckX = 0, neckY = 0.92, neckZ = 0.36;
+  const neckLen = 0.5;
+  const neck = new THREE.BoxGeometry(0.22, neckLen, 0.22);
+  neck.translate(0, neckLen / 2, 0);
   neck.rotateX(neckAngle);
   neck.translate(neckX, neckY, neckZ);
+  const headOffsetY = neckLen + 0.11, headOffsetZ = 0.06;
   const head = new THREE.BoxGeometry(0.2, 0.22, 0.32);
-  head.translate(0, 0.25, 0.05);
+  head.translate(0, headOffsetY, headOffsetZ);
   head.rotateX(neckAngle);
   head.translate(neckX, neckY, neckZ);
-  const mane = new THREE.BoxGeometry(0.06, 0.5, 0.14);
-  mane.translate(0, 0, -0.12);
+  const mane = new THREE.BoxGeometry(0.06, neckLen, 0.14);
+  mane.translate(0, neckLen / 2, -0.16);
   mane.rotateX(neckAngle);
   mane.translate(neckX, neckY, neckZ);
-  const earOffsets = [[-0.06, 0.13, 0.14], [0.06, 0.13, 0.14]];
+  const earOffsets = [[-0.06, headOffsetY + 0.15, headOffsetZ + 0.1], [0.06, headOffsetY + 0.15, headOffsetZ + 0.1]];
   const ears = earOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.05, 0.1, 0.04);
-    g.translate(x, y + 0.25, z);
+    g.translate(x, y, z);
     g.rotateX(neckAngle);
     g.translate(neckX, neckY, neckZ);
     return g;
   });
   const tail = new THREE.BoxGeometry(0.1, 0.4, 0.1);
   tail.translate(0, 0.55, -0.44);
-  const faceEyeOffsets = [[-0.06, 0.02, 0.15], [0.06, 0.02, 0.15]];
+  const faceEyeOffsets = [[-0.06, headOffsetY - 0.02, headOffsetZ + 0.17], [0.06, headOffsetY - 0.02, headOffsetZ + 0.17]];
   const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
-    g.translate(x, y + 0.25, z);
+    g.translate(x, y, z);
     g.rotateX(neckAngle);
     g.translate(neckX, neckY, neckZ);
     return g;
