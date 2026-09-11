@@ -2330,6 +2330,18 @@ const DECOR_TYPES = {
   // same type, chained down through a real size tier rather than ending
   // in one single new state. See attemptSplitMagmaCube / updateMagmaCube.
   magma_cube: { kind: 'magma_cube', interactive: true },
+  // Real donkeys are tamed the exact same real repeated-mount-attempt way
+  // as a horse (see attemptTameHorse, reused directly here, unchanged),
+  // but a donkey (and mule) is the only real equine that can also be
+  // equipped with a genuine, PERMANENT chest for extra storage, once
+  // tamed (minecraft.wiki/w/Donkey). The first mob here whose own visible
+  // equipment change is triggered automatically by noticing a nearby
+  // dropped item, rather than by a direct player click (the horse's own
+  // saddle, the armor stand's tiers) or a consumed/paid-back trade (the
+  // piglin's own barter) — once equipped, it can never be un-equipped
+  // again, matching a real chest's own real permanence. See
+  // updateDonkey / DONKEY_CHEST_SCAN_RADIUS.
+  donkey: { kind: 'donkey', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3783,6 +3795,19 @@ function buildHorsePaddockInterior(grid, silhouette, dims, exteriorMat, accentMa
   const cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'horse', x: Math.max(1, Math.floor(dims.sx / 2) - 2), y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'horse', x: Math.min(dims.sx - 2, Math.floor(dims.sx / 2) + 2), y: 1, z: cz, facing: 'south' });
+}
+// An untamed donkey with a real dropped chest waiting nearby — switch to
+// Interact mode and click the donkey repeatedly (the exact same real
+// temper-then-chance taming this app's own horse already uses) until
+// it's genuinely tamed; the instant it is, watch it notice that nearby
+// chest on its own and equip it permanently, with zero further clicks.
+function buildDonkeyPackPostInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'donkey', x: cx, y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'dropped_item', itemType: 'chest', x: Math.min(dims.sx - 2, cx + 2), y: 1, z: cz });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5288,6 +5313,18 @@ const PRESETS = [
       'Not modeled: real magma cube contact damage, their real immunity specifically to fire and lava damage (already modeled once, on the strider), their real inability to path around obstacles or avoid ledges (this one still respects the grid exactly like a slime does), and their real random 2-4 split count — this app has no combat/damage system at all, so this magma cube only ever hops, and only ever splits by a direct player click, never by taking damage.',
     ],
   },
+  {
+    id: 'donkey-pack-post', name: 'Donkey Pack Post', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 10 }, interiorMode: 'donkeyPackPost',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'An untamed donkey with a real dropped chest waiting nearby — real vanilla donkeys are tamed the exact same repeated-mount-attempt way as a horse, but are the only real equine that can also be permanently equipped with a genuine chest for extra storage. Tame it (Interact mode, click repeatedly), then watch it notice and equip that chest entirely on its own.',
+    keywords: ['donkey', 'mule', 'chest', 'tame', 'temper', 'pack', 'storage'],
+    notes: [
+      'Turn on Interact mode and click the donkey — exactly like the horse, nothing happens for a real, unpredictable number of tries while its own live `_temper` stat climbs, until it\'s genuinely tamed for good (this app\'s own `attemptTameHorse` is reused completely unchanged, since real vanilla donkeys use that exact same real mechanic). The genuinely new part starts the instant it IS tamed: with zero further clicks, it notices the real dropped chest placed nearby on its own and permanently equips it, adding 2 real chest panniers to its own model for good. Real vanilla donkeys (and mules) are the only equine that can be given a genuine chest, once tamed, for 15 extra real inventory slots, and that chest can never be removed again short of the donkey\'s own death (minecraft.wiki/w/Donkey). This app\'s own `updateDonkey`-equivalent check runs a fresh proximity scan for a real `chest`-type dropped item every frame — the same "notice a nearby real dropped item automatically" technique already proven by the piglin\'s own gold-ingot barter — but instead of consuming that item and paying a DIFFERENT item back, the chest itself becomes permanently worn geometry via `rebuildDonkeyMesh`, the same reentrant-loop-safe manual splice/rebuild technique already proven by the vindicator\'s own axe-raise.',
+      'Verified directly by a unit test confirming an untamed donkey standing right next to a real dropped chest never equips it no matter how long it sits there, that the exact same donkey genuinely does equip it the instant (and only the instant) it becomes actually tamed, that the real dropped chest item is genuinely removed from the world once equipped (not merely hidden), and that a donkey with no chest anywhere nearby stays un-chested indefinitely even once tamed. This app has no verified real chest-notice radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the vindicator\'s own aggro radius and the horse\'s own temper figures. The geometry is new: leaner and shorter than the horse, with dramatically LONGER ears (a real donkey\'s single most recognizable trait) and a short tufted tail instead of a flowing one, reusing the exact same proven consistent-pivot neck/head technique (the head rides level on the angled neck) fixed on the horse just before this.',
+      'Not modeled: a donkey\'s own real inventory contents (this app has no item-storage/UI system at all, so the chest is purely a permanent visual, never functional storage), breeding a donkey with a horse to get a real mule, and a foal\'s real inability to be chested or saddled at all — this app has no breeding or age/growth system, so every donkey here spawns as a full adult.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5770,6 +5807,8 @@ function generateModel() {
     buildArmorTierRackInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'horsePaddock') {
     buildHorsePaddockInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'donkeyPackPost') {
+    buildDonkeyPackPostInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -7038,6 +7077,7 @@ const DROPPED_ITEM_COLORS = {
   feather: 0xf0ead6,
   red_mushroom: 0xc22b2b,
   gunpowder: 0x8a8478,
+  chest: 0x8a5a2f,
 };
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
@@ -8100,6 +8140,69 @@ function horseParts() {
   const saddle = new THREE.BoxGeometry(0.3, 0.08, 0.3);
   saddle.translate(0, 0.9, -0.02);
   return { body, legs, neck, head, mane, ears, tail, faceEyes, muzzle, hooves, saddle };
+}
+// A real donkey is leaner and shorter than a horse, with much LONGER
+// ears (its single most recognizable real silhouette trait) and a
+// short tufted tail instead of a flowing one — reuses the exact same
+// proven consistent-pivot neck/head technique as horseParts (head stays
+// level on the angled neck), just with donkey-specific proportions.
+function donkeyParts() {
+  const body = new THREE.BoxGeometry(0.4, 0.42, 0.78);
+  body.translate(0, 0.54, 0);
+  const legOffsets = [[-0.13, -0.29], [0.13, -0.29], [-0.13, 0.29], [0.13, 0.29]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.11, 0.54, 0.11);
+    g.translate(x, 0.27, z);
+    return g;
+  });
+  const neckAngle = 0.25, neckX = 0, neckY = 0.7, neckZ = 0.3;
+  const neckLen = 0.4;
+  const neck = new THREE.BoxGeometry(0.18, neckLen, 0.18);
+  neck.translate(0, neckLen / 2, 0);
+  neck.rotateX(neckAngle);
+  neck.translate(neckX, neckY, neckZ);
+  const headOffsetY = neckLen + 0.09, headOffsetZ = 0.05;
+  const headWorldY = neckY + headOffsetY * Math.cos(neckAngle) - headOffsetZ * Math.sin(neckAngle);
+  const headWorldZ = neckZ + headOffsetY * Math.sin(neckAngle) + headOffsetZ * Math.cos(neckAngle);
+  const head = new THREE.BoxGeometry(0.17, 0.19, 0.26);
+  head.translate(neckX, headWorldY, headWorldZ);
+  // Real donkey ears are dramatically longer than a horse's — nearly
+  // twice the length here — the single trait that reads as "donkey"
+  // even at a glance.
+  const earOffsets = [[-0.055, headWorldY + 0.2, headWorldZ + 0.08], [0.055, headWorldY + 0.2, headWorldZ + 0.08]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.045, 0.19, 0.035);
+    g.translate(x, y, z);
+    return g;
+  });
+  // A short tufted tail, not a long flowing one like the horse's.
+  const tail = new THREE.BoxGeometry(0.08, 0.2, 0.08);
+  tail.translate(0, 0.5, -0.4);
+  const faceEyeOffsets = [[-0.05, headWorldY - 0.02, headWorldZ + 0.14], [0.05, headWorldY - 0.02, headWorldZ + 0.14]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.035, 0.035, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  const muzzle = new THREE.BoxGeometry(0.11, 0.1, 0.08);
+  muzzle.translate(neckX, headWorldY - 0.05, headWorldZ + 0.16);
+  const hoofOffsets = legOffsets;
+  const hooves = hoofOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.08, 0.12);
+    g.translate(x, 0.04, z);
+    return g;
+  });
+  const saddle = new THREE.BoxGeometry(0.26, 0.07, 0.26);
+  saddle.translate(0, 0.78, -0.02);
+  // Real donkeys (and mules) are the only equine that can be equipped
+  // with a real permanent chest — 2 side panniers slung over the flanks,
+  // one on each side of the body. See DECOR_TYPES.donkey / updateDonkey.
+  const chestSides = [-0.27, 0.27].map((x) => {
+    const g = new THREE.BoxGeometry(0.1, 0.22, 0.32);
+    g.translate(x, 0.58, 0);
+    return g;
+  });
+  return { body, legs, neck, head, ears, tail, faceEyes, muzzle, hooves, saddle, chestSides };
 }
 // A real polar bear has almost no visible neck at all — its blocky head
 // sits nearly flush against the front of its body — unlike the horse,
@@ -9787,6 +9890,39 @@ function buildDecorMeshesForEntry(entry) {
     group.userData.decorKind = 'horse';
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'donkey') {
+    let parts = decorGeoCache.get('donkey');
+    if (!parts) { parts = donkeyParts(); decorGeoCache.set('donkey', parts); }
+    const group = new THREE.Group();
+    // Real donkeys are a plain grayish-brown, notably duller/flatter than
+    // a horse's own coat range (minecraft.wiki/w/Donkey).
+    const coatMat = solidMaterial(0x8a7a6a);
+    const muzzleMat = solidMaterial(0xc4ab97);
+    const hoofMat = solidMaterial(0x2a2018);
+    const darkMat = solidMaterial(0x5a4c40);
+    group.add(new THREE.Mesh(parts.body, coatMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, coatMat));
+    for (const g of parts.hooves) group.add(new THREE.Mesh(g, hoofMat));
+    group.add(new THREE.Mesh(parts.neck, coatMat));
+    group.add(new THREE.Mesh(parts.head, coatMat));
+    group.add(new THREE.Mesh(parts.muzzle, muzzleMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, coatMat));
+    group.add(new THREE.Mesh(parts.tail, darkMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    if (entry._tamed) group.add(new THREE.Mesh(parts.saddle, solidMaterial(0x6b4a2f)));
+    // See DECOR_TYPES.donkey: once equipped, a real chest can never be
+    // removed again, so this mesh is added purely off entry._chested —
+    // there is no click path that ever clears that flag back off.
+    if (entry._chested) {
+      const chestMat = solidMaterial(0x8a5a2f);
+      for (const g of parts.chestSides) group.add(new THREE.Mesh(g, chestMat));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'donkey';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'polar_bear') {
     let parts = decorGeoCache.get('polar_bear');
     if (!parts) { parts = polarBearParts(); decorGeoCache.set('polar_bear', parts); }
@@ -10182,7 +10318,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -15988,6 +16124,40 @@ function updatePiglin(entry, obj, dt) {
   obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
+// The real new mechanic — see DECOR_TYPES.donkey. A real donkey is
+// equipped with a chest by noticing a nearby dropped one, once actually
+// tamed; unlike the piglin's own gold-ingot barter (which CONSUMES the
+// ingot and pays a different item back), the chest itself is genuinely
+// worn from then on — this app's rebuildDonkeyMesh technique, not a
+// separate output item.
+const DONKEY_CHEST_SCAN_RADIUS = 5;
+function findNearestDroppedChest(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item' || other.itemType !== 'chest') continue;
+    const dist = Math.hypot(other.x - entry._wx, other.z - entry._wz);
+    if (dist <= DONKEY_CHEST_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+// Reentrant-loop-safe rebuild — see rebuildVindicatorMesh for the same
+// manual splice/rebuild technique, needed here because equipping the
+// chest changes entry._chested mid-frame, from inside updateMobs' own
+// per-frame loop, where a full renderThree() would be unsafe.
+function rebuildDonkeyMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
 // Samples the straight real-world-space line between 2 points at small
 // fixed steps and checks whether any sampled point lands inside a real
 // solid grid cell — this app's first genuine line-of-sight raycast, used
@@ -16137,6 +16307,20 @@ function updateMobs(dt) {
       if (entry._collectTimer <= 0) { removeDroppedItemFromWorld(entry); continue; }
     }
     if (entry.type === 'mob_spawner') { updateMobSpawner(entry, dt); continue; }
+    // A real donkey notices a nearby chest and equips it automatically,
+    // permanently, the instant it's actually tamed — checked before the
+    // shared generic wander below so it can equip mid-wander without
+    // interrupting it, and skipped on the very first frame before
+    // entry._wx even exists yet (initialized by that generic block).
+    if (entry.type === 'donkey' && entry._tamed && !entry._chested && entry._wx !== undefined) {
+      const chest = findNearestDroppedChest(entry);
+      if (chest) {
+        removeDroppedItemFromWorld(chest);
+        entry._chested = true;
+        rebuildDonkeyMesh(entry);
+        continue;
+      }
+    }
     // A real enderman with a live endermite within its own real hunt
     // radius overrides its ordinary wander/teleport for just this frame
     // and closes in instead — checked before the shared generic mob
@@ -16945,6 +17129,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'horse') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'donkey') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'magma_cube') { attemptSplitMagmaCube(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
@@ -17414,7 +17599,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -17484,7 +17669,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -17656,6 +17841,12 @@ function renderCommands(model) {
         else lines.push(`summon minecraft:horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       }
       else if (d.type === 'polar_bear') lines.push(`summon minecraft:polar_bear ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${d._cub ? ' {Age:-24000}' : ''}`);
+      else if (d.type === 'donkey') {
+        const tags = [];
+        if (d._tamed) tags.push('Tame:1b', 'SaddleItem:{id:"minecraft:saddle",Count:1b}');
+        if (d._chested) tags.push('ChestedHorse:1b');
+        lines.push(`summon minecraft:donkey ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}${tags.length ? ` {${tags.join(',')}}` : ''}`);
+      }
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
