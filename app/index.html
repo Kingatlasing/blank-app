@@ -2413,6 +2413,22 @@ const DECOR_TYPES = {
   // optional sword replaced by an always-carried golden axe built on the
   // vindicator's own rest/raised 2-pose axe geometry.
   piglin_brute: { kind: 'piglin_brute', interactive: false },
+  // A real hoglin automatically becomes a zoglin after spending a real 300
+  // game ticks (15 seconds) outside the Nether, entirely on its own, with
+  // zero player interaction of any kind (minecraft.wiki/w/Zoglin). This
+  // app's own tadpole is the only other fully autonomous mob-type mutation
+  // here, but it only ever turns one peaceful mob into another — a zoglin
+  // is the first automatic, zero-interaction mutation to turn an
+  // already-modeled mob into an outright HOSTILE one. See updateHoglin /
+  // transformHoglinIntoZoglin / updateZoglin. Once transformed, it also
+  // targets the closer of the live player OR any other tracked mob of any
+  // species via the new findNearestAnyMobOrLivePlayer — broader than the
+  // piglin brute's own check against one single named species, since here
+  // NO species (the player included) is excluded from the exact same
+  // open-ended scan the vindicator's own findNearestAnyMob already
+  // performs. Reuses the hoglin's own ravagerParts geometry unchanged, just
+  // recolored a pale, rotten hide.
+  zoglin: { kind: 'zoglin', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3936,6 +3952,19 @@ function buildPiglinBruteOutpostInterior(grid, silhouette, dims, exteriorMat, ac
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'piglin_brute', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east' });
   decorOut.push({ type: 'wither_skeleton', x: Math.min(dims.sx - 1, cx + 2), y: 1, z: cz, facing: 'west' });
+}
+// A hoglin already marked as being outside the Nether (`_zoglinTimer: 0`)
+// on open grass, with a real pig standing a few blocks away — do nothing
+// at all and just watch: a real 15 seconds after the model starts
+// simulating, the hoglin automatically becomes a zoglin, entirely on its
+// own, and immediately charges the nearby pig.
+function buildZoglinTransformationInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'hoglin', x: Math.max(0, cx - 2), y: 1, z: cz, facing: 'east', _zoglinTimer: 0 });
+  decorOut.push({ type: 'pig', x: Math.min(dims.sx - 1, cx + 3), y: 1, z: cz, facing: 'west' });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5512,6 +5541,18 @@ const PRESETS = [
       'Not modeled: a real piglin brute\'s own conversion into a zombified piglin after spending too long in the Overworld or the End, its real immunity to golden items/armor (it can\'t be pacified or given anything), and its real chance to drop its own golden axe on death — this app has no transformation/conversion timer or death/loot system at all, so this piglin brute only ever wanders, chases, and swings.',
     ],
   },
+  {
+    id: 'zoglin-transformation', name: 'Zoglin Transformation', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 12 }, interiorMode: 'zoglinTransformation',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A hoglin on open grass, already marked as being outside the Nether, with a real pig standing a few blocks away — do nothing at all and just watch: a real 15 seconds after the model starts simulating, the hoglin automatically becomes a zoglin, entirely on its own, and immediately charges the nearby pig.',
+    keywords: ['zoglin', 'hoglin', 'transformation', 'mutation', 'nether', 'overworld'],
+    notes: [
+      'Just let the model run — no player action of any kind is needed. A real 15 seconds (a real "300 game ticks") after this hoglin is placed, it automatically becomes a zoglin right in front of you, and the instant it does, it charges the nearby pig and starts genuinely lunging at it in melee range, with zero player involvement anywhere in the sequence (minecraft.wiki/w/Zoglin). This app\'s own tadpole is the only other fully autonomous mob-type mutation here, but growTadpoleIntoFrog only ever turns one peaceful mob into another peaceful one — `transformHoglinIntoZoglin` is the first automatic, zero-interaction mutation to turn an already-modeled mob into an outright HOSTILE one. Only a hoglin explicitly marked with a `_zoglinTimer` field (this preset\'s own hoglin) ever counts toward it — an ordinary hoglin placed anywhere else in this app (like the Nether Hazard preset\'s own fungus-fleeing one) has no such field and is completely unaffected, the same "optional per-entry flag" pattern already used for a horse\'s own `_tamed` or a piglin\'s own `_hasSword`.',
+      'Verified directly by a unit test confirming a hoglin with no `_zoglinTimer` field at all never transforms no matter how much simulated time passes, that the exact same hoglin WITH that field genuinely becomes a zoglin the instant its own timer reaches the real 15-second mark (and not a moment before), that the newly transformed zoglin genuinely closes distance on the nearby pig with zero player involved, and that a live Walk-mode player who is genuinely closer than any other tracked mob pulls its own target away instead — reusing the exact same "weigh 2 real candidates, chase whichever is closer" shape already proven by the piglin brute, just widened via the new `findNearestAnyMobOrLivePlayer` to include every mob species at all, not one single named one. This app has no dimension/biome system of any kind, so "outside the Nether" is honestly just this one explicit per-entry flag rather than a real region check — an honest, direct stand-in for the actual rule, not an invented one.',
+      'Not modeled: a real zoglin\'s own fire and lava immunity, its real inability to breed, and the real Nausea effect it briefly gets for 10 seconds right after transforming — this app has no fire/lava-damage, breeding, or status-effect system at all, so this zoglin only ever wanders, chases, and lunges once it exists.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6006,6 +6047,8 @@ function generateModel() {
     buildBoggedSwampInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'piglinBruteOutpost') {
     buildPiglinBruteOutpostInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'zoglinTransformation') {
+    buildZoglinTransformationInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -10539,6 +10582,28 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.head, hideMat));
     group.add(new THREE.Mesh(parts.snout, hideMat));
     const tuskMat = solidMaterial(0xe8ddc8);
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, tuskMat));
+    group.add(new THREE.Mesh(parts.tail, hideMat));
+    const faceMat = solidMaterial(0x8a1a1a);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.scale.setScalar(0.65);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'zoglin') {
+    // Reuses the exact same ravagerParts geometry the hoglin it came from
+    // already uses, unchanged, just recolored a pale, rotten hide — a real
+    // zoglin IS a zombified hoglin in every structural sense
+    // (minecraft.wiki/w/Zoglin).
+    let parts = decorGeoCache.get('ravager');
+    if (!parts) { parts = ravagerParts(); decorGeoCache.set('ravager', parts); }
+    const group = new THREE.Group();
+    const hideMat = solidMaterial(0x8f9a82);
+    group.add(new THREE.Mesh(parts.body, hideMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, hideMat));
+    group.add(new THREE.Mesh(parts.head, hideMat));
+    group.add(new THREE.Mesh(parts.snout, hideMat));
+    const tuskMat = solidMaterial(0xb8b09a);
     for (const g of parts.horns) group.add(new THREE.Mesh(g, tuskMat));
     group.add(new THREE.Mesh(parts.tail, hideMat));
     const faceMat = solidMaterial(0x8a1a1a);
@@ -15470,6 +15535,7 @@ function findNearestFungus(entry) {
   }
   return best ? { entry: best, dist: bestDist } : null;
 }
+const ZOGLIN_TRANSFORM_TIME = 15; // real "300 game ticks (15 seconds)" — used directly (minecraft.wiki/w/Zoglin)
 function updateHoglin(entry, obj, dt) {
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   if (entry._mobState === undefined) {
@@ -15477,6 +15543,18 @@ function updateHoglin(entry, obj, dt) {
     entry._mobTimer = HOGLIN_WANDER_MIN + Math.random() * (HOGLIN_WANDER_MAX - HOGLIN_WANDER_MIN);
     entry._wx = entry.x + 0.5;
     entry._wz = entry.z + 0.5;
+  }
+  // Only a hoglin explicitly marked as being outside the Nether (see
+  // buildZoglinTransformationInterior) ever counts toward this — an
+  // ordinary hoglin with no `_zoglinTimer` field at all is completely
+  // unaffected, exactly like every other optional per-entry flag here
+  // (a horse's own `_tamed`, a piglin's own `_hasSword`).
+  if (entry._zoglinTimer !== undefined) {
+    entry._zoglinTimer += dt;
+    if (entry._zoglinTimer >= ZOGLIN_TRANSFORM_TIME) {
+      transformHoglinIntoZoglin(entry);
+      return;
+    }
   }
   const fungus = findNearestFungus(entry);
   if (fungus && fungus.dist <= HOGLIN_FUNGUS_FEAR_RADIUS) {
@@ -15516,6 +15594,145 @@ function updateHoglin(entry, obj, dt) {
         entry._mobState = 'idle';
         entry._mobTimer = HOGLIN_WANDER_MIN + Math.random() * (HOGLIN_WANDER_MAX - HOGLIN_WANDER_MIN);
       }
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+      entry._mobYaw = Math.atan2(dx, dz);
+    }
+  }
+  obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+// The real new mechanic — see DECOR_TYPES.zoglin. Called from inside
+// updateHoglin itself, which runs from inside updateMobs' own per-frame
+// loop, so this deliberately avoids a full scene rebuild and instead
+// splices only this one mob's own stale mesh/record out and adds its
+// freshly built zoglin mesh back in directly — the same targeted technique
+// already proven by growTadpoleIntoFrog. Its own AI state is reset rather
+// than carried over so updateZoglin starts completely fresh, exactly like
+// a genuinely new mob would.
+function transformHoglinIntoZoglin(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  entry.x = Math.floor(entry._wx);
+  entry.z = Math.floor(entry._wz);
+  entry.type = 'zoglin';
+  delete entry._zoglinTimer;
+  delete entry._mobState;
+  delete entry._mobTimer;
+  delete entry._targetX;
+  delete entry._targetZ;
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// Extends the vindicator's own findNearestAnyMob by folding the live
+// player into the exact same open-ended scan as just one more candidate —
+// see DECOR_TYPES.zoglin.
+function findNearestAnyMobOrLivePlayer(entry) {
+  const nearestMob = findNearestAnyMob(entry);
+  let best = nearestMob ? {
+    x: nearestMob.entry._wx !== undefined ? nearestMob.entry._wx : nearestMob.entry.x + 0.5,
+    z: nearestMob.entry._wz !== undefined ? nearestMob.entry._wz : nearestMob.entry.z + 0.5,
+    dist: nearestMob.dist,
+  } : null;
+  if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
+    const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+    const px = flyState.pos.x - offX, pz = flyState.pos.z - offZ;
+    const d = Math.hypot(px - entry._wx, pz - entry._wz);
+    if (!best || d < best.dist) best = { x: px, z: pz, dist: d };
+  }
+  return best;
+}
+const ZOGLIN_WANDER_MIN = 2, ZOGLIN_WANDER_MAX = 5;
+const ZOGLIN_WALK_SPEED = 1.0;
+const ZOGLIN_CHASE_SPEED = 1.4;
+const ZOGLIN_AGGRO_RANGE = 8;
+const ZOGLIN_MELEE_RANGE = 0.9;
+const ZOGLIN_ATTACK_TIME = 0.4;
+const ZOGLIN_ATTACK_COOLDOWN = 1.0;
+const ZOGLIN_LUNGE_TILT = 0.5;
+// Real vanilla zoglins never retreat and attack the player and almost all
+// non-zoglin mobs indiscriminately (minecraft.wiki/w/Zoglin). Unlike the
+// piglin brute's own updatePiglinBrute, which only extends its target
+// check to one single additional NAMED species, this one folds the live
+// player into the exact same open-ended any-species scan the vindicator's
+// own findNearestAnyMob already performs — no species, the player
+// included, is excluded. Since a real zoglin has no held weapon, its own
+// attack is a plain forward head-lunge applied directly to the live mesh's
+// own rotation rather than a rebuilt weapon pose.
+function updateZoglin(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'idle';
+    entry._mobTimer = ZOGLIN_WANDER_MIN + Math.random() * (ZOGLIN_WANDER_MAX - ZOGLIN_WANDER_MIN);
+    if (entry._wx === undefined) entry._wx = entry.x + 0.5;
+    if (entry._wz === undefined) entry._wz = entry.z + 0.5;
+    entry._attackCooldown = 0;
+  }
+  entry._attackCooldown = Math.max(0, entry._attackCooldown - dt);
+  if (entry._attacking) {
+    entry._attackTimer -= dt;
+    const progress = Math.min(1, 1 - entry._attackTimer / ZOGLIN_ATTACK_TIME);
+    obj.rotation.x = Math.sin(progress * Math.PI) * ZOGLIN_LUNGE_TILT;
+    if (entry._attackTimer <= 0) {
+      entry._attacking = false;
+      entry._attackCooldown = ZOGLIN_ATTACK_COOLDOWN;
+      obj.rotation.x = 0;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  const target = findNearestAnyMobOrLivePlayer(entry);
+  if (target && target.dist <= ZOGLIN_AGGRO_RANGE) {
+    const dx = target.x - entry._wx, dz = target.z - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    if (dist > 0.01) entry._mobYaw = Math.atan2(dx, dz);
+    if (dist <= ZOGLIN_MELEE_RANGE) {
+      if (entry._attackCooldown <= 0) {
+        entry._attacking = true;
+        entry._attackTimer = ZOGLIN_ATTACK_TIME;
+      }
+    } else {
+      const step = Math.min(ZOGLIN_CHASE_SPEED * dt, dist);
+      entry._wx += (dx / dist) * step;
+      entry._wz += (dz / dist) * step;
+    }
+    obj.position.set(entry._wx + offX, entry.y, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  if (entry._mobState === 'idle') {
+    entry._mobTimer -= dt;
+    if (entry._mobTimer <= 0) {
+      const wt = pickWanderTarget(currentModel, entry);
+      if (wt) {
+        entry._targetX = wt.x + 0.5;
+        entry._targetZ = wt.z + 0.5;
+        entry._mobState = 'walking';
+      } else {
+        entry._mobTimer = ZOGLIN_WANDER_MIN;
+      }
+    }
+  } else if (entry._mobState === 'walking') {
+    const dx = entry._targetX - entry._wx, dz = entry._targetZ - entry._wz;
+    const dist = Math.hypot(dx, dz);
+    const step = ZOGLIN_WALK_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = entry._targetX;
+      entry._wz = entry._targetZ;
+      entry.x = Math.floor(entry._wx);
+      entry.z = Math.floor(entry._wz);
+      entry._mobState = 'idle';
+      entry._mobTimer = ZOGLIN_WANDER_MIN + Math.random() * (ZOGLIN_WANDER_MAX - ZOGLIN_WANDER_MIN);
     } else {
       entry._wx += (dx / dist) * step;
       entry._wz += (dz / dist) * step;
@@ -17163,6 +17380,7 @@ function updateMobs(dt) {
     if (entry.type === 'elder_guardian') { updateElderGuardian(entry, obj, dt); continue; }
     if (entry.type === 'ravager') { updateRavager(entry, obj, dt); continue; }
     if (entry.type === 'hoglin') { updateHoglin(entry, obj, dt); continue; }
+    if (entry.type === 'zoglin') { updateZoglin(entry, obj, dt); continue; }
     if (entry.type === 'shulker') { updateShulker(entry, obj, dt); continue; }
     if (entry.type === 'phantom') { updatePhantom(entry, obj, dt); continue; }
     if (entry.type === 'breeze') { updateBreeze(entry, obj, dt); continue; }
@@ -18412,7 +18630,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -18482,7 +18700,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -18609,6 +18827,7 @@ function renderCommands(model) {
       else if (d.type === 'wither_skeleton') lines.push(`summon minecraft:wither_skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'bogged') lines.push(`summon minecraft:bogged ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'piglin_brute') lines.push(`summon minecraft:piglin_brute ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'zoglin') lines.push(`summon minecraft:zoglin ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
