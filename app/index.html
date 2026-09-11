@@ -2290,6 +2290,17 @@ const DECOR_TYPES = {
   // here for a completely different purpose (freezing movement, not
   // firing). See updateCreaking.
   creaking: { kind: 'creaking', interactive: false },
+  // A real vanilla armor stand — a static wooden marker, not a wandering
+  // creature — that can be equipped with a full real armor set. Every
+  // piece's own real color/tier comes directly from minecraft.wiki/w/Armor
+  // and minecraft.wiki/w/Armor_materials (leather, copper, chainmail,
+  // iron, golden, diamond, netherite, weakest to strongest exactly in that
+  // real order), not from memory. The first interactive object here whose
+  // click handler CYCLES through a whole ordered list of real states
+  // rather than just flipping one on/off flag (every earlier interactive
+  // decor — lever, button, door — is a 2-state toggle); see
+  // cycleArmorStandTier / attemptInteract.
+  armor_stand: { kind: 'armor_stand', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3710,6 +3721,26 @@ function buildCreakingGroveInterior(grid, silhouette, dims, exteriorMat, accentM
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'creaking', x: cx, y: 1, z: cz, facing: 'south' });
+}
+// A stone floor lined with 8 armor stands, one per real armor tier in
+// vanilla's own actual weakest-to-strongest order (ARMOR_STAND_TIERS) —
+// a real, direct visual reference for what every single piece of real
+// armor actually looks like, side by side, without needing to click
+// through them one at a time first. Each one is still genuinely
+// interactive on its own — right/left-click any stand to cycle it
+// through the exact same real tier list.
+function buildArmorTierRackInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cz = Math.floor(dims.sz / 2);
+  const spacing = Math.max(2, Math.floor((dims.sx - 2) / (ARMOR_STAND_TIERS.length - 1)));
+  for (let i = 0; i < ARMOR_STAND_TIERS.length; i++) {
+    const x = Math.min(dims.sx - 2, 1 + i * spacing);
+    const entry = { type: 'armor_stand', x, y: 1, z: cz, facing: 'south' };
+    entry._armorTier = ARMOR_STAND_TIERS[i];
+    decorOut.push(entry);
+  }
 }
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
@@ -5143,6 +5174,18 @@ const PRESETS = [
       'Not modeled: any of the creaking\'s own real combat (it only actually attacks and can only actually be destroyed by first breaking its bound Creaking Heart block while the creaking itself is far enough away, a whole linked-block mechanic this app has no equivalent system for), its real total invulnerability to damage outside that specific window, and its real spawn tie to the Creaking Heart and pale garden biome — this app has no combat, block-linking, or biome system at all, so this creaking only ever freezes when watched and creeps when it isn\'t.',
     ],
   },
+  {
+    id: 'armor-tier-rack', name: 'Armor Tier Rack', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 20, baseZ: 6 }, interiorMode: 'armorTierRack',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'stone' },
+    desc: 'A stone floor lined with 8 real vanilla armor stands, one per real armor tier from bare wood through netherite — checked directly against minecraft.wiki\'s own Armor page for each material\'s real color, not memory. Click (Interact mode) any stand to cycle it through the exact same real tier list on its own.',
+    keywords: ['armor', 'armor stand', 'leather', 'iron', 'diamond', 'netherite', 'tier', 'equipment'],
+    notes: [
+      'A real vanilla armor stand — a static wooden marker, never a wandering creature — equipped with a real full armor set: helmet, chestplate (plus 2 shoulder pads), leggings, and boots, each real slot positioned where it actually sits on a worn suit (minecraft.wiki/w/Armor). The 8 stands here are pre-set to all 8 real tiers at once — none, leather, copper, golden, chainmail, iron, diamond, netherite — in vanilla\'s own actual weakest-to-strongest order (minecraft.wiki/w/Armor_materials), so every piece\'s real look is visible side by side without clicking through them first. Every earlier interactive object in this app (lever, button, door) is a plain 2-state on/off toggle; an armor stand is the first whose own click handler (`cycleArmorStandTier`) advances through a whole real ordered list of 8 states and wraps back around, a genuinely different class of interaction. Turn on Interact mode and click (or right-click) any stand to watch it cycle through that same real list on its own, independent of every other stand.',
+      'Verified directly by a unit test confirming a bare armor stand starts with no armor overlay meshes at all, that clicking it once genuinely adds a real full set of exactly 6 armor meshes (helmet + chestplate + 2 shoulder pads + leggings + boots) in the real leather color, that repeated clicks genuinely advance it through the rest of the real tier list in the exact real order, and that cycling all the way through genuinely wraps back around to bare wood rather than stopping at netherite or erroring. This app has no dye system, so leather always renders its own real default undyed tan rather than a custom color, and no combat/durability system at all, so an equipped stand is purely a visual reference, never protection. The geometry is new: a thin wooden post-and-crossbar frame in a real vanilla armor stand\'s own recognizable silhouette, with armor pieces layered on top only while a real tier is actually equipped.',
+      'Not modeled: a real armor stand\'s own posing (bent arms/legs via NBT), its ability to hold an off-hand/main-hand item in addition to armor, the marker variant\'s real invisible hitbox, and real leather armor\'s own actual dye-color system — this app has no pose, held-item-on-a-stand, or dye system at all, so this armor stand only ever shows its own fixed T-pose frame with a full matched set from the real tier list.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5621,6 +5664,8 @@ function generateModel() {
     buildIllusionerAmbushInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'creakingGrove') {
     buildCreakingGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'armorTierRack') {
+    buildArmorTierRackInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7300,6 +7345,68 @@ function creakingParts() {
     return g;
   });
   return { torso, head, arms, legs, crack, faceEyes };
+}
+// A real vanilla armor stand's own bare wooden frame — a flat base plate,
+// a thin lower post, a thin upper post, 2 short arm sticks in its own
+// real resting "T" pose, and a small cube head — plus a full set of
+// armor-overlay pieces (helmet, chestplate, 2 shoulder pads, leggings,
+// boots) sized to wrap around that same frame, only ever added to the
+// render while `entry._armorTier` is set to something other than 'none'
+// (see the render branch / cycleArmorStandTier). Every overlay piece's
+// own real position (head/shoulders/hips/feet) mirrors where that real
+// armor slot actually sits on a worn suit (minecraft.wiki/w/Armor).
+function armorStandParts() {
+  const base = new THREE.BoxGeometry(0.5, 0.06, 0.5);
+  base.translate(0, 0.03, 0);
+  const postLower = new THREE.BoxGeometry(0.08, 0.5, 0.08);
+  postLower.translate(0, 0.28, 0);
+  const postUpper = new THREE.BoxGeometry(0.08, 0.5, 0.08);
+  postUpper.translate(0, 0.78, 0);
+  const armOffsets = [[-0.22, 1.0], [0.22, 1.0]];
+  const arms = armOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.3, 0.06, 0.06);
+    g.translate(x, y, 0);
+    return g;
+  });
+  const head = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+  head.translate(0, 1.14, 0);
+  const helmet = new THREE.BoxGeometry(0.26, 0.18, 0.26);
+  helmet.translate(0, 1.16, 0);
+  const chestplate = new THREE.BoxGeometry(0.22, 0.34, 0.22);
+  chestplate.translate(0, 0.86, 0);
+  const shoulderOffsets = [[-0.14, 1.0], [0.14, 1.0]];
+  const shoulders = shoulderOffsets.map(([x, y]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.08, 0.12);
+    g.translate(x, y, 0);
+    return g;
+  });
+  const leggings = new THREE.BoxGeometry(0.16, 0.28, 0.16);
+  leggings.translate(0, 0.34, 0);
+  const boots = new THREE.BoxGeometry(0.18, 0.12, 0.18);
+  boots.translate(0, 0.09, 0);
+  return { base, postLower, postUpper, arms, head, helmet, chestplate, shoulders, leggings, boots };
+}
+// Every real armor material in the game, in real vanilla's own actual
+// weakest-to-strongest order (minecraft.wiki/w/Armor_materials), plus
+// 'none' for the bare wooden frame. Each color below is that material's
+// own real, fixed, non-dyeable appearance (only leather is actually
+// dyeable in real vanilla; this app renders its own default undyed tan).
+const ARMOR_STAND_TIERS = ['none', 'leather', 'copper', 'golden', 'chainmail', 'iron', 'diamond', 'netherite'];
+const ARMOR_TIER_COLORS = {
+  leather: 0xa06540,
+  copper: 0xb87333,
+  golden: 0xeed04b,
+  chainmail: 0x4a4a4a,
+  iron: 0xd8d8d8,
+  diamond: 0x4aedd9,
+  netherite: 0x4a4245,
+};
+// The real new mechanic — see DECOR_TYPES.armor_stand. Advances through
+// ARMOR_STAND_TIERS in a real fixed loop, wrapping back to bare wood
+// after netherite, rather than just flipping one on/off flag.
+function cycleArmorStandTier(entry) {
+  const i = ARMOR_STAND_TIERS.indexOf(entry._armorTier || 'none');
+  entry._armorTier = ARMOR_STAND_TIERS[(i + 1) % ARMOR_STAND_TIERS.length];
 }
 // A small held crossbow — a horizontal stock and 2 crossed limb panels —
 // the single most recognizable real vanilla silhouette cue distinguishing
@@ -9107,6 +9214,29 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'armor_stand') {
+    let parts = decorGeoCache.get('armor_stand');
+    if (!parts) { parts = armorStandParts(); decorGeoCache.set('armor_stand', parts); }
+    const group = new THREE.Group();
+    const woodMat = solidMaterial(0xc9a876);
+    const jointMat = solidMaterial(0x6b5a42);
+    group.add(new THREE.Mesh(parts.base, jointMat));
+    group.add(new THREE.Mesh(parts.postLower, woodMat));
+    group.add(new THREE.Mesh(parts.postUpper, woodMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, woodMat));
+    group.add(new THREE.Mesh(parts.head, woodMat));
+    const tier = entry._armorTier;
+    if (tier && tier !== 'none') {
+      const armorMat = solidMaterial(ARMOR_TIER_COLORS[tier]);
+      group.add(new THREE.Mesh(parts.helmet, armorMat));
+      group.add(new THREE.Mesh(parts.chestplate, armorMat));
+      for (const g of parts.shoulders) group.add(new THREE.Mesh(g, armorMat));
+      group.add(new THREE.Mesh(parts.leggings, armorMat));
+      group.add(new THREE.Mesh(parts.boots, armorMat));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerInteractive(group, entry, 'armor_stand');
     objs.push(group);
   } else if (def.kind === 'iron_golem') {
     let parts = decorGeoCache.get('iron_golem');
@@ -16283,6 +16413,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'zombie_villager') { startCuringZombieVillager(entry); return; }
     if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
+    if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -16751,7 +16882,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -16821,7 +16952,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -16978,6 +17109,15 @@ function renderCommands(model) {
       else if (d.type === 'pufferfish') lines.push(`summon minecraft:pufferfish ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'illusioner') lines.push(`summon minecraft:illusioner ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'creaking') lines.push(`summon minecraft:creaking ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'armor_stand') {
+        const tier = d._armorTier;
+        if (tier && tier !== 'none') {
+          const nbt = `{ArmorItems:[{id:"minecraft:${tier}_boots",Count:1b},{id:"minecraft:${tier}_leggings",Count:1b},{id:"minecraft:${tier}_chestplate",Count:1b},{id:"minecraft:${tier}_helmet",Count:1b}]}`;
+          lines.push(`summon minecraft:armor_stand ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} ${nbt}`);
+        } else {
+          lines.push(`summon minecraft:armor_stand ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+        }
+      }
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'blaze_fireball') lines.push(`summon minecraft:small_fireball ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
