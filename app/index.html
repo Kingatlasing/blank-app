@@ -7996,40 +7996,40 @@ function horseParts() {
   neck.translate(0, neckLen / 2, 0);
   neck.rotateX(neckAngle);
   neck.translate(neckX, neckY, neckZ);
-  const headOffsetY = neckLen + 0.11, headOffsetZ = 0.06;
-  const head = new THREE.BoxGeometry(0.2, 0.22, 0.32);
-  head.translate(0, headOffsetY, headOffsetZ);
-  head.rotateX(neckAngle);
-  head.translate(neckX, neckY, neckZ);
   const mane = new THREE.BoxGeometry(0.06, neckLen, 0.14);
   mane.translate(0, neckLen / 2, -0.16);
   mane.rotateX(neckAngle);
   mane.translate(neckX, neckY, neckZ);
-  const earOffsets = [[-0.06, headOffsetY + 0.15, headOffsetZ + 0.1], [0.06, headOffsetY + 0.15, headOffsetZ + 0.1]];
+  // Unlike the neck, a real horse's head rides level on top of it rather
+  // than tilting forward at the same angle — so the head (and everything
+  // mounted ON it: muzzle, ears, eyes) is positioned at the correct spot
+  // atop the angled neck by rotating its OWN attachment point by
+  // neckAngle, but the head box itself is never rotated, so it stays
+  // straight/upright instead of angled.
+  const headOffsetY = neckLen + 0.11, headOffsetZ = 0.06;
+  const headWorldY = neckY + headOffsetY * Math.cos(neckAngle) - headOffsetZ * Math.sin(neckAngle);
+  const headWorldZ = neckZ + headOffsetY * Math.sin(neckAngle) + headOffsetZ * Math.cos(neckAngle);
+  const head = new THREE.BoxGeometry(0.2, 0.22, 0.32);
+  head.translate(neckX, headWorldY, headWorldZ);
+  const earOffsets = [[-0.06, headWorldY + 0.15, headWorldZ + 0.1], [0.06, headWorldY + 0.15, headWorldZ + 0.1]];
   const ears = earOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.05, 0.1, 0.04);
     g.translate(x, y, z);
-    g.rotateX(neckAngle);
-    g.translate(neckX, neckY, neckZ);
     return g;
   });
   const tail = new THREE.BoxGeometry(0.1, 0.4, 0.1);
   tail.translate(0, 0.55, -0.44);
-  const faceEyeOffsets = [[-0.06, headOffsetY - 0.02, headOffsetZ + 0.17], [0.06, headOffsetY - 0.02, headOffsetZ + 0.17]];
+  const faceEyeOffsets = [[-0.06, headWorldY - 0.02, headWorldZ + 0.17], [0.06, headWorldY - 0.02, headWorldZ + 0.17]];
   const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
     g.translate(x, y, z);
-    g.rotateX(neckAngle);
-    g.translate(neckX, neckY, neckZ);
     return g;
   });
   // A real vanilla horse's muzzle (nose/chin) reads visibly lighter and more
   // pink-toned than the rest of the coat on every real color variant,
   // including white — it sits at the front-bottom of the head, below the eyes.
   const muzzle = new THREE.BoxGeometry(0.14, 0.12, 0.1);
-  muzzle.translate(0, headOffsetY - 0.06, headOffsetZ + 0.2);
-  muzzle.rotateX(neckAngle);
-  muzzle.translate(neckX, neckY, neckZ);
+  muzzle.translate(neckX, headWorldY - 0.06, headWorldZ + 0.2);
   // Real horses (every color variant) have dark hooves at the very bottom
   // of each leg, distinct from the coat color — a small dark cap layered
   // over the bottom of each leg box.
