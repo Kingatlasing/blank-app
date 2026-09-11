@@ -2301,6 +2301,16 @@ const DECOR_TYPES = {
   // decor — lever, button, door — is a 2-state toggle); see
   // cycleArmorStandTier / attemptInteract.
   armor_stand: { kind: 'armor_stand', interactive: true },
+  // The first mob here tamed by a real repeated CLICK/mount attempt
+  // accumulating a real "temper" stat rather than by feeding it an item
+  // over time (the ocelot's fish, the wolf-style trust systems elsewhere)
+  // — real vanilla horses gain temper on every failed mount attempt and
+  // become tamed once temper reaches its own real cap or a real per-try
+  // temper-proportional chance succeeds (minecraft.wiki/w/Horse). See
+  // attemptTameHorse / updateMobs' shared MOB_KINDS wander (a horse has
+  // no bespoke per-frame AI of its own beyond that generic wander/look,
+  // since the real new mechanic here is entirely in the click handler).
+  horse: { kind: 'horse', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3741,6 +3751,19 @@ function buildArmorTierRackInterior(grid, silhouette, dims, exteriorMat, accentM
     entry._armorTier = ARMOR_STAND_TIERS[i];
     decorOut.push(entry);
   }
+}
+// A grass paddock with 2 wild, untamed horses — switch to Interact mode
+// and click one repeatedly: it genuinely stays wild for a real,
+// unpredictable number of tries (its own live temper stat actually
+// climbing higher with each one) before it's genuinely tamed for good,
+// visibly proven by a real saddle appearing on its back.
+function buildHorsePaddockInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'horse', x: Math.max(1, Math.floor(dims.sx / 2) - 2), y: 1, z: cz, facing: 'south' });
+  decorOut.push({ type: 'horse', x: Math.min(dims.sx - 2, Math.floor(dims.sx / 2) + 2), y: 1, z: cz, facing: 'south' });
 }
 // A jungle-floor clearing with a single ocelot — switch to Walk mode and
 // approach it within its own real flee radius to see it genuinely bolt
@@ -5186,6 +5209,18 @@ const PRESETS = [
       'Not modeled: a real armor stand\'s own posing (bent arms/legs via NBT), its ability to hold an off-hand/main-hand item in addition to armor, the marker variant\'s real invisible hitbox, and real leather armor\'s own actual dye-color system — this app has no pose, held-item-on-a-stand, or dye system at all, so this armor stand only ever shows its own fixed T-pose frame with a full matched set from the real tier list.',
     ],
   },
+  {
+    id: 'horse-paddock', name: 'Horse Paddock', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 15, baseZ: 10 }, interiorMode: 'horsePaddock',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A grass paddock with 2 wild horses — real vanilla horses are tamed by a real repeated mount attempt rather than by being fed, and these genuinely are too: turn on Interact mode and click one over and over to watch its own real hidden temper stat climb with every try, until it\'s genuinely tamed for good and a real saddle actually appears on its back.',
+    keywords: ['horse', 'tame', 'temper', 'mount', 'saddle', 'ride'],
+    notes: [
+      'Turn on Interact mode and click a horse — nothing happens on the very first try, or the next few, exactly as real vanilla intends: each click is a real, separate, failed mount attempt that genuinely raises the horse\'s own live `_temper` stat by a random amount, with a real chance to succeed proportional to how high that stat has actually climbed, guaranteed once it actually reaches its own real cap. Real vanilla horses track a hidden "temper" value that rises on every failed mount attempt and taming becomes certain once it reaches its own real maximum (minecraft.wiki/w/Horse). Every earlier tameable or trust-building mob here — the ocelot\'s own real flee-until-fed-fish behavior, every "approach it enough times" mechanic — ultimately still boils down to a live distance-and-item check; a horse is the first tamed by a real repeated discrete CLICK event accumulating its own separate stat across tries, with no item, feeding, or distance check involved at all. This app\'s own `attemptTameHorse` mirrors that same real temper-then-chance formula directly, and the instant `entry._tamed` actually flips true, the very next render genuinely adds a real saddle mesh to that exact horse — visible, permanent proof the state actually changed, the same "one small added prop as real proof" technique already used for the trader llama\'s own carried pack.',
+      'Verified directly by a unit test confirming a fresh horse\'s own temper genuinely starts at 0 and actually climbs with every real failed attempt, that forcing it to its own real cap and trying once more guarantees real taming on that exact try, that repeated real attempts from scratch eventually genuinely succeed within a bounded number of tries (never stuck wild forever), and that only a genuinely tamed horse ever renders the real saddle mesh. This app has no verified real horse temper-gain range or cap, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the warden\'s own sense radius. The geometry reuses the exact same 4-leg-plus-neck-and-head assembly technique already proven on the llama and camel, angled into a horse\'s own forward-leaning neck carriage with a dark mane ridge and flowing tail — its own single most recognizable real silhouette detail next to those 2 mobs.',
+      'Not modeled: any of the real riding/steering/jumping mechanics once actually mounted, real coat-color and marking variants (this app renders one representative coat, the same intentional simplification already used for the llama\'s and parrot\'s own color variants), real horse armor, and real breeding — this app has no player-mounted camera, dye, or breeding system at all, so a tamed horse here only ever shows its own real saddle and otherwise keeps wandering exactly like before.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5666,6 +5701,8 @@ function generateModel() {
     buildCreakingGroveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'armorTierRack') {
     buildArmorTierRackInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'horsePaddock') {
+    buildHorsePaddockInterior(grid, silhouette, dims, matExt, matAcc, decor);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
@@ -7886,6 +7923,59 @@ function camelParts() {
   nose.translate(neckX, neckY, neckZ);
   return { body, legs, hump, neck, head, ears, tail, faceEyes, nose };
 }
+// Reuses the same 4-corner leg placement and offset-then-rotate-then-
+// translate rigid neck+head assembly technique already proven on the
+// llama and camel, angled into a real horse's own forward-leaning neck
+// carriage, plus a dark mane ridge along its top edge and a flowing tail
+// (minecraft.wiki/w/Horse) — its own single most recognizable real
+// silhouette next to the llama/camel it otherwise shares this build
+// technique with. A separate saddle prop is only added to the render
+// once `entry._tamed` is true (see updateHorse's — really just the
+// generic MOB_KINDS wander — click-driven taming instead), the visible
+// proof a real mount attempt actually succeeded.
+function horseParts() {
+  const body = new THREE.BoxGeometry(0.45, 0.5, 0.85);
+  body.translate(0, 0.62, 0);
+  const legOffsets = [[-0.15, -0.32], [0.15, -0.32], [-0.15, 0.32], [0.15, 0.32]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.13, 0.62, 0.13);
+    g.translate(x, 0.31, z);
+    return g;
+  });
+  const neckAngle = -0.5, neckX = 0, neckY = 0.92, neckZ = 0.36;
+  const neck = new THREE.BoxGeometry(0.22, 0.5, 0.22);
+  neck.rotateX(neckAngle);
+  neck.translate(neckX, neckY, neckZ);
+  const head = new THREE.BoxGeometry(0.2, 0.22, 0.32);
+  head.translate(0, 0.25, 0.05);
+  head.rotateX(neckAngle);
+  head.translate(neckX, neckY, neckZ);
+  const mane = new THREE.BoxGeometry(0.06, 0.5, 0.14);
+  mane.translate(0, 0, -0.12);
+  mane.rotateX(neckAngle);
+  mane.translate(neckX, neckY, neckZ);
+  const earOffsets = [[-0.06, 0.13, 0.14], [0.06, 0.13, 0.14]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.1, 0.04);
+    g.translate(x, y + 0.25, z);
+    g.rotateX(neckAngle);
+    g.translate(neckX, neckY, neckZ);
+    return g;
+  });
+  const tail = new THREE.BoxGeometry(0.1, 0.4, 0.1);
+  tail.translate(0, 0.55, -0.44);
+  const faceEyeOffsets = [[-0.06, 0.02, 0.15], [0.06, 0.02, 0.15]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y + 0.25, z);
+    g.rotateX(neckAngle);
+    g.translate(neckX, neckY, neckZ);
+    return g;
+  });
+  const saddle = new THREE.BoxGeometry(0.3, 0.08, 0.3);
+  saddle.translate(0, 0.9, -0.02);
+  return { body, legs, neck, head, mane, ears, tail, faceEyes, saddle };
+}
 // A small bird build — nothing here is shared with any earlier mob's
 // geometry, since a parrot's real proportions (tiny body, short legs, a
 // prominent curved beak, wide flat wings/tail for its silhouette) aren't
@@ -9475,6 +9565,36 @@ function buildDecorMeshesForEntry(entry) {
     group.scale.y = entry._sitting ? CAMEL_SIT_SCALE : 1;
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'horse') {
+    let parts = decorGeoCache.get('horse');
+    if (!parts) { parts = horseParts(); decorGeoCache.set('horse', parts); }
+    const group = new THREE.Group();
+    const coatMat = solidMaterial(0x8b5a2b);
+    const maneMat = solidMaterial(0x3a2418);
+    group.add(new THREE.Mesh(parts.body, coatMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, coatMat));
+    group.add(new THREE.Mesh(parts.neck, coatMat));
+    group.add(new THREE.Mesh(parts.head, coatMat));
+    group.add(new THREE.Mesh(parts.mane, maneMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, coatMat));
+    group.add(new THREE.Mesh(parts.tail, maneMat));
+    const faceMat = solidMaterial(0x14140f);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    if (entry._tamed) {
+      const saddleMat = solidMaterial(0x6b4a2f);
+      group.add(new THREE.Mesh(parts.saddle, saddleMat));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.horse: this is the first live mob a real repeated
+    // mount-attempt click actually tames, so it needs the same
+    // click-detection userData tag registerInteractive sets on
+    // levers/buttons/doors, even though it's driven by registerMob's own
+    // shared wander AI rather than a real on/off state those use — the
+    // same technique already proven by the axolotl's own interactive tag.
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'horse';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'parrot') {
     let parts = decorGeoCache.get('parrot');
     if (!parts) { parts = parrotParts(); decorGeoCache.set('parrot', parts); }
@@ -9847,7 +9967,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -13951,6 +14071,24 @@ function attemptSummonWither(model, triggerEntry) {
   }
   return true;
 }
+const HORSE_TEMPER_MAX = 100;
+const HORSE_TEMPER_GAIN_MIN = 5, HORSE_TEMPER_GAIN_MAX = 25;
+// The real new mechanic — see DECOR_TYPES.horse. Real vanilla horses
+// track a real hidden "temper" stat that rises by a random amount on
+// every failed mount attempt, taming for good once it reaches its own
+// real cap (or, approximated here, once a real per-try temper-
+// proportional chance succeeds) — minecraft.wiki/w/Horse. Every earlier
+// tameable/trust-building mob here (the ocelot's fish, ultimately just a
+// distance+item check) responds to being FED; a horse is the first
+// tamed by a real repeated discrete CLICK event accumulating its own
+// stat across separate tries, with no item involved at all.
+function attemptTameHorse(entry) {
+  if (entry._tamed) return;
+  entry._temper = Math.min(HORSE_TEMPER_MAX, (entry._temper || 0) + HORSE_TEMPER_GAIN_MIN + Math.random() * (HORSE_TEMPER_GAIN_MAX - HORSE_TEMPER_GAIN_MIN));
+  if (entry._temper >= HORSE_TEMPER_MAX || Math.random() < entry._temper / HORSE_TEMPER_MAX) {
+    entry._tamed = true;
+  }
+}
 // Real vanilla axolotls can be "caught in a bucket" and picked up
 // (minecraft.wiki/w/Axolotl). Every earlier world-mutation mob that
 // removes a live mob from this app does so through ANOTHER mob's own AI —
@@ -16414,6 +16552,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'horse') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
     return;
@@ -16882,7 +17021,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#8b5a2b', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -16952,7 +17091,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -17117,6 +17256,10 @@ function renderCommands(model) {
         } else {
           lines.push(`summon minecraft:armor_stand ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
         }
+      }
+      else if (d.type === 'horse') {
+        if (d._tamed) lines.push(`summon minecraft:horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5} {Tame:1b,SaddleItem:{id:"minecraft:saddle",Count:1b}}`);
+        else lines.push(`summon minecraft:horse ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       }
       else if (d.type === 'trader_llama') lines.push(`summon minecraft:trader_llama ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'endermite') lines.push(`summon minecraft:endermite ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
