@@ -7684,10 +7684,14 @@ function pillagerCrossbowParts() {
   });
   const arrowShaft = new THREE.BoxGeometry(0.03, 0.03, 0.3);
   arrowShaft.translate(0.4, 0.77, 0.08);
+  // The tip belongs at +Z (this app's established "front" direction —
+  // see the skeleton's and illusioner's own nocked arrows) and the
+  // fletching at -Z; these 2 were previously swapped, pointing the bolt
+  // backward into the pillager's own body instead of at its target.
   const arrowTip = new THREE.BoxGeometry(0.05, 0.05, 0.05);
-  arrowTip.translate(0.4, 0.77, -0.08);
+  arrowTip.translate(0.4, 0.77, 0.22);
   const arrowFletch = new THREE.BoxGeometry(0.09, 0.05, 0.03);
-  arrowFletch.translate(0.4, 0.77, 0.22);
+  arrowFletch.translate(0.4, 0.77, -0.08);
   return { stock, limbs, arrowShaft, arrowTip, arrowFletch };
 }
 // A tall, tapering hat stacked from 3 progressively narrower boxes — real
