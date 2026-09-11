@@ -7981,9 +7981,25 @@ function horseParts() {
     g.translate(neckX, neckY, neckZ);
     return g;
   });
+  // A real vanilla horse's muzzle (nose/chin) reads visibly lighter and more
+  // pink-toned than the rest of the coat on every real color variant,
+  // including white — it sits at the front-bottom of the head, below the eyes.
+  const muzzle = new THREE.BoxGeometry(0.14, 0.12, 0.1);
+  muzzle.translate(0, headOffsetY - 0.06, headOffsetZ + 0.2);
+  muzzle.rotateX(neckAngle);
+  muzzle.translate(neckX, neckY, neckZ);
+  // Real horses (every color variant) have dark hooves at the very bottom
+  // of each leg, distinct from the coat color — a small dark cap layered
+  // over the bottom of each leg box.
+  const hoofOffsets = legOffsets;
+  const hooves = hoofOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.14, 0.1, 0.14);
+    g.translate(x, 0.05, z);
+    return g;
+  });
   const saddle = new THREE.BoxGeometry(0.3, 0.08, 0.3);
   saddle.translate(0, 0.9, -0.02);
-  return { body, legs, neck, head, mane, ears, tail, faceEyes, saddle };
+  return { body, legs, neck, head, mane, ears, tail, faceEyes, muzzle, hooves, saddle };
 }
 // A small bird build — nothing here is shared with any earlier mob's
 // geometry, since a parrot's real proportions (tiny body, short legs, a
@@ -9578,12 +9594,20 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get('horse');
     if (!parts) { parts = horseParts(); decorGeoCache.set('horse', parts); }
     const group = new THREE.Group();
-    const coatMat = solidMaterial(0x8b5a2b);
-    const maneMat = solidMaterial(0x3a2418);
+    // White is a real vanilla base coat color (in fact the default one —
+    // summoning a horse with no Variant set produces a white horse), with a
+    // light gray mane/tail, a pinkish-tan muzzle, and dark hooves on every
+    // color variant. Matches the wiki's own reference image for this piece.
+    const coatMat = solidMaterial(0xdedad2);
+    const maneMat = solidMaterial(0x8f8b85);
+    const muzzleMat = solidMaterial(0xcbb3a0);
+    const hoofMat = solidMaterial(0x2a2018);
     group.add(new THREE.Mesh(parts.body, coatMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, coatMat));
+    for (const g of parts.hooves) group.add(new THREE.Mesh(g, hoofMat));
     group.add(new THREE.Mesh(parts.neck, coatMat));
     group.add(new THREE.Mesh(parts.head, coatMat));
+    group.add(new THREE.Mesh(parts.muzzle, muzzleMat));
     group.add(new THREE.Mesh(parts.mane, maneMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, coatMat));
     group.add(new THREE.Mesh(parts.tail, maneMat));
