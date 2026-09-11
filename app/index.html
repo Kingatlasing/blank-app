@@ -2386,6 +2386,18 @@ const DECOR_TYPES = {
   // but pointed at a target no earlier melee-swinging mob here has ever
   // been aimed at. See updateWitherSkeleton.
   wither_skeleton: { kind: 'wither_skeleton', interactive: false },
+  // A real bogged is a mossy swamp-dwelling skeleton variant that fires
+  // tipped arrows of Poison instead of plain ones, reloads noticeably
+  // slower than an ordinary skeleton, and — the genuinely new part here
+  // — can be SHEARED once for 2 real mushrooms growing from its own
+  // head, after which it can never be sheared again
+  // (minecraft.wiki/w/Bogged). Every earlier one-time click harvest here
+  // either transforms the mob into a different species for good (the
+  // mooshroom's own shearing, which becomes a cow) or removes it
+  // outright (the axolotl's own bucket-capture) — a bogged is the first
+  // that drops a real item and then just keeps being itself, permanently
+  // missing only that one cosmetic prop. See attemptShearBogged.
+  bogged: { kind: 'bogged', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3886,6 +3898,16 @@ function buildWitherSkeletonFortressInterior(grid, silhouette, dims, exteriorMat
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'wither_skeleton', x: cx, y: 1, z: cz, facing: 'south' });
+}
+// A single bogged on an open swamp floor — switch to Interact mode and
+// click it: it's genuinely sheared for 2 real mushrooms, and its own
+// mushroom cap permanently disappears from its model afterward.
+function buildBoggedSwampInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'bogged', x: cx, y: 1, z: cz, facing: 'south' });
 }
 // A snowy den with an adult polar bear standing right next to its own real
 // cub — switch to Walk mode and approach: the adult genuinely ignores you
@@ -5438,6 +5460,18 @@ const PRESETS = [
       'Not modeled: the real Wither status effect its melee hits actually inflict on a player (this app has no combat/damage/status-effect system at all, so a "swing" here is purely a visible pose with no effect on the player), its real fire and lava immunity, and its real 8.5% chance to drop its own stone sword on death — this app has no death/loot system at all, so this wither skeleton only ever wanders, chases, and swings.',
     ],
   },
+  {
+    id: 'bogged-swamp', name: 'Bogged Swamp', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 12, baseZ: 12 }, interiorMode: 'boggedSwamp',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'A single bogged on open swamp ground — real vanilla bogged are mossy skeleton variants that fire tipped arrows of Poison and reload noticeably slower than an ordinary skeleton, but the real standout: turn on Interact mode and click it — it\'s genuinely sheared for 2 real mushrooms, permanently losing its own mushroom cap, exactly once.',
+    keywords: ['bogged', 'skeleton', 'poison', 'mushroom', 'shear', 'swamp'],
+    notes: [
+      'Turn on Interact mode and click the bogged — its own real mushroom cap (2 small caps actually modeled growing from its head) is genuinely removed for good, and 2 real dropped mushroom items appear beside it, each independently a real 50/50 chance of brown or red, exactly matching real vanilla\'s own drop table. Click it again, and nothing happens — a real bogged "cannot be sheared again" once its own mushrooms are gone (minecraft.wiki/w/Bogged). Every earlier one-time click harvest here either transforms the SAME entry into a different species for good (the mooshroom\'s own shearing, which becomes a cow) or removes it from the world outright (the axolotl\'s own bucket-capture) — `attemptShearBogged` is the first that drops a real item and then leaves `entry.type` completely untouched, so the bogged keeps being a bogged, just permanently missing that one cosmetic prop from then on. Switch to Walk mode and let it shoot you, too: it fires a genuine tipped arrow of Poison (visibly green, reusing the exact same tipped-arrow rendering technique already proven by the stray\'s own Slowness arrow) and reloads at a real ~1.75x slower rate than an ordinary skeleton — this app\'s own shared `updateSkeleton` picks between the 2 real cooldowns purely by checking `entry.type`.',
+      'Verified directly by a unit test confirming a fresh bogged still has its own real mushroom-cap mesh and is not yet sheared, that clicking it once genuinely adds exactly 2 new dropped mushroom items to the model and permanently removes the mushroom-cap mesh from its own rendered model, and that clicking the exact same bogged again afterward changes nothing further (no additional items, no already-gone mesh reappearing). This app has no real combat/damage/status-effect system at all, so real Poison\'s own actual damage-over-time is honestly not modeled — the tipped-arrow color and the real slower reload are both directly verifiable, sourced facts, while the poison "effect" itself is purely cosmetic here, an honest gap rather than an invented substitute. The geometry reuses the exact same skeleton body plan completely unchanged, recolored a mossy swamp tone, with 2 small mushroom props added on top of the head using new geometry.',
+      'Not modeled: real Poison\'s own actual damage-over-time on the player (this app has no health/damage system at all), a bogged\'s real spawn tie to the swamp biome and ranged mob trial spawners, and its real 4-less-health stat compared to an ordinary skeleton — this app has no biome, trial-chamber, or health system at all, so this bogged only ever wanders, shoots, and can be sheared exactly once.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -5928,6 +5962,8 @@ function generateModel() {
     buildStraySnowfieldInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'witherSkeletonFortress') {
     buildWitherSkeletonFortressInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'boggedSwamp') {
+    buildBoggedSwampInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'polarBearDen') {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
@@ -7195,6 +7231,7 @@ const DROPPED_ITEM_COLORS = {
   gravel: 0x8a8478,
   feather: 0xf0ead6,
   red_mushroom: 0xc22b2b,
+  brown_mushroom: 0x8a6a4a,
   gunpowder: 0x8a8478,
   chest: 0x8a5a2f,
 };
@@ -7584,6 +7621,25 @@ function witherSkeletonSwordParts() {
   swingBlade.rotateZ(swingAngle);
   swingBlade.translate(swingX, swingY, swingZ);
   return { restHandle, restBlade, swingHandle, swingBlade };
+}
+// 2 small mushroom caps growing from a bogged's own head — the real
+// vanilla detail that's actually harvestable (minecraft.wiki/w/Bogged:
+// "a bogged drops 2 mushrooms when sheared... afterward, it cannot be
+// sheared again"), only ever rendered while entry._sheared is falsy (see
+// the render branch / attemptShearBogged).
+function boggedMushroomCapParts() {
+  const offsets = [[-0.08, 0.04], [0.07, -0.05]];
+  const stems = offsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.06, 0.03);
+    g.translate(x, 1.59, z);
+    return g;
+  });
+  const caps = offsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.09, 0.05, 0.09);
+    g.translate(x, 1.64, z);
+    return g;
+  });
+  return { stems, caps };
 }
 // A held bow with a nocked arrow, raised and drawn — the single most
 // recognizable real vanilla silhouette cue distinguishing an illusioner
@@ -9941,16 +9997,61 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'bogged') {
+    // Reuses skeletonParts' geometry entirely unchanged — a real bogged
+    // IS a skeleton in every structural sense, just recolored a mossy
+    // swamp tone and, until actually sheared, topped with 2 real
+    // mushrooms (minecraft.wiki/w/Bogged). Its own AI is the exact same
+    // shared updateSkeleton every skeleton/stray here already uses,
+    // just with a real slower reload and its own tipped-poison arrow.
+    let parts = decorGeoCache.get('skeleton');
+    if (!parts) { parts = skeletonParts(); decorGeoCache.set('skeleton', parts); }
+    let mushrooms = decorGeoCache.get('boggedMushroomCap');
+    if (!mushrooms) { mushrooms = boggedMushroomCapParts(); decorGeoCache.set('boggedMushroomCap', mushrooms); }
+    const group = new THREE.Group();
+    const boneMat = solidMaterial(0x6b7a4a);
+    const bowMat = solidMaterial(0x4a5a38);
+    group.add(new THREE.Mesh(parts.torso, boneMat));
+    group.add(new THREE.Mesh(parts.head, boneMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, boneMat));
+    group.add(new THREE.Mesh(parts.bowGrip, bowMat));
+    const drawn = entry._mobState === 'drawing';
+    for (const g of (drawn ? parts.bowLimbsDrawn : parts.bowLimbs)) group.add(new THREE.Mesh(g, bowMat));
+    if (drawn) {
+      const arrowShaftMat = solidMaterial(0x8a6a4a);
+      const arrowTipMat = solidMaterial(0x4a8f3a);
+      const arrowFletchMat = solidMaterial(0xe8e4d8);
+      group.add(new THREE.Mesh(parts.nockedArrowShaft, arrowShaftMat));
+      group.add(new THREE.Mesh(parts.nockedArrowTip, arrowTipMat));
+      group.add(new THREE.Mesh(parts.nockedArrowFletch, arrowFletchMat));
+    }
+    const faceMat = solidMaterial(0x1c1c1c);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    // See DECOR_TYPES.bogged: once sheared, its real mushrooms are
+    // permanently gone — there is no click path that ever restores them.
+    if (!entry._sheared) {
+      const stemMat = solidMaterial(0xd8d0b8);
+      const capMats = [solidMaterial(0x8a6a4a), solidMaterial(0xc22b2b)];
+      mushrooms.stems.forEach((g, i) => group.add(new THREE.Mesh(g, stemMat)));
+      mushrooms.caps.forEach((g, i) => group.add(new THREE.Mesh(g, capMats[i])));
+    }
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'bogged';
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'arrow') {
     let parts = decorGeoCache.get('arrow');
     if (!parts) { parts = arrowParts(); decorGeoCache.set('arrow', parts); }
     const group = new THREE.Group();
     const shaftMat = solidMaterial(0x8a6a4a);
-    // A real tipped arrow of Slowness reads visibly cyan compared to a
-    // plain gray arrowhead — the same "the effect is visible before it
-    // even lands" idea already used for the skeleton's own drawn-vs-
-    // relaxed bow.
-    const tipMat = solidMaterial(entry._tipped === 'slowness' ? 0x4fb8c4 : 0xb0b0b0);
+    // A real tipped arrow of Slowness reads visibly cyan, and a real
+    // tipped arrow of Poison visibly green, compared to a plain gray
+    // arrowhead — the same "the effect is visible before it even lands"
+    // idea already used for the skeleton's own drawn-vs-relaxed bow.
+    const tipColor = entry._tipped === 'slowness' ? 0x4fb8c4 : entry._tipped === 'poison' ? 0x4a8f3a : 0xb0b0b0;
+    const tipMat = solidMaterial(tipColor);
     const fletchMat = solidMaterial(0xe8e4d8);
     group.add(new THREE.Mesh(parts.shaft, shaftMat));
     group.add(new THREE.Mesh(parts.tip, tipMat));
@@ -13637,10 +13738,10 @@ function fireArrow(model, skeletonEntry) {
     _vx: (dx / dist) * ARROW_SPEED, _vy: (dy / dist) * ARROW_SPEED, _vz: (dz / dist) * ARROW_SPEED,
     _age: 0,
     _yaw: Math.atan2(dx, dz), _pitch: Math.atan2(dy, Math.hypot(dx, dz)),
-    // See DECOR_TYPES.stray: a real stray fires tipped arrows of
-    // Slowness instead of plain ones, everything else about it identical
-    // to an ordinary skeleton's own shot.
-    _tipped: skeletonEntry.type === 'stray' ? 'slowness' : undefined,
+    // See DECOR_TYPES.stray/bogged: a real stray fires tipped arrows of
+    // Slowness, a real bogged fires tipped arrows of Poison, everything
+    // else about either shot identical to an ordinary skeleton's own.
+    _tipped: skeletonEntry.type === 'stray' ? 'slowness' : skeletonEntry.type === 'bogged' ? 'poison' : undefined,
   };
   model.decor.push(arrowEntry);
   for (const mesh of buildDecorMeshesForEntry(arrowEntry)) {
@@ -13755,7 +13856,12 @@ function updateSkeleton(entry, obj, dt) {
     entry._mobYaw = Math.atan2(entry._aimX - entry._wx, entry._aimZ - entry._wz);
     if (entry._drawTimer <= 0) {
       fireArrow(currentModel, entry);
-      entry._shootCooldown = SKELETON_SHOOT_COOLDOWN;
+      // Real vanilla: a bogged is "much slower to reload," a real 3.5
+      // seconds versus an ordinary skeleton's real 2.0 — reproduced here
+      // as the same real ~1.75x ratio applied to this app's own
+      // (already compressed, approximate) base cooldown, rather than a
+      // second invented constant unrelated to the skeleton's own.
+      entry._shootCooldown = entry.type === 'bogged' ? SKELETON_SHOOT_COOLDOWN * 1.75 : SKELETON_SHOOT_COOLDOWN;
       entry._mobState = 'idle';
       entry._mobTimer = SKELETON_WANDER_MIN + Math.random() * (SKELETON_WANDER_MAX - SKELETON_WANDER_MIN);
       rebuildSkeletonMesh(entry);
@@ -14876,6 +14982,31 @@ function shearMooshroom(model, entry) {
     const x = Math.max(0, Math.min(dims.sx - 1, entry.x + dx));
     const z = Math.max(0, Math.min(dims.sz - 1, entry.z + dz));
     model.decor.push({ type: 'dropped_item', itemType: 'red_mushroom', x, y: entry.y, z });
+  }
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
+// The real new mechanic — see DECOR_TYPES.bogged. Unlike shearMooshroom
+// (which transforms the SAME entry into a different species for good),
+// this leaves entry.type completely untouched — the bogged remains a
+// bogged, just permanently missing its own real mushroom cap mesh from
+// this point on, since the render branch only ever adds it while
+// `!entry._sheared`.
+function attemptShearBogged(model, entry) {
+  if (entry._sheared) return;
+  entry._sheared = true;
+  const dims = model.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const dropSpots = [[-1, 0], [1, 0]];
+  for (const [dx, dz] of dropSpots) {
+    const x = Math.max(0, Math.min(dims.sx - 1, entry.x + dx));
+    const z = Math.max(0, Math.min(dims.sz - 1, entry.z + dz));
+    // Real vanilla: each of the 2 mushrooms is independently a 50/50
+    // chance of brown or red.
+    const itemType = Math.random() < 0.5 ? 'brown_mushroom' : 'red_mushroom';
+    model.decor.push({ type: 'dropped_item', itemType, x, y: entry.y, z });
   }
   if (!three || !three.group) return;
   renderThree(model, true);
@@ -16811,6 +16942,7 @@ function updateMobs(dt) {
     if (entry.type === 'zombie') { updateZombie(entry, obj, dt); continue; }
     if (entry.type === 'skeleton') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'stray') { updateSkeleton(entry, obj, dt); continue; }
+    if (entry.type === 'bogged') { updateSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'wither_skeleton') { updateWitherSkeleton(entry, obj, dt); continue; }
     if (entry.type === 'arrow') { updateArrow(entry, obj, dt); continue; }
     if (entry.type === 'wolf') { updateWolf(entry, obj, dt); continue; }
@@ -17600,6 +17732,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'horse') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'donkey') { attemptTameHorse(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'bogged') { attemptShearBogged(currentModel, entry); return; }
     if (entry.type === 'magma_cube') { attemptSplitMagmaCube(currentModel, entry); return; }
     const def = DECOR_TYPES[entry.type];
     if (def && def.interactive) toggleDecorEntry(entry);
@@ -18073,7 +18206,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -18143,7 +18276,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -18268,6 +18401,7 @@ function renderCommands(model) {
       else if (d.type === 'skeleton') lines.push(`summon minecraft:skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'stray') lines.push(`summon minecraft:stray ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wither_skeleton') lines.push(`summon minecraft:wither_skeleton ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'bogged') lines.push(`summon minecraft:bogged ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
