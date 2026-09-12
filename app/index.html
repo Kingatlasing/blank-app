@@ -7052,24 +7052,37 @@ function endermanParts() {
 function spiderParts() {
   const abdomen = new THREE.BoxGeometry(0.5, 0.3, 0.4);
   abdomen.translate(0, 0.15, -0.15);
-  const thorax = new THREE.BoxGeometry(0.32, 0.24, 0.24);
-  thorax.translate(0, 0.14, 0.25);
+  const head = new THREE.BoxGeometry(0.32, 0.24, 0.24);
+  head.translate(0, 0.14, 0.25);
   // Real vanilla spiders — like every real arachnid — have every leg
-  // attach to the cephalothorax (this app's own "thorax" box), never the
-  // abdomen. Each leg's own INNER end is anchored exactly flush against
-  // the thorax's own real side wall (x = ±0.16, its own actual
-  // half-width) at a different point along the thorax's own real length,
-  // then splays outward from there — fixing an earlier version where
-  // every leg's anchor point was actually measured against the ABDOMEN's
-  // own old position, leaving all 6 legs clustered around the rear
-  // segment while the thorax (and the eyes on its front face) floated
-  // free with no legs actually touching it at all.
+  // attach to the cephalothorax, a distinct small segment of its own
+  // between the head and the abdomen, never the abdomen or head directly
+  // (a real reference render of the vanilla spider model makes this 3-way
+  // split obvious). An earlier version of this geometry had only 2 body
+  // segments — this app's own "abdomen" and a front box doing double duty
+  // as both head AND leg-attachment point — so every leg ended up
+  // anchored to the head instead. This adds a genuine third box flush
+  // between the two (spanning exactly the gap between the abdomen's own
+  // front face and the head's own back face, touching both with no seam),
+  // and every leg now anchors to ITS side wall instead.
+  const thorax = new THREE.BoxGeometry(0.36, 0.2, 0.08);
+  thorax.translate(0, 0.14, 0.09);
+  // Real vanilla spiders — like every real arachnid — have 8 legs, not 6;
+  // an earlier version of this geometry only ever modeled 3 pairs. Each
+  // leg's own INNER end is anchored exactly flush against the thorax's
+  // own real side wall (x = ±0.18, its own actual half-width) at a
+  // different point along the thorax's own real (short) length, then
+  // splays outward from there at its own real fan angle — the 2 middle
+  // pairs splayed nearly straight out to the side, the front pair angled
+  // forward, and the back pair angled backward, matching a real spider's
+  // own leg stance.
   const legSpecs = [
-    { az: 0.14, dz: -0.35 }, // back pair — anchored right at the thorax's own back edge, at the waist
-    { az: 0.24, dz: 0 },     // middle pair — straight out to the side
-    { az: 0.34, dz: 0.35 },  // front pair — anchored near the thorax's own front edge, by the head
+    { az: -0.03, dz: -0.6 }, // back pair — angled backward
+    { az: -0.01, dz: -0.2 }, // back-middle pair
+    { az: 0.01, dz: 0.2 },   // front-middle pair
+    { az: 0.03, dz: 0.6 },   // front pair — angled forward, toward the head
   ];
-  const halfLen = 0.18, thoraxHalfWidth = 0.16, legY = 0.12;
+  const halfLen = 0.18, thoraxHalfWidth = 0.18, legY = 0.12;
   const legs = [];
   for (const { az, dz } of legSpecs) {
     const dx = Math.sqrt(1 - dz * dz);
@@ -7083,7 +7096,7 @@ function spiderParts() {
       legs.push(g);
     }
   }
-  // A pair of small glowing red eyes on the front of the thorax — real
+  // A pair of small glowing red eyes on the front of the head — real
   // vanilla's own single most recognizable identifier, especially visible
   // at night (minecraft.wiki/w/Spider), missing from an earlier version of
   // this geometry (the whole body was rendered as one flat dark color with
@@ -7094,7 +7107,7 @@ function spiderParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { abdomen, thorax, legs, faceEyes };
+  return { abdomen, thorax, head, legs, faceEyes };
 }
 // A large cube body (real vanilla ghasts are a genuine 4x4x4) with a
 // handful of thin hanging tentacle boxes below — real vanilla has nine;
@@ -9625,6 +9638,7 @@ function buildDecorMeshesForEntry(entry) {
     const eyeMat = solidMaterial(0xd91f1f);
     group.add(new THREE.Mesh(parts.abdomen, bodyMat));
     group.add(new THREE.Mesh(parts.thorax, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
@@ -9643,6 +9657,7 @@ function buildDecorMeshesForEntry(entry) {
     const eyeMat = solidMaterial(0xd91f1f);
     group.add(new THREE.Mesh(parts.abdomen, bodyMat));
     group.add(new THREE.Mesh(parts.thorax, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.scale.setScalar(0.7);
