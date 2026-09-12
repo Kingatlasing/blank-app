@@ -8832,22 +8832,19 @@ function armorStandParts() {
   });
   const head = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   head.translate(0, 1.14, 0);
-  // A real vanilla helmet reads as a stepped, brimmed shape — a narrower
-  // band hugging the head with a wider flat brim/plate sitting on top of
-  // it, not one plain uniform cube (which read as just a slightly bigger
-  // head, with no distinct helmet silhouette at all). 2 stacked boxes:
-  // a lower skirt flush against the head's own sides (fully covering it,
-  // unlike an earlier version of this geometry that was shorter than the
-  // head and left bare wood visible at the jaw), and a wider brim above.
-  const helmetSkirt = new THREE.BoxGeometry(0.26, 0.16, 0.26);
-  helmetSkirt.translate(0, 1.09, 0);
-  // Starts flush with the skirt's own top (1.17) and clears the head's
-  // own top (1.25) by a real margin, rather than landing exactly flush
-  // with it — an earlier version sat exactly coplanar with the head's
-  // top face, so the wooden head's own top face z-fought with the
-  // brim's, flickering tan through the armor color.
-  const helmetBrim = new THREE.BoxGeometry(0.32, 0.16, 0.32);
-  helmetBrim.translate(0, 1.25, 0);
+  // Per user-supplied reference images: a worn helmet covers only the
+  // UPPER portion of the head — roughly its top half-to-two-thirds, plus
+  // a small flat brim overhanging right at the very top — leaving the
+  // head's own lower portion (the face) genuinely visible below it, not
+  // fully enclosed (an earlier version of this geometry fully encased the
+  // head, hiding the face entirely, which the reference images show is
+  // wrong). The head spans y=1.03 to 1.25; the skirt covers only the
+  // upper ~0.12 of that (1.13 to 1.25ish), leaving the lower ~0.10
+  // (1.03 to 1.13, well over a third of the head) exposed as the face.
+  const helmetSkirt = new THREE.BoxGeometry(0.26, 0.14, 0.26);
+  helmetSkirt.translate(0, 1.2, 0);
+  const helmetBrim = new THREE.BoxGeometry(0.3, 0.06, 0.3);
+  helmetBrim.translate(0, 1.3, 0);
   const chestplate = new THREE.BoxGeometry(0.22, 0.34, 0.22);
   chestplate.translate(0, 0.86, 0);
   const shoulderOffsets = [[-0.14, 1.0], [0.14, 1.0]];
