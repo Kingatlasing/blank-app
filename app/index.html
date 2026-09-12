@@ -7389,17 +7389,15 @@ function enderDragonParts() {
     g.translate(x, y, hz);
     return g;
   });
-  // On the FRONT of the face, above and to either side of where the
-  // snout begins (snout half-width 0.18, so x = ±0.22 clears it) —
-  // poking out half their own depth past the head's own front face
-  // (z = headZ + headDepth/2, its own real front wall) so they actually
-  // render visibly rather than sitting flush or recessed into the head
-  // box. Placing them there directly (an earlier version of this fix)
-  // put them inside the snout's own footprint once the snout was added,
-  // burying them there instead — offsetting sideways past the snout's
-  // own width, rather than moving them to the head's SIDE walls (a
-  // second earlier version), keeps them on the actual front of the face.
-  const eyeOffsets = [[-0.22, 0.22, headZ + headDepth / 2 + 0.015], [0.22, 0.22, headZ + headDepth / 2 + 0.015]];
+  // On the FRONT of the face, close together above where the snout
+  // begins — set at y=0.22, already above the snout's own top surface
+  // (0.18) regardless of x, so there's no need to push them out wide to
+  // clear it sideways (an earlier version of this fix did that,
+  // spacing them too far apart). Poking out half their own depth past
+  // the head's own front face (z = headZ + headDepth/2, its own real
+  // front wall) so they actually render visibly rather than sitting
+  // flush or recessed into the head box.
+  const eyeOffsets = [[-0.13, 0.22, headZ + headDepth / 2 + 0.015], [0.13, 0.22, headZ + headDepth / 2 + 0.015]];
   const eyes = eyeOffsets.map(([x, y, ez]) => {
     const g = new THREE.BoxGeometry(0.08, 0.07, 0.03);
     g.translate(x, y, ez);
