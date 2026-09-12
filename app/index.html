@@ -6998,17 +6998,35 @@ function spiderParts() {
   abdomen.translate(0, 0.15, -0.15);
   const thorax = new THREE.BoxGeometry(0.32, 0.24, 0.24);
   thorax.translate(0, 0.14, 0.25);
-  const legPositions = [
-    [-0.35, -0.15, -Math.PI / 5], [0.35, -0.15, Math.PI / 5],
-    [-0.38, 0.05, -Math.PI / 2.2], [0.38, 0.05, Math.PI / 2.2],
-    [-0.32, 0.22, -Math.PI / 1.6], [0.32, 0.22, Math.PI / 1.6],
+  // Real vanilla spiders — like every real arachnid — have every leg
+  // attach to the cephalothorax (this app's own "thorax" box), never the
+  // abdomen. Each leg's own INNER end is anchored exactly flush against
+  // the thorax's own real side wall (x = ±0.16, its own actual
+  // half-width) at a different point along the thorax's own real length,
+  // then splays outward from there — fixing an earlier version where
+  // every leg's anchor point was actually measured against the ABDOMEN's
+  // own old position, leaving all 6 legs clustered around the rear
+  // segment while the thorax (and the eyes on its front face) floated
+  // free with no legs actually touching it at all.
+  const legSpecs = [
+    { az: 0.14, dz: -0.35 }, // back pair — anchored right at the thorax's own back edge, at the waist
+    { az: 0.24, dz: 0 },     // middle pair — straight out to the side
+    { az: 0.34, dz: 0.35 },  // front pair — anchored near the thorax's own front edge, by the head
   ];
-  const legs = legPositions.map(([x, z, yaw]) => {
-    const g = new THREE.BoxGeometry(0.36, 0.06, 0.06);
-    g.rotateY(yaw);
-    g.translate(x, 0.1, z);
-    return g;
-  });
+  const halfLen = 0.18, thoraxHalfWidth = 0.16, legY = 0.12;
+  const legs = [];
+  for (const { az, dz } of legSpecs) {
+    const dx = Math.sqrt(1 - dz * dz);
+    for (const side of [-1, 1]) {
+      const ax = side * thoraxHalfWidth;
+      const dirX = side * dx;
+      const yaw = Math.atan2(-dz, dirX);
+      const g = new THREE.BoxGeometry(halfLen * 2, 0.06, 0.06);
+      g.rotateY(yaw);
+      g.translate(ax + halfLen * dirX, legY, az + halfLen * dz);
+      legs.push(g);
+    }
+  }
   // A pair of small glowing red eyes on the front of the thorax — real
   // vanilla's own single most recognizable identifier, especially visible
   // at night (minecraft.wiki/w/Spider), missing from an earlier version of
