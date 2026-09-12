@@ -7335,46 +7335,145 @@ function salmonParts() {
   });
   return { body, topFin, tailFin, eyes };
 }
-// A horned head, a long neck, a wide body, a 2-segment tapering tail, 2
-// big wings, and 2 short legs — real vanilla ender dragons are this app's
-// largest and most recognizable silhouette by far, built at a real scale
-// noticeably bigger than every earlier mob rather than the usual low-poly
-// human/animal scale. See DECOR_TYPES.ender_dragon.
+// A horned head on a tapering 3-segment neck, a wide body, a tapering
+// 4-segment tail, a jagged spike ridge running the whole length of the
+// spine, 2 ribbed fan-shaped wings (an arm bone plus 3 splayed finger
+// bones and a membrane, rather than a single flat plane), and 4 legs
+// (a thinner front pair, a thicker rear pair) — matched directly against
+// a real reference render of the vanilla ender dragon model, which an
+// earlier, cruder version of this geometry (a single-box neck, a plain
+// flat-plane wing, and only 2 legs) did not resemble closely. Real
+// vanilla ender dragons are this app's largest and most recognizable
+// silhouette by far, built at a real scale noticeably bigger than every
+// earlier mob rather than the usual low-poly human/animal scale. See
+// DECOR_TYPES.ender_dragon.
 function enderDragonParts() {
-  const head = new THREE.BoxGeometry(0.7, 0.55, 1.0);
-  head.translate(0, 0.15, 1.9);
-  const hornOffsets = [[-0.22, 0.45, 2.2], [0.22, 0.45, 2.2]];
-  const horns = hornOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.12, 0.35, 0.12);
-    g.translate(x, y, z);
-    return g;
-  });
-  const neck = new THREE.BoxGeometry(0.55, 0.55, 0.9);
-  neck.translate(0, 0.05, 1.2);
   const body = new THREE.BoxGeometry(1.5, 1.1, 1.7);
-  const tail1 = new THREE.BoxGeometry(0.9, 0.7, 0.9);
-  tail1.translate(0, -0.05, -1.25);
-  const tail2 = new THREE.BoxGeometry(0.5, 0.4, 0.9);
-  tail2.translate(0, -0.1, -1.95);
-  const wingOffsets = [[-1.55, 0.25, 0], [1.55, 0.25, 0]];
-  const wings = wingOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(2.4, 0.1, 1.5);
-    g.translate(x, y, z);
+
+  // The neck tapers down across 3 segments from the body's own front
+  // face to the head, each carrying its own spine spike on top.
+  const neckSpecs = [
+    { w: 0.62, h: 0.55, d: 0.45, y: 0.05 },
+    { w: 0.52, h: 0.48, d: 0.4, y: 0.1 },
+    { w: 0.42, h: 0.4, d: 0.35, y: 0.15 },
+  ];
+  const neckSegments = [];
+  const neckSpikes = [];
+  let z = 0.85; // the body's own front face
+  for (const { w, h, d, y } of neckSpecs) {
+    z += d / 2;
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(0, y, z);
+    neckSegments.push(g);
+    const spike = new THREE.BoxGeometry(0.1, 0.18, 0.12);
+    spike.translate(0, y + h / 2 + 0.09, z);
+    neckSpikes.push(spike);
+    z += d / 2;
+  }
+  const headZ = z + 0.375;
+  const head = new THREE.BoxGeometry(0.62, 0.5, 0.75);
+  head.translate(0, 0.12, headZ);
+  const hornOffsets = [[-0.2, 0.4, headZ - 0.15], [0.2, 0.4, headZ - 0.15]];
+  const horns = hornOffsets.map(([x, y, hz]) => {
+    const g = new THREE.BoxGeometry(0.1, 0.32, 0.1);
+    g.translate(x, y, hz);
     return g;
   });
-  const legOffsets = [[-0.55, -0.7, 0.35], [0.55, -0.7, 0.35]];
-  const legs = legOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.32, 0.55, 0.32);
-    g.translate(x, y, z);
+  const eyeOffsets = [[-0.15, 0.16, headZ + 0.36], [0.15, 0.16, headZ + 0.36]];
+  const eyes = eyeOffsets.map(([x, y, ez]) => {
+    const g = new THREE.BoxGeometry(0.07, 0.06, 0.03);
+    g.translate(x, y, ez);
     return g;
   });
-  const eyeOffsets = [[-0.16, 0.2, 2.35], [0.16, 0.2, 2.35]];
-  const eyes = eyeOffsets.map(([x, y, z]) => {
-    const g = new THREE.BoxGeometry(0.08, 0.06, 0.03);
-    g.translate(x, y, z);
+
+  // The tail tapers down across 4 segments from the body's own back
+  // face to a small pointed tip, drooping slightly then flicking back
+  // up right at the very end — matching the real reference model's own
+  // silhouette — each carrying its own spine spike on top just like the
+  // neck's.
+  const tailSpecs = [
+    { w: 0.85, h: 0.65, d: 0.5, y: -0.05 },
+    { w: 0.62, h: 0.5, d: 0.45, y: -0.1 },
+    { w: 0.42, h: 0.35, d: 0.4, y: -0.12 },
+    { w: 0.22, h: 0.2, d: 0.35, y: -0.08 },
+  ];
+  const tailSegments = [];
+  const tailSpikes = [];
+  z = -0.85; // the body's own back face
+  for (const { w, h, d, y } of tailSpecs) {
+    z -= d / 2;
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.translate(0, y, z);
+    tailSegments.push(g);
+    const spike = new THREE.BoxGeometry(0.09, 0.16, 0.1);
+    spike.translate(0, y + h / 2 + 0.08, z);
+    tailSpikes.push(spike);
+    z -= d / 2;
+  }
+
+  // 2 spikes on the body itself, closing the gap in the ridge line
+  // between the neck's own spikes and the tail's own.
+  const bodySpikes = [0.4, -0.2].map((sz) => {
+    const g = new THREE.BoxGeometry(0.1, 0.18, 0.12);
+    g.translate(0, 0.55 + 0.09, sz);
     return g;
   });
-  return { head, horns, neck, body, tail1, tail2, wings, legs, eyes };
+
+  // Each wing is a short arm bone near the shoulder, 3 finger bones
+  // splayed out from its own tip at different angles/lengths (like a
+  // real bat-style wing skeleton), and a flat membrane panel filling the
+  // gap between them — not a single flat plane, which reads as a solid
+  // paddle rather than a real membranous wing.
+  const armLen = 0.9;
+  const wingArms = [];
+  const wingFingers = [];
+  const wingMembranes = [];
+  const fingerSpecs = [
+    { yaw: -0.35, len: 1.0 },
+    { yaw: 0, len: 1.5 },
+    { yaw: 0.4, len: 1.1 },
+  ];
+  for (const side of [-1, 1]) {
+    const armX = side * (0.85 + armLen / 2);
+    const arm = new THREE.BoxGeometry(armLen, 0.14, 0.4);
+    arm.translate(armX, 0.3, 0.1);
+    wingArms.push(arm);
+    const tipX = side * (0.85 + armLen);
+    for (const { yaw, len } of fingerSpecs) {
+      const dirX = side * Math.cos(yaw), dirZ = Math.sin(yaw);
+      const theta = Math.atan2(-dirZ, dirX);
+      const g = new THREE.BoxGeometry(len, 0.08, 0.16);
+      g.rotateY(theta);
+      g.translate(tipX + (len / 2) * dirX, 0.3, 0.1 + (len / 2) * dirZ);
+      wingFingers.push(g);
+    }
+    const membrane = new THREE.BoxGeometry(1.7, 0.05, 1.3);
+    membrane.translate(side * 2.0, 0.28, 0.15);
+    wingMembranes.push(membrane);
+  }
+
+  // A thinner front pair (nearer the neck) and a thicker rear pair
+  // (under the body) — real vanilla's own 4-legged stance, distinct from
+  // an earlier version of this geometry that only ever modeled 2.
+  const frontLegOffsets = [[-0.42, -0.5, 0.55], [0.42, -0.5, 0.55]];
+  const backLegOffsets = [[-0.55, -0.65, -0.3], [0.55, -0.65, -0.3]];
+  const legs = [
+    ...frontLegOffsets.map(([x, y, lz]) => {
+      const g = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+      g.translate(x, y, lz);
+      return g;
+    }),
+    ...backLegOffsets.map(([x, y, lz]) => {
+      const g = new THREE.BoxGeometry(0.3, 0.6, 0.3);
+      g.translate(x, y, lz);
+      return g;
+    }),
+  ];
+
+  return {
+    head, horns, eyes, neckSegments, neckSpikes, body, tailSegments,
+    tailSpikes, bodySpikes, wingArms, wingFingers, wingMembranes, legs,
+  };
 }
 // A flat wide shell, a small head, and four flipper stubs — real vanilla
 // turtles are noticeably wider than tall (1.2 x 1.2 footprint, only 0.4
@@ -9884,17 +9983,25 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = enderDragonParts(); decorGeoCache.set('enderDragon', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x1c1c1e);
-    const hornMat = solidMaterial(0x0f0f10);
+    // The real reference model's own spine spikes, horns, and wing bones
+    // are a light bone-gray, clearly contrasting the near-black
+    // body/membrane — an earlier version of this used the SAME dark
+    // color for both, reading as a flat, undetailed silhouette.
+    const boneMat = solidMaterial(0xb0aeae);
     const eyeMat = solidMaterial(0xc23bde);
     group.add(new THREE.Mesh(parts.head, bodyMat));
-    for (const g of parts.horns) group.add(new THREE.Mesh(g, hornMat));
-    group.add(new THREE.Mesh(parts.neck, bodyMat));
-    group.add(new THREE.Mesh(parts.body, bodyMat));
-    group.add(new THREE.Mesh(parts.tail1, bodyMat));
-    group.add(new THREE.Mesh(parts.tail2, bodyMat));
-    for (const g of parts.wings) group.add(new THREE.Mesh(g, hornMat));
-    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, boneMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.neckSegments) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.neckSpikes) group.add(new THREE.Mesh(g, boneMat));
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    for (const g of parts.bodySpikes) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.tailSegments) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.tailSpikes) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.wingArms) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.wingFingers) group.add(new THREE.Mesh(g, boneMat));
+    for (const g of parts.wingMembranes) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     // See DECOR_TYPES.ender_dragon/updateEnderDragon: this rearing-back
     // tilt is set live, every frame, only while actually roaring — never
