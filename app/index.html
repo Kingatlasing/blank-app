@@ -8856,7 +8856,14 @@ function armorStandParts() {
 const ARMOR_STAND_TIERS = ['none', 'leather', 'copper', 'golden', 'chainmail', 'iron', 'diamond', 'netherite'];
 const ARMOR_TIER_COLORS = {
   leather: 0xa06540,
-  copper: 0xb87333,
+  // Real vanilla copper armor "has a striking orange color" — the generic
+  // web "copper" color (0xb87333, used here before this audit) is
+  // actually a muted brownish-orange, closer to weathered/oxidized copper
+  // than the vivid unoxidized look real copper gear has. Reuses this same
+  // app's own COPPER_GOLEM_OXIDATION_COLORS[0] (unoxidized) directly,
+  // since it's the identical real material — copper ARMOR itself never
+  // oxidizes in real vanilla, unlike copper blocks/golems.
+  copper: 0xd97b4a,
   golden: 0xeed04b,
   chainmail: 0x4a4a4a,
   iron: 0xd8d8d8,
