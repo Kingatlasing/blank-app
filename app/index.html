@@ -6898,12 +6898,26 @@ function cowParts() {
   // geometry (also reused unchanged by the mooshroom, a real cow variant).
   const udder = new THREE.BoxGeometry(0.18, 0.1, 0.22);
   udder.translate(0, -0.11, 0.18);
+  // A flat snout and 2 small eyes — the head alone, with neither, read as
+  // a plain faceless block. The head's own front face sits at z=0.75
+  // (0.6 + half its own 0.3 depth); each part's own back face is set
+  // flush against it and extends OUTWARD from there, rather than
+  // straddling that face (which would bury half of it invisibly inside
+  // the head box).
+  const snout = new THREE.BoxGeometry(0.16, 0.1, 0.08);
+  snout.translate(0, 0.1, 0.79);
+  const faceEyeOffsets = [[-0.09, 0.27, 0.76], [0.09, 0.27, 0.76]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
   const legs = [[-0.18, -0.3], [0.18, -0.3], [-0.18, 0.3], [0.18, 0.3]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.12, 0.4, 0.12);
     g.translate(x, -0.3, z);
     return g;
   });
-  return { body, head, udder, legs };
+  return { body, head, udder, snout, faceEyes, legs };
 }
 // A real mooshroom's own body/head/legs are the exact same as a cow's —
 // see DECOR_TYPES.mooshroom — plus 3 small red-and-white mushroom bumps
@@ -6946,12 +6960,20 @@ function pigParts() {
   // rendered, with no distinct snout shape at all).
   const snout = new THREE.BoxGeometry(0.14, 0.1, 0.05);
   snout.translate(0, 0.07, 0.55);
+  // 2 small eyes above the snout — the head/snout alone read as a
+  // faceless block with no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.08, 0.18, 0.54], [0.08, 0.18, 0.54]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
   const legs = [[-0.15, -0.22], [0.15, -0.22], [-0.15, 0.22], [0.15, 0.22]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.11, 0.28, 0.11);
     g.translate(x, -0.24, z);
     return g;
   });
-  return { body, head, snout, legs };
+  return { body, head, snout, faceEyes, legs };
 }
 // Same recipe again, bulkier (the wool) with a darker separate head — see
 // DECOR_TYPES.sheep.
@@ -6960,12 +6982,22 @@ function sheepParts() {
   body.translate(0, 0.2, 0);
   const head = new THREE.BoxGeometry(0.28, 0.28, 0.24);
   head.translate(0, 0.18, 0.5);
+  // A short snout and 2 small eyes — the head alone read as a plain
+  // faceless block, with no distinguishing front to it at all.
+  const snout = new THREE.BoxGeometry(0.14, 0.09, 0.06);
+  snout.translate(0, 0.1, 0.65);
+  const faceEyeOffsets = [[-0.08, 0.24, 0.63], [0.08, 0.24, 0.63]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
   const legs = [[-0.17, -0.28], [0.17, -0.28], [-0.17, 0.28], [0.17, 0.28]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.11, 0.38, 0.11);
     g.translate(x, -0.32, z);
     return g;
   });
-  return { body, head, legs };
+  return { body, head, snout, faceEyes, legs };
 }
 // A much smaller two-legged build with a comb and a pair of wing boxes
 // instead of the cow/pig/sheep's 4-leg body plan — see DECOR_TYPES.chicken.
@@ -6976,6 +7008,16 @@ function chickenParts() {
   head.translate(0, 0.22, 0.24);
   const comb = new THREE.BoxGeometry(0.06, 0.06, 0.08);
   comb.translate(0, 0.32, 0.24);
+  // A small beak and 2 eyes — the head/comb alone read as a plain
+  // faceless block with no distinguishing front to it at all.
+  const beak = new THREE.BoxGeometry(0.06, 0.05, 0.06);
+  beak.translate(0, 0.2, 0.35);
+  const faceEyeOffsets = [[-0.05, 0.24, 0.325], [0.05, 0.24, 0.325]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
   const legs = [[-0.07, 0], [0.07, 0]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.05, 0.22, 0.05);
     g.translate(x, -0.22, z);
@@ -6986,7 +7028,7 @@ function chickenParts() {
     g.translate(x, 0.05, z);
     return g;
   });
-  return { body, head, comb, legs, wings };
+  return { body, head, comb, beak, faceEyes, legs, wings };
 }
 // A small body/head/ears/tail build, no separate leg boxes (real rabbits
 // crouch low between hops) — see DECOR_TYPES.rabbit. Its hop, rather than a
@@ -7004,7 +7046,17 @@ function rabbitParts() {
   });
   const tail = new THREE.BoxGeometry(0.1, 0.1, 0.1);
   tail.translate(0, -0.06, -0.22);
-  return { body, head, ears, tail };
+  // A small nose and 2 eyes — the head alone read as a plain faceless
+  // block with no distinguishing front to it at all.
+  const nose = new THREE.BoxGeometry(0.05, 0.04, 0.03);
+  nose.translate(0, -0.02, 0.335);
+  const faceEyeOffsets = [[-0.06, 0.05, 0.325], [0.06, 0.05, 0.325]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, ears, tail, nose, faceEyes };
 }
 // A small body with two flat wing boxes — see DECOR_TYPES.bat. Built at a
 // fixed orientation facing +Z the same as every other mob here; the actual
@@ -7017,7 +7069,16 @@ function batParts() {
     g.translate(x, 0.02, z);
     return g;
   });
-  return { body, wings };
+  // 2 small eyes on the front of the body — this app's real bat has no
+  // separate head box at all, so with no eyes here the whole thing read
+  // as one plain faceless block.
+  const faceEyeOffsets = [[-0.05, 0.02, 0.135], [0.05, 0.02, 0.135]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.025, 0.025, 0.01);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, wings, faceEyes };
 }
 // A tall, thin, dark humanoid build (real vanilla endermen stand a genuine
 // ~2.9 blocks) with a pair of small glowing-purple eye boxes on the head —
@@ -7145,7 +7206,17 @@ function spiderParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { abdomen, thorax, head, legs, faceEyes };
+  // 2 small fangs below the eyes — real vanilla spiders have a
+  // distinctive red mouth/fang marking on the front of the head, missing
+  // from an earlier version of this geometry (the eyes alone were
+  // rendered, with no mouth at all).
+  const fangOffsets = [[-0.05, 0.08 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.37], [0.05, 0.08 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.37]];
+  const fangs = fangOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { abdomen, thorax, head, legs, faceEyes, fangs };
 }
 // A large cube body (real vanilla ghasts are a genuine 4x4x4) with a
 // handful of thin hanging tentacle boxes below — real vanilla has nine;
@@ -7156,6 +7227,19 @@ function ghastParts() {
   body.translate(0, 0.4, 0);
   const face = new THREE.BoxGeometry(0.9, 0.5, 0.05);
   face.translate(0, 0.55, 0.81);
+  // Real vanilla ghasts have a distinctive closed-eyed, frowning face —
+  // 2 small dark eyes and a mouth line, poking out past the face panel's
+  // own front surface so they actually render visibly rather than the
+  // face panel alone reading as one plain undifferentiated dark patch
+  // with no real eyes or mouth on it at all.
+  const faceEyeOffsets = [[-0.2, 0.65, 0.845], [0.2, 0.65, 0.845]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.14, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  const mouth = new THREE.BoxGeometry(0.3, 0.08, 0.03);
+  mouth.translate(0, 0.4, 0.845);
   const tentacleOffsets = [-0.6, -0.36, -0.12, 0.12, 0.36, 0.6];
   const tentacles = tentacleOffsets.map((x, i) => {
     const len = 0.9 + (i % 2) * 0.3;
@@ -7163,7 +7247,7 @@ function ghastParts() {
     g.translate(x, -0.4 - len / 2, 0);
     return g;
   });
-  return { body, face, tentacles };
+  return { body, face, faceEyes, mouth, tentacles };
 }
 // A small rounded body (real vanilla bees are 0.7 x 0.6) with two flat wing
 // planes and a black stripe accent — see DECOR_TYPES.bee.
@@ -7175,7 +7259,17 @@ function beeParts() {
     g.translate(x, 0.14, z);
     return g;
   });
-  return { body, stripe, wings };
+  // 2 small eyes on the front of the body — real vanilla bees have
+  // large compound eyes, this app's own single most recognizable
+  // identifier for it; the body alone, with no head box of its own,
+  // read as one plain faceless block.
+  const faceEyeOffsets = [[-0.08, 0.04, 0.21], [0.08, 0.04, 0.21]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, stripe, wings, faceEyes };
 }
 // A small box hive with a darker entrance hole — no real beehive
 // texture/model exists in this app, same "new procedural geometry as a
@@ -7270,6 +7364,10 @@ function pufferfishParts() {
     g.translate(x, y, z);
     return g;
   });
+  // A small mouth at the very front — the round body/eyes alone still
+  // had no real mouth anywhere on it.
+  const mouth = new THREE.BoxGeometry(0.04, 0.02, 0.015);
+  mouth.translate(0, -0.04, 0.165);
   const finOffsets = [[-0.19, 0, 0], [0.19, 0, 0]];
   const fins = finOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.03, 0.1, 0.12);
@@ -7297,7 +7395,7 @@ function pufferfishParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { body, eyes, fins, tailFin, spikes };
+  return { body, eyes, mouth, fins, tailFin, spikes };
 }
 // A small elongated body, a top fin, a tail fin, and 2 eyes — real vanilla
 // tropical fish are noticeably smaller and slimmer than a pufferfish
@@ -7315,7 +7413,11 @@ function tropicalFishParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { body, topFin, tailFin, eyes };
+  // A small mouth at the very front — the body/eyes alone still had no
+  // real mouth anywhere on it.
+  const mouth = new THREE.BoxGeometry(0.04, 0.02, 0.015);
+  mouth.translate(0, -0.02, 0.155);
+  return { body, topFin, tailFin, eyes, mouth };
 }
 // A slightly longer, plainer body than a tropical fish — real vanilla
 // salmon are a single, larger, unpatterned real-world silvery-pink, unlike
@@ -7333,7 +7435,12 @@ function salmonParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { body, topFin, tailFin, eyes };
+  // A small mouth at the very front — reused unchanged by cod (see
+  // DECOR_TYPES.cod) — the body/eyes alone still had no real mouth
+  // anywhere on it.
+  const mouth = new THREE.BoxGeometry(0.05, 0.025, 0.015);
+  mouth.translate(0, -0.02, 0.195);
+  return { body, topFin, tailFin, eyes, mouth };
 }
 // A horned head on a tapering 3-segment neck, a wide body, a tapering
 // 4-segment tail, a jagged spike ridge running the whole length of the
@@ -7501,13 +7608,23 @@ function turtleParts() {
   const shell = new THREE.BoxGeometry(0.6, 0.28, 0.6);
   const head = new THREE.BoxGeometry(0.18, 0.16, 0.16);
   head.translate(0, -0.02, 0.36);
+  // 2 small eyes and a small beak — the head alone read as a plain
+  // faceless block.
+  const faceEyeOffsets = [[-0.05, 0.01, 0.445], [0.05, 0.01, 0.445]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
+  const beak = new THREE.BoxGeometry(0.07, 0.04, 0.03);
+  beak.translate(0, -0.05, 0.445);
   const flipperOffsets = [[-0.34, -0.26], [0.34, -0.26], [-0.34, 0.26], [0.34, 0.26]];
   const flippers = flipperOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.16, 0.08, 0.2);
     g.translate(x, -0.04, z);
     return g;
   });
-  return { shell, head, flippers };
+  return { shell, head, faceEyes, beak, flippers };
 }
 // A small cluster of three overlapping speckled boxes standing in for the
 // real single-block egg cluster (1-4 eggs render as one block in real
@@ -7538,7 +7655,18 @@ function dolphinParts() {
     g.translate(x, -0.05, z);
     return g;
   });
-  return { body, dorsalFin, tailFluke, pectoralFins };
+  // A short rostrum (real vanilla dolphins have a distinctive pointed
+  // beak) and 2 small eyes — this app's own body alone, with no head
+  // box of its own, read as one plain faceless block.
+  const rostrum = new THREE.BoxGeometry(0.12, 0.1, 0.14);
+  rostrum.translate(0, -0.06, 0.44);
+  const faceEyeOffsets = [[-0.09, 0.06, 0.38], [0.09, 0.06, 0.38]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, dorsalFin, tailFluke, pectoralFins, rostrum, faceEyes };
 }
 // An almost-full-cell opaque box standing in for real lava — unlike
 // water, real vanilla lava is fully opaque, not translucent, so this
@@ -7554,13 +7682,22 @@ function lavaBlockParts() {
 function striderParts() {
   const body = new THREE.BoxGeometry(0.62, 0.58, 0.62);
   body.translate(0, 0.42, 0);
+  // 2 small eyes near the top of the body — real vanilla striders have
+  // no separate head box at all, and this app's own plain body cube had
+  // no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.15, 0.6, 0.32], [0.15, 0.6, 0.32]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
   const legOffsets = [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.08, 0.62, 0.08);
     g.translate(x, -0.02, z);
     return g;
   });
-  return { body, legs };
+  return { body, faceEyes, legs };
 }
 // A large round body, a long snout for sniffing, 4 stout legs, and a
 // small tail — real vanilla sniffers are big, dinosaur-like, low-slung
@@ -7579,13 +7716,21 @@ function snifferParts() {
   // of this geometry (the body alone was rendered with no sail at all).
   const sail = new THREE.BoxGeometry(0.5, 0.14, 0.7);
   sail.translate(0, 0.64, 0);
+  // 2 small eyes above the snout — the body/snout alone read as a
+  // faceless block with no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.14, 0.45, 0.46], [0.14, 0.45, 0.46]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
   const legOffsets = [[-0.28, 0.28], [0.28, 0.28], [-0.28, -0.28], [0.28, -0.28]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.16, 0.32, 0.16);
     g.translate(x, -0.09, z);
     return g;
   });
-  return { body, snout, tail, sail, legs };
+  return { body, snout, tail, sail, faceEyes, legs };
 }
 // A thin stem with a small flame-orange bloom on top, standing in for a
 // real torchflower — no torchflower texture/model exists in this app,
@@ -7615,13 +7760,18 @@ function pandaParts() {
   });
   const eyePatch = new THREE.BoxGeometry(0.44, 0.14, 0.1);
   eyePatch.translate(0, 0.52, 0.75);
+  // A small black snout/nose below the eye patch — real vanilla pandas
+  // have a distinct dark nose, missing from an earlier version of this
+  // geometry (the eye patch alone was rendered, with nothing below it).
+  const snout = new THREE.BoxGeometry(0.16, 0.12, 0.1);
+  snout.translate(0, 0.4, 0.77);
   const legOffsets = [[-0.26, 0.3], [0.26, 0.3], [-0.26, -0.3], [0.26, -0.3]];
   const legs = legOffsets.map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.2, 0.3, 0.2);
     g.translate(x, 0.05, z);
     return g;
   });
-  return { body, head, ears, eyePatch, legs };
+  return { body, head, ears, eyePatch, snout, legs };
 }
 // A small round ball standing in for a real dropped slimeball item entity
 // — no item-entity geometry exists anywhere in this app (every other decor
@@ -7750,7 +7900,11 @@ function tadpoleParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { body, tail, eyes };
+  // A small mouth below the eyes — the body/eyes alone still had no
+  // real mouth anywhere on it.
+  const mouth = new THREE.BoxGeometry(0.04, 0.02, 0.015);
+  mouth.translate(0, 0.08, 0.155);
+  return { body, tail, eyes, mouth };
 }
 // A rounded body, 2 bulging top-facing eyes, a tongue (retracted flat
 // against the mouth normally, only stretched out during the real tongue-
@@ -7836,7 +7990,14 @@ function vexParts() {
   });
   const sword = new THREE.BoxGeometry(0.05, 0.32, 0.05);
   sword.translate(0.26, 0.32, 0.05);
-  return { body, head, arms, sword };
+  // 2 small eyes — the head alone read as a plain faceless block.
+  const faceEyeOffsets = [[-0.06, 0.7, 0.13], [0.06, 0.7, 0.13]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, arms, sword, faceEyes };
 }
 // A small rounded body, head, 2 flat wings, and a held-item slot in front
 // (scaled to nothing except while actually carrying something) — real
@@ -7855,7 +8016,14 @@ function allayParts() {
   });
   const heldItem = new THREE.BoxGeometry(0.12, 0.12, 0.12);
   heldItem.translate(0, 0.32, 0.18);
-  return { body, head, wings, heldItem };
+  // 2 small eyes — the head alone read as a plain faceless block.
+  const faceEyeOffsets = [[-0.06, 0.62, 0.12], [0.06, 0.62, 0.12]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.03, 0.03, 0.015);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, wings, heldItem, faceEyes };
 }
 // A small floating cube standing in for a real dropped item entity — same
 // "new procedural geometry, no item-entity asset exists in this app"
@@ -7953,7 +8121,15 @@ function silverfishParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { segments, antennae };
+  // 2 small eyes on the front segment — the segmented body alone read
+  // as a plain faceless block with no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.04, 0.11, 0.27], [0.04, 0.11, 0.27]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.02, 0.02, 0.01);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { segments, antennae, faceEyes };
 }
 // A smaller, more tightly segmented body than the silverfish's own —
 // real endermites are noticeably smaller (minecraft.wiki/w/Endermite) —
@@ -7973,7 +8149,15 @@ function endermiteParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { segments, antennae };
+  // 2 small eyes on the front segment — the segmented body alone read
+  // as a plain faceless block with no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.03, 0.08, 0.18], [0.03, 0.08, 0.18]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.015, 0.015, 0.008);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { segments, antennae, faceEyes };
 }
 // A stocky boar-like torso wearing a real leather-look vest and gold
 // belt, a wide flattened head with a pig snout, 2 tusks, and 2 large
@@ -8034,7 +8218,18 @@ function piglinParts() {
   swordBlade.translate(0, 0.33, 0);
   swordBlade.rotateZ(swordAngle);
   swordBlade.translate(swordX, swordY, swordZ);
-  return { torso, belt, head, snout, tusks, ears, arms, legs, boots, swordHilt, swordBlade };
+  // 2 small eyes above the snout — the head/snout alone read as a
+  // faceless block, at the same offset the zombified piglin's own reuse
+  // of this head already uses for its own face (see
+  // zombifiedPiglinFaceParts), just baked directly in here instead so
+  // the base piglin itself actually has eyes too.
+  const faceEyeOffsets = [[-0.09, 1.32, 0.21], [0.09, 1.32, 0.21]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { torso, belt, head, snout, tusks, ears, arms, legs, boots, swordHilt, swordBlade, faceEyes };
 }
 // A small face — 2 dark eye boxes — for the zombified piglin's own reuse
 // of piglinParts' head, this app's standing rule that every mob gets one.
@@ -8167,7 +8362,15 @@ function foxParts() {
   // proof of the real "carries a picked-up item in its mouth" behavior.
   const heldItem = new THREE.BoxGeometry(0.14, 0.14, 0.14);
   heldItem.translate(0, 0.32, 0.66);
-  return { body, head, snout, ears, legs, tailBase, tailTip, heldItem };
+  // 2 small eyes above the snout — the head/snout alone read as a
+  // faceless block with no eyes anywhere on it.
+  const faceEyeOffsets = [[-0.08, 0.46, 0.52], [0.08, 0.46, 0.52]];
+  const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.04, 0.04, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { body, head, snout, ears, legs, tailBase, tailTip, heldItem, faceEyes };
 }
 // A single robe body reaching the ground (real vanilla villagers' legs are
 // mostly hidden under a long robe/tunic, so no separate leg geometry, and
@@ -9158,7 +9361,12 @@ function axolotlParts() {
     g.translate(x, y, z);
     return g;
   });
-  return { body, head, tail, legs, gills, faceEyes };
+  // A small wide mouth — real vanilla axolotls have a distinctive flat
+  // smile, missing from an earlier version of this geometry (the eyes
+  // alone were rendered, with no mouth at all).
+  const mouth = new THREE.BoxGeometry(0.14, 0.02, 0.02);
+  mouth.translate(0, 0.01, 0.4);
+  return { body, head, tail, legs, gills, faceEyes, mouth };
 }
 // Real illagers share the same basic humanoid build as a villager
 // (minecraft.wiki/w/Evoker), so this reuses villagerParts' own robe/head/
@@ -9680,9 +9888,12 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x5c3d21), headMat = solidMaterial(0xd8cdb8);
     const udderMat = solidMaterial(0xe0a0ae);
+    const snoutMat = solidMaterial(0x8a7060), eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, headMat));
     group.add(new THREE.Mesh(parts.udder, udderMat));
+    group.add(new THREE.Mesh(parts.snout, snoutMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -9698,9 +9909,11 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x8a2323), headMat = solidMaterial(0xd8cdb8);
     const udderMat = solidMaterial(0xe0a0ae);
+    const snoutMat = solidMaterial(0x8a7060);
     group.add(new THREE.Mesh(cowGeo.body, bodyMat));
     group.add(new THREE.Mesh(cowGeo.head, headMat));
     group.add(new THREE.Mesh(cowGeo.udder, udderMat));
+    group.add(new THREE.Mesh(cowGeo.snout, snoutMat));
     for (const g of cowGeo.legs) group.add(new THREE.Mesh(g, bodyMat));
     const stemMat = solidMaterial(0xd8cdb8), capMat = solidMaterial(0xc22b2b), dotMat = solidMaterial(0xf0ead6);
     for (const g of bumps.stems) group.add(new THREE.Mesh(g, stemMat));
@@ -9718,9 +9931,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = pigParts(); decorGeoCache.set('pig', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xf0a9b8), snoutMat = solidMaterial(0xd88a9c);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
     group.add(new THREE.Mesh(parts.snout, snoutMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, snoutMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -9741,9 +9956,12 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = chickenParts(); decorGeoCache.set('chicken', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xf5f0e6), combMat = solidMaterial(0xc4362d), legMat = solidMaterial(0xd7a53a);
+    const beakMat = solidMaterial(0xd7a53a), eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
     group.add(new THREE.Mesh(parts.comb, combMat));
+    group.add(new THREE.Mesh(parts.beak, beakMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, legMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
@@ -9754,10 +9972,13 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = rabbitParts(); decorGeoCache.set('rabbit', parts); }
     const group = new THREE.Group();
     const furMat = solidMaterial(0xc9a876), tailMat = solidMaterial(0xf2ede0);
+    const noseMat = solidMaterial(0xe0a0ae), eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, furMat));
     group.add(new THREE.Mesh(parts.head, furMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, furMat));
     group.add(new THREE.Mesh(parts.tail, tailMat));
+    group.add(new THREE.Mesh(parts.nose, noseMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -9766,8 +9987,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = batParts(); decorGeoCache.set('bat', parts); }
     const group = new THREE.Group();
     const furMat = solidMaterial(0x2b2b2b), wingMat = solidMaterial(0x3d2d52);
+    const eyeMat = solidMaterial(0xd91f1f);
     group.add(new THREE.Mesh(parts.body, furMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, wingMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.rotation.z = entry._batState === 'roosting' || entry._batState === undefined ? Math.PI : 0; // real vanilla: hangs upside down while idle
     registerMob(group, entry);
@@ -9796,6 +10019,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.fangs) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0; // pitched flat against the wall while climbing
     registerMob(group, entry);
@@ -9825,8 +10049,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = ghastParts(); decorGeoCache.set('ghast', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xe9e9e9), faceMat = solidMaterial(0x3a3a3a);
+    const eyeMat = solidMaterial(0x141414);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.face, faceMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -9836,9 +10063,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = beeParts(); decorGeoCache.set('bee', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xe8b923), stripeMat = solidMaterial(0x2a2216), wingMat = solidMaterial(0xd8e8ec);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.stripe, stripeMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, wingMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -9924,6 +10153,7 @@ function buildDecorMeshesForEntry(entry) {
     const spikeMat = solidMaterial(0x8a7a3a);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     for (const g of parts.fins) group.add(new THREE.Mesh(g, finMat));
     group.add(new THREE.Mesh(parts.tailFin, finMat));
     const puffLevel = entry._puffLevel || 0;
@@ -9955,6 +10185,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.topFin, patternMat));
     group.add(new THREE.Mesh(parts.tailFin, patternMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -9969,6 +10200,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.topFin, finMat));
     group.add(new THREE.Mesh(parts.tailFin, finMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     // See DECOR_TYPES.salmon/updateSalmon: rotation.z is set live, every
     // frame, only while actually flopping outside water — never baked
@@ -9990,6 +10222,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.topFin, finMat));
     group.add(new THREE.Mesh(parts.tailFin, finMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     // See DECOR_TYPES.cod/updateSalmon (reused directly): rotation.z is
     // set live, every frame, only while actually flopping outside water.
@@ -10033,8 +10266,11 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = turtleParts(); decorGeoCache.set('turtle', parts); }
     const group = new THREE.Group();
     const shellMat = solidMaterial(0x4a7c3f), skinMat = solidMaterial(0x9bb86a);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.shell, shellMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.beak, eyeMat));
     for (const g of parts.flippers) group.add(new THREE.Mesh(g, skinMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -10051,10 +10287,13 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = dolphinParts(); decorGeoCache.set('dolphin', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x6e7f8a), finMat = solidMaterial(0x4d5a63);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.dorsalFin, finMat));
     group.add(new THREE.Mesh(parts.tailFluke, finMat));
     for (const g of parts.pectoralFins) group.add(new THREE.Mesh(g, finMat));
+    group.add(new THREE.Mesh(parts.rostrum, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10072,6 +10311,8 @@ function buildDecorMeshesForEntry(entry) {
     const bodyMesh = new THREE.Mesh(parts.body, striderWarmMaterial());
     bodyMesh.userData.isStriderSkin = true;
     group.add(bodyMesh);
+    const eyeMat = solidMaterial(0x1a0f08);
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, striderLegMaterial()));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -10081,9 +10322,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = snifferParts(); decorGeoCache.set('sniffer', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xc9a876), snoutMat = solidMaterial(0x9c7a52);
-    const sailMat = solidMaterial(0x5a8a3a);
+    const sailMat = solidMaterial(0x5a8a3a), eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.snout, snoutMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.add(new THREE.Mesh(parts.tail, bodyMat));
     group.add(new THREE.Mesh(parts.sail, sailMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
@@ -10106,6 +10348,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.head, bodyMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, patchMat));
     group.add(new THREE.Mesh(parts.eyePatch, patchMat));
+    group.add(new THREE.Mesh(parts.snout, patchMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, patchMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -10145,6 +10388,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.tail, bodyMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10185,8 +10429,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = vexParts(); decorGeoCache.set('vex', parts); }
     const group = new THREE.Group();
     const skinMat = vexSkinMaterial(), swordMat = solidMaterial(0xc7c7c7);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, skinMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
     group.add(new THREE.Mesh(parts.sword, swordMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
@@ -10197,8 +10443,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = allayParts(); decorGeoCache.set('allay', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0xa8c4de);
+    const eyeMat = solidMaterial(0x14140f);
     group.add(new THREE.Mesh(parts.body, bodyMat));
     group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.wings) group.add(new THREE.Mesh(g, allayWingMaterial()));
     const heldMesh = new THREE.Mesh(parts.heldItem, solidMaterial(0x2acb57));
     heldMesh.userData.isAllayHeldItem = true;
@@ -10240,8 +10488,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = silverfishParts(); decorGeoCache.set('silverfish', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x8a8f8a);
+    const eyeMat = solidMaterial(0x14140f);
     for (const g of parts.segments) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.antennae) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10250,8 +10500,10 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = endermiteParts(); decorGeoCache.set('endermite', parts); }
     const group = new THREE.Group();
     const bodyMat = solidMaterial(0x5a4a6e);
+    const eyeMat = solidMaterial(0xc23bde);
     for (const g of parts.segments) group.add(new THREE.Mesh(g, bodyMat));
     for (const g of parts.antennae) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -10261,10 +10513,12 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const skinMat = solidMaterial(0xe8a888), tuskMat = solidMaterial(0xe8dcc0);
     const vestMat = solidMaterial(0x6b4a35), beltMat = solidMaterial(0xd4af37), bootMat = solidMaterial(0x1a1410);
+    const eyeMat = solidMaterial(0x1a1410);
     group.add(new THREE.Mesh(parts.torso, vestMat));
     group.add(new THREE.Mesh(parts.belt, beltMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
     group.add(new THREE.Mesh(parts.snout, skinMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.tusks) group.add(new THREE.Mesh(g, tuskMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
@@ -10366,6 +10620,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.body, furMat));
     group.add(new THREE.Mesh(parts.head, furMat));
     group.add(new THREE.Mesh(parts.snout, furMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, darkMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, darkMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, darkMat));
     group.add(new THREE.Mesh(parts.tailBase, furMat));
@@ -10820,10 +11075,12 @@ function buildDecorMeshesForEntry(entry) {
     const group = new THREE.Group();
     const skinMat = solidMaterial(0x8a7568), tuskMat = solidMaterial(0xe8dcc0);
     const vestMat = solidMaterial(0x3f2c22), beltMat = solidMaterial(0x1a1410), bootMat = solidMaterial(0x1a1410);
+    const eyeMat = solidMaterial(0x1a1410);
     group.add(new THREE.Mesh(parts.torso, vestMat));
     group.add(new THREE.Mesh(parts.belt, beltMat));
     group.add(new THREE.Mesh(parts.head, skinMat));
     group.add(new THREE.Mesh(parts.snout, skinMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.tusks) group.add(new THREE.Mesh(g, tuskMat));
     for (const g of parts.ears) group.add(new THREE.Mesh(g, skinMat));
     for (const g of parts.arms) group.add(new THREE.Mesh(g, skinMat));
@@ -11178,6 +11435,7 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.gills) group.add(new THREE.Mesh(g, gillMat));
     const faceMat = solidMaterial(0x14140f);
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, faceMat));
+    group.add(new THREE.Mesh(parts.mouth, faceMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     // See DECOR_TYPES.axolotl: this is the first live mob the click-to-
     // interact raycaster can hit, so it needs the same userData tag
