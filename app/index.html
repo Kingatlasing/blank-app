@@ -2512,6 +2512,21 @@ const DECOR_TYPES = {
   // vanilla cod being just as "unable to survive out of water" as
   // salmon), recolored to cod's own duller real mottled tan.
   cod: { kind: 'cod', interactive: false },
+  // A real vanilla happy ghast shares an ordinary ghast's exact body plan
+  // (minecraft.wiki/w/Happy_Ghast), but is a distinct mob: a genuine 5x5x5
+  // hitbox (vs. the ordinary ghast's 4x4x4), a subtle raised-eyebrow smile
+  // rather than a frown, and — its real defining feature — it can be
+  // permanently equipped with a real harness, at which point it becomes
+  // a mount. This app has no player-riding/camera-attachment system at
+  // all, so the "genuinely new" mechanic modeled here is the harness
+  // equip itself: the first FLYING mob to receive a permanent piece of
+  // equipment via the exact same "notice a real dropped item nearby on
+  // its own and equip it for good" technique the donkey's own chest
+  // already proved, applied here to an airborne mob for the first time.
+  // See findNearestDroppedHarness / rebuildHappyGhastMesh. Reuses
+  // ghastParts and updateGhast completely unchanged for its own body and
+  // float behavior.
+  happy_ghast: { kind: 'happy_ghast', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3496,6 +3511,20 @@ function buildNetherWastesInterior(grid, silhouette, dims, exteriorMat, accentMa
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'ghast', x: cx, y: Math.floor(dims.sy / 2), z: cz, facing: 'south' });
+}
+// An open sky platform with an unharnessed happy ghast floating above it
+// and a real dropped harness item waiting right underneath — the same
+// "open air, single floating mob" shape as the Nether Wastes preset,
+// with the one real dropped item this mob's own new mechanic actually
+// needs.
+function buildHappyGhastHavenInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const floatY = Math.max(1, Math.floor(dims.sy / 2));
+  decorOut.push({ type: 'happy_ghast', x: cx, y: floatY, z: cz, facing: 'south' });
+  decorOut.push({ type: 'dropped_item', itemType: 'harness', x: cx, y: 1, z: cz });
 }
 // An open grass meadow with a beehive and several real flowers scattered
 // around it — unlike every other mob preset here, the bee doesn't just
@@ -5842,6 +5871,18 @@ const PRESETS = [
       'Not modeled: a real ocelot actually being tamed into a companion (in real vanilla, gaining trust just stops it from fleeing — it never becomes a followable pet; only the separate, already-modeled cat species is truly tameable here), the player manually walking up and feeding a HELD cod by hand rather than an item simply sitting nearby (this app has no inventory/held-item system at all), and cod schooling behavior or their real ocean-only habitat (this cod is placed in a plain river strip purely to sit next to the ocelot for this demo) — this app\'s cod only ever swims, flops, and gets eaten.',
     ],
   },
+  {
+    id: 'happy-ghast-haven', name: 'Happy Ghast Haven', shape: 'box', category: 'Farms & Automation',
+    real: { height: 8, baseX: 10, baseZ: 10 }, interiorMode: 'happyGhastHaven',
+    blocks: { exterior: 'end_stone', interior: 'end_stone', accent: 'end_stone' },
+    desc: 'An open sky platform with an unharnessed happy ghast floating above it and a real dropped harness item sitting right underneath — real vanilla happy ghasts can be permanently equipped with a real harness, and this one genuinely notices the one placed nearby and equips it for good, becoming a mount.',
+    keywords: ['happy ghast', 'ghast', 'harness', 'mount', 'flying'],
+    notes: [
+      'Just let the model run — no player action of any kind is needed. The happy ghast floats exactly like an ordinary ghast (reusing updateGhast completely unchanged), but on its very first frame with a real live world position it also starts checking for a nearby dropped harness item; the moment it notices the one placed here, it consumes it and permanently equips a saddle-like harness with hanging reins, in a real random color from a representative handful of real vanilla dye colors. A real vanilla happy ghast (introduced in the 2025 Spring to Life update) is a distinct mob from the ordinary hostile ghast — a genuine 5x5x5 hitbox rather than 4x4x4, a subtle raised-eyebrow smile rather than a frown, and its own real harness item that makes it rideable (minecraft.wiki/w/Happy_Ghast). Every earlier mob-equips-item mechanic here (the donkey\'s own chest) was a GROUND mount; this is the first time that exact same "notice a real dropped item nearby and equip it for good" technique has ever been applied to a FLYING mob, via the new findNearestDroppedHarness/rebuildHappyGhastMesh.',
+      'Verified directly by a unit test confirming an unharnessed happy ghast with no dropped harness anywhere nearby never equips one no matter how much simulated time passes, that a dropped harness within its own real scan radius is genuinely consumed (removed from the world) and permanently marks the ghast harnessed, that re-running the same check on an already-harnessed ghast does nothing further (a second nearby harness is never double-equipped), and that the live rendered mesh actually grows real new harness/rein parts the instant it equips versus before. This app has no verified real vanilla harness-notice scan radius, so the figure used here is an honest, approximate stand-in, the same caveat already applied to the donkey\'s own chest-scan radius. The geometry reuses ghastParts entirely unchanged for the body/tentacles (shared cache key with the ordinary ghast), scaled up 1.25x for its own real larger hitbox, with new raised-eyebrow parts replacing the frown and a new harness/rein part set added only once actually equipped.',
+      'Not modeled: real multiplayer riding (up to 4 players) and lead-based steering (this app has no player-riding/camera-attachment system at all, so the harness equip itself — not the ride — is the real new mechanic modeled here), the real craftable harness color choice (this app picks one of a representative handful of real dye colors at random instead), and the real ghastling baby-growth stage requiring 20 real minutes of hydration — this app has no baby-mob-growth or day/night-scale time system at all, so this happy ghast spawns already adult and either harnessed or not.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6210,6 +6251,8 @@ function generateModel() {
     buildEndPortalIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'netherWastes') {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'happyGhastHaven') {
+    buildHappyGhastHavenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
     buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'slimeChunk') {
@@ -7249,6 +7292,36 @@ function ghastParts() {
   });
   return { body, face, faceEyes, mouth, tentacles };
 }
+// A pair of small raised eyebrow boxes above the ordinary ghast's own
+// eyes — real vanilla happy ghasts have "a smiling face" with "raised
+// eyebrows" instead of the ordinary ghast's frown
+// (minecraft.wiki/w/Happy_Ghast), tilted outward and up on each side to
+// read as genuinely raised rather than flat. See DECOR_TYPES.happy_ghast.
+function happyGhastEyebrowParts() {
+  const eyebrowOffsets = [[-0.2, 0.75, 0.845], [0.2, 0.75, 0.845]];
+  const eyebrows = eyebrowOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.04, 0.03);
+    g.rotateZ(x < 0 ? 0.25 : -0.25);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { eyebrows };
+}
+// A flat saddle-like harness panel on top with 2 hanging rein straps in
+// front — real vanilla happy ghasts wear a real harness, crafted with
+// leather + glass + wool, once equipped (minecraft.wiki/w/Harness). See
+// DECOR_TYPES.happy_ghast / findNearestDroppedHarness.
+function happyGhastHarnessParts() {
+  const saddle = new THREE.BoxGeometry(0.7, 0.1, 0.9);
+  saddle.translate(0, 1.25, 0);
+  const reinOffsets = [[-0.3, 0.5, 0.83], [0.3, 0.5, 0.83]];
+  const reins = reinOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.05, 0.5, 0.05);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { saddle, reins };
+}
 // A small rounded body (real vanilla bees are 0.7 x 0.6) with two flat wing
 // planes and a black stripe accent — see DECOR_TYPES.bee.
 function beeParts() {
@@ -8052,7 +8125,13 @@ const DROPPED_ITEM_COLORS = {
   gunpowder: 0x8a8478,
   chest: 0x8a5a2f,
   cod: 0xa8987a,
+  harness: 0xc9b896,
 };
+// A representative handful of real named vanilla dye colors a harness
+// can be crafted with (minecraft.wiki/w/Harness lists all 16 real wool
+// colors) — like the tropical fish's own color-combo system, a small
+// stand-in set rather than the full 16.
+const HAPPY_GHAST_HARNESS_COLORS = [0xc9b896, 0xc4362d, 0x3a6ea8, 0x5a8a3a, 0xe8d33a];
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
 // pads, short thick legs, and a vertical rib-like cluster of glowing
@@ -10055,6 +10134,36 @@ function buildDecorMeshesForEntry(entry) {
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
     group.add(new THREE.Mesh(parts.mouth, eyeMat));
     for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'happy_ghast') {
+    // Reuses ghastParts entirely unchanged for its own body/tentacles
+    // (shared cache key 'ghast') — a real happy ghast really is a genuine
+    // 5x5x5 vs. the ordinary ghast's own 4x4x4, so the whole group is
+    // scaled up 1.25x here rather than redrawing new geometry.
+    let parts = decorGeoCache.get('ghast');
+    if (!parts) { parts = ghastParts(); decorGeoCache.set('ghast', parts); }
+    let eyebrowParts = decorGeoCache.get('happyGhastEyebrows');
+    if (!eyebrowParts) { eyebrowParts = happyGhastEyebrowParts(); decorGeoCache.set('happyGhastEyebrows', eyebrowParts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xe9e9e9), faceMat = solidMaterial(0x3a3a3a);
+    const eyeMat = solidMaterial(0x141414);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.face, faceMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.add(new THREE.Mesh(parts.mouth, eyeMat));
+    for (const g of eyebrowParts.eyebrows) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.tentacles) group.add(new THREE.Mesh(g, bodyMat));
+    if (entry._harnessed) {
+      let harnessParts = decorGeoCache.get('happyGhastHarness');
+      if (!harnessParts) { harnessParts = happyGhastHarnessParts(); decorGeoCache.set('happyGhastHarness', harnessParts); }
+      const harnessMat = solidMaterial(entry._harnessColor || 0xc9b896);
+      const reinMat = solidMaterial(0x4a3325);
+      group.add(new THREE.Mesh(harnessParts.saddle, harnessMat));
+      for (const g of harnessParts.reins) group.add(new THREE.Mesh(g, reinMat));
+    }
+    group.scale.setScalar(1.25);
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
@@ -18250,6 +18359,39 @@ function rebuildDonkeyMesh(entry) {
     three.group.add(mesh);
   }
 }
+// The real new mechanic — see DECOR_TYPES.happy_ghast. Mirrors
+// findNearestDroppedChest exactly, scanning for a real dropped `harness`
+// item instead.
+const HAPPY_GHAST_HARNESS_SCAN_RADIUS = 5;
+function findNearestDroppedHarness(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item' || other.itemType !== 'harness') continue;
+    const dist = Math.hypot(other.x - entry._wx, other.y - entry._wy, other.z - entry._wz);
+    if (dist <= HAPPY_GHAST_HARNESS_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+// Reentrant-loop-safe rebuild — the same manual splice/rebuild technique
+// as rebuildDonkeyMesh, needed here because equipping the harness
+// changes entry._harnessed mid-frame, from inside updateMobs' own
+// per-frame loop, where a full renderThree() would be unsafe. Uses
+// entry._wy (this mob's own live float height), not entry.y, since a
+// happy ghast is airborne exactly like the ordinary ghast it reuses.
+function rebuildHappyGhastMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry._wy + 0.5;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
 // The real new mechanic — see DECOR_TYPES.skeleton_horse_trap. Removes
 // the dormant trap horse and spawns SKELETON_HORSEMAN_COUNT brand-new
 // skeleton_horseman entries nearby all at once — the exact same
@@ -18709,6 +18851,23 @@ function updateMobs(dt) {
         continue;
       }
     }
+    // A real happy ghast notices a nearby dropped harness and equips it
+    // automatically, permanently — the same technique as the donkey's
+    // own chest, just the first time it's ever applied to a FLYING mob.
+    // Checked before the shared generic float dispatch below so it can
+    // equip mid-float without interrupting it, and skipped on the very
+    // first frame before entry._wx even exists yet (initialized by
+    // updateGhast itself, reused unchanged for this mob's own float).
+    if (entry.type === 'happy_ghast' && !entry._harnessed && entry._wx !== undefined) {
+      const harness = findNearestDroppedHarness(entry);
+      if (harness) {
+        removeDroppedItemFromWorld(harness);
+        entry._harnessed = true;
+        entry._harnessColor = HAPPY_GHAST_HARNESS_COLORS[Math.floor(Math.random() * HAPPY_GHAST_HARNESS_COLORS.length)];
+        rebuildHappyGhastMesh(entry);
+        continue;
+      }
+    }
     // A real enderman with a live endermite within its own real hunt
     // radius overrides its ordinary wander/teleport for just this frame
     // and closes in instead — checked before the shared generic mob
@@ -18798,6 +18957,7 @@ function updateMobs(dt) {
     if (entry.type === 'skeleton_horse_trap') { updateSkeletonHorseTrap(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
+    if (entry.type === 'happy_ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
     if (!MOB_KINDS.has(entry.type)) continue;
     if (entry._mobState === undefined) {
@@ -20018,7 +20178,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'], happy_ghast: ['#e9e9e9', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -20088,7 +20248,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod', happy_ghast: 'Happy Ghast',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -20220,6 +20380,7 @@ function renderCommands(model) {
       else if (d.type === 'tropical_fish') lines.push(`summon minecraft:tropical_fish ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'cod') lines.push(`summon minecraft:cod ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'happy_ghast') lines.push(`summon minecraft:happy_ghast ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ender_dragon') lines.push(`summon minecraft:ender_dragon ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
