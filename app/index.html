@@ -8832,14 +8832,22 @@ function armorStandParts() {
   });
   const head = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   head.translate(0, 1.14, 0);
-  // A worn helmet must fully enclose the head on every side, real
-  // vanilla's own armor-layer convention (a uniformly larger copy of the
-  // head box, not a shorter cap sitting on top of it) — this used to be
-  // only 0.18 tall (shorter than the 0.22-tall head) and centered 0.02
-  // above it, leaving a visible ring of bare wood head exposed at the
-  // jaw/neck on every tier. Same 0.22-vs-0.26 center matches, full height.
-  const helmet = new THREE.BoxGeometry(0.26, 0.26, 0.26);
-  helmet.translate(0, 1.14, 0);
+  // A real vanilla helmet reads as a stepped, brimmed shape — a narrower
+  // band hugging the head with a wider flat brim/plate sitting on top of
+  // it, not one plain uniform cube (which read as just a slightly bigger
+  // head, with no distinct helmet silhouette at all). 2 stacked boxes:
+  // a lower skirt flush against the head's own sides (fully covering it,
+  // unlike an earlier version of this geometry that was shorter than the
+  // head and left bare wood visible at the jaw), and a wider brim above.
+  const helmetSkirt = new THREE.BoxGeometry(0.26, 0.16, 0.26);
+  helmetSkirt.translate(0, 1.09, 0);
+  // Starts flush with the skirt's own top (1.17) and clears the head's
+  // own top (1.25) by a real margin, rather than landing exactly flush
+  // with it — an earlier version sat exactly coplanar with the head's
+  // top face, so the wooden head's own top face z-fought with the
+  // brim's, flickering tan through the armor color.
+  const helmetBrim = new THREE.BoxGeometry(0.32, 0.16, 0.32);
+  helmetBrim.translate(0, 1.25, 0);
   const chestplate = new THREE.BoxGeometry(0.22, 0.34, 0.22);
   chestplate.translate(0, 0.86, 0);
   const shoulderOffsets = [[-0.14, 1.0], [0.14, 1.0]];
@@ -8852,7 +8860,7 @@ function armorStandParts() {
   leggings.translate(0, 0.34, 0);
   const boots = new THREE.BoxGeometry(0.18, 0.12, 0.18);
   boots.translate(0, 0.09, 0);
-  return { base, postLower, postUpper, arms, head, helmet, chestplate, shoulders, leggings, boots };
+  return { base, postLower, postUpper, arms, head, helmetSkirt, helmetBrim, chestplate, shoulders, leggings, boots };
 }
 // Every real armor material in the game, in real vanilla's own actual
 // weakest-to-strongest order (minecraft.wiki/w/Armor_materials), plus
@@ -11169,7 +11177,8 @@ function buildDecorMeshesForEntry(entry) {
     const tier = entry._armorTier;
     if (tier && tier !== 'none') {
       const armorMat = solidMaterial(ARMOR_TIER_COLORS[tier]);
-      group.add(new THREE.Mesh(parts.helmet, armorMat));
+      group.add(new THREE.Mesh(parts.helmetSkirt, armorMat));
+      group.add(new THREE.Mesh(parts.helmetBrim, armorMat));
       group.add(new THREE.Mesh(parts.chestplate, armorMat));
       for (const g of parts.shoulders) group.add(new THREE.Mesh(g, armorMat));
       group.add(new THREE.Mesh(parts.leggings, armorMat));
