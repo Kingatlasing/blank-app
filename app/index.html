@@ -8833,18 +8833,17 @@ function armorStandParts() {
   const head = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   head.translate(0, 1.14, 0);
   // Per user-supplied reference images: a worn helmet covers only the
-  // UPPER portion of the head — roughly its top half-to-two-thirds, plus
-  // a small flat brim overhanging right at the very top — leaving the
-  // head's own lower portion (the face) genuinely visible below it, not
-  // fully enclosed (an earlier version of this geometry fully encased the
-  // head, hiding the face entirely, which the reference images show is
-  // wrong). The head spans y=1.03 to 1.25; the skirt covers only the
-  // upper ~0.12 of that (1.13 to 1.25ish), leaving the lower ~0.10
-  // (1.03 to 1.13, well over a third of the head) exposed as the face.
-  const helmetSkirt = new THREE.BoxGeometry(0.26, 0.14, 0.26);
-  helmetSkirt.translate(0, 1.2, 0);
-  const helmetBrim = new THREE.BoxGeometry(0.3, 0.06, 0.3);
-  helmetBrim.translate(0, 1.3, 0);
+  // UPPER portion of the head — roughly its top half-to-two-thirds —
+  // leaving the head's own lower portion (the face) genuinely visible
+  // below it, not fully enclosed (an earlier version of this geometry
+  // fully encased the head, hiding the face entirely, which the
+  // reference images show is wrong). The head spans y=1.03 to 1.25; the
+  // skirt covers only the upper ~0.12 of that (1.13 to 1.25ish), leaving
+  // the lower ~0.10 (1.03 to 1.13, well over a third of the head)
+  // exposed as the face. No separate brim on top — the user asked for
+  // the overhanging lip piece to be removed.
+  const helmet = new THREE.BoxGeometry(0.26, 0.14, 0.26);
+  helmet.translate(0, 1.2, 0);
   const chestplate = new THREE.BoxGeometry(0.22, 0.34, 0.22);
   chestplate.translate(0, 0.86, 0);
   const shoulderOffsets = [[-0.14, 1.0], [0.14, 1.0]];
@@ -8857,7 +8856,7 @@ function armorStandParts() {
   leggings.translate(0, 0.34, 0);
   const boots = new THREE.BoxGeometry(0.18, 0.12, 0.18);
   boots.translate(0, 0.09, 0);
-  return { base, postLower, postUpper, arms, head, helmetSkirt, helmetBrim, chestplate, shoulders, leggings, boots };
+  return { base, postLower, postUpper, arms, head, helmet, chestplate, shoulders, leggings, boots };
 }
 // Every real armor material in the game, in real vanilla's own actual
 // weakest-to-strongest order (minecraft.wiki/w/Armor_materials), plus
@@ -11174,8 +11173,7 @@ function buildDecorMeshesForEntry(entry) {
     const tier = entry._armorTier;
     if (tier && tier !== 'none') {
       const armorMat = solidMaterial(ARMOR_TIER_COLORS[tier]);
-      group.add(new THREE.Mesh(parts.helmetSkirt, armorMat));
-      group.add(new THREE.Mesh(parts.helmetBrim, armorMat));
+      group.add(new THREE.Mesh(parts.helmet, armorMat));
       group.add(new THREE.Mesh(parts.chestplate, armorMat));
       for (const g of parts.shoulders) group.add(new THREE.Mesh(g, armorMat));
       group.add(new THREE.Mesh(parts.leggings, armorMat));
