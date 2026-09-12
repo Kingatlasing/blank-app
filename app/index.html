@@ -7053,15 +7053,26 @@ function endermanParts() {
 // the belly well clear of the floor — legs sticking straight out
 // sideways at body height (an earlier version of this geometry) leave
 // nothing actually supporting the body, so it visually reads as resting
-// flat on the ground instead of standing on its own legs. BODY_LIFT
-// raises the whole body so its belly clears the floor by the same real
-// amount the angled legs actually reach down to plant their own feet.
+// flat on the ground instead of standing on its own legs.
+//
+// Every ordinary ground mob here (see the shared MOB_KINDS wander/render
+// dispatch) is positioned with `obj.position.y = entry._wy + 0.5` — i.e.
+// this geometry's own local y=0 is WAIST height, not the floor; a mob's
+// own feet need to reach down to local y ≈ -0.5 to actually land on the
+// ground (pig/sheep/cow's own legs all translate to a NEGATIVE y for
+// exactly this reason). SPIDER_GROUND_Y is that same real floor
+// reference in this geometry's own local space, and SPIDER_BODY_LIFT is
+// how far above it the body actually sits (an earlier version of this
+// fix used a small POSITIVE lift above an assumed y=0 floor instead —
+// wrong given the real +0.5 convention above, so the entire spider
+// visibly floated about half a block off the ground).
+const SPIDER_GROUND_Y = -0.5;
 const SPIDER_BODY_LIFT = 0.15;
 function spiderParts() {
   const abdomen = new THREE.BoxGeometry(0.5, 0.3, 0.4);
-  abdomen.translate(0, 0.15 + SPIDER_BODY_LIFT, -0.15);
+  abdomen.translate(0, 0.15 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, -0.15);
   const head = new THREE.BoxGeometry(0.32, 0.24, 0.24);
-  head.translate(0, 0.14 + SPIDER_BODY_LIFT, 0.25);
+  head.translate(0, 0.14 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.25);
   // Real vanilla spiders — like every real arachnid — have every leg
   // attach to the cephalothorax, a distinct small segment of its own
   // between the head and the abdomen, never the abdomen or head directly
@@ -7074,7 +7085,7 @@ function spiderParts() {
   // front face and the head's own back face, touching both with no seam),
   // and every leg now anchors to ITS side wall instead.
   const thorax = new THREE.BoxGeometry(0.36, 0.2, 0.08);
-  thorax.translate(0, 0.14 + SPIDER_BODY_LIFT, 0.09);
+  thorax.translate(0, 0.14 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.09);
   // Real vanilla spiders — like every real arachnid — have 8 legs, not 6;
   // an earlier version of this geometry only ever modeled 3 pairs, AND
   // pointed them dead level out to the sides — a real spider's own legs
@@ -7084,7 +7095,7 @@ function spiderParts() {
   // (x = ±0.18, its own actual half-width) at a different point along the
   // thorax's own real (short) length, then splays outward AND downward
   // from there at a real downward tilt, its outer tip landing right at
-  // real ground level (y=0) — the 2 middle pairs splayed nearly straight
+  // the real floor (SPIDER_GROUND_Y) — the 2 middle pairs splayed nearly straight
   // out to the side, the front pair angled forward, and the back pair
   // angled backward, matching a real spider's own leg stance.
   const legSpecs = [
@@ -7094,11 +7105,11 @@ function spiderParts() {
     { az: 0.03, dz: 0.6 },   // front pair — angled forward, toward the head
   ];
   const halfLen = 0.2, thoraxHalfWidth = 0.18, legTilt = 0.6; // legTilt ~34° down from horizontal
-  // The real attach height (already accounting for SPIDER_BODY_LIFT,
-  // chosen so this comes out close to the thorax's own real center) that
-  // makes each leg's own outer tip land exactly at real ground level
-  // (y=0) given this exact halfLen/legTilt.
-  const legY = 2 * halfLen * Math.sin(legTilt);
+  // The real attach height (in this geometry's own local space, where
+  // SPIDER_GROUND_Y is the real floor) that makes each leg's own outer
+  // tip land exactly on that real floor given this exact
+  // halfLen/legTilt.
+  const legY = SPIDER_GROUND_Y + 2 * halfLen * Math.sin(legTilt);
   const legs = [];
   for (const { az, dz } of legSpecs) {
     const dx = Math.sqrt(1 - dz * dz);
@@ -7128,7 +7139,7 @@ function spiderParts() {
   // at night (minecraft.wiki/w/Spider), missing from an earlier version of
   // this geometry (the whole body was rendered as one flat dark color with
   // no eyes at all).
-  const faceEyeOffsets = [[-0.08, 0.17 + SPIDER_BODY_LIFT, 0.37], [0.08, 0.17 + SPIDER_BODY_LIFT, 0.37]];
+  const faceEyeOffsets = [[-0.08, 0.17 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.37], [0.08, 0.17 + SPIDER_GROUND_Y + SPIDER_BODY_LIFT, 0.37]];
   const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
     g.translate(x, y, z);
