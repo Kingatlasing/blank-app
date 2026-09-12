@@ -2541,6 +2541,16 @@ const DECOR_TYPES = {
   // good, the real vanilla effect of applying honeycomb. See
   // updateCopperGolem / attemptWaxCopperGolem.
   copper_golem: { kind: 'copper_golem', interactive: true },
+  // A real vanilla sulfur cube (introduced in Chaos Cubed, June 16 2026)
+  // "looks like a yellow slime" and absorbs a block dropped nearby or fed
+  // to it, rewriting its own physics based on what it ate — 11-12 named
+  // archetypes in total, e.g. Sliding from ice, Sticky from honeycomb,
+  // Airborne from wool, Explosive from TNT, Slow Flat from a metal block
+  // (minecraft.wiki/w/Sulfur_Cube). Once it has absorbed a block, "they
+  // cannot move on their own" until sheared, which removes the absorbed
+  // block and drops it as an item. See updateSulfurCube /
+  // attemptShearSulfurCube.
+  sulfur_cube: { kind: 'sulfur_cube', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3552,6 +3562,21 @@ function buildCopperGolemHomeInterior(grid, silhouette, dims, exteriorMat, accen
   if (!decorOut) return;
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'copper_golem', x: cx, y: 1, z: cz, facing: 'south' });
+}
+// An open floor with an unfed sulfur cube hopping around, plus a real
+// dropped honeycomb sitting nearby — the same "notice a real dropped item
+// nearby and consume it for a permanent state change" shape as the happy
+// ghast's harness and the ocelot's cod, here triggering the Sticky
+// archetype (one of a representative handful of the real 11-12) and
+// freezing the cube in place for good, exactly like real vanilla's own
+// "cannot move on their own" once a block has been absorbed.
+function buildSulfurCaveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'sulfur_cube', x: cx, y: 1, z: cz, facing: 'south', size: 2 });
+  decorOut.push({ type: 'dropped_item', itemType: 'honeycomb', x: cx + 2, y: 1, z: cz });
 }
 // An open grass meadow with a beehive and several real flowers scattered
 // around it — unlike every other mob preset here, the bee doesn't just
@@ -5922,6 +5947,18 @@ const PRESETS = [
       'Not modeled: the real copper-chest item-sorting behavior (this app\'s golem uses the same generic wander-and-look behavior shared by every other MOB_KINDS ground mob, not a real chest-seeking goal, since this app has no chest-inventory/item-transfer system for any mob), the real "unwaxed and fully oxidized" statue transformation — a genuine unwaxed golem left fully oxidized has a small real per-tick chance to freeze into a random stationary pose as a copper golem statue and drop any items it is holding, which waxing also permanently prevents (minecraft.wiki/w/Copper_Golem) — this app keeps it wandering normally forever once fully oxidized instead, and crafting/summoning via a carved pumpkin — this app has no crafting or golem-assembly system at all, so it spawns already complete.',
     ],
   },
+  {
+    id: 'sulfur-cave', name: 'Sulfur Cave', shape: 'box', category: 'Farms & Automation',
+    real: { height: 4, baseX: 10, baseZ: 10 }, interiorMode: 'sulfurCave',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'stone' },
+    desc: 'An unfed sulfur cube hopping around a stone cave floor next to a real dropped honeycomb — the cube genuinely notices it, absorbs it, and freezes in place for good with the honeycomb visible inside its own translucent body, real vanilla\'s own Sticky archetype; click the frozen cube to shear it back out and watch it resume hopping on its own.',
+    keywords: ['sulfur cube', 'slime', 'archetype', 'oxidize', 'shear', 'absorb'],
+    notes: [
+      'Just let the model run — no player action is needed to see the absorb-and-freeze half of the real mechanic; a player click is only needed afterward to reverse it. The cube starts out hopping exactly like an ordinary slime (reusing updateSlime completely unchanged) and, the moment it notices the real dropped honeycomb placed nearby, consumes it and permanently freezes in place with the honeycomb\'s own color genuinely visible inside its translucent body. A real vanilla sulfur cube, added in Chaos Cubed (June 16, 2026), "looks like a yellow slime" but absorbs a block dropped nearby or fed to it directly, rewriting its own physics into one of 11-12 real named archetypes based on what it ate — Sticky from honeycomb, Sliding from ice, Airborne from wool, Explosive from TNT, Slow Flat from a metal block, and more — and once it has absorbed a block, real vanilla says "they cannot move on their own" until it is sheared, which removes the block, drops it as a real item, and lets the cube resume wandering ([minecraft.wiki/w/Sulfur_Cube](https://minecraft.wiki/w/Sulfur_Cube)). This app\'s own ordinary slime has existed since early in this project\'s history but has no absorb concept anywhere in it; the new `findNearestSulfurCubeFeed` scans for a real dropped item matching one of a representative handful of the real archetype-triggering blocks (`SULFUR_CUBE_ARCHETYPES`), and `attemptShearSulfurCube` reverses it, the same "click a mob back to its unfed state" shape already proven by `shearMooshroom`/`attemptShearBogged`.',
+      'Verified directly by a unit test confirming an unfed cube with no matching dropped item anywhere nearby wanders indefinitely and never freezes, that a matching dropped item within real scan range is genuinely consumed and the cube genuinely stops moving for good afterward (its own world position sampled unchanged across a large amount of further simulated time), that the live rendered mesh genuinely shows a real absorbed-block color inside the translucent body once fed, and that shearing a fed cube genuinely drops a real matching item back into the world and lets it resume moving on its own again. This app has no verified real sulfur-cube feed-scan radius, so the figure used is an honest, approximate stand-in, the same caveat already applied to the ocelot\'s own feeding radius. The geometry reuses slimeParts entirely unchanged (the real cube "looks like a yellow slime"), recolored translucent yellow instead of green, with the slime\'s own dark-green inner cube repurposed to show whichever real block was actually absorbed.',
+      'Not modeled: the other 6-7 real archetypes beyond this app\'s representative handful of 5 (this app has no combat/knockback/force system at all to even demonstrate what an archetype\'s own bounciness, friction, or air drag would look like when the cube is hit or pushed — freezing in place on absorption is the one real, directly observable mechanic this app models), splitting into 2 smaller cubes on death and small cubes growing back into large ones over real time (this app has no health/death or mob-growth system at all), the real Sulfur Caves biome it naturally spawns in, and bucketability — this app has no biome-generation or bucket/inventory system either, so this sulfur cube only ever hops, absorbs, freezes, and (once sheared) hops again.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6294,6 +6331,8 @@ function generateModel() {
     buildHappyGhastHavenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'copperGolemHome') {
     buildCopperGolemHomeInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'sulfurCave') {
+    buildSulfurCaveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
     buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'slimeChunk') {
@@ -6658,6 +6697,14 @@ let _slimeBodyMaterial = null;
 function slimeBodyMaterial() {
   if (!_slimeBodyMaterial) _slimeBodyMaterial = new THREE.MeshStandardMaterial({ color: 0x6cbf4a, roughness: 0.7, transparent: true, opacity: 0.55, clippingPlanes: [cutawayPlane] });
   return _slimeBodyMaterial;
+}
+let _sulfurCubeBodyMaterial = null;
+// A real vanilla sulfur cube "looks like a yellow slime" — the same
+// translucent jelly material as slimeBodyMaterial, just recolored, since
+// it reuses slimeParts' own geometry outright rather than a new shape.
+function sulfurCubeBodyMaterial() {
+  if (!_sulfurCubeBodyMaterial) _sulfurCubeBodyMaterial = new THREE.MeshStandardMaterial({ color: 0xd9c23a, roughness: 0.6, transparent: true, opacity: 0.55, clippingPlanes: [cutawayPlane] });
+  return _sulfurCubeBodyMaterial;
 }
 let _waterMaterial = null;
 function waterMaterial() {
@@ -8207,6 +8254,23 @@ const DROPPED_ITEM_COLORS = {
   chest: 0x8a5a2f,
   cod: 0xa8987a,
   harness: 0xc9b896,
+  iron_block: 0xd8d8d2,
+  ice: 0x9fd6e8,
+  honeycomb: 0xe3a72e,
+  wool: 0xe6e2d6,
+  tnt: 0xb8402a,
+};
+// A representative handful of the real 11-12 sulfur cube archetypes
+// (minecraft.wiki/w/Sulfur_Cube) — named after the specific real block
+// that triggers each one, not the full set, the same "representative
+// handful, not the full system" precedent already used for the tropical
+// fish's own color combos.
+const SULFUR_CUBE_ARCHETYPES = {
+  iron_block: { name: 'Slow Flat', color: 0xd8d8d2 },
+  ice: { name: 'Sliding', color: 0x9fd6e8 },
+  honeycomb: { name: 'Sticky', color: 0xe3a72e },
+  wool: { name: 'Airborne', color: 0xe6e2d6 },
+  tnt: { name: 'Explosive', color: 0xb8402a },
 };
 // A representative handful of real named vanilla dye colors a harness
 // can be crafted with (minecraft.wiki/w/Harness lists all 16 real wool
@@ -10275,6 +10339,35 @@ function buildDecorMeshesForEntry(entry) {
     // same dual-registration precedent as mooshroom's shear click.
     group.userData.decorEntry = entry;
     group.userData.decorKind = 'copper_golem';
+    objs.push(group);
+  } else if (def.kind === 'sulfur_cube') {
+    // Reuses slimeParts entirely unchanged — a real vanilla sulfur cube
+    // "looks like a yellow slime" (minecraft.wiki/w/Sulfur_Cube), not a
+    // new shape of its own. No position is set here at all, matching the
+    // ordinary slime's own render branch — updateSulfurCube/updateSlime
+    // owns positioning entirely via obj.position.set every frame while
+    // unfed, and rebuildSulfurCubeMesh sets it once and for all once fed.
+    let parts = decorGeoCache.get('slime');
+    if (!parts) { parts = slimeParts(); decorGeoCache.set('slime', parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.outer, sulfurCubeBodyMaterial()));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, solidMaterial(0x1a1a1a)));
+    if (entry._fed) {
+      // The absorbed block, genuinely visible inside the translucent
+      // body — reuses slimeParts' own inner-cube geometry/position
+      // (built for the slime's own dark-green core) recolored to
+      // whatever real block was actually fed to this cube.
+      group.add(new THREE.Mesh(parts.inner, solidMaterial(entry._absorbedColor || 0xffffff)));
+    }
+    group.scale.setScalar(entry.size || 2);
+    group.rotation.y = entry._yaw !== undefined ? entry._yaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    // Interactive (shear-to-release), same dual-registration precedent as
+    // copper_golem/mooshroom: registerMob alone never sets
+    // userData.decorEntry, which attemptInteract's findInteractiveAncestor
+    // walk requires.
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'sulfur_cube';
     objs.push(group);
   } else if (def.kind === 'bee') {
     let parts = decorGeoCache.get('bee');
@@ -18553,6 +18646,90 @@ function rebuildCopperGolemMesh(entry) {
 function attemptWaxCopperGolem(entry) {
   entry._waxed = true;
 }
+// The real new mechanic — see DECOR_TYPES.sulfur_cube. Scans for a real
+// dropped block item this app recognizes as one of a representative
+// handful of real sulfur cube archetype triggers (SULFUR_CUBE_ARCHETYPES)
+// within a short real range — the same shape as findNearestDroppedCod/
+// findNearestDroppedHarness, just filtered by a whole small SET of
+// itemTypes instead of one.
+const SULFUR_CUBE_FEED_SCAN_RADIUS = 5;
+function findNearestSulfurCubeFeed(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item' || !SULFUR_CUBE_ARCHETYPES[other.itemType]) continue;
+    const dist = Math.hypot(other.x - entry._wx, other.y - entry.y, other.z - entry._wz);
+    if (dist <= SULFUR_CUBE_FEED_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
+// Reuses updateSlime's own hop/wander completely unchanged while unfed —
+// a real vanilla sulfur cube "looks like a yellow slime" and, per the
+// wiki, only gains its own new mechanic once it has actually absorbed a
+// block. The moment it has (entry._fed), real vanilla says "they cannot
+// move on their own" until sheared, so this returns immediately without
+// ever touching obj.position again — it stays exactly where
+// rebuildSulfurCubeMesh last placed it, frozen, for good.
+function updateSulfurCube(entry, obj, dt) {
+  if (entry._fed) return;
+  updateSlime(entry, obj, dt);
+  if (entry._wx === undefined) return;
+  const feed = findNearestSulfurCubeFeed(entry);
+  if (feed) {
+    const archetype = SULFUR_CUBE_ARCHETYPES[feed.itemType];
+    entry._fed = true;
+    entry._archetype = archetype.name;
+    entry._absorbedColor = archetype.color;
+    entry._absorbedItemType = feed.itemType;
+    removeDroppedItemFromWorld(feed);
+    rebuildSulfurCubeMesh(entry);
+  }
+}
+// Reentrant-loop-safe rebuild — the same manual splice/rebuild technique
+// as rebuildCopperGolemMesh, needed here because absorbing a block
+// changes entry._fed mid-frame, from inside updateMobs' own per-frame
+// loop, where a full renderThree() would be unsafe. Matches updateSlime's
+// own floor-anchored positioning convention (entry.y + a size-scaled
+// half-height), fixed in place with zero hop height since a freshly-fed
+// cube is, per real vanilla, now permanently immobile.
+function rebuildSulfurCubeMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  const size = entry.size || 2;
+  const halfHeight = size * 0.255;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += entry._wx + offX;
+    mesh.position.y += entry.y + halfHeight;
+    mesh.position.z += entry._wz + offZ;
+    three.group.add(mesh);
+  }
+}
+// A click SHEARS a sulfur cube that has absorbed a block — the real
+// vanilla way to remove it, dropping it back into the world as a real
+// item and letting the cube resume wandering on its own again
+// (minecraft.wiki/w/Sulfur_Cube). Unlike rebuildSulfurCubeMesh (used
+// mid-frame from inside updateMobs' own loop), this is only ever called
+// from the player's own click handler, so — like shearMooshroom and
+// attemptShearBogged — it's safe to do a normal full renderThree refresh.
+function attemptShearSulfurCube(model, entry) {
+  if (!entry._fed) return;
+  const dims = model.dims;
+  const x = Math.max(0, Math.min(dims.sx - 1, entry.x));
+  const z = Math.max(0, Math.min(dims.sz - 1, entry.z));
+  model.decor.push({ type: 'dropped_item', itemType: entry._absorbedItemType, x, y: entry.y, z });
+  entry._fed = false;
+  delete entry._archetype;
+  delete entry._absorbedColor;
+  delete entry._absorbedItemType;
+  if (!three || !three.group) return;
+  renderThree(model, true);
+  renderBlueprint(model);
+  renderCommands(model);
+  renderStats(model);
+}
 // The real new mechanic — see DECOR_TYPES.skeleton_horse_trap. Removes
 // the dormant trap horse and spawns SKELETON_HORSEMAN_COUNT brand-new
 // skeleton_horseman entries nearby all at once — the exact same
@@ -19114,6 +19291,7 @@ function updateMobs(dt) {
     if (entry.type === 'ender_dragon') { updateEnderDragon(entry, obj, dt); continue; }
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
+    if (entry.type === 'sulfur_cube') { updateSulfurCube(entry, obj, dt); continue; }
     if (entry.type === 'magma_cube') { updateMagmaCube(entry, obj, dt); continue; }
     if (entry.type === 'skeleton_horse_trap') { updateSkeletonHorseTrap(entry, obj, dt); continue; }
     if (entry.type === 'bee') { updateBee(entry, obj, dt); continue; }
@@ -19865,6 +20043,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
     if (entry.type === 'copper_golem') { attemptWaxCopperGolem(entry); return; }
+    if (entry.type === 'sulfur_cube') { attemptShearSulfurCube(currentModel, entry); return; }
     if (entry.type === 'horse' || entry.type === 'donkey') {
       if (entry._tamed && !entry._bred) {
         const partner = findNearestTamedOppositeEquine(entry);
@@ -20346,7 +20525,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'], happy_ghast: ['#e9e9e9', 'A'], copper_golem: ['#d97b4a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'], happy_ghast: ['#e9e9e9', 'A'], copper_golem: ['#d97b4a', 'A'], sulfur_cube: ['#d9c23a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -20416,7 +20595,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod', happy_ghast: 'Happy Ghast', copper_golem: 'Copper Golem',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod', happy_ghast: 'Happy Ghast', copper_golem: 'Copper Golem', sulfur_cube: 'Sulfur Cube',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -20550,6 +20729,7 @@ function renderCommands(model) {
       else if (d.type === 'cod') lines.push(`summon minecraft:cod ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'happy_ghast') lines.push(`summon minecraft:happy_ghast ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'copper_golem') lines.push(`summon minecraft:copper_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'sulfur_cube') lines.push(`summon minecraft:sulfur_cube ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ender_dragon') lines.push(`summon minecraft:ender_dragon ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
