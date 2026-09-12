@@ -7049,11 +7049,19 @@ function endermanParts() {
 // splayed legs — real vanilla spiders are 8-legged and noticeably wider
 // than tall (1.4 x 0.9), simplified here the same way every other low-poly
 // stand-in mob in this app is. See DECOR_TYPES.spider.
+// A real spider's legs angle DOWN from the body to the ground, holding
+// the belly well clear of the floor — legs sticking straight out
+// sideways at body height (an earlier version of this geometry) leave
+// nothing actually supporting the body, so it visually reads as resting
+// flat on the ground instead of standing on its own legs. BODY_LIFT
+// raises the whole body so its belly clears the floor by the same real
+// amount the angled legs actually reach down to plant their own feet.
+const SPIDER_BODY_LIFT = 0.22;
 function spiderParts() {
   const abdomen = new THREE.BoxGeometry(0.5, 0.3, 0.4);
-  abdomen.translate(0, 0.15, -0.15);
+  abdomen.translate(0, 0.15 + SPIDER_BODY_LIFT, -0.15);
   const head = new THREE.BoxGeometry(0.32, 0.24, 0.24);
-  head.translate(0, 0.14, 0.25);
+  head.translate(0, 0.14 + SPIDER_BODY_LIFT, 0.25);
   // Real vanilla spiders — like every real arachnid — have every leg
   // attach to the cephalothorax, a distinct small segment of its own
   // between the head and the abdomen, never the abdomen or head directly
@@ -7066,23 +7074,31 @@ function spiderParts() {
   // front face and the head's own back face, touching both with no seam),
   // and every leg now anchors to ITS side wall instead.
   const thorax = new THREE.BoxGeometry(0.36, 0.2, 0.08);
-  thorax.translate(0, 0.14, 0.09);
+  thorax.translate(0, 0.14 + SPIDER_BODY_LIFT, 0.09);
   // Real vanilla spiders — like every real arachnid — have 8 legs, not 6;
-  // an earlier version of this geometry only ever modeled 3 pairs. Each
-  // leg's own INNER end is anchored exactly flush against the thorax's
-  // own real side wall (x = ±0.18, its own actual half-width) at a
-  // different point along the thorax's own real (short) length, then
-  // splays outward from there at its own real fan angle — the 2 middle
-  // pairs splayed nearly straight out to the side, the front pair angled
-  // forward, and the back pair angled backward, matching a real spider's
-  // own leg stance.
+  // an earlier version of this geometry only ever modeled 3 pairs, AND
+  // pointed them dead level out to the sides — a real spider's own legs
+  // angle down from the body to plant their feet on the ground, they
+  // never stick straight out at body height. Each leg's own INNER end is
+  // anchored exactly flush against the thorax's own real side wall
+  // (x = ±0.18, its own actual half-width) at a different point along the
+  // thorax's own real (short) length, then splays outward AND downward
+  // from there at a real downward tilt, its outer tip landing right at
+  // real ground level (y=0) — the 2 middle pairs splayed nearly straight
+  // out to the side, the front pair angled forward, and the back pair
+  // angled backward, matching a real spider's own leg stance.
   const legSpecs = [
     { az: -0.03, dz: -0.6 }, // back pair — angled backward
     { az: -0.01, dz: -0.2 }, // back-middle pair
     { az: 0.01, dz: 0.2 },   // front-middle pair
     { az: 0.03, dz: 0.6 },   // front pair — angled forward, toward the head
   ];
-  const halfLen = 0.18, thoraxHalfWidth = 0.18, legY = 0.12;
+  const halfLen = 0.3, thoraxHalfWidth = 0.18, legTilt = 0.6; // legTilt ~34° down from horizontal
+  // The real attach height (already accounting for SPIDER_BODY_LIFT,
+  // chosen so this comes out close to the thorax's own real center) that
+  // makes each leg's own outer tip land exactly at real ground level
+  // (y=0) given this exact halfLen/legTilt.
+  const legY = 2 * halfLen * Math.sin(legTilt);
   const legs = [];
   for (const { az, dz } of legSpecs) {
     const dx = Math.sqrt(1 - dz * dz);
@@ -7091,8 +7107,19 @@ function spiderParts() {
       const dirX = side * dx;
       const yaw = Math.atan2(-dz, dirX);
       const g = new THREE.BoxGeometry(halfLen * 2, 0.06, 0.06);
+      // Tilt the leg's own length axis down first, while it's still
+      // lying flat along its own local length axis — this dips its own
+      // far end toward -Y regardless of which way it'll end up pointing
+      // horizontally — then yaw it to the real fan direction; a Y-axis
+      // rotation only ever mixes X/Z together and leaves Y untouched, so
+      // the downward dip survives the yaw exactly as tilted.
+      g.rotateZ(-legTilt);
       g.rotateY(yaw);
-      g.translate(ax + halfLen * dirX, legY, az + halfLen * dz);
+      g.translate(
+        ax + halfLen * Math.cos(legTilt) * dirX,
+        legY - halfLen * Math.sin(legTilt),
+        az + halfLen * Math.cos(legTilt) * dz
+      );
       legs.push(g);
     }
   }
@@ -7101,7 +7128,7 @@ function spiderParts() {
   // at night (minecraft.wiki/w/Spider), missing from an earlier version of
   // this geometry (the whole body was rendered as one flat dark color with
   // no eyes at all).
-  const faceEyeOffsets = [[-0.08, 0.17, 0.37], [0.08, 0.17, 0.37]];
+  const faceEyeOffsets = [[-0.08, 0.17 + SPIDER_BODY_LIFT, 0.37], [0.08, 0.17 + SPIDER_BODY_LIFT, 0.37]];
   const faceEyes = faceEyeOffsets.map(([x, y, z]) => {
     const g = new THREE.BoxGeometry(0.05, 0.05, 0.02);
     g.translate(x, y, z);
