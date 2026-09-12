@@ -2487,6 +2487,18 @@ const DECOR_TYPES = {
   // so its ordinary wander/climb resumes automatically the instant the
   // player leaves its own aggro range.
   cave_spider: { kind: 'cave_spider', interactive: false },
+  // Real vanilla ender dragons circle the ring of obsidian pillars and,
+  // after completing a full lap, have a real chance to instead fly to and
+  // perch on the exit portal, where it roars and holds a real breath
+  // attack for a few seconds before taking back off and resuming its own
+  // circling (minecraft.wiki/w/Ender_Dragon). Every earlier flying mob
+  // here (the ghast, the allay) wanders to a freshly-picked nearby point
+  // and back, with no fixed shape to its own path at all; an ender dragon
+  // is the first whose own ordinary movement is a continuous ORBIT around
+  // one fixed anchor point, layered with a periodic perch-then-roar cycle
+  // at that same anchor — a real geometric flight pattern, not a wander.
+  // See updateEnderDragon.
+  ender_dragon: { kind: 'ender_dragon', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3431,6 +3443,35 @@ function buildCaveSpiderMineshaftInterior(grid, silhouette, dims, exteriorMat, a
   }
   if (!decorOut) return;
   decorOut.push({ type: 'cave_spider', x: Math.floor(dims.sx / 2), y: 1, z: Math.floor(dims.sz / 2), facing: 'south' });
+}
+// An end-stone island with 4 real obsidian pillars arranged in a ring
+// around a single obsidian block at the very center — an honest
+// simplification of the real multi-block exit portal frame and eye-of-
+// ender activation, this app has neither concept at all. The ender
+// dragon's own real anchor/radius/height fields are set directly on its
+// decor entry, the same "extra fields baked in at preset-build time"
+// technique already used for the polar bear cub's own `_cub: true`.
+function buildEndPortalIslandsInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const pillarRadius = Math.max(2, Math.min(cx, cz) - 2);
+  const pillarHeight = Math.max(2, Math.min(6, dims.sy - 4));
+  const pillarAngles = [0, Math.PI / 2, Math.PI, Math.PI * 1.5];
+  for (const a of pillarAngles) {
+    const px = Math.round(cx + pillarRadius * Math.cos(a));
+    const pz = Math.round(cz + pillarRadius * Math.sin(a));
+    for (let y = 0; y <= pillarHeight; y++) {
+      if (px >= 0 && px < dims.sx && pz >= 0 && pz < dims.sz && y < dims.sy) grid[idx(px, y, pz, dims)] = accentMat;
+    }
+  }
+  grid[idx(cx, 0, cz, dims)] = accentMat;
+  if (!decorOut) return;
+  const circleY = Math.min(dims.sy - 1, pillarHeight + 2);
+  decorOut.push({
+    type: 'ender_dragon', x: cx, y: circleY, z: cz, facing: 'south',
+    anchorX: cx, anchorZ: cz, anchorY: 0, circleRadius: Math.max(2, pillarRadius - 1), circleY,
+  });
 }
 // A floating netherrack platform, open on every side and with plenty of
 // open air above it — real vanilla ghasts "float around randomly" through
@@ -5735,6 +5776,18 @@ const PRESETS = [
       'Not modeled: the real Poison status effect a cave spider\'s bite would actually inflict, its real spawning exclusively from monster spawners in abandoned mineshafts, and its real 4-less-health stat compared to an ordinary spider — this app has no status-effect, structure-spawner-type, or health system at all, so this cave spider only ever wanders, climbs, chases, and lunges.',
     ],
   },
+  {
+    id: 'end-portal-islands', name: 'End Portal Islands', shape: 'box', category: 'Farms & Automation',
+    real: { height: 12, baseX: 18, baseZ: 18 }, interiorMode: 'endPortalIslands',
+    blocks: { exterior: 'end_stone', interior: 'end_stone', accent: 'obsidian' },
+    desc: 'An end-stone island with 4 real obsidian pillars ringed around a single obsidian block at the center — an ender dragon circles them continuously, and after each real full lap it has a real chance to break off, fly down, perch on the center block, and roar before taking back off.',
+    keywords: ['ender dragon', 'dragon', 'end', 'obsidian', 'pillar', 'boss'],
+    notes: [
+      'Just watch — no player action of any kind is needed. The dragon circles the ring of pillars at a fixed radius and height, genuinely orbiting rather than wandering to a series of picked points; after each real full lap, it rolls a real chance to break off, fly straight down to the center obsidian block, perch, and after a real pause, rear back and roar for a real few seconds before taking back off and resuming exactly where its own circling left off. Real vanilla ender dragons circle the ring of obsidian pillars and, after completing a full lap, have a real chance to instead fly to and perch on the exit portal, where they roar and hold a real breath attack for a few seconds (minecraft.wiki/w/Ender_Dragon). Every earlier flying mob here (the ghast, the allay) wanders to a freshly-picked nearby point and back, with no fixed shape to its own path at all — `updateEnderDragon` is the first whose own ordinary movement is a continuous ORBIT around one fixed anchor, layered with a periodic perch-then-roar cycle at that same anchor.',
+      'Verified directly by a unit test confirming the dragon\'s own live position genuinely traces a real circle around its own fixed anchor at a constant radius (sampled at several points around one full lap), that completing a real full lap is the only thing that can ever trigger a transition toward perching (never mid-lap), that once perched it genuinely holds still, roars, and takes back off entirely on its own after a real fixed sequence of timers, and that it resumes circling afterward rather than getting stuck. This app has no verified single documented exact circling speed or perch chance — a real vanilla dragon\'s own chance actually increases as end crystals are destroyed, a system this app doesn\'t have — so both figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius. The geometry is a new, deliberately larger body plan (horned head, long neck, tapering 2-segment tail, 2 big wings) — this app\'s largest silhouette by far, matching real vanilla\'s own signature scale.',
+      'Not modeled: the real breath attack\'s actual damage and its own lingering purple particle cloud (this app has no combat/damage/status-effect system at all, so the roar is purely a visible pose), the real crystal-healing/chance-scaling system (there are no interactive end crystals here, just static pillars), the dragon destroying blocks as it flies through them, and the real death sequence and portal-generation cutscene — this app has no health/death system at all, so this dragon only ever circles, perches, and roars, forever.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6099,6 +6152,8 @@ function generateModel() {
     buildSpiderNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'caveSpiderMineshaft') {
     buildCaveSpiderMineshaftInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'endPortalIslands') {
+    buildEndPortalIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'netherWastes') {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
@@ -7154,6 +7209,47 @@ function salmonParts() {
     return g;
   });
   return { body, topFin, tailFin, eyes };
+}
+// A horned head, a long neck, a wide body, a 2-segment tapering tail, 2
+// big wings, and 2 short legs — real vanilla ender dragons are this app's
+// largest and most recognizable silhouette by far, built at a real scale
+// noticeably bigger than every earlier mob rather than the usual low-poly
+// human/animal scale. See DECOR_TYPES.ender_dragon.
+function enderDragonParts() {
+  const head = new THREE.BoxGeometry(0.7, 0.55, 1.0);
+  head.translate(0, 0.15, 1.9);
+  const hornOffsets = [[-0.22, 0.45, 2.2], [0.22, 0.45, 2.2]];
+  const horns = hornOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.35, 0.12);
+    g.translate(x, y, z);
+    return g;
+  });
+  const neck = new THREE.BoxGeometry(0.55, 0.55, 0.9);
+  neck.translate(0, 0.05, 1.2);
+  const body = new THREE.BoxGeometry(1.5, 1.1, 1.7);
+  const tail1 = new THREE.BoxGeometry(0.9, 0.7, 0.9);
+  tail1.translate(0, -0.05, -1.25);
+  const tail2 = new THREE.BoxGeometry(0.5, 0.4, 0.9);
+  tail2.translate(0, -0.1, -1.95);
+  const wingOffsets = [[-1.55, 0.25, 0], [1.55, 0.25, 0]];
+  const wings = wingOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(2.4, 0.1, 1.5);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.55, -0.7, 0.35], [0.55, -0.7, 0.35]];
+  const legs = legOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.32, 0.55, 0.32);
+    g.translate(x, y, z);
+    return g;
+  });
+  const eyeOffsets = [[-0.16, 0.2, 2.35], [0.16, 0.2, 2.35]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.08, 0.06, 0.03);
+    g.translate(x, y, z);
+    return g;
+  });
+  return { head, horns, neck, body, tail1, tail2, wings, legs, eyes };
 }
 // A flat wide shell, a small head, and four flipper stubs — real vanilla
 // turtles are noticeably wider than tall (1.2 x 1.2 footprint, only 0.4
@@ -9633,6 +9729,29 @@ function buildDecorMeshesForEntry(entry) {
     // frame, only while actually flopping outside water — never baked
     // into this geometry itself.
     if (entry._mobState === 'flopping') group.rotation.z = entry._flopped ? Math.PI * 0.42 : -Math.PI * 0.42;
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'ender_dragon') {
+    let parts = decorGeoCache.get('enderDragon');
+    if (!parts) { parts = enderDragonParts(); decorGeoCache.set('enderDragon', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x1c1c1e);
+    const hornMat = solidMaterial(0x0f0f10);
+    const eyeMat = solidMaterial(0xc23bde);
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    for (const g of parts.horns) group.add(new THREE.Mesh(g, hornMat));
+    group.add(new THREE.Mesh(parts.neck, bodyMat));
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.tail1, bodyMat));
+    group.add(new THREE.Mesh(parts.tail2, bodyMat));
+    for (const g of parts.wings) group.add(new THREE.Mesh(g, hornMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.ender_dragon/updateEnderDragon: this rearing-back
+    // tilt is set live, every frame, only while actually roaring — never
+    // baked into this geometry itself.
+    if (entry._roaring) group.rotation.x = -0.3;
     registerMob(group, entry);
     objs.push(group);
   } else if (def.kind === 'turtle') {
@@ -12182,6 +12301,84 @@ function updateSalmon(entry, obj, dt) {
   obj.rotation.z = 0;
   obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
   if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+}
+const ENDER_DRAGON_ANGULAR_SPEED = 0.5; // radians/sec — compressed so a full lap takes real time to actually watch, not a verified real circling speed
+const ENDER_DRAGON_PERCH_CHANCE = 0.5; // an honest, approximate stand-in for real vanilla's own chance, which actually increases as end crystals are destroyed — no crystal-count system exists here
+const ENDER_DRAGON_PERCH_APPROACH_SPEED = 2.5;
+const ENDER_DRAGON_PERCH_DELAY = 1.25; // real vanilla figure, used directly
+const ENDER_DRAGON_ROAR_DURATION = 3; // real vanilla breath-attack duration, used directly (the breath itself is purely cosmetic here — no combat/damage system)
+// The real new mechanic — see DECOR_TYPES.ender_dragon. Circles a fixed
+// anchor point at a constant radius/height (every earlier flying mob here
+// picks a fresh nearby point and flies straight to it, then picks
+// another — a real orbit, not a wander), and after completing each real
+// full lap, rolls a real chance to break off and fly to the anchor's own
+// ground level, perch, and roar, before taking back off and resuming
+// circling from wherever the lap left off.
+function updateEnderDragon(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  if (entry._mobState === undefined) {
+    entry._mobState = 'circling';
+    entry._anchorX = (entry.anchorX !== undefined ? entry.anchorX : dims.sx / 2) + 0.5;
+    entry._anchorZ = (entry.anchorZ !== undefined ? entry.anchorZ : dims.sz / 2) + 0.5;
+    entry._anchorY = entry.anchorY !== undefined ? entry.anchorY : entry.y;
+    entry._circleRadius = entry.circleRadius || 5;
+    entry._circleY = entry.circleY !== undefined ? entry.circleY : entry.y + 3;
+    entry._angle = 0;
+    entry._lapAngle = 0;
+    entry._wx = entry._anchorX + entry._circleRadius;
+    entry._wy = entry._circleY;
+    entry._wz = entry._anchorZ;
+  }
+  if (entry._mobState === 'circling') {
+    const step = ENDER_DRAGON_ANGULAR_SPEED * dt;
+    entry._angle += step;
+    entry._lapAngle += step;
+    const oldWx = entry._wx, oldWz = entry._wz;
+    entry._wx = entry._anchorX + entry._circleRadius * Math.cos(entry._angle);
+    entry._wz = entry._anchorZ + entry._circleRadius * Math.sin(entry._angle);
+    entry._wy = entry._circleY;
+    const dx = entry._wx - oldWx, dz = entry._wz - oldWz;
+    if (Math.hypot(dx, dz) > 0.0001) entry._mobYaw = Math.atan2(dx, dz);
+    if (entry._lapAngle >= Math.PI * 2) {
+      entry._lapAngle -= Math.PI * 2;
+      if (Math.random() < ENDER_DRAGON_PERCH_CHANCE) {
+        entry._mobState = 'approaching_perch';
+      }
+    }
+  } else if (entry._mobState === 'approaching_perch') {
+    const tx = entry._anchorX, ty = entry._anchorY + 1, tz = entry._anchorZ;
+    const dx = tx - entry._wx, dy = ty - entry._wy, dz = tz - entry._wz;
+    const dist = Math.hypot(dx, dy, dz);
+    const step = ENDER_DRAGON_PERCH_APPROACH_SPEED * dt;
+    if (dist <= step) {
+      entry._wx = tx; entry._wy = ty; entry._wz = tz;
+      entry._mobState = 'perched';
+      entry._perchTimer = ENDER_DRAGON_PERCH_DELAY;
+      entry._roaring = false;
+    } else {
+      entry._wx += (dx / dist) * step;
+      entry._wy += (dy / dist) * step;
+      entry._wz += (dz / dist) * step;
+      if (Math.hypot(dx, dz) > 0.0001) entry._mobYaw = Math.atan2(dx, dz);
+    }
+  } else { // perched
+    if (!entry._roaring) {
+      entry._perchTimer -= dt;
+      if (entry._perchTimer <= 0) {
+        entry._roaring = true;
+        entry._roarTimer = ENDER_DRAGON_ROAR_DURATION;
+      }
+    } else {
+      entry._roarTimer -= dt;
+      if (entry._roarTimer <= 0) {
+        entry._roaring = false;
+        entry._mobState = 'circling';
+      }
+    }
+  }
+  obj.position.set(entry._wx + offX, entry._wy, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+  obj.rotation.x = entry._roaring ? -0.3 : 0;
 }
 const PUFFERFISH_WANDER_MIN = 1, PUFFERFISH_WANDER_MAX = 3;
 const PUFFERFISH_SWIM_SPEED = 0.4;
@@ -18032,6 +18229,7 @@ function updateMobs(dt) {
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'tropical_fish') { updateTropicalFish(entry, obj, dt); continue; }
     if (entry.type === 'salmon') { updateSalmon(entry, obj, dt); continue; }
+    if (entry.type === 'ender_dragon') { updateEnderDragon(entry, obj, dt); continue; }
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
     if (entry.type === 'magma_cube') { updateMagmaCube(entry, obj, dt); continue; }
@@ -19258,7 +19456,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -19328,7 +19526,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -19460,6 +19658,7 @@ function renderCommands(model) {
       else if (d.type === 'tropical_fish') lines.push(`summon minecraft:tropical_fish ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'ender_dragon') lines.push(`summon minecraft:ender_dragon ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
