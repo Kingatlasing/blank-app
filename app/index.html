@@ -2473,6 +2473,20 @@ const DECOR_TYPES = {
   // the squid's own pickSquidSwimTarget/squidCellSwimmable completely
   // unchanged for its in-water wander.
   salmon: { kind: 'salmon', interactive: false },
+  // Real vanilla cave spiders are a smaller, always-hostile spider variant
+  // that still climbs walls exactly like an ordinary one
+  // (minecraft.wiki/w/Cave_Spider). The spider's own wall-climbing here has
+  // "no aggro/attack model exists in this app (no combat at all)" — it
+  // only ever wanders and climbs, never hunts. A cave spider is the first
+  // to combine that exact same unchanged wall-climbing wander (reusing
+  // MOB_CLIMB_KINDS/pickSpiderClimbTarget unchanged) with an active,
+  // player-directed melee hunt-and-bite, the same chase-then-attack shape
+  // already proven by the wither skeleton, layered on TOP of a movement
+  // style (wall climbing) no earlier hunter here has ever had. See
+  // updateCaveSpiderHunt, checked before the shared generic mob dispatch
+  // so its ordinary wander/climb resumes automatically the instant the
+  // player leaves its own aggro range.
+  cave_spider: { kind: 'cave_spider', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3403,6 +3417,20 @@ function buildSpiderNestInterior(grid, silhouette, dims, exteriorMat, accentMat,
   }
   if (!decorOut) return;
   decorOut.push({ type: 'spider', x: 1, y: 1, z: 1, facing: 'south' });
+}
+// Only 2 adjacent stone walls (not all 4 like the fully-sealed Spider
+// Nest) — real walls for it to climb while wandering, but left open on
+// the other 2 sides so a Walk-mode player can actually walk in and get
+// hunted, unlike the ordinary spider's own fully-enclosed preset.
+function buildCaveSpiderMineshaftInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  for (let y = 0; y < dims.sy; y++) {
+    for (let x = 0; x < dims.sx; x++) grid[idx(x, y, 0, dims)] = exteriorMat;
+    for (let z = 0; z < dims.sz; z++) grid[idx(0, y, z, dims)] = exteriorMat;
+  }
+  if (!decorOut) return;
+  decorOut.push({ type: 'cave_spider', x: Math.floor(dims.sx / 2), y: 1, z: Math.floor(dims.sz / 2), facing: 'south' });
 }
 // A floating netherrack platform, open on every side and with plenty of
 // open air above it — real vanilla ghasts "float around randomly" through
@@ -5695,6 +5723,18 @@ const PRESETS = [
       'Not modeled: a real flopping salmon eventually suffocating and dying (this app has no health/damage/death system at all, so this one just flops in place forever instead), a player rescuing it back into water with a bucket (no inventory/held-item system here either), and salmon genuinely leaping 4-5 blocks up real waterfalls (this app has no waterfall-climb mechanic) — this app\'s salmon only ever swims in water or flops on land, whichever it started in.',
     ],
   },
+  {
+    id: 'cave-spider-mineshaft', name: 'Cave Spider Mineshaft', shape: 'box', category: 'Farms & Automation',
+    real: { height: 4, baseX: 9, baseZ: 9 }, interiorMode: 'caveSpiderMineshaft',
+    blocks: { exterior: 'stone', interior: 'stone', accent: 'cobblestone' },
+    desc: 'A small stone room with 2 real climbable walls, left open on the other 2 sides — a real cave spider waits inside. Switch to Walk mode and step in: unlike an ordinary spider, it genuinely charges straight at you and lunges the instant it\'s close enough.',
+    keywords: ['cave spider', 'spider', 'mineshaft', 'climb', 'hunt', 'melee'],
+    notes: [
+      'Switch to Walk mode and step into the room — the cave spider ignores you until you\'re actually within its own real aggro range, then charges straight at your live position, and the instant it\'s actually within real melee reach, it lunges (a genuine forward tilt) before resetting and starting a real cooldown. Real vanilla cave spiders are a smaller, always-hostile spider variant that still climbs walls exactly like an ordinary one (minecraft.wiki/w/Cave_Spider). This app\'s own ordinary spider already climbs walls, but has "no aggro/attack model... at all" — it only ever wanders and climbs, never hunts. `updateCaveSpiderHunt` is the first here to layer an active, player-directed melee hunt directly on top of that exact same unchanged wall-climbing wander (reusing `MOB_CLIMB_KINDS`/`pickSpiderClimbTarget` completely unchanged) — a wall-climber that hunts, and a hunter that climbs walls, together for the first time. Since a real cave spider has no held weapon, its own attack is a plain forward lunge applied directly to the live mesh\'s own rotation, the same "no rebuild needed" technique already proven by the zoglin\'s own head-butt.',
+      'Verified directly by a unit test confirming a cave spider with the player genuinely far away stays in its own ordinary wander/climb behavior untouched, that the exact same one genuinely starts closing real distance the instant the player enters its own aggro range, that it genuinely stops and lunges once actually within melee range rather than walking through the player, and that the lunge genuinely finishes and starts a real cooldown before it can lunge again. This app has no verified single documented exact cave spider aggro range, melee range, or lunge timing, so the figures used are honest, approximate stand-ins, the same caveat already applied to the vindicator\'s own aggro radius and the wither skeleton\'s own melee figures. The geometry reuses the exact same spider body plan completely unchanged, scaled down and recolored a real teal-blue.',
+      'Not modeled: the real Poison status effect a cave spider\'s bite would actually inflict, its real spawning exclusively from monster spawners in abandoned mineshafts, and its real 4-less-health stat compared to an ordinary spider — this app has no status-effect, structure-spawner-type, or health system at all, so this cave spider only ever wanders, climbs, chases, and lunges.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6057,6 +6097,8 @@ function generateModel() {
     buildEndIslandsInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'spiderNest') {
     buildSpiderNestInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'caveSpiderMineshaft') {
+    buildCaveSpiderMineshaftInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'netherWastes') {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
@@ -9418,6 +9460,25 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0; // pitched flat against the wall while climbing
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'cave_spider') {
+    // Reuses the spider's own geometry entirely unchanged, just scaled
+    // down and recolored a real teal-blue — a real cave spider IS a
+    // spider in every structural sense, just smaller
+    // (minecraft.wiki/w/Cave_Spider).
+    let parts = decorGeoCache.get('spider');
+    if (!parts) { parts = spiderParts(); decorGeoCache.set('spider', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0x1a4a4a);
+    const eyeMat = solidMaterial(0xd91f1f);
+    group.add(new THREE.Mesh(parts.abdomen, bodyMat));
+    group.add(new THREE.Mesh(parts.thorax, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.scale.setScalar(0.7);
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    group.rotation.x = entry._mobState === 'climbing' ? -Math.PI / 2 : 0;
+    registerMob(group, entry);
+    objs.push(group);
   } else if (def.kind === 'ghast') {
     let parts = decorGeoCache.get('ghast');
     if (!parts) { parts = ghastParts(); decorGeoCache.set('ghast', parts); }
@@ -11087,7 +11148,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey', 'mule']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey', 'mule', 'cave_spider']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -11135,7 +11196,7 @@ const MOB_TELEPORT_CHANCE = 0.5;
 // model exists in this app (no combat at all), so only the wandering half
 // of that is implemented: a spider touching a wall may climb it a few
 // blocks instead of picking a normal floor destination.
-const MOB_CLIMB_KINDS = new Set(['spider']);
+const MOB_CLIMB_KINDS = new Set(['spider', 'cave_spider']);
 const MOB_CLIMB_CHANCE = 0.4;
 const SPIDER_CLIMB_RADIUS = 3;
 function hasAdjacentWall(model, x, y, z) {
@@ -11159,6 +11220,55 @@ function pickSpiderClimbTarget(model, entry) {
     return { y: ty };
   }
   return null;
+}
+const CAVE_SPIDER_AGGRO_RANGE = 6; // an honest, approximate stand-in — real vanilla cave spiders are simply "always hostile," with no single documented exact detection range
+const CAVE_SPIDER_MELEE_RANGE = 0.7;
+const CAVE_SPIDER_CHASE_SPEED = 1.4;
+const CAVE_SPIDER_ATTACK_TIME = 0.3;
+const CAVE_SPIDER_ATTACK_COOLDOWN = 1.0;
+const CAVE_SPIDER_LUNGE_TILT = 0.4;
+// The real new mechanic — see DECOR_TYPES.cave_spider. Chases the live
+// player directly, the same shape already proven by updateWitherSkeleton,
+// but is the first hunter here to do so while ALSO able to climb real
+// walls via the exact same unchanged MOB_CLIMB_KINDS system the ordinary
+// spider already uses for its own wander — a wall-climber that hunts, and
+// a hunter that climbs walls, together for the first time. Since a real
+// cave spider has no held weapon, its own attack is a plain forward lunge
+// applied directly to the live mesh's own rotation, the same "no rebuild
+// needed" technique already proven by the zoglin's own head-butt.
+function updateCaveSpiderHunt(entry, obj, dt) {
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  entry._attackCooldown = Math.max(0, (entry._attackCooldown || 0) - dt);
+  if (entry._attacking) {
+    entry._attackTimer -= dt;
+    const progress = Math.min(1, 1 - entry._attackTimer / CAVE_SPIDER_ATTACK_TIME);
+    obj.rotation.z = Math.sin(progress * Math.PI) * CAVE_SPIDER_LUNGE_TILT;
+    if (entry._attackTimer <= 0) {
+      entry._attacking = false;
+      entry._attackCooldown = CAVE_SPIDER_ATTACK_COOLDOWN;
+      obj.rotation.z = 0;
+    }
+    obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
+    if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
+    return;
+  }
+  const px = flyState.pos.x - offX, pz = flyState.pos.z - offZ;
+  const dx = px - entry._wx, dz = pz - entry._wz;
+  const dist = Math.hypot(dx, dz);
+  if (dist > 0.01) entry._mobYaw = Math.atan2(dx, dz);
+  if (dist <= CAVE_SPIDER_MELEE_RANGE) {
+    if (entry._attackCooldown <= 0) {
+      entry._attacking = true;
+      entry._attackTimer = CAVE_SPIDER_ATTACK_TIME;
+    }
+  } else {
+    const step = Math.min(CAVE_SPIDER_CHASE_SPEED * dt, dist);
+    entry._wx += (dx / dist) * step;
+    entry._wz += (dz / dist) * step;
+  }
+  obj.rotation.x = 0;
+  obj.position.set(entry._wx + offX, entry._wy + 0.5, entry._wz + offZ);
+  if (entry._mobYaw !== undefined) obj.rotation.y = entry._mobYaw;
 }
 function mobCellWalkable(model, x, y, z) {
   const dims = model.dims;
@@ -17850,6 +17960,17 @@ function updateMobs(dt) {
       const prey = findNearestLiveEndermite(entry);
       if (prey) { updateEndermanHunt(entry, obj, dt, prey); continue; }
     }
+    // A real cave spider actively hunts the live player at all times,
+    // layered directly on top of its own unmodified wall-climbing wander —
+    // checked before the shared generic mob block below so its ordinary
+    // wander/climb resumes automatically the instant the player leaves its
+    // own aggro range, and skipped on the very first frame before
+    // entry._wx even exists yet (initialized by that same generic block).
+    if (entry.type === 'cave_spider' && entry._wx !== undefined && (cameraMode === 'walk' || cameraMode === 'thirdperson')) {
+      const px = flyState.pos.x - offX, pz = flyState.pos.z - offZ;
+      const dist = Math.hypot(px - entry._wx, pz - entry._wz);
+      if (dist <= CAVE_SPIDER_AGGRO_RANGE || entry._attacking) { updateCaveSpiderHunt(entry, obj, dt); continue; }
+    }
     if (entry.type === 'zombified_piglin') { updateZombifiedPiglin(entry, obj, dt); continue; }
     if (entry.type === 'piglin') { updatePiglin(entry, obj, dt); continue; }
     if (entry.type === 'creeper') { updateCreeper(entry, obj, dt); continue; }
@@ -19137,7 +19258,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -19207,7 +19328,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -19338,6 +19459,7 @@ function renderCommands(model) {
       else if (d.type === 'mule') lines.push(`summon minecraft:mule ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'tropical_fish') lines.push(`summon minecraft:tropical_fish ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'wolf') lines.push(`summon minecraft:wolf ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ocelot') lines.push(`summon minecraft:ocelot ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
