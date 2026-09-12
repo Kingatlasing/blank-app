@@ -7056,7 +7056,7 @@ function endermanParts() {
 // flat on the ground instead of standing on its own legs. BODY_LIFT
 // raises the whole body so its belly clears the floor by the same real
 // amount the angled legs actually reach down to plant their own feet.
-const SPIDER_BODY_LIFT = 0.22;
+const SPIDER_BODY_LIFT = 0.15;
 function spiderParts() {
   const abdomen = new THREE.BoxGeometry(0.5, 0.3, 0.4);
   abdomen.translate(0, 0.15 + SPIDER_BODY_LIFT, -0.15);
@@ -7093,7 +7093,7 @@ function spiderParts() {
     { az: 0.01, dz: 0.2 },   // front-middle pair
     { az: 0.03, dz: 0.6 },   // front pair — angled forward, toward the head
   ];
-  const halfLen = 0.3, thoraxHalfWidth = 0.18, legTilt = 0.6; // legTilt ~34° down from horizontal
+  const halfLen = 0.2, thoraxHalfWidth = 0.18, legTilt = 0.6; // legTilt ~34° down from horizontal
   // The real attach height (already accounting for SPIDER_BODY_LIFT,
   // chosen so this comes out close to the thorax's own real center) that
   // makes each leg's own outer tip land exactly at real ground level
