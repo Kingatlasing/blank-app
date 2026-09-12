@@ -7043,12 +7043,25 @@ function cowParts() {
     g.translate(x, y, z);
     return g;
   });
+  // 2 small flat ears on the sides of the head, near the top — real
+  // vanilla's own other easily-missed identifier alongside the snout
+  // (minecraft.wiki/w/Cow), missing entirely from an earlier version of
+  // this geometry (also reused unchanged by the mooshroom). The head's
+  // own side faces sit at x=±0.16 (half its own 0.32 width); each ear's
+  // own inner face is set flush against that and extends OUTWARD from
+  // there, the same convention already used for the snout/eyes.
+  const earOffsets = [[-0.19, 0.28, 0.62], [0.19, 0.28, 0.62]];
+  const ears = earOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.12, 0.18);
+    g.translate(x, y, z);
+    return g;
+  });
   const legs = [[-0.18, -0.3], [0.18, -0.3], [-0.18, 0.3], [0.18, 0.3]].map(([x, z]) => {
     const g = new THREE.BoxGeometry(0.12, 0.4, 0.12);
     g.translate(x, -0.3, z);
     return g;
   });
-  return { body, head, udder, snout, faceEyes, legs };
+  return { body, head, udder, snout, faceEyes, ears, legs };
 }
 // A real mooshroom's own body/head/legs are the exact same as a cow's —
 // see DECOR_TYPES.mooshroom — plus 3 small red-and-white mushroom bumps
@@ -10118,6 +10131,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(parts.udder, udderMat));
     group.add(new THREE.Mesh(parts.snout, snoutMat));
     for (const g of parts.faceEyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.ears) group.add(new THREE.Mesh(g, headMat));
     for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
@@ -10138,6 +10152,7 @@ function buildDecorMeshesForEntry(entry) {
     group.add(new THREE.Mesh(cowGeo.head, headMat));
     group.add(new THREE.Mesh(cowGeo.udder, udderMat));
     group.add(new THREE.Mesh(cowGeo.snout, snoutMat));
+    for (const g of cowGeo.ears) group.add(new THREE.Mesh(g, headMat));
     for (const g of cowGeo.legs) group.add(new THREE.Mesh(g, bodyMat));
     const stemMat = solidMaterial(0xd8cdb8), capMat = solidMaterial(0xc22b2b), dotMat = solidMaterial(0xf0ead6);
     for (const g of bumps.stems) group.add(new THREE.Mesh(g, stemMat));
