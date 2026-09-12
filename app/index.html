@@ -2499,6 +2499,19 @@ const DECOR_TYPES = {
   // at that same anchor — a real geometric flight pattern, not a wander.
   // See updateEnderDragon.
   ender_dragon: { kind: 'ender_dragon', interactive: false },
+  // Real vanilla ocelots "have a 1/3 chance of trusting the player" on
+  // every raw cod/salmon they're fed, and once trusted "no longer flee
+  // from the player" (minecraft.wiki/w/Ocelot); this app's own ocelot
+  // (see DECOR_TYPES.ocelot) has so far only ever implemented the FLEEING
+  // half of that real behavior, never the fish/trust half. A cod is the
+  // first mob here that exists to give an ALREADY-MODELED earlier mob a
+  // genuinely new mechanic just by being placed nearby, rather than
+  // adding a new mechanic to itself — see the cod-feeding check inside
+  // updateOcelot / findNearestDroppedCod. Reuses salmonParts() and
+  // updateSalmon() completely unchanged (same swim/flop shape, real
+  // vanilla cod being just as "unable to survive out of water" as
+  // salmon), recolored to cod's own duller real mottled tan.
+  cod: { kind: 'cod', interactive: false },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -4175,6 +4188,35 @@ function buildOcelotJungleFloorInterior(grid, silhouette, dims, exteriorMat, acc
   const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
   decorOut.push({ type: 'ocelot', x: cx, y: 1, z: cz, facing: 'south' });
 }
+// The same river-width water-strip containment technique as Salmon
+// Riverbank, with a real live cod swimming in it, plus a wild ocelot on
+// the dry bank surrounded by several dropped cod items — real vanilla
+// ocelots gain trust from being fed raw cod/salmon at a real 1/3 chance
+// per feeding (minecraft.wiki/w/Ocelot), and this one genuinely does:
+// several cod items are placed (rather than just one) so that real
+// per-attempt chance has a realistic shot at actually landing within a
+// short demo window. See the cod-feeding check inside updateOcelot.
+function buildOcelotTrustCoveInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  const poolWidth = Math.max(3, Math.floor(dims.sx / 3));
+  for (let z = 0; z < dims.sz; z++) {
+    for (let x = 0; x < dims.sx; x++) {
+      const floorY = x < poolWidth ? 0 : 1;
+      grid[idx(x, floorY, z, dims)] = exteriorMat;
+    }
+  }
+  if (!decorOut) return;
+  for (let z = 0; z < dims.sz; z++) decorOut.push({ type: 'water', x: 0, y: 1, z, source: true });
+  const cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'cod', x: 1, y: 1, z: cz, facing: 'south' });
+  const ocelotX = Math.min(dims.sx - 2, poolWidth + 3);
+  decorOut.push({ type: 'ocelot', x: ocelotX, y: 2, z: cz, facing: 'south' });
+  for (const dx of [-2, -1, 0, 1, 2]) {
+    const fx = ocelotX + dx;
+    if (fx <= poolWidth || fx >= dims.sx) continue;
+    decorOut.push({ type: 'dropped_item', itemType: 'cod', x: fx, y: 2, z: cz });
+  }
+}
 // A 3-llama caravan — a leader and 2 followers, each pre-linked to the
 // one directly ahead of it — so the real leader-follower trail chain is
 // directly observable as the leader wanders.
@@ -5788,6 +5830,18 @@ const PRESETS = [
       'Not modeled: the real breath attack\'s actual damage and its own lingering purple particle cloud (this app has no combat/damage/status-effect system at all, so the roar is purely a visible pose), the real crystal-healing/chance-scaling system (there are no interactive end crystals here, just static pillars), the dragon destroying blocks as it flies through them, and the real death sequence and portal-generation cutscene — this app has no health/death system at all, so this dragon only ever circles, perches, and roars, forever.',
     ],
   },
+  {
+    id: 'ocelot-trust-cove', name: 'Ocelot Trust Cove', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 14, baseZ: 10 }, interiorMode: 'ocelotTrustCove',
+    blocks: { exterior: 'grass_block', interior: 'grass_block', accent: 'grass_block' },
+    desc: 'The same river-width water strip as Salmon Riverbank, now with a real cod swimming in it, plus a wild ocelot on the dry bank surrounded by 5 dropped cod items — real vanilla ocelots gain trust from being fed raw cod at a real 1/3 chance per feeding, and this one genuinely does, eventually settling down and no longer fleeing the player at all.',
+    keywords: ['ocelot', 'cod', 'fish', 'trust', 'tame', 'feed'],
+    notes: [
+      'Just let the model run — no player action of any kind is needed. The ocelot automatically checks for a nearby dropped cod item on a periodic timer and, if one is there, consumes it and rolls a real 1-in-3 chance to become trusted; 5 cod items are placed around it so that real chance gets several genuine attempts within a short demo window rather than depending on a single roll. Once trusted, switch to Walk mode and approach it within what used to be its own real flee radius — it no longer bolts away at all, unlike the untrusted ocelot on the Ocelot Jungle Floor preset. Real vanilla ocelots "have a 1/3 chance of trusting the player" on every raw cod or salmon they\'re fed, and once trusted "no longer flee from the player" (minecraft.wiki/w/Ocelot). Every earlier mob added to this app has always gained its own new mechanic on ITSELF; a cod is the first mob here whose entire purpose is to hand an already-shipped EARLIER mob (the ocelot, added long before this one) a genuinely new mechanic just by existing nearby, found by the new findNearestDroppedCod.',
+      'Verified directly by a unit test confirming an ocelot with no dropped cod anywhere nearby never gains trust no matter how much simulated time passes, that a dropped cod within its own real feeding-scan radius is genuinely consumed (removed from the world) on the very next feeding-attempt tick regardless of outcome, that repeating that same feeding attempt enough times eventually does grant trust (the real 1/3-per-try chance, driven enough tries to be overwhelmingly likely), and that a trusted ocelot placed right next to a simulated nearby player position genuinely no longer flees while an untrusted one under the same conditions still does. This app has no verified real feeding-scan radius or feeding-attempt cadence, so both figures used are honest, approximate stand-ins, the same caveat already applied to the wolf\'s own pack-leash radius. Cod itself reuses salmon\'s own geometry and swim/flop AI completely unchanged (real vanilla cod being just as unable to survive out of water as salmon), recolored to its own duller real mottled tan.',
+      'Not modeled: a real ocelot actually being tamed into a companion (in real vanilla, gaining trust just stops it from fleeing — it never becomes a followable pet; only the separate, already-modeled cat species is truly tameable here), the player manually walking up and feeding a HELD cod by hand rather than an item simply sitting nearby (this app has no inventory/held-item system at all), and cod schooling behavior or their real ocean-only habitat (this cod is placed in a plain river strip purely to sit next to the ocelot for this demo) — this app\'s cod only ever swims, flops, and gets eaten.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6210,6 +6264,8 @@ function generateModel() {
     buildWolfPackClearingInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'ocelotJungleFloor') {
     buildOcelotJungleFloorInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'ocelotTrustCove') {
+    buildOcelotTrustCoveInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'llamaCaravanTrail') {
     buildLlamaCaravanTrailInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'camelRestStop') {
@@ -7659,6 +7715,7 @@ const DROPPED_ITEM_COLORS = {
   brown_mushroom: 0x8a6a4a,
   gunpowder: 0x8a8478,
   chest: 0x8a5a2f,
+  cod: 0xa8987a,
 };
 // A tall, hunched torso, a head with a wide teal crown band and 2 curved
 // feeler tendrils sweeping outward, long arms with tan bark-like shoulder
@@ -9746,6 +9803,26 @@ function buildDecorMeshesForEntry(entry) {
     // See DECOR_TYPES.salmon/updateSalmon: rotation.z is set live, every
     // frame, only while actually flopping outside water — never baked
     // into this geometry itself.
+    if (entry._mobState === 'flopping') group.rotation.z = entry._flopped ? Math.PI * 0.42 : -Math.PI * 0.42;
+    registerMob(group, entry);
+    objs.push(group);
+  } else if (def.kind === 'cod') {
+    // Reuses salmon's own geometry function/cache key entirely unchanged
+    // (the same shared-cache technique cave_spider uses for spiderParts())
+    // — cod is only distinguished here by its own duller real coloring.
+    let parts = decorGeoCache.get('salmon');
+    if (!parts) { parts = salmonParts(); decorGeoCache.set('salmon', parts); }
+    const group = new THREE.Group();
+    const bodyMat = solidMaterial(0xa8987a);
+    const finMat = solidMaterial(0x7a6a52);
+    const eyeMat = solidMaterial(0x14140f);
+    group.add(new THREE.Mesh(parts.body, bodyMat));
+    group.add(new THREE.Mesh(parts.topFin, finMat));
+    group.add(new THREE.Mesh(parts.tailFin, finMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    // See DECOR_TYPES.cod/updateSalmon (reused directly): rotation.z is
+    // set live, every frame, only while actually flopping outside water.
     if (entry._mobState === 'flopping') group.rotation.z = entry._flopped ? Math.PI * 0.42 : -Math.PI * 0.42;
     registerMob(group, entry);
     objs.push(group);
@@ -14905,6 +14982,19 @@ const OCELOT_WANDER_MIN = 2, OCELOT_WANDER_MAX = 5;
 const OCELOT_WALK_SPEED = 1.0;
 const OCELOT_FLEE_SPEED = 2.2;
 const OCELOT_FLEE_RADIUS = 6;
+const OCELOT_FEED_SCAN_RADIUS = 3;
+const OCELOT_FEED_CHECK_INTERVAL = 1; // an honest, approximate stand-in cadence — not a verified exact vanilla figure
+// The real new mechanic belongs to DECOR_TYPES.cod, not this ocelot's own
+// type — see findNearestDroppedCod.
+function findNearestDroppedCod(entry) {
+  let best = null, bestDist = Infinity;
+  for (const { entry: other } of mobObjects) {
+    if (other.type !== 'dropped_item' || other.itemType !== 'cod') continue;
+    const dist = Math.hypot(other.x - entry._wx, other.z - entry._wz);
+    if (dist <= OCELOT_FEED_SCAN_RADIUS && dist < bestDist) { best = other; bestDist = dist; }
+  }
+  return best;
+}
 function updateOcelot(entry, obj, dt) {
   const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
   if (entry._mobState === undefined) {
@@ -14913,13 +15003,29 @@ function updateOcelot(entry, obj, dt) {
     entry._wx = entry.x + 0.5;
     entry._wz = entry.z + 0.5;
   }
+  // Real vanilla ocelots "have a 1/3 chance of trusting the player" on
+  // every raw cod/salmon they're fed, and once trusted "no longer flee
+  // from the player" (minecraft.wiki/w/Ocelot) — checked on a periodic
+  // timer, the same shape as every other mob's own wander timer here,
+  // against any real dropped cod item currently within scan range.
+  if (!entry._trusted) {
+    entry._feedTimer = (entry._feedTimer === undefined ? OCELOT_FEED_CHECK_INTERVAL : entry._feedTimer) - dt;
+    if (entry._feedTimer <= 0) {
+      entry._feedTimer = OCELOT_FEED_CHECK_INTERVAL;
+      const cod = findNearestDroppedCod(entry);
+      if (cod) {
+        removeDroppedItemFromWorld(cod);
+        if (Math.random() < 1 / 3) entry._trusted = true;
+      }
+    }
+  }
   let playerDist = Infinity, sensedX = 0, sensedZ = 0;
   if (cameraMode === 'walk' || cameraMode === 'thirdperson') {
     sensedX = flyState.pos.x - offX;
     sensedZ = flyState.pos.z - offZ;
     playerDist = Math.hypot(sensedX - entry._wx, sensedZ - entry._wz);
   }
-  if (playerDist <= OCELOT_FLEE_RADIUS) {
+  if (playerDist <= OCELOT_FLEE_RADIUS && !entry._trusted) {
     entry._mobState = 'fleeing';
     const awayDist = Math.max(playerDist, 0.01);
     const fleeX = entry._wx + ((entry._wx - sensedX) / awayDist) * 4;
@@ -18247,6 +18353,7 @@ function updateMobs(dt) {
     if (entry.type === 'squid' || entry.type === 'glow_squid') { updateSquid(entry, obj, dt); continue; }
     if (entry.type === 'tropical_fish') { updateTropicalFish(entry, obj, dt); continue; }
     if (entry.type === 'salmon') { updateSalmon(entry, obj, dt); continue; }
+    if (entry.type === 'cod') { updateSalmon(entry, obj, dt); continue; }
     if (entry.type === 'ender_dragon') { updateEnderDragon(entry, obj, dt); continue; }
     if (entry.type === 'pufferfish') { updatePufferfish(entry, obj, dt); continue; }
     if (entry.type === 'slime') { updateSlime(entry, obj, dt); continue; }
@@ -19474,7 +19581,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -19544,7 +19651,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -19675,6 +19782,7 @@ function renderCommands(model) {
       else if (d.type === 'mule') lines.push(`summon minecraft:mule ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'tropical_fish') lines.push(`summon minecraft:tropical_fish ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
+      else if (d.type === 'cod') lines.push(`summon minecraft:cod ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ender_dragon') lines.push(`summon minecraft:ender_dragon ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
