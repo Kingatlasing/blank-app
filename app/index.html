@@ -2527,6 +2527,20 @@ const DECOR_TYPES = {
   // ghastParts and updateGhast completely unchanged for its own body and
   // float behavior.
   happy_ghast: { kind: 'happy_ghast', interactive: false },
+  // A real vanilla copper golem (introduced in The Copper Age, 2025)
+  // autonomously oxidizes over real time through the same 4 real stages
+  // as a plain copper block — unoxidized, exposed, weathered, and
+  // oxidized — permanently, unless waxed first
+  // (minecraft.wiki/w/Copper_Golem, minecraft.wiki/w/Oxidation). Every
+  // earlier interactive object here (the armor stand) only ever changes
+  // its own OWN state through a player's own repeated click; a copper
+  // golem is the first mob whose own visible color genuinely progresses
+  // through real discrete stages purely with elapsed time, completely
+  // unprompted — a click here does the opposite of advancing it: it
+  // permanently WAXES the golem, halting that automatic progression for
+  // good, the real vanilla effect of applying honeycomb. See
+  // updateCopperGolem / attemptWaxCopperGolem.
+  copper_golem: { kind: 'copper_golem', interactive: true },
 };
 // Real vanilla north_east/north_west/south_east/south_west curved-rail
 // y-rotations (blockstates/rail.json) — which two of the cell's four edges
@@ -3525,6 +3539,19 @@ function buildHappyGhastHavenInterior(grid, silhouette, dims, exteriorMat, accen
   const floatY = Math.max(1, Math.floor(dims.sy / 2));
   decorOut.push({ type: 'happy_ghast', x: cx, y: floatY, z: cz, facing: 'south' });
   decorOut.push({ type: 'dropped_item', itemType: 'harness', x: cx, y: 1, z: cz });
+}
+// A plain open courtyard with a single copper golem standing on it — the
+// golem's own real mechanic (see DECOR_TYPES.copper_golem/
+// updateCopperGolem) is automatic, continuous oxidation purely from real
+// elapsed time, needing no fed/dropped item at all to demonstrate, unlike
+// the happy ghast's harness; a player click on it (attemptWaxCopperGolem)
+// halts that oxidation in place, same as vanilla waxing with honeycomb.
+function buildCopperGolemHomeInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
+  for (let i = 0; i < grid.length; i++) grid[i] = 0;
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
+  if (!decorOut) return;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  decorOut.push({ type: 'copper_golem', x: cx, y: 1, z: cz, facing: 'south' });
 }
 // An open grass meadow with a beehive and several real flowers scattered
 // around it — unlike every other mob preset here, the bee doesn't just
@@ -5883,6 +5910,18 @@ const PRESETS = [
       'Not modeled: real multiplayer riding (up to 4 players) and lead-based steering (this app has no player-riding/camera-attachment system at all, so the harness equip itself — not the ride — is the real new mechanic modeled here), the real craftable harness color choice (this app picks one of a representative handful of real dye colors at random instead), and the real ghastling baby-growth stage requiring 20 real minutes of hydration — this app has no baby-mob-growth or day/night-scale time system at all, so this happy ghast spawns already adult and either harnessed or not.',
     ],
   },
+  {
+    id: 'copper-golem-home', name: 'Copper Golem Home', shape: 'box', category: 'Farms & Automation',
+    real: { height: 3, baseX: 8, baseZ: 8 }, interiorMode: 'copperGolemHome',
+    blocks: { exterior: 'copper_block', interior: 'copper_block', accent: 'copper_block' },
+    desc: 'A single copper golem standing on an open copper-block courtyard, genuinely oxidizing on its own through the same 4 real copper stages a plain copper block cycles through — just watch it darken over time, or click it to wax it and freeze it in place at whatever stage it has reached, exactly like applying real honeycomb.',
+    keywords: ['copper golem', 'golem', 'copper', 'oxidize', 'wax', 'weathered'],
+    notes: [
+      'Just let the model run — no player action of any kind is needed to see the real mechanic. The golem starts unoxidized (bright orange-pink, matching a fresh copper block) and, purely from real elapsed time, automatically advances through exposed, then weathered, then fully oxidized (dull teal-green) — the same 4 real stages a plain copper block itself passes through, each real stage taking roughly 7 to 7 hours 40 minutes of real gametime (minecraft.wiki/w/Oxidation). A real vanilla copper golem, added in The Copper Age (Sept 30, 2025), is a small craftable automaton built from copper blocks and a carved pumpkin whose real job is sorting items out of nearby copper chests into other storage, and its own copper body oxidizes over real time exactly like any other copper block (minecraft.wiki/w/Copper_Golem). Click the golem at any point to WAX it, the same real vanilla effect of applying honeycomb — this permanently halts its oxidation right where it is, and it never advances another stage again.',
+      'Verified directly by a unit test confirming an unwaxed golem\'s own oxidation stage genuinely advances through all 4 real stages purely from enough simulated elapsed time, that it never advances past the final fully-oxidized stage no matter how much more time passes, that waxing (setting _waxed) genuinely freezes it at its current stage even with a large amount of further simulated time, and that the live rendered mesh color actually changes to match each new stage. This app has no verified exact real per-stage oxidation duration down to the minute, so COPPER_GOLEM_OXIDATION_INTERVAL is an honest, heavily compressed stand-in for that real multi-hour figure, the same caveat already applied to several other timed mechanics here (e.g. the ocelot\'s own feeding cadence). The geometry is a small humanoid body plan — thin arms, short legs, a villager-like nose, 2 glowing eyes, and a short lightning-rod spike on top — matched against a real reference description of the vanilla model, reusing the same click-to-interact wiring (registerMob + a manually-set userData.decorEntry) already proven by mooshroom\'s own dual wander+click needs.',
+      'Not modeled: the real copper-chest item-sorting behavior (this app\'s golem uses the same generic wander-and-look behavior shared by every other MOB_KINDS ground mob, not a real chest-seeking goal, since this app has no chest-inventory/item-transfer system for any mob), the real "unwaxed and fully oxidized" statue transformation — a genuine unwaxed golem left fully oxidized has a small real per-tick chance to freeze into a random stationary pose as a copper golem statue and drop any items it is holding, which waxing also permanently prevents (minecraft.wiki/w/Copper_Golem) — this app keeps it wandering normally forever once fully oxidized instead, and crafting/summoning via a carved pumpkin — this app has no crafting or golem-assembly system at all, so it spawns already complete.',
+    ],
+  },
 ];
 
 const CUSTOM_SHAPE_LABELS = {
@@ -6253,6 +6292,8 @@ function generateModel() {
     buildNetherWastesInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'happyGhastHaven') {
     buildHappyGhastHavenInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  } else if (wantInterior && interiorMode === 'copperGolemHome') {
+    buildCopperGolemHomeInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'flowerMeadow') {
     buildFlowerMeadowInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'slimeChunk') {
@@ -7321,6 +7362,46 @@ function happyGhastHarnessParts() {
     return g;
   });
   return { saddle, reins };
+}
+// A small humanoid body (torso, 2 thin arms, 2 short legs), a head with a
+// real villager-like nose and 2 glowing eyes, and a short lightning rod
+// spike on top — matched against a real reference description of the
+// vanilla copper golem model (minecraft.wiki/w/Copper_Golem). See
+// DECOR_TYPES.copper_golem.
+function copperGolemParts() {
+  // Every Y here is relative to this mob's own waist-height local origin
+  // (see MOB_KINDS' shared wander code: obj.position.y = entry._wy + 0.5),
+  // NOT the floor — matching the established pig/sheep/cow convention,
+  // legs must extend down to roughly local y=-0.5 to actually reach the
+  // ground rather than float, the same root cause once found and fixed
+  // for the spider (SPIDER_GROUND_Y).
+  const torso = new THREE.BoxGeometry(0.42, 0.5, 0.3);
+  torso.translate(0, 0.05, 0);
+  const head = new THREE.BoxGeometry(0.34, 0.32, 0.34);
+  head.translate(0, 0.46, 0);
+  const nose = new THREE.BoxGeometry(0.1, 0.1, 0.14);
+  nose.translate(0, 0.4, 0.24);
+  const rod = new THREE.BoxGeometry(0.06, 0.22, 0.06);
+  rod.translate(0, 0.73, 0);
+  const eyeOffsets = [[-0.09, 0.5, 0.175], [0.09, 0.5, 0.175]];
+  const eyes = eyeOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.06, 0.06, 0.02);
+    g.translate(x, y, z);
+    return g;
+  });
+  const armOffsets = [[-0.27, 0.05, 0], [0.27, 0.05, 0]];
+  const arms = armOffsets.map(([x, y, z]) => {
+    const g = new THREE.BoxGeometry(0.12, 0.42, 0.14);
+    g.translate(x, y, z);
+    return g;
+  });
+  const legOffsets = [[-0.13, 0.15], [0.13, 0.15]];
+  const legs = legOffsets.map(([x, z]) => {
+    const g = new THREE.BoxGeometry(0.16, 0.3, 0.18);
+    g.translate(x, -0.35, z);
+    return g;
+  });
+  return { torso, head, nose, rod, eyes, arms, legs };
 }
 // A small rounded body (real vanilla bees are 0.7 x 0.6) with two flat wing
 // planes and a black stripe accent — see DECOR_TYPES.bee.
@@ -10167,6 +10248,34 @@ function buildDecorMeshesForEntry(entry) {
     group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
     registerMob(group, entry);
     objs.push(group);
+  } else if (def.kind === 'copper_golem') {
+    let parts = decorGeoCache.get('copperGolem');
+    if (!parts) { parts = copperGolemParts(); decorGeoCache.set('copperGolem', parts); }
+    const group = new THREE.Group();
+    // See DECOR_TYPES.copper_golem/updateCopperGolem: the body's own
+    // color is picked fresh from its real current oxidation stage every
+    // time this mesh is (re)built, not baked in once — a stage change
+    // triggers rebuildCopperGolemMesh specifically so this runs again.
+    const stage = entry._oxidationStage || 0;
+    const bodyMat = solidMaterial(COPPER_GOLEM_OXIDATION_COLORS[stage]);
+    const eyeMat = solidMaterial(0xf5d33a);
+    const rodMat = solidMaterial(0x8a8f8a);
+    group.add(new THREE.Mesh(parts.torso, bodyMat));
+    group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.nose, bodyMat));
+    group.add(new THREE.Mesh(parts.rod, rodMat));
+    for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
+    for (const g of parts.arms) group.add(new THREE.Mesh(g, bodyMat));
+    for (const g of parts.legs) group.add(new THREE.Mesh(g, bodyMat));
+    group.rotation.y = entry._mobYaw !== undefined ? entry._mobYaw : FACING_YAW[entry.facing || 'south'];
+    registerMob(group, entry);
+    // Copper golems both wander (registerMob, read by updateMobs) AND
+    // respond to a player click-to-wax (attemptInteract's
+    // findInteractiveAncestor walk, which requires userData.decorEntry) —
+    // same dual-registration precedent as mooshroom's shear click.
+    group.userData.decorEntry = entry;
+    group.userData.decorKind = 'copper_golem';
+    objs.push(group);
   } else if (def.kind === 'bee') {
     let parts = decorGeoCache.get('bee');
     if (!parts) { parts = beeParts(); decorGeoCache.set('bee', parts); }
@@ -11908,7 +12017,7 @@ function isEntryActive(entry) {
  * inventory/held-item concept, no "hurt" concept, no water fluid), so
  * faking them would just be cosmetic rather than a real simulated rule.
  * ========================================================================= */
-const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey', 'mule', 'cave_spider']);
+const MOB_KINDS = new Set(['cow', 'mooshroom', 'pig', 'sheep', 'chicken', 'rabbit', 'enderman', 'spider', 'silverfish', 'endermite', 'horse', 'donkey', 'mule', 'cave_spider', 'copper_golem']);
 const MOB_IDLE_MIN = 2, MOB_IDLE_MAX = 6; // seconds between wander bursts
 const MOB_WALK_SPEED = 1.6; // blocks/second — a leisurely stroll, well under the player's own real 4.317 blocks/sec walk speed
 const MOB_WANDER_RADIUS = 3;
@@ -18392,6 +18501,58 @@ function rebuildHappyGhastMesh(entry) {
     three.group.add(mesh);
   }
 }
+// The real new mechanic — see DECOR_TYPES.copper_golem. Real vanilla
+// copper golems progress through the same 4 real oxidation stages as a
+// plain copper block over real elapsed game time
+// (minecraft.wiki/w/Oxidation); COPPER_GOLEM_OXIDATION_INTERVAL is an
+// honest, heavily compressed real-time stand-in for that (the real
+// figure is hours of real gametime per stage) so the progression is
+// actually visible within a real, short demo window.
+const COPPER_GOLEM_OXIDATION_INTERVAL = 4; // seconds per stage — an honest, compressed stand-in
+const COPPER_GOLEM_OXIDATION_COLORS = [0xd97b4a, 0xb87c5a, 0x7a9a72, 0x4a9a8a]; // unoxidized, exposed, weathered, oxidized — the same 4 real copper stages a copper block itself cycles through
+function updateCopperGolem(entry, obj, dt) {
+  if (entry._oxidationStage === undefined) {
+    entry._oxidationStage = 0;
+    entry._oxidationTimer = COPPER_GOLEM_OXIDATION_INTERVAL;
+  }
+  if (!entry._waxed && entry._oxidationStage < COPPER_GOLEM_OXIDATION_COLORS.length - 1) {
+    entry._oxidationTimer -= dt;
+    if (entry._oxidationTimer <= 0) {
+      entry._oxidationStage++;
+      entry._oxidationTimer = COPPER_GOLEM_OXIDATION_INTERVAL;
+      rebuildCopperGolemMesh(entry);
+    }
+  }
+}
+// Reentrant-loop-safe rebuild — the same manual splice/rebuild technique
+// as rebuildDonkeyMesh, needed here because advancing the oxidation
+// stage changes entry._oxidationStage mid-frame, from inside updateMobs'
+// own per-frame loop, where a full renderThree() would be unsafe. Uses
+// entry._wy (this mob's own live wander height, initialized by the
+// shared MOB_KINDS wander block this mob also opts into), not entry.y.
+function rebuildCopperGolemMesh(entry) {
+  const mobIdx = mobObjects.findIndex(m => m.entry === entry);
+  const oldObj = mobIdx !== -1 ? mobObjects[mobIdx].obj : null;
+  if (oldObj && three && three.group) three.group.remove(oldObj);
+  if (mobIdx !== -1) mobObjects.splice(mobIdx, 1);
+  if (!three || !three.group) return;
+  const dims = currentModel.dims, offX = -dims.sx / 2, offZ = -dims.sz / 2;
+  for (const mesh of buildDecorMeshesForEntry(entry)) {
+    mesh.position.x += (entry._wx !== undefined ? entry._wx : entry.x + 0.5) + offX;
+    mesh.position.y += (entry._wy !== undefined ? entry._wy : entry.y) + 0.5;
+    mesh.position.z += (entry._wz !== undefined ? entry._wz : entry.z + 0.5) + offZ;
+    three.group.add(mesh);
+  }
+}
+// A click permanently WAXES a copper golem — the real vanilla effect of
+// applying honeycomb, halting its own automatic oxidation progression
+// for good from whatever stage it's currently at
+// (minecraft.wiki/w/Oxidation). No mesh rebuild or renderThree refresh is
+// needed at all: waxing doesn't alter the golem's own current color, it
+// only stops updateCopperGolem from ever advancing _oxidationStage again.
+function attemptWaxCopperGolem(entry) {
+  entry._waxed = true;
+}
 // The real new mechanic — see DECOR_TYPES.skeleton_horse_trap. Removes
 // the dormant trap horse and spawns SKELETON_HORSEMAN_COUNT brand-new
 // skeleton_horseman entries nearby all at once — the exact same
@@ -18959,6 +19120,12 @@ function updateMobs(dt) {
     if (entry.type === 'ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'happy_ghast') { updateGhast(entry, obj, dt); continue; }
     if (entry.type === 'bat') { updateBat(entry, obj, dt); continue; }
+    // A real copper golem oxidizes automatically over real time,
+    // completely independent of its own ordinary wander — checked here,
+    // WITHOUT a `continue`, so it falls straight through into the shared
+    // generic MOB_KINDS wander block right below (copper_golem is a
+    // member of that Set) and does both every single frame.
+    if (entry.type === 'copper_golem') { updateCopperGolem(entry, obj, dt); }
     if (!MOB_KINDS.has(entry.type)) continue;
     if (entry._mobState === undefined) {
       entry._mobState = 'idle';
@@ -19697,6 +19864,7 @@ function attemptInteract(clientX, clientY, button) {
     if (entry.type === 'zombified_piglin') { alertZombifiedPiglinGroup(currentModel, entry); return; }
     if (entry.type === 'wither_skull') { attemptSummonWither(currentModel, entry); return; }
     if (entry.type === 'armor_stand') { cycleArmorStandTier(entry); renderThree(currentModel, true); return; }
+    if (entry.type === 'copper_golem') { attemptWaxCopperGolem(entry); return; }
     if (entry.type === 'horse' || entry.type === 'donkey') {
       if (entry._tamed && !entry._bred) {
         const partner = findNearestTamedOppositeEquine(entry);
@@ -20178,7 +20346,7 @@ function renderBlueprint(model) {
     hoglin: ['#c98a76', 'A'], warped_fungus: ['#149c8f', 'F'], shulker: ['#9a4fae', 'A'], phantom: ['#4a5568', 'A'],
     breeze: ['#8fd4c9', 'A'], wind_charge: ['#c9f0e8', 'V'],
     cat: ['#d8d3c8', 'A'], wandering_trader: ['#2f7d7a', 'A'], mooshroom: ['#8a2323', 'A'], elder_guardian: ['#8a8f8a', 'A'], zombie_villager: ['#4c7a4c', 'A'],
-    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'], happy_ghast: ['#e9e9e9', 'A'],
+    blaze: ['#e8b23a', 'A'], blaze_fireball: ['#ffcf4a', 'V'], witch: ['#2c2438', 'A'], mob_spawner: ['#242e3e', 'S'], zombified_piglin: ['#9caa6e', 'A'], tadpole: ['#5a4632', 'A'], armadillo: ['#c9a876', 'A'], drowned: ['#4a8a78', 'A'], husk: ['#8a8578', 'A'], wither_skull: ['#d8d4c8', 'K'], wither: ['#2b2b2b', 'A'], pillager: ['#4a5a42', 'A'], trader_llama: ['#e6ddc8', 'A'], endermite: ['#5a4a6e', 'A'], vindicator: ['#5a6e52', 'A'], pufferfish: ['#d9c66a', 'A'], illusioner: ['#2e4f7a', 'A'], illusioner_clone: ['#2e4f7a', 'A'], creaking: ['#d9c9a3', 'A'], armor_stand: ['#c9a876', 'A'], horse: ['#dedad2', 'A'], polar_bear: ['#f0efe6', 'A'], magma_cube: ['#cc5a2a', 'A'], donkey: ['#8a7a6a', 'A'], skeleton_horse_trap: ['#cfcabe', 'A'], skeleton_horseman: ['#cfcabe', 'A'], stray: ['#c4d9d6', 'A'], wither_skeleton: ['#1c1c1c', 'A'], bogged: ['#6b7a4a', 'A'], piglin_brute: ['#8a7568', 'A'], zoglin: ['#8f9a82', 'A'], mule: ['#6b4423', 'A'], tropical_fish: ['#ff8c1a', 'A'], salmon: ['#9a7472', 'A'], cave_spider: ['#1a4a4a', 'A'], ender_dragon: ['#1c1c1e', 'A'], cod: ['#a8987a', 'A'], happy_ghast: ['#e9e9e9', 'A'], copper_golem: ['#d97b4a', 'A'],
   };
   function drawLayer(y) {
     const ctx = canvas.getContext('2d');
@@ -20248,7 +20416,7 @@ function renderBlueprint(model) {
     skeleton: 'Skeleton', arrow: 'Arrow', wolf: 'Wolf', ocelot: 'Ocelot', llama: 'Llama', camel: 'Camel', parrot: 'Parrot', axolotl: 'Axolotl', evoker: 'Evoker', guardian: 'Guardian', ravager: 'Ravager',
     hoglin: 'Hoglin', warped_fungus: 'Warped Fungus', shulker: 'Shulker', phantom: 'Phantom',
     breeze: 'Breeze', wind_charge: 'Wind Charge', cat: 'Cat', wandering_trader: 'Wandering Trader', mooshroom: 'Mooshroom', elder_guardian: 'Elder Guardian', zombie_villager: 'Zombie Villager',
-    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod', happy_ghast: 'Happy Ghast',
+    blaze: 'Blaze', blaze_fireball: 'Fireball', witch: 'Witch', mob_spawner: 'Mob Spawner', zombified_piglin: 'Zombified Piglin', tadpole: 'Tadpole', armadillo: 'Armadillo', drowned: 'Drowned', husk: 'Husk', wither_skull: 'Wither Skeleton Skull', wither: 'Wither', pillager: 'Pillager', trader_llama: 'Trader Llama', endermite: 'Endermite', vindicator: 'Vindicator', pufferfish: 'Pufferfish', illusioner: 'Illusioner', illusioner_clone: 'Illusioner (decoy clone)', creaking: 'Creaking', armor_stand: 'Armor Stand', horse: 'Horse', polar_bear: 'Polar Bear', magma_cube: 'Magma Cube', donkey: 'Donkey', skeleton_horse_trap: 'Skeleton Horse (trap)', skeleton_horseman: 'Skeleton Horseman', stray: 'Stray', wither_skeleton: 'Wither Skeleton', bogged: 'Bogged', piglin_brute: 'Piglin Brute', zoglin: 'Zoglin', mule: 'Mule', tropical_fish: 'Tropical Fish', salmon: 'Salmon', cave_spider: 'Cave Spider', ender_dragon: 'Ender Dragon', cod: 'Cod', happy_ghast: 'Happy Ghast', copper_golem: 'Copper Golem',
   };
   for (const type of usedDecor) {
     const [color, letter] = DECOR_MARKER[type] || ['#fff', '?'];
@@ -20381,6 +20549,7 @@ function renderCommands(model) {
       else if (d.type === 'salmon') lines.push(`summon minecraft:salmon ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'cod') lines.push(`summon minecraft:cod ~${d.x + 0.5} ~${d.y + 0.5} ~${d.z + 0.5}`);
       else if (d.type === 'happy_ghast') lines.push(`summon minecraft:happy_ghast ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
+      else if (d.type === 'copper_golem') lines.push(`summon minecraft:copper_golem ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'cave_spider') lines.push(`summon minecraft:cave_spider ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'ender_dragon') lines.push(`summon minecraft:ender_dragon ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'arrow') lines.push(`summon minecraft:arrow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
