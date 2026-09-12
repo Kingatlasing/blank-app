@@ -8832,8 +8832,14 @@ function armorStandParts() {
   });
   const head = new THREE.BoxGeometry(0.22, 0.22, 0.22);
   head.translate(0, 1.14, 0);
-  const helmet = new THREE.BoxGeometry(0.26, 0.18, 0.26);
-  helmet.translate(0, 1.16, 0);
+  // A worn helmet must fully enclose the head on every side, real
+  // vanilla's own armor-layer convention (a uniformly larger copy of the
+  // head box, not a shorter cap sitting on top of it) — this used to be
+  // only 0.18 tall (shorter than the 0.22-tall head) and centered 0.02
+  // above it, leaving a visible ring of bare wood head exposed at the
+  // jaw/neck on every tier. Same 0.22-vs-0.26 center matches, full height.
+  const helmet = new THREE.BoxGeometry(0.26, 0.26, 0.26);
+  helmet.translate(0, 1.14, 0);
   const chestplate = new THREE.BoxGeometry(0.22, 0.34, 0.22);
   chestplate.translate(0, 0.86, 0);
   const shoulderOffsets = [[-0.14, 1.0], [0.14, 1.0]];
