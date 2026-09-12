@@ -7370,18 +7370,35 @@ function enderDragonParts() {
     neckSpikes.push(spike);
     z += d / 2;
   }
-  const headZ = z + 0.375;
-  const head = new THREE.BoxGeometry(0.62, 0.5, 0.75);
+  const headDepth = 0.5;
+  const headZ = z + headDepth / 2;
+  const head = new THREE.BoxGeometry(0.6, 0.48, headDepth);
   head.translate(0, 0.12, headZ);
-  const hornOffsets = [[-0.2, 0.4, headZ - 0.15], [0.2, 0.4, headZ - 0.15]];
+  // Real vanilla ender dragon heads have a distinct narrow, tapered
+  // snout projecting forward from the main skull, sitting a bit lower
+  // than the skull's own center — an earlier version of this geometry
+  // had no snout at all, just one plain head box, which read as a flat,
+  // faceless block with no real front to it.
+  const snoutW = 0.36, snoutH = 0.24, snoutD = 0.55;
+  const snoutZ = headZ + headDepth / 2 + snoutD / 2;
+  const snout = new THREE.BoxGeometry(snoutW, snoutH, snoutD);
+  snout.translate(0, 0.06, snoutZ);
+  const hornOffsets = [[-0.2, 0.38, headZ - headDepth / 2 + 0.08], [0.2, 0.38, headZ - headDepth / 2 + 0.08]];
   const horns = hornOffsets.map(([x, y, hz]) => {
     const g = new THREE.BoxGeometry(0.1, 0.32, 0.1);
     g.translate(x, y, hz);
     return g;
   });
-  const eyeOffsets = [[-0.15, 0.16, headZ + 0.36], [0.15, 0.16, headZ + 0.36]];
+  // On the SIDES of the skull, above where the snout begins, poking out
+  // half their own width past the head's own side wall (x = ±0.3, its
+  // own real half-width) so they actually render visibly rather than
+  // sitting flush or recessed into the head box — placing them on the
+  // head's own front face instead (an earlier version of this fix) put
+  // them inside the snout's own footprint once the snout was added,
+  // burying them there instead.
+  const eyeOffsets = [[-(0.3 + 0.015), 0.2, headZ + headDepth / 2 - 0.15], [0.3 + 0.015, 0.2, headZ + headDepth / 2 - 0.15]];
   const eyes = eyeOffsets.map(([x, y, ez]) => {
-    const g = new THREE.BoxGeometry(0.07, 0.06, 0.03);
+    const g = new THREE.BoxGeometry(0.03, 0.07, 0.08);
     g.translate(x, y, ez);
     return g;
   });
@@ -7471,7 +7488,7 @@ function enderDragonParts() {
   ];
 
   return {
-    head, horns, eyes, neckSegments, neckSpikes, body, tailSegments,
+    head, snout, horns, eyes, neckSegments, neckSpikes, body, tailSegments,
     tailSpikes, bodySpikes, wingArms, wingFingers, wingMembranes, legs,
   };
 }
@@ -9990,6 +10007,7 @@ function buildDecorMeshesForEntry(entry) {
     const boneMat = solidMaterial(0xb0aeae);
     const eyeMat = solidMaterial(0xc23bde);
     group.add(new THREE.Mesh(parts.head, bodyMat));
+    group.add(new THREE.Mesh(parts.snout, bodyMat));
     for (const g of parts.horns) group.add(new THREE.Mesh(g, boneMat));
     for (const g of parts.eyes) group.add(new THREE.Mesh(g, eyeMat));
     for (const g of parts.neckSegments) group.add(new THREE.Mesh(g, bodyMat));
