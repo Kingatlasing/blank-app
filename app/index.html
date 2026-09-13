@@ -2947,18 +2947,24 @@ function etLegHalfWidth(yReal, scale) {
   const t = Math.min(1, yReal / ET_MERGE_Y);
   return Math.max(1, Math.round((ET_LEG_HALF_BASE + (ET_LEG_HALF_MERGE - ET_LEG_HALF_BASE) * t) * scale));
 }
-// A leg's own curving centerline: a straight (linear) inward convergence
-// from its base corner at y=0 to the tower's central axis at
-// ET_MERGE_Y — matches the real leg offset closely enough, at the real
-// published first-platform height (57m), to keep the legs from poking
-// out past that platform's own real published footprint (see
-// ET_PLATFORM_HALFW above) rather than a slower, more sharply-curving
-// ease that would leave them stranded outside it.
+// A leg's own curving centerline: a real graceful ARCH, not a straight
+// diagonal line — the exact detail an earlier version of this shape was
+// missing (a straight linear taper reads as a sloped beam, not the
+// tower's own iconic swooping curve). Parametrized as a quarter-ellipse:
+// offset = baseOffset * cos(theta), height = ET_MERGE_Y * sin(theta) for
+// theta 0..90°, which is the same as offset(y) = baseOffset *
+// sqrt(1-t^2) for t = y/ET_MERGE_Y. At t=0 (the real base) this has a
+// VERTICAL tangent — the real legs plant into the ground close to
+// straight up, not already leaning inward — and at t=1 (the merge
+// height) a HORIZONTAL tangent, swooping the 4 legs into the central
+// shaft the way they do in every real photo, rather than meeting it at
+// a sharp angle.
 function etLegCenter(legIdx, yReal, dims, scale, cx, cz) {
   const offset = (ET_BASE / 2) * scale;
   const signX = (legIdx & 1) ? 1 : -1, signZ = (legIdx & 2) ? 1 : -1;
   const t = Math.min(1, yReal / ET_MERGE_Y);
-  return [cx + signX * offset * (1 - t), cz + signZ * offset * (1 - t)];
+  const archT = Math.sqrt(Math.max(0, 1 - t * t));
+  return [cx + signX * offset * archT, cz + signZ * offset * archT];
 }
 // The single shaft above the leg-merge height, tapering to a thin point
 // near the real structure top before the antenna mast takes over.
@@ -2980,6 +2986,23 @@ function etLatticeSolid(du, dv, halfW, y, scale) {
   if ((y % bracePeriod) >= braceThick) return false;
   return Math.abs(du - dv) <= braceThick || Math.abs(du + dv) <= braceThick;
 }
+// A platform's own half-width: the real published floor-area size, EXCEPT
+// never narrower than however far the 4 legs' own arch has already
+// reached at that exact height (plus their own half-width) — the arch
+// curve above stays wide for most of the leg zone and only swoops in
+// sharply near the very top, so a real platform low in that zone (the
+// real 1st floor, 57m) needs to reach out to the legs' own real position
+// there rather than leaving them poking out past a smaller platform.
+function etPlatformHalfWidth(p, dims, scale) {
+  const realHalf = Math.round(ET_PLATFORM_HALFW[p] * scale);
+  let legReach = 0;
+  if (ET_PLATFORM_YS[p] <= ET_MERGE_Y) {
+    const t = ET_PLATFORM_YS[p] / ET_MERGE_Y;
+    const archT = Math.sqrt(Math.max(0, 1 - t * t));
+    legReach = Math.round((ET_BASE / 2) * scale * archT + etLegHalfWidth(ET_PLATFORM_YS[p], scale));
+  }
+  return Math.min(Math.round(dims.sx / 2), Math.max(realHalf, legReach));
+}
 function eiffelTowerSolid(x, y, z, dims) {
   const scale = dims.sy / ET_REAL_HEIGHT;
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
@@ -2992,7 +3015,7 @@ function eiffelTowerSolid(x, y, z, dims) {
     const platYBlocks = Math.round(ET_PLATFORM_YS[p] * scale);
     const halfThick = Math.max(1, Math.round((ET_PLATFORM_THICK / 2) * scale));
     if (Math.abs(y - platYBlocks) <= halfThick) {
-      const platHalfW = Math.min(Math.round(dims.sx / 2), Math.round(ET_PLATFORM_HALFW[p] * scale));
+      const platHalfW = etPlatformHalfWidth(p, dims, scale);
       if (Math.abs(x - cx) <= platHalfW && Math.abs(z - cz) <= platHalfW) return true;
     }
   }
@@ -3024,7 +3047,7 @@ function applyEiffelTowerDetail(grid, dims, matAcc) {
   for (let p = 0; p < ET_PLATFORM_YS.length; p++) {
     const platYBlocks = Math.round(ET_PLATFORM_YS[p] * scale);
     const halfThick = Math.max(1, Math.round((ET_PLATFORM_THICK / 2) * scale));
-    const platHalfW = Math.min(Math.round(dims.sx / 2), Math.round(ET_PLATFORM_HALFW[p] * scale));
+    const platHalfW = etPlatformHalfWidth(p, dims, scale);
     for (let y = Math.max(0, platYBlocks - halfThick); y <= Math.min(dims.sy - 1, platYBlocks + halfThick); y++) {
       for (let x = Math.max(0, Math.round(cx - platHalfW)); x <= Math.min(dims.sx - 1, Math.round(cx + platHalfW)); x++) {
         for (let z = Math.max(0, Math.round(cz - platHalfW)); z <= Math.min(dims.sz - 1, Math.round(cz + platHalfW)); z++) {
@@ -3039,18 +3062,51 @@ function applyEiffelTowerDetail(grid, dims, matAcc) {
 // A highly-detailed shape for the Statue of Liberty preset SPECIFICALLY —
 // a human figure genuinely can't be captured by a primitive cylinder
 // (the shape this preset used before this rebuild, with its own honest
-// note admitting exactly that). This instead builds a stylized but
-// recognizable robed figure — a tapering robe, a narrower torso, a
-// rounded head with a flared crown band, one arm raised holding a torch
-// well above the head, the other holding a tablet against the body — on
-// a real 2-tier pedestal. Unlike the Golden Gate Bridge/Eiffel Tower
-// shapes above, this one works in FRACTIONS of this preset's own dims
-// rather than absolute real meters: its existing real.baseX/baseZ (16m)
-// is already an honest scaffold approximation of the statue's own
-// footprint (per that same old note), not a real building's exact plan,
-// so there's no fixed real-meter grid worth keying off.
+// note admitting exactly that), and a first rebuild attempt using
+// smooth stacked ellipsoids didn't read as a human figure either — real
+// player-built Minecraft statues almost always use a hand-authored,
+// BLOCKY front-profile silhouette (like pixel art extruded into 3D)
+// with a real visible neck/waist, not smooth geometric curves, which is
+// what this version switches to: a keyframed, piecewise-LINEAR
+// rectangular cross-section per row (SOL_KEYFRAMES below), giving a
+// deliberately sculpted outline — a wide robe hem, a real narrow waist,
+// broader shoulders, a distinct narrow neck separating a rounder head,
+// then a flared crown band tapering to a spike tip — plus the raised
+// torch arm and tablet as separate offset appendages. Works in
+// FRACTIONS of this preset's own dims rather than absolute real meters
+// (unlike the Golden Gate Bridge/Eiffel Tower shapes above): its
+// real.baseX/baseZ was always an honest scaffold approximation of the
+// statue's own footprint (per the original preset's own old note), not
+// a real building's exact plan, and was widened further here (16m to
+// 26m) purely to give this silhouette enough voxel columns to actually
+// read as a figure rather than a blur.
 const SOL_PEDESTAL_TOP = 0.505; // 47m of the real published 93m total (real pedestal height)
-const SOL_ROBE_TOP = 0.645, SOL_TORSO_TOP = 0.806, SOL_HEAD_TOP = 0.86, SOL_CROWN_TOP = 0.90;
+// [t, halfX, halfZ] keyframes for the robed figure above the pedestal —
+// interpolated LINEARLY between consecutive rows (not a smooth curve)
+// for the same deliberate, sculpted-edge look real blocky statue builds
+// have, with a real waist/neck instead of one continuous taper.
+const SOL_KEYFRAMES = [
+  [0.505, 0.30, 0.26], // robe hem, flared out from under the robe
+  [0.58, 0.24, 0.22],  // knee
+  [0.65, 0.15, 0.14],  // waist — the real cinched point that reads as a body, not a cone
+  [0.75, 0.20, 0.17],  // chest/shoulders, broadening again
+  [0.795, 0.09, 0.09], // neck — narrow on purpose so the head reads as its own separate mass
+  [0.84, 0.115, 0.105],// head
+  [0.865, 0.16, 0.11], // crown band flares out past the head
+  [0.90, 0.03, 0.03],  // crown spike tip
+];
+function solBodyHalfWidths(t) {
+  if (t <= SOL_KEYFRAMES[0][0]) return [SOL_KEYFRAMES[0][1], SOL_KEYFRAMES[0][2]];
+  for (let i = 1; i < SOL_KEYFRAMES.length; i++) {
+    if (t <= SOL_KEYFRAMES[i][0]) {
+      const [t0, x0, z0] = SOL_KEYFRAMES[i - 1], [t1, x1, z1] = SOL_KEYFRAMES[i];
+      const f = (t - t0) / (t1 - t0 || 1e-9);
+      return [x0 + (x1 - x0) * f, z0 + (z1 - z0) * f];
+    }
+  }
+  const last = SOL_KEYFRAMES[SOL_KEYFRAMES.length - 1];
+  return [last[1], last[2]];
+}
 function statueOfLibertySolid(x, y, z, dims) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const t = y / dims.sy;
@@ -3065,8 +3121,8 @@ function statueOfLibertySolid(x, y, z, dims) {
   // The raised right arm + torch: an offset column, thinner than the
   // body, starting at shoulder height and rising above the head — the
   // statue's own single most recognizable silhouette feature.
-  const armX = cx + dims.sx * 0.16;
-  if (t >= 0.70) {
+  const armX = cx + dims.sx * 0.19;
+  if (t >= 0.72) {
     const armHalf = Math.max(1, dims.sx * 0.05);
     if (Math.abs(x - armX) <= armHalf && Math.abs(z - cz) <= armHalf) return true;
     if (t >= 0.97) {
@@ -3075,45 +3131,21 @@ function statueOfLibertySolid(x, y, z, dims) {
     }
   }
   // The tablet: a flat rectangular slab held against the body's other side.
-  if (t >= 0.66 && t <= 0.74) {
-    const tabX = cx - dims.sx * 0.18;
-    if (Math.abs(x - tabX) <= dims.sx * 0.07 && Math.abs(z - cz) <= dims.sz * 0.14) return true;
+  if (t >= 0.66 && t <= 0.745) {
+    const tabX = cx - dims.sx * 0.21;
+    if (Math.abs(x - tabX) <= dims.sx * 0.07 && Math.abs(z - cz) <= dims.sz * 0.16) return true;
   }
 
-  if (t <= SOL_ROBE_TOP) {
-    const rt = (t - SOL_PEDESTAL_TOP) / (SOL_ROBE_TOP - SOL_PEDESTAL_TOP);
-    const rx = dims.sx * (0.30 - 0.10 * rt), rz = dims.sz * (0.28 - 0.09 * rt);
-    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
-    return nx * nx + nz * nz <= 1.0;
-  }
-  if (t <= SOL_TORSO_TOP) {
-    const rx = dims.sx * 0.19, rz = dims.sz * 0.17;
-    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
-    return nx * nx + nz * nz <= 1.0;
-  }
-  if (t <= SOL_HEAD_TOP) {
-    const ht = (t - SOL_TORSO_TOP) / (SOL_HEAD_TOP - SOL_TORSO_TOP);
-    const shrink = Math.sqrt(Math.max(0.15, 1 - ht * ht));
-    const rx = dims.sx * 0.12 * shrink, rz = dims.sz * 0.11 * shrink;
-    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
-    return nx * nx + nz * nz <= 1.0;
-  }
-  if (t <= SOL_CROWN_TOP) {
-    // The crown: a real spiked crown's own radiating points aren't
-    // practical in a plain solid/air voxel test, so a wider flared disc
-    // at the same height stands in for it instead.
-    const rx = dims.sx * 0.16, rz = dims.sz * 0.15;
-    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
-    return nx * nx + nz * nz <= 1.0;
-  }
-  return false;
+  if (t > SOL_KEYFRAMES[SOL_KEYFRAMES.length - 1][0]) return false;
+  const [hx, hz] = solBodyHalfWidths(t);
+  return Math.abs(x - cx) <= dims.sx * hx && Math.abs(z - cz) <= dims.sz * hz;
 }
 // Always-on finishing pass: paints the torch head in the accent material
 // (a real flame color) since statueOfLibertySolid can only decide
 // solid/air.
 function applyStatueOfLibertyDetail(grid, dims, matAcc) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
-  const armX = Math.round(cx + dims.sx * 0.16);
+  const armX = Math.round(cx + dims.sx * 0.19);
   const torchHalf = Math.max(1, Math.round(dims.sx * 0.09));
   const y0 = Math.max(0, Math.round(dims.sy * 0.97)), y1 = dims.sy - 1;
   for (let y = y0; y <= y1; y++) {
@@ -5650,13 +5682,13 @@ const PRESETS = [
   },
   {
     id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'statueOfLiberty',
-    real: { height: 93, baseX: 16, baseZ: 16 }, interiorMode: null,
+    real: { height: 93, baseX: 26, baseZ: 26 }, interiorMode: null,
     blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'gold_block' },
-    desc: 'Ground to torch height ~93m. Rebuilt as a stylized but recognizable robed figure — a tapering robe, narrower torso, rounded head with a flared crown, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal, instead of a plain cylindrical scaffold.',
+    desc: 'Ground to torch height ~93m. Rebuilt with a hand-authored, blocky front-profile silhouette — a real narrow waist and neck (not a smooth taper) separating a flared robe hem, broader shoulders, and a distinct head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal, replacing both the original plain cylinder and a first rebuild attempt that used smooth stacked ellipsoids and still didn\'t read as a figure.',
     keywords: ['statue of liberty', 'new york', 'liberty island', 'torch'],
     notes: [
-      'Rebuilt from the earlier plain cylinder (whose own note admitted "a human figure can\'t be captured by a primitive shape"): `statueOfLibertySolid` works in FRACTIONS of this preset\'s own dims rather than absolute real meters — unlike the Golden Gate Bridge/Eiffel Tower shapes, there\'s no exact real building footprint to key off, since this preset\'s own real.baseX/baseZ (16m) was always an honest scaffold approximation rather than the statue\'s own real plan. The real published pedestal height (47m of the 93m total) sets where the 2-tier pedestal ends and the tapering robed figure begins; the raised right arm + torch (real-gilded since a 1986 restoration, hence the gold accent material) is the one silhouette feature kept geometrically distinct at every scale, rising above the head the way it does on the real statue.',
-      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, a real face, or the real 7-spike crown (approximated here as a plain flared disc). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
+      'Rebuilt a second time from an earlier version that used smooth stacked ellipsoids for the body — those still just looked like a stepped cylinder, not a human figure, because the transitions between robe/torso/head were too gradual to read at all. This version instead hand-authors a piecewise-LINEAR (not smoothly curved) rectangular half-width per height keyframe (`SOL_KEYFRAMES`) the same way real player-built Minecraft statues do it — as a deliberate front-profile silhouette with a real cinched WAIST and a genuinely narrow NECK separating the head from the shoulders, rather than one continuous taper — since those 2 sharp transitions are what actually make a voxel silhouette read as "a body with a head" instead of a tapered pillar. The overall footprint (real.baseX/baseZ) was also widened from 16m to 26m specifically to give this silhouette enough voxel columns per row to hold that shape at typical scales instead of collapsing to a handful of blocks.',
+      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, a real face, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
     ],
   },
   {
@@ -5685,11 +5717,12 @@ const PRESETS = [
     id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'eiffelTower',
     real: { height: 330, baseX: 125, baseZ: 125 }, interiorMode: null,
     blocks: { exterior: 'iron_block', interior: 'iron_block', accent: 'stone_bricks' },
-    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs curve inward from the real 125m-square base and merge into a single tapering shaft at the real 2nd-platform height, both built as real hollow-tube ironwork with periodic diagonal cross-braces instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
+    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs sweep inward along a real graceful ARCH curve (not a straight diagonal) from the real 125m-square base and merge into a single tapering shaft at the real 2nd-platform height, both built as real hollow-tube ironwork with periodic diagonal cross-braces instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
     keywords: ['eiffel', 'tower', 'paris', 'france', 'lattice', 'iron'],
     notes: [
-      'Rebuilt from the earlier solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Each leg tapers from a real ~8m half-width at the base to ~3m where all 4 merge into the shaft, and the shaft continues tapering to ~1m just below the real structure top (300m) — both rendered as a hollow square tube (only the outer wall is solid) with a real full diagonal X cross-brace band every ~12m, the same repeating truss pattern visible in every photo of the real tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
-      'Real dimensions and this construction spec from published figures: base 125m square, total height 330m with antennas (~300m of actual structure), leg-merge/2nd-platform height 115m, 1st platform height 57m, 3rd (summit) platform height 276m, and real published floor areas per platform (1st ~4,200 sq.m, 2nd ~1,650 sq.m, 3rd ~350 sq.m) used to size each platform\'s own footprint directly rather than deriving it from the leg/shaft width at that height, since a real platform is a walkway deck bracketed out well beyond the narrow structural member it surrounds. Not modeled: the real elevators/machinery inside the legs, the true continuous curved (not straight-segment) leg profile, individual rivets/beams, and the tower\'s real paint color (only the block palette chosen here).',
+      'Rebuilt a second time after user feedback that the legs still read as straight diagonal beams rather than the tower\'s own iconic arch: `etLegCenter`\'s convergence curve was replaced with a real quarter-ellipse (offset = baseOffset * sqrt(1-t^2) for t = height/mergeHeight) — a VERTICAL tangent right at the real base (the legs plant into the ground close to straight up, not already leaning inward) sweeping to a HORIZONTAL tangent at the merge height (swooping into the central shaft the way every real photo shows), instead of the constant-slope straight line a plain linear taper produces. Each real observation platform\'s own half-width now also takes whichever is larger of its real published floor area or however far that arch curve has actually reached at that exact height, so a platform low on the arch (the real 1st floor, 57m) can\'t end up narrower than the legs it\'s supposed to meet.',
+      'Rebuilt from an original solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Each leg tapers from a real ~8m half-width at the base to ~3m where all 4 merge into the shaft, and the shaft continues tapering to ~1m just below the real structure top (300m) — both rendered as a hollow square tube (only the outer wall is solid) with a real full diagonal X cross-brace band every ~12m, the same repeating truss pattern visible in every photo of the real tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
+      'Real dimensions and this construction spec from published figures: base 125m square, total height 330m with antennas (~300m of actual structure), leg-merge/2nd-platform height 115m, 1st platform height 57m, 3rd (summit) platform height 276m, and real published floor areas per platform (1st ~4,200 sq.m, 2nd ~1,650 sq.m, 3rd ~350 sq.m). Not modeled: the real elevators/machinery inside the legs, individual rivets/beams, and the tower\'s real paint color (only the block palette chosen here).',
     ],
   },
   {
