@@ -170,6 +170,7 @@
             <option value="domebuilding">Domed building (box + dome roof)</option>
             <option value="ring">Ring / arena wall (hollow annulus)</option>
             <option value="freeform">Freeform (blank canvas — build anything, block by block)</option>
+            <option value="bridge">Suspension bridge (2 towers + deck + sagging cables)</option>
           </select>
           <div class="hint">Don't see it in the library? Look up its real height &amp; footprint and approximate it with the closest primitive shape here — that's how you can build a scale model of literally anything.</div>
           <div class="row">
@@ -2654,16 +2655,95 @@ function ringSolid(x, y, z, dims, params) {
 // character, a vehicle, a building with no real-world reference, whatever.
 function freeformSolid(x, y, z, dims) { return y === 0; }
 
+// Shortest distance from point (px,py) to the line SEGMENT a->b, in a
+// single 2D plane — used only by bridgeSolid's own cable silhouette.
+function pointSegDist2D(px, py, ax, ay, bx, by) {
+  const abx = bx - ax, aby = by - ay;
+  const lenSq = abx * abx + aby * aby || 1e-9;
+  let t = ((px - ax) * abx + (py - ay) * aby) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + abx * t), py - (ay + aby * t));
+}
+// A real suspension bridge silhouette — every other shape here (pyramid,
+// tower, dome...) is a single solid mass; a bridge is this app's first
+// shape whose own silhouette is mostly OPEN space around a thin
+// structure. 2 support towers rise from the deck near 1/4 and 3/4 along
+// the span (matching a real suspension bridge's own main-cable anchor
+// towers, not the very ends), each with 2 separate legs straddling the
+// deck's own width rather than one solid wall across it, a single deck
+// slab spans the full length, and the real main cables run along each
+// side of the deck as straight-segment stand-ins for the real parabolic
+// curve — tower-to-tower with a real visible sag at midspan, then each
+// tower down to its own end anchor — using pointSegDist2D against the
+// bridge's own side-view (x,y) cross-section.
+function bridgeSolid(x, y, z, dims, params) {
+  const deckThickness = Math.max(1, Math.round(dims.sy * 0.06));
+  const deckY0 = Math.round(dims.sy * 0.3);
+  const deckY1 = deckY0 + deckThickness;
+  if (y >= deckY0 && y < deckY1) return true; // the deck slab itself, full span and width
+
+  const towerFrac = (params && params.towerFrac) || 0.22;
+  // 2 different axes, 2 different proportions: a tower's own thickness
+  // ALONG the span scales with the bridge's real length (dims.sx), while
+  // each leg's own thickness ACROSS the deck scales with the bridge's
+  // real width (dims.sz) — conflating the two into a single "towerWidth"
+  // meant a very long, narrow bridge (a real bridge is far longer than
+  // it is wide) always failed the leg-split check below even once the
+  // real width itself had enough room for 2 visually distinct legs.
+  const towerXHalfWidth = Math.max(1, Math.round(dims.sx * 0.035));
+  const tower1X = Math.round(dims.sx * towerFrac);
+  const tower2X = Math.round(dims.sx * (1 - towerFrac));
+  const towerTopY = dims.sy - 1;
+  const cz = (dims.sz - 1) / 2;
+  const legZHalfWidth = Math.max(1, Math.round(dims.sz * 0.15));
+  const legOffset = (dims.sz / 2) * 0.72;
+  // A scale that keeps the real length reasonable can still shrink the
+  // real width below a single block — when there isn't room for 2
+  // visually distinct legs, fall back to one central leg/cable spanning
+  // the bridge's own full width instead of 2 offset ones collapsing
+  // into the same cell anyway.
+  const legZs = (legOffset >= legZHalfWidth + 1) ? [cz - legOffset, cz + legOffset] : [cz];
+  const nearLeg = legZs.some(lz => Math.abs(z - lz) <= legZHalfWidth);
+
+  if (y >= deckY0 && y <= towerTopY && nearLeg &&
+      (Math.abs(x - tower1X) <= towerXHalfWidth || Math.abs(x - tower2X) <= towerXHalfWidth)) return true;
+
+  // The main cables only ever run along those same leg line(s) — gated
+  // by a WIDTH-scaled threshold (like legZHalfWidth), not the length-
+  // scaled cableThickness below: on a real bridge (far longer than it
+  // is wide), that length-scaled value is enormous in block terms and
+  // would otherwise cover the bridge's own ENTIRE width, silently
+  // undoing the 2-leg split above by letting the cable render as one
+  // continuous band across all of z regardless of the actual leg split.
+  const cableZHalfWidth = Math.max(1, Math.round(dims.sz * 0.06));
+  if (!legZs.some(lz => Math.abs(z - lz) <= cableZHalfWidth)) return false;
+  // The cable's own thickness in the X-Y (length/height) cross-section.
+  const cableThickness = Math.max(1, Math.round(dims.sx * 0.012));
+  const midX = (tower1X + tower2X) / 2;
+  const sagY = towerTopY - (towerTopY - deckY1) * 0.4; // a real visible midspan sag, not a flat line
+  const segs = [
+    [0, deckY1, tower1X, towerTopY],
+    [tower1X, towerTopY, midX, sagY],
+    [midX, sagY, tower2X, towerTopY],
+    [tower2X, towerTopY, dims.sx - 1, deckY1],
+  ];
+  for (const [ax, ay, bx, by] of segs) {
+    if (pointSegDist2D(x, y, ax, ay, bx, by) <= cableThickness) return true;
+  }
+  return false;
+}
+
 const SHAPES = {
   box: boxSolid, pyramid: pyramidSolid, cylinder: cylinderSolid, cone: coneSolid,
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
   domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
+  bridge: bridgeSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
-  cone: null, ring: null, freeform: null,
+  cone: null, ring: null, freeform: null, bridge: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -4875,6 +4955,28 @@ const PRESETS = [
     notes: [],
   },
   {
+    id: 'golden-gate-bridge', name: "Golden Gate Bridge (San Francisco)", shape: 'bridge',
+    real: { height: 227.4, baseX: 2737, baseZ: 27.4 },
+    blocks: { exterior: 'red_concrete', interior: 'red_concrete', accent: 'iron_block' },
+    desc: 'A real suspension bridge silhouette: 2 support towers, one main deck, and sagging main cables running the full span — height (water to tower top) ~227.4m, total length ~2,737m, deck width ~27.4m.',
+    keywords: ['golden gate', 'bridge', 'suspension', 'san francisco', 'tower'],
+    notes: [
+      'This app\'s first shape whose own silhouette is mostly open space around a thin structure rather than one solid mass — every earlier shape here (pyramid, tower, dome, cone...) fills in a single continuous silhouette top to bottom, while a bridge is a deck and 2 towers connected by real cables with open air everywhere else. The new `bridgeSolid` places the 2 support towers near a real 1/4 and 3/4 of the way along the span (matching a real suspension bridge\'s own main-cable anchor towers, not the very ends), each as 2 separate legs straddling the deck\'s own width rather than a solid wall across it, and the real main cables as straight-line segments (not the real smooth parabola, which a voxel grid can\'t represent exactly) sagging visibly at midspan between the 2 towers before running down to each end anchor.',
+      'Real dimensions from published figures: total length ~8,980 ft (2,737m), height from water to the top of the towers ~746 ft (227.4m), deck width ~90 ft (27.4m) (Golden Gate Bridge, Wikipedia). Not modeled: the real Art Deco tower lattice detailing, the vertical suspender cables hanging from the main cables down to the deck (only the 2 main cables themselves are modeled), roadway lanes/sidewalks, and the real bridge\'s own International Orange paint scheme beyond the accent color chosen here.',
+    ],
+  },
+  {
+    id: 'brooklyn-bridge', name: "Brooklyn Bridge (New York)", shape: 'bridge',
+    real: { height: 82.9, baseX: 1833.7, baseZ: 25.9 },
+    blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'iron_block' },
+    desc: 'The same real suspension bridge silhouette as the Golden Gate Bridge (2 towers, 1 deck, sagging main cables), scaled to the Brooklyn Bridge\'s own real figures: tower height ~82.9m, total length ~1,833.7m, deck width ~25.9m — reusing bridgeSolid unchanged, since real vanilla suspension bridges share the same basic silhouette regardless of era or location.',
+    keywords: ['brooklyn bridge', 'bridge', 'suspension', 'new york', 'tower'],
+    notes: [
+      'Real dimensions from published figures: total length ~6,016 ft (1,833.7m), tower height ~272 ft (82.9m), deck width ~85 ft (25.9m) (Brooklyn Bridge, Wikipedia). Real stone masonry towers (rather than the Golden Gate\'s steel lattice) are the Brooklyn Bridge\'s own most distinctive real feature, honestly approximated here only by the exterior block choice (stone bricks) since `bridgeSolid` builds one shared silhouette shape for every bridge preset rather than a tower-material-specific one.',
+      'Not modeled: the real distinctive Gothic-arched double-tower openings, the diagonal stay cables (in addition to the main suspension cables) that are one of this specific bridge\'s own signature real details, and the wooden promenade deck — this app\'s bridgeSolid models one generic suspension-bridge silhouette shared across every bridge preset, not each bridge\'s own unique structural ornamentation.',
+    ],
+  },
+  {
     id: 'mechanism-demo', name: "Redstone Mechanism Demo Room", shape: 'box', category: 'Traps & Mechanisms',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'mechanismDemo',
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'gold_block' },
@@ -6015,7 +6117,7 @@ const PRESETS = [
 const CUSTOM_SHAPE_LABELS = {
   box: 'Box', pyramid: 'Custom Pyramid', cylinder: 'Cylinder', cone: 'Cone', dome: 'Dome',
   ziggurat: 'Ziggurat', tower: 'Tower', domebuilding: 'Domed Building', ring: 'Ring / Arena Wall',
-  freeform: 'Freeform Build',
+  freeform: 'Freeform Build', bridge: 'Suspension Bridge',
 };
 
 /* =========================================================================
