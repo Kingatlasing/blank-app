@@ -171,6 +171,7 @@
             <option value="ring">Ring / arena wall (hollow annulus)</option>
             <option value="freeform">Freeform (blank canvas — build anything, block by block)</option>
             <option value="bridge">Suspension bridge (2 towers + deck + sagging cables)</option>
+            <option value="vaderHelmet">Helmet (dome + flared cheeks + grille)</option>
           </select>
           <div class="hint">Don't see it in the library? Look up its real height &amp; footprint and approximate it with the closest primitive shape here — that's how you can build a scale model of literally anything.</div>
           <div class="row">
@@ -2733,17 +2734,74 @@ function bridgeSolid(x, y, z, dims, params) {
   return false;
 }
 
+// This app's first PROP/COSTUME-PIECE shape rather than a building or
+// civil structure — every earlier shape models something a person walks
+// through or across; a helmet is worn, with no usable interior at all
+// (hence its null SHAPE_DEFAULT_INTERIOR entry below). A rounded dome
+// narrows to the top, a wide flared cheek/jaw band fills the middle, and
+// a slightly wider collar flare sits right at the base, matching a real
+// reference description of Darth Vader's helmet — "a rounded dome with
+// slightly flared cheek panels" (darth-vader-fans.fandom.com/wiki/
+// Darth_Vader's_Helmet). 2 forward-protruding eye lens bumps and a
+// forward-protruding triangular mouth grille (wide at the bottom,
+// narrowing toward the top, matching the same real reference's "triangular
+// grill" description) are placed at fixed fractional positions on the
+// front (+Z) face — the same "explicit box region at a fixed fraction of
+// the overall silhouette" technique already used by decor part functions
+// elsewhere in this app — since expressing them as a function of the
+// head ellipsoid's own curved front boundary would need solving that
+// ellipsoid's own equation at every single (x,y) pair first.
+function vaderHelmetSolid(x, y, z, dims) {
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const t = y / dims.sy;
+  let rx, rz;
+  if (t > 0.7) {
+    const dt = (t - 0.7) / 0.3;
+    const shrink = Math.max(0.08, Math.sqrt(Math.max(0, 1 - dt * dt)));
+    rx = dims.sx * 0.4 * shrink;
+    rz = dims.sz * 0.38 * shrink;
+  } else if (t > 0.15) {
+    rx = dims.sx * 0.42;
+    rz = dims.sz * 0.4;
+  } else {
+    const ct = t / 0.15;
+    rx = dims.sx * (0.46 - 0.04 * ct);
+    rz = dims.sz * (0.44 - 0.04 * ct);
+  }
+  const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+  if (nx * nx + nz * nz <= 1.0) return true;
+
+  // Eye lenses: 2 small forward bumps on the upper-front face.
+  const eyeY0 = dims.sy * 0.55, eyeY1 = dims.sy * 0.68;
+  const eyeZ0 = dims.sz * 0.78;
+  const eyeXOffset = dims.sx * 0.16;
+  const eyeHalfX = Math.max(1, dims.sx * 0.09);
+  if (y >= eyeY0 && y <= eyeY1 && z >= eyeZ0 && z <= dims.sz - 1 &&
+      (Math.abs(x - (cx - eyeXOffset)) <= eyeHalfX || Math.abs(x - (cx + eyeXOffset)) <= eyeHalfX)) return true;
+
+  // Mouth/grille: a forward protrusion below the eyes, wide at the
+  // bottom and narrowing toward the top — the real triangular shape.
+  const grilleY0 = dims.sy * 0.25, grilleY1 = dims.sy * 0.52;
+  const grilleZ0 = dims.sz * 0.75;
+  if (y >= grilleY0 && y <= grilleY1 && z >= grilleZ0 && z <= dims.sz - 1) {
+    const gt = (y - grilleY0) / (grilleY1 - grilleY0);
+    const halfWidth = dims.sx * (0.22 - 0.14 * gt);
+    if (Math.abs(x - cx) <= halfWidth) return true;
+  }
+  return false;
+}
+
 const SHAPES = {
   box: boxSolid, pyramid: pyramidSolid, cylinder: cylinderSolid, cone: coneSolid,
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
   domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
-  bridge: bridgeSolid,
+  bridge: bridgeSolid, vaderHelmet: vaderHelmetSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
-  cone: null, ring: null, freeform: null, bridge: null,
+  cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -4977,6 +5035,18 @@ const PRESETS = [
     ],
   },
   {
+    id: 'darth-vader-helmet', name: "Darth Vader Helmet (Star Wars)", shape: 'vaderHelmet',
+    real: { height: 0.36, baseX: 0.38, baseZ: 0.36 },
+    blocks: { exterior: 'black_concrete', interior: 'black_concrete', accent: 'iron_block' },
+    desc: 'This app\'s first prop/costume shape rather than a building — a rounded dome narrowing to the top, a wide flared cheek/jaw band through the middle, and forward-protruding eye lenses and a triangular mouth grille on the front face, matching a real reference description of Darth Vader\'s helmet. Real dimensions are tiny (a real, wearable prop replica, ~36cm tall), so unlike every pyramid or building here, this one needs real SCALE-UP, not scale-down — try a scale ratio of 10/1 or more.',
+    keywords: ['darth vader', 'helmet', 'star wars', 'mask', 'sith', 'prop'],
+    notes: [
+      'Every earlier shape here (pyramid, tower, dome, bridge...) is either a building someone walks through/across, or open civil-engineering space; a helmet is worn, with no usable interior at all, which is why it has no available interior mode. The new `vaderHelmetSolid` shapes the overall dome-plus-flared-cheeks silhouette with a stepped ellipsoid radius (narrower near the top for the dome, full width through the middle for the cheek/jaw flare, a touch wider again right at the base for the real neck-collar flare), then adds 2 small forward-protruding bumps for the eye lenses and one forward-protruding triangular shape (wide at the bottom, narrowing toward the top) for the real mouth grille, both placed at fixed fractional positions on the front face — matching a real reference description: "a rounded dome with slightly flared cheek panels," bulbous eye lenses, and "a triangular grill" for the mouth (darth-vader-fans.fandom.com/wiki/Darth_Vader\'s_Helmet).',
+      'Real dimensions from a commonly-cited 1:1 scale prop replica: height ~14in (36cm), width ~15in (38cm), depth ~14in (36cm) (EFX Collectibles Darth Vader Helmet replica, via Sideshow Collectibles). Since this is a small worn prop rather than a building, its own real footprint is far smaller than a single Minecraft block at 1:1 scale — every other real-world preset here needs SCALE-DOWN to become a buildable size, while this is this app\'s first preset that instead needs real scale-UP (try 10/1 or higher) to become one, exercising the exact same Scale panel from the opposite direction.',
+      'Not modeled: the real side "tubes" running along the mask\'s own edges down to silver studs, the hermetic neck collar\'s own separate flared ring geometry (only implied by the base\'s own slightly wider radius), the real two-tone gloss finish (a more polished front, a duller back), and the true smooth, curved surfacing real fiberglass/ABS replicas have — this app renders everything as flat voxel cubes, the same blocky approximation every other curved shape here (dome, cylinder, cone) already accepts.',
+    ],
+  },
+  {
     id: 'mechanism-demo', name: "Redstone Mechanism Demo Room", shape: 'box', category: 'Traps & Mechanisms',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'mechanismDemo',
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'gold_block' },
@@ -6117,7 +6187,7 @@ const PRESETS = [
 const CUSTOM_SHAPE_LABELS = {
   box: 'Box', pyramid: 'Custom Pyramid', cylinder: 'Cylinder', cone: 'Cone', dome: 'Dome',
   ziggurat: 'Ziggurat', tower: 'Tower', domebuilding: 'Domed Building', ring: 'Ring / Arena Wall',
-  freeform: 'Freeform Build', bridge: 'Suspension Bridge',
+  freeform: 'Freeform Build', bridge: 'Suspension Bridge', vaderHelmet: 'Helmet (dome + flared cheeks + grille)',
 };
 
 /* =========================================================================
