@@ -2922,6 +2922,120 @@ function applyGoldenGateBridgeDetail(grid, dims, matAcc) {
   }
 }
 
+// A highly-detailed shape for the Eiffel Tower preset SPECIFICALLY — the
+// generic tapering pyramid this preset used before this rebuild was a
+// solid mass with no resemblance to the real tower's own open ironwork,
+// 4 separate curving legs, or its 3 real observation platforms. Every
+// constant below is a real published Eiffel Tower figure (base width,
+// leg-merge/platform heights, platform floor areas), so — like
+// goldenGateBridgeSolid above — this shape only makes sense driven by
+// this one preset's own fixed real dims and isn't exposed as a Custom
+// shape.
+const ET_REAL_HEIGHT = 330, ET_BASE = 125, ET_MERGE_Y = 115, ET_STRUCTURE_TOP = 300;
+// Platform half-widths are real sqrt(published floor area)/2 (4,200 /
+// 1,650 / 350 sq.m for the 1st/2nd/3rd floors) rather than derived from
+// the leg/shaft width at that height — a real platform is a walkway deck
+// bracketed out well beyond the narrow structural member it surrounds,
+// not merely a wide spot on the leg/shaft itself.
+const ET_PLATFORM_YS = [57, 115, 276], ET_PLATFORM_HALFW = [32, 20, 9], ET_PLATFORM_THICK = 4;
+const ET_LEG_HALF_BASE = 8, ET_LEG_HALF_MERGE = 3, ET_SHAFT_HALF_TOP = 1, ET_ANTENNA_HALF = 1;
+const ET_BRACE_PERIOD = 12, ET_BRACE_THICK = 2;
+
+// One leg's own cross-section half-width at a given real height — shared
+// by all 4 legs, since only their X/Z position differs, not their width.
+function etLegHalfWidth(yReal, scale) {
+  const t = Math.min(1, yReal / ET_MERGE_Y);
+  return Math.max(1, Math.round((ET_LEG_HALF_BASE + (ET_LEG_HALF_MERGE - ET_LEG_HALF_BASE) * t) * scale));
+}
+// A leg's own curving centerline: a straight (linear) inward convergence
+// from its base corner at y=0 to the tower's central axis at
+// ET_MERGE_Y — matches the real leg offset closely enough, at the real
+// published first-platform height (57m), to keep the legs from poking
+// out past that platform's own real published footprint (see
+// ET_PLATFORM_HALFW above) rather than a slower, more sharply-curving
+// ease that would leave them stranded outside it.
+function etLegCenter(legIdx, yReal, dims, scale, cx, cz) {
+  const offset = (ET_BASE / 2) * scale;
+  const signX = (legIdx & 1) ? 1 : -1, signZ = (legIdx & 2) ? 1 : -1;
+  const t = Math.min(1, yReal / ET_MERGE_Y);
+  return [cx + signX * offset * (1 - t), cz + signZ * offset * (1 - t)];
+}
+// The single shaft above the leg-merge height, tapering to a thin point
+// near the real structure top before the antenna mast takes over.
+function etShaftHalfWidth(yReal, scale) {
+  const t2 = Math.min(1, Math.max(0, (yReal - ET_MERGE_Y) / (ET_STRUCTURE_TOP - ET_MERGE_Y)));
+  const halfReal = ET_LEG_HALF_MERGE + (ET_SHAFT_HALF_TOP - ET_LEG_HALF_MERGE) * Math.sqrt(t2);
+  return Math.max(1, Math.round(halfReal * scale));
+}
+// Real open ironwork, not a solid mass: a hollow square tube (only the
+// outer shell is solid) with periodic full diagonal X cross-braces — the
+// same real repeating truss pattern visible in every photo of the
+// tower's own legs and shaft, far simpler to get right on a curving,
+// tapering member than a continuous diagonal lattice would be.
+function etLatticeSolid(du, dv, halfW, y, scale) {
+  const wallT = Math.max(1, Math.round(halfW * 0.35));
+  if (Math.abs(du) >= halfW - wallT || Math.abs(dv) >= halfW - wallT) return true;
+  const bracePeriod = Math.max(1, Math.round(ET_BRACE_PERIOD * scale));
+  const braceThick = Math.max(1, Math.round(ET_BRACE_THICK * scale));
+  if ((y % bracePeriod) >= braceThick) return false;
+  return Math.abs(du - dv) <= braceThick || Math.abs(du + dv) <= braceThick;
+}
+function eiffelTowerSolid(x, y, z, dims) {
+  const scale = dims.sy / ET_REAL_HEIGHT;
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const yReal = y / scale;
+
+  // The 3 real observation platforms: solid slabs, sized to their own
+  // real published floor areas, cutting straight across the leg-to-
+  // shaft transition.
+  for (let p = 0; p < ET_PLATFORM_YS.length; p++) {
+    const platYBlocks = Math.round(ET_PLATFORM_YS[p] * scale);
+    const halfThick = Math.max(1, Math.round((ET_PLATFORM_THICK / 2) * scale));
+    if (Math.abs(y - platYBlocks) <= halfThick) {
+      const platHalfW = Math.min(Math.round(dims.sx / 2), Math.round(ET_PLATFORM_HALFW[p] * scale));
+      if (Math.abs(x - cx) <= platHalfW && Math.abs(z - cz) <= platHalfW) return true;
+    }
+  }
+
+  if (yReal <= ET_MERGE_Y) {
+    const halfW = etLegHalfWidth(yReal, scale);
+    for (let leg = 0; leg < 4; leg++) {
+      const [legX, legZ] = etLegCenter(leg, yReal, dims, scale, cx, cz);
+      const du = x - legX, dv = z - legZ;
+      if (Math.abs(du) <= halfW && Math.abs(dv) <= halfW && etLatticeSolid(du, dv, halfW, y, scale)) return true;
+    }
+    return false;
+  }
+  if (yReal <= ET_STRUCTURE_TOP) {
+    const halfW = etShaftHalfWidth(yReal, scale);
+    const du = x - cx, dv = z - cz;
+    return Math.abs(du) <= halfW && Math.abs(dv) <= halfW && etLatticeSolid(du, dv, halfW, y, scale);
+  }
+  // The antenna mast: thin and solid, no lattice.
+  const antHalfW = Math.max(1, Math.round(ET_ANTENNA_HALF * scale));
+  return Math.abs(x - cx) <= antHalfW && Math.abs(z - cz) <= antHalfW;
+}
+// Always-on finishing pass (like applyGoldenGateBridgeDetail above): the
+// 3 real observation platforms get their own distinct deck material,
+// since eiffelTowerSolid can only decide solid/air.
+function applyEiffelTowerDetail(grid, dims, matAcc) {
+  const scale = dims.sy / ET_REAL_HEIGHT;
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  for (let p = 0; p < ET_PLATFORM_YS.length; p++) {
+    const platYBlocks = Math.round(ET_PLATFORM_YS[p] * scale);
+    const halfThick = Math.max(1, Math.round((ET_PLATFORM_THICK / 2) * scale));
+    const platHalfW = Math.min(Math.round(dims.sx / 2), Math.round(ET_PLATFORM_HALFW[p] * scale));
+    for (let y = Math.max(0, platYBlocks - halfThick); y <= Math.min(dims.sy - 1, platYBlocks + halfThick); y++) {
+      for (let x = Math.max(0, Math.round(cx - platHalfW)); x <= Math.min(dims.sx - 1, Math.round(cx + platHalfW)); x++) {
+        for (let z = Math.max(0, Math.round(cz - platHalfW)); z <= Math.min(dims.sz - 1, Math.round(cz + platHalfW)); z++) {
+          const i = idx(x, y, z, dims);
+          if (grid[i]) grid[i] = matAcc;
+        }
+      }
+    }
+  }
+}
+
 // Deterministic hash of a (integer-ish) 2D coordinate pair into [0,1) —
 // NOT Math.random(): buildSilhouette and hollowCarve both call a shape's
 // test function repeatedly for the very same (x,y,z) cell (once for the
@@ -3046,13 +3160,16 @@ const SHAPES = {
   // (see its own comment above), so it only makes sense driven by the
   // golden-gate-bridge preset itself, never a user-typed custom size.
   goldenGateBridge: goldenGateBridgeSolid,
+  // Same reasoning: eiffelTowerSolid hardcodes this one preset's own
+  // real dims, so it's not exposed as a selectable Custom shape either.
+  eiffelTower: eiffelTowerSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
   cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null,
-  goldenGateBridge: null,
+  goldenGateBridge: null, eiffelTower: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -5229,11 +5346,15 @@ const PRESETS = [
     notes: ['Real floor plan is a stepped Y-shape, simplified here to a tapering cone.'],
   },
   {
-    id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'pyramid',
+    id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'eiffelTower',
     real: { height: 330, baseX: 125, baseZ: 125 }, interiorMode: null,
-    blocks: { exterior: 'terracotta', interior: 'stone', accent: 'iron_block' },
-    desc: 'Height ~330m (incl. antennas), base ~125m square at the feet.',
-    notes: ['Simplified to a solid tapered silhouette — the real lattice ironwork is far more open. Use Hollow mode for a lighter, lace-like build.'],
+    blocks: { exterior: 'iron_block', interior: 'iron_block', accent: 'stone_bricks' },
+    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs curve inward from the real 125m-square base and merge into a single tapering shaft at the real 2nd-platform height, both built as real hollow-tube ironwork with periodic diagonal cross-braces instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
+    keywords: ['eiffel', 'tower', 'paris', 'france', 'lattice', 'iron'],
+    notes: [
+      'Rebuilt from the earlier solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Each leg tapers from a real ~8m half-width at the base to ~3m where all 4 merge into the shaft, and the shaft continues tapering to ~1m just below the real structure top (300m) — both rendered as a hollow square tube (only the outer wall is solid) with a real full diagonal X cross-brace band every ~12m, the same repeating truss pattern visible in every photo of the real tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
+      'Real dimensions and this construction spec from published figures: base 125m square, total height 330m with antennas (~300m of actual structure), leg-merge/2nd-platform height 115m, 1st platform height 57m, 3rd (summit) platform height 276m, and real published floor areas per platform (1st ~4,200 sq.m, 2nd ~1,650 sq.m, 3rd ~350 sq.m) used to size each platform\'s own footprint directly rather than deriving it from the leg/shaft width at that height, since a real platform is a walkway deck bracketed out well beyond the narrow structural member it surrounds. Not modeled: the real elevators/machinery inside the legs, the true continuous curved (not straight-segment) leg profile, individual rivets/beams, and the tower\'s real paint color (only the block palette chosen here).',
+    ],
   },
   {
     id: 'windmill', name: "Traditional Windmill", shape: 'tower',
@@ -6965,6 +7086,11 @@ function generateModel() {
   // interior.
   if (shapeType === 'goldenGateBridge') {
     applyGoldenGateBridgeDetail(grid, dims, matAcc);
+  }
+  // Same reasoning again: the Eiffel Tower's own 3 real observation
+  // platforms are always-visible defining features, not an interior.
+  if (shapeType === 'eiffelTower') {
+    applyEiffelTowerDetail(grid, dims, matAcc);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
