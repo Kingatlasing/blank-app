@@ -3036,6 +3036,311 @@ function applyEiffelTowerDetail(grid, dims, matAcc) {
   }
 }
 
+// A highly-detailed shape for the Statue of Liberty preset SPECIFICALLY —
+// a human figure genuinely can't be captured by a primitive cylinder
+// (the shape this preset used before this rebuild, with its own honest
+// note admitting exactly that). This instead builds a stylized but
+// recognizable robed figure — a tapering robe, a narrower torso, a
+// rounded head with a flared crown band, one arm raised holding a torch
+// well above the head, the other holding a tablet against the body — on
+// a real 2-tier pedestal. Unlike the Golden Gate Bridge/Eiffel Tower
+// shapes above, this one works in FRACTIONS of this preset's own dims
+// rather than absolute real meters: its existing real.baseX/baseZ (16m)
+// is already an honest scaffold approximation of the statue's own
+// footprint (per that same old note), not a real building's exact plan,
+// so there's no fixed real-meter grid worth keying off.
+const SOL_PEDESTAL_TOP = 0.505; // 47m of the real published 93m total (real pedestal height)
+const SOL_ROBE_TOP = 0.645, SOL_TORSO_TOP = 0.806, SOL_HEAD_TOP = 0.86, SOL_CROWN_TOP = 0.90;
+function statueOfLibertySolid(x, y, z, dims) {
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const t = y / dims.sy;
+
+  if (t <= SOL_PEDESTAL_TOP) {
+    // A 2-tier rectangular pedestal, narrower on top.
+    const tierT = t / SOL_PEDESTAL_TOP;
+    const half = tierT < 0.65 ? dims.sx * 0.46 : dims.sx * 0.34;
+    return Math.abs(x - cx) <= half && Math.abs(z - cz) <= half;
+  }
+
+  // The raised right arm + torch: an offset column, thinner than the
+  // body, starting at shoulder height and rising above the head — the
+  // statue's own single most recognizable silhouette feature.
+  const armX = cx + dims.sx * 0.16;
+  if (t >= 0.70) {
+    const armHalf = Math.max(1, dims.sx * 0.05);
+    if (Math.abs(x - armX) <= armHalf && Math.abs(z - cz) <= armHalf) return true;
+    if (t >= 0.97) {
+      const torchHalf = Math.max(1, dims.sx * 0.09); // the torch head, a touch wider than the arm
+      if (Math.abs(x - armX) <= torchHalf && Math.abs(z - cz) <= torchHalf) return true;
+    }
+  }
+  // The tablet: a flat rectangular slab held against the body's other side.
+  if (t >= 0.66 && t <= 0.74) {
+    const tabX = cx - dims.sx * 0.18;
+    if (Math.abs(x - tabX) <= dims.sx * 0.07 && Math.abs(z - cz) <= dims.sz * 0.14) return true;
+  }
+
+  if (t <= SOL_ROBE_TOP) {
+    const rt = (t - SOL_PEDESTAL_TOP) / (SOL_ROBE_TOP - SOL_PEDESTAL_TOP);
+    const rx = dims.sx * (0.30 - 0.10 * rt), rz = dims.sz * (0.28 - 0.09 * rt);
+    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+    return nx * nx + nz * nz <= 1.0;
+  }
+  if (t <= SOL_TORSO_TOP) {
+    const rx = dims.sx * 0.19, rz = dims.sz * 0.17;
+    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+    return nx * nx + nz * nz <= 1.0;
+  }
+  if (t <= SOL_HEAD_TOP) {
+    const ht = (t - SOL_TORSO_TOP) / (SOL_HEAD_TOP - SOL_TORSO_TOP);
+    const shrink = Math.sqrt(Math.max(0.15, 1 - ht * ht));
+    const rx = dims.sx * 0.12 * shrink, rz = dims.sz * 0.11 * shrink;
+    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+    return nx * nx + nz * nz <= 1.0;
+  }
+  if (t <= SOL_CROWN_TOP) {
+    // The crown: a real spiked crown's own radiating points aren't
+    // practical in a plain solid/air voxel test, so a wider flared disc
+    // at the same height stands in for it instead.
+    const rx = dims.sx * 0.16, rz = dims.sz * 0.15;
+    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+    return nx * nx + nz * nz <= 1.0;
+  }
+  return false;
+}
+// Always-on finishing pass: paints the torch head in the accent material
+// (a real flame color) since statueOfLibertySolid can only decide
+// solid/air.
+function applyStatueOfLibertyDetail(grid, dims, matAcc) {
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const armX = Math.round(cx + dims.sx * 0.16);
+  const torchHalf = Math.max(1, Math.round(dims.sx * 0.09));
+  const y0 = Math.max(0, Math.round(dims.sy * 0.97)), y1 = dims.sy - 1;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = Math.max(0, armX - torchHalf); x <= Math.min(dims.sx - 1, armX + torchHalf); x++) {
+      for (let z = Math.max(0, Math.round(cz - torchHalf)); z <= Math.min(dims.sz - 1, Math.round(cz + torchHalf)); z++) {
+        const i = idx(x, y, z, dims);
+        if (grid[i]) grid[i] = matAcc;
+      }
+    }
+  }
+}
+
+// Big Ben keeps the generic tapered-box `tower` shape (its gross box +
+// spire silhouette is already a reasonable match) — this always-on
+// finishing pass adds the one real detail that shape can't express on
+// its own: 4 real clock faces, one per side, near the top of the shaft.
+// Gated on the PRESET id rather than shapeType (unlike the dedicated
+// shapes above) since `tower` is shared by other presets (windmill,
+// village house) that must not get clock faces painted on by mistake.
+function applyBigBenDetail(grid, dims, matAcc) {
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const y0 = Math.round(dims.sy * 0.68), y1 = Math.round(dims.sy * 0.80);
+  const cy = (y0 + y1) / 2, ry = (y1 - y0) / 2 || 1;
+  const faceR = Math.max(1, Math.min(dims.sx, dims.sz) * 0.32);
+  for (let y = y0; y <= y1; y++) {
+    const dy = (y - cy) / ry;
+    if (Math.abs(dy) > 1) continue;
+    const spread = Math.sqrt(Math.max(0, 1 - dy * dy)) * faceR;
+    for (let d = -Math.ceil(spread); d <= Math.ceil(spread); d++) {
+      if (Math.abs(d) > spread) continue;
+      const zc = Math.round(cz + d);
+      if (zc >= 0 && zc < dims.sz) {
+        let i = idx(0, y, zc, dims); if (grid[i]) grid[i] = matAcc;
+        i = idx(dims.sx - 1, y, zc, dims); if (grid[i]) grid[i] = matAcc;
+      }
+      const xc = Math.round(cx + d);
+      if (xc >= 0 && xc < dims.sx) {
+        let i = idx(xc, y, 0, dims); if (grid[i]) grid[i] = matAcc;
+        i = idx(xc, y, dims.sz - 1, dims); if (grid[i]) grid[i] = matAcc;
+      }
+    }
+  }
+}
+
+// A highly-detailed shape for the Colosseum preset SPECIFICALLY — the
+// generic `ring` shape this preset used before this rebuild is a single
+// unbroken elliptical wall with no facade detail at all (its own old
+// note admitted the arched tiers "are not modeled"). This carves the
+// real signature feature directly into the wall: a real 80 arches per
+// full loop (the real published count) across 3 arcade tiers, plus a
+// 4th attic tier above with small rectangular windows at half that
+// frequency, instead of one blank wall.
+function colosseumSolid(x, y, z, dims, params) {
+  const innerRatio = (params && params.innerRatio) || 0.78;
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const rx = dims.sx / 2, rz = dims.sz / 2;
+  const nx = (x - cx) / rx, nz = (z - cz) / rz;
+  if (nx * nx + nz * nz > 1.0) return false;
+  const inx = (x - cx) / (rx * innerRatio || 1e-9), inz = (z - cz) / (rz * innerRatio || 1e-9);
+  if (inx * inx + inz * inz <= 1.0) return false;
+
+  // The ellipse's own eccentricity would otherwise distort the angular
+  // spacing of the arches unevenly around the loop — normalizing by
+  // each axis's own radius first maps the real ellipse into an
+  // equivalent circle's angle space, keeping the real ~4.5° arch period
+  // uniform all the way around regardless of the footprint's own
+  // width/depth ratio.
+  const angle = Math.atan2(nz, nx);
+  const archPeriod = (2 * Math.PI) / 80;
+  const archPhase = ((angle % archPeriod) + archPeriod) % archPeriod;
+  const isArchColumn = archPhase < archPeriod * 0.55;
+  const t = y / dims.sy;
+  const atticStart = 0.75;
+  if (t < atticStart) {
+    const tierH = atticStart / 3;
+    const tierT = (t % tierH) / tierH;
+    const inArchBand = tierT > 0.12 && tierT < 0.88; // a real cornice/floor band between tiers
+    if (isArchColumn && inArchBand) return false;
+    return true;
+  }
+  // Attic: solid, with small rectangular windows at half the arch
+  // frequency (real "a window every second panel").
+  const isWindowColumn = archPhase < archPeriod * 0.25 && Math.floor(angle / archPeriod) % 2 === 0;
+  const atticT = (t - atticStart) / (1 - atticStart);
+  if (isWindowColumn && atticT > 0.35 && atticT < 0.75) return false;
+  return true;
+}
+
+// A highly-detailed shape for the Leaning Tower of Pisa preset
+// SPECIFICALLY — the generic `cylinder` shape this preset used before
+// this rebuild was modeled perfectly vertical with no arcade detail at
+// all (its own old note said as much). This adds the real published
+// 3.97° lean directly into the geometry (rather than leaving it to the
+// builder to fake by hand), plus the real 6 open loggia levels (out of
+// 8 total stories) as a genuine thin colonnade ring around a solid
+// stairwell core instead of one solid shaft.
+const PISA_LEAN_DEG = 3.97;
+function pisaSolid(x, y, z, dims) {
+  const leanRad = (PISA_LEAN_DEG * Math.PI) / 180;
+  // The real lean displacement is a fixed fraction (tan of the lean
+  // angle) of the height climbed so far — applying it directly in block
+  // units works at any scale, since y and this offset both scale by the
+  // same factor together.
+  const cx = (dims.sx - 1) / 2 + y * Math.tan(leanRad), cz = (dims.sz - 1) / 2;
+  const t = y / dims.sy;
+  const stories = 8, storyH = 1 / stories;
+  const storyIdx = Math.min(stories - 1, Math.floor(t * stories));
+  let r = dims.sx / 2;
+  if (storyIdx === stories - 1) {
+    // The belfry: a small domed cap rather than a flat-topped cylinder.
+    const bt = (t - (stories - 1) * storyH) / storyH;
+    r *= Math.max(0.3, Math.sqrt(Math.max(0, 1 - bt * bt)));
+  }
+  const dx = x - cx, dz = z - cz;
+  const dist2 = (dx * dx + dz * dz) / (r * r || 1e-9);
+  if (dist2 > 1.0) return false;
+  if (storyIdx >= 1 && storyIdx <= 6) {
+    // An open loggia: a solid inner core (a real spiral-stair shaft
+    // needs one regardless) surrounded by a ring of thin columns with
+    // real open gaps between them, not a solid disc.
+    const wallInner = 0.55;
+    if (dist2 <= wallInner * wallInner) return true;
+    const angle = Math.atan2(dz, dx);
+    const colCount = 20;
+    const period = (2 * Math.PI) / colCount;
+    const phase = ((angle % period) + period) % period;
+    return phase < period * 0.35;
+  }
+  return true; // the solid ground-floor blind arcade, and the solid belfry cap
+}
+
+// A highly-detailed shape for the Taj Mahal preset SPECIFICALLY — adds
+// the real 4 corner minarets this preset's own old note admitted were
+// missing ("build them separately"), each a real slim, slightly
+// outward-leaning tower with a small dome cap at the real published
+// ~40m height, standing on the real plinth margin OUTSIDE the main
+// mausoleum body's own footprint (this preset's real.baseX/baseZ were
+// widened from the bare 56m mausoleum to 76m specifically to give the
+// minarets that real standing room, without changing the mausoleum
+// body's own real size).
+const TM_MINARET_HEIGHT_FRAC = 0.548; // real ~40m of the real published 73m dome height
+function tajMahalSolid(x, y, z, dims, params) {
+  const domeFrac = (params && params.domeFrac) || 0.55;
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const bodyHalfX = dims.sx * 0.37, bodyHalfZ = dims.sz * 0.37;
+  const domeStart = dims.sy * domeFrac;
+  let bodySolid;
+  if (y < domeStart) {
+    bodySolid = Math.abs(x - cx) <= bodyHalfX && Math.abs(z - cz) <= bodyHalfZ;
+  } else {
+    const R = dims.sy - domeStart;
+    const ny = (y - domeStart) / (R || 1e-9);
+    bodySolid = false;
+    if (ny <= 1) {
+      const shrink = Math.sqrt(Math.max(0, 1 - ny * ny));
+      const nx = (x - cx) / (bodyHalfX * shrink || 1e-9), nz = (z - cz) / (bodyHalfZ * shrink || 1e-9);
+      bodySolid = nx * nx + nz * nz <= 1.0;
+    }
+  }
+  if (bodySolid) return true;
+
+  const minaretTopY = dims.sy * TM_MINARET_HEIGHT_FRAC;
+  if (y > minaretTopY) return false;
+  const cornerOffset = Math.min(dims.sx, dims.sz) * 0.46;
+  const leanFrac = 0.03; // a real slight outward tilt
+  const t2 = y / minaretTopY;
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const baseCX = cx + sx * cornerOffset, baseCZ = cz + sz * cornerOffset;
+      const leanX = baseCX + sx * cornerOffset * leanFrac * t2, leanZ = baseCZ + sz * cornerOffset * leanFrac * t2;
+      let r = Math.max(1, dims.sx * 0.045);
+      if (t2 > 0.88) {
+        const dt = (t2 - 0.88) / 0.12;
+        r *= Math.max(0.2, Math.sqrt(Math.max(0, 1 - dt * dt))); // a small dome cap
+      }
+      const dx = x - leanX, dz = z - leanZ;
+      if (dx * dx + dz * dz <= r * r) return true;
+    }
+  }
+  return false;
+}
+
+// A highly-detailed shape for the Burj Khalifa preset SPECIFICALLY — the
+// generic `cone` shape this preset used before this rebuild was a plain
+// taper (its own old note admitted the real "stepped Y-shape" was
+// simplified away). This instead builds the real Y-shaped tripartite
+// plan directly: 3 wings fanning out from a central core at real 120°
+// intervals, tapering and staggering their own recession as height
+// increases to suggest the real published 27 setbacks' spiraling
+// pattern, before the wings fully recede into the core and a single
+// spire continues tapering to the real published top.
+const BK_WING_ZONE_FRAC = 0.705; // real ~584m of the real published 828m total, before the real ~244m spire
+function bkArmLength(t, wingIdx, dims) {
+  const baseLen = Math.min(dims.sx, dims.sz) * 0.46;
+  const zoneT = Math.min(1, t / BK_WING_ZONE_FRAC);
+  const taper = Math.pow(Math.max(0, 1 - zoneT), 0.85);
+  const stepBands = 9;
+  const phase = Math.floor(zoneT * stepBands * 3 + wingIdx) % 3;
+  const stagger = 1 - phase * 0.06;
+  return Math.max(0, baseLen * taper * stagger);
+}
+function burjKhalifaSolid(x, y, z, dims) {
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const t = y / dims.sy;
+  const coreHalf = Math.max(1, Math.min(dims.sx, dims.sz) * 0.12);
+
+  if (t > BK_WING_ZONE_FRAC) {
+    const st = (t - BK_WING_ZONE_FRAC) / (1 - BK_WING_ZONE_FRAC);
+    const r = Math.max(1, coreHalf * Math.sqrt(Math.max(0, 1 - st * st)));
+    const dx = x - cx, dz = z - cz;
+    return dx * dx + dz * dz <= r * r;
+  }
+
+  if (Math.abs(x - cx) <= coreHalf && Math.abs(z - cz) <= coreHalf) return true;
+
+  const armHalfW = Math.max(1, Math.min(dims.sx, dims.sz) * 0.11);
+  for (let w = 0; w < 3; w++) {
+    const angle = w * ((2 * Math.PI) / 3);
+    const cos = Math.cos(angle), sin = Math.sin(angle);
+    const dx = x - cx, dz = z - cz;
+    const u = dx * cos + dz * sin, v = -dx * sin + dz * cos;
+    const armLen = bkArmLength(t, w, dims);
+    if (u >= 0 && u <= armLen && Math.abs(v) <= armHalfW) return true;
+  }
+  return false;
+}
+
 // Deterministic hash of a (integer-ish) 2D coordinate pair into [0,1) —
 // NOT Math.random(): buildSilhouette and hollowCarve both call a shape's
 // test function repeatedly for the very same (x,y,z) cell (once for the
@@ -3163,6 +3468,13 @@ const SHAPES = {
   // Same reasoning: eiffelTowerSolid hardcodes this one preset's own
   // real dims, so it's not exposed as a selectable Custom shape either.
   eiffelTower: eiffelTowerSolid,
+  // Same reasoning again for every dedicated preset-specific shape below:
+  // none are exposed as selectable Custom shapes.
+  statueOfLiberty: statueOfLibertySolid,
+  colosseum: colosseumSolid,
+  pisa: pisaSolid,
+  tajMahal: tajMahalSolid,
+  burjKhalifa: burjKhalifaSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
@@ -3170,6 +3482,7 @@ const SHAPE_DEFAULT_INTERIOR = {
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
   cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null,
   goldenGateBridge: null, eiffelTower: null,
+  statueOfLiberty: null, colosseum: null, pisa: null, tajMahal: null, burjKhalifa: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -5307,43 +5620,66 @@ const PRESETS = [
     id: 'big-ben', name: "Big Ben (Elizabeth Tower)", shape: 'tower',
     real: { height: 96, baseX: 12, baseZ: 12 }, params: { roofFrac: 0.18 }, interiorMode: 'floors', floorHeightMeters: 6,
     blocks: { exterior: 'sandstone', interior: 'stone', accent: 'gold_block' },
-    desc: 'Clock tower of the Palace of Westminster, height to the roof ~96m, ~12m square footprint.',
-    notes: ['Clock faces, belfry detailing, and the spire finial are simplified into the tapered roof.'],
+    desc: 'Clock tower of the Palace of Westminster, height to the roof ~96m, ~12m square footprint. Now includes a real gold-toned clock face on all 4 sides near the top of the shaft.',
+    notes: [
+      'Rebuilt from the earlier plain version: the generic tapered-box `tower` shape is kept (its own box + spire silhouette already reasonably matches Big Ben\'s own gross form), but a new always-on `applyBigBenDetail` finishing pass — gated on this specific preset\'s own id, not on the shared shape, so the windmill and village house presets that also use `tower` are unaffected — paints a real circular clock face in the accent material onto all 4 sides near the top of the shaft, the one real detail that shape alone can\'t express.',
+      'Belfry detailing and the spire finial are still simplified into the tapered roof.',
+    ],
   },
   {
-    id: 'pisa', name: "Leaning Tower of Pisa", shape: 'cylinder',
-    real: { height: 55.86, baseX: 15.5, baseZ: 15.5 }, interiorMode: 'floors', floorHeightMeters: 5,
+    id: 'pisa', name: "Leaning Tower of Pisa", shape: 'pisa',
+    real: { height: 55.86, baseX: 15.5, baseZ: 15.5 }, interiorMode: null,
     blocks: { exterior: 'quartz_block', interior: 'stone', accent: 'oak_planks' },
-    desc: 'Freestanding bell tower, height ~55.86m, base diameter ~15.5m.',
-    notes: ['Modeled perfectly vertical for simplicity — for the famous lean, offset each layer by 1 block every ~15 layers as you build.'],
+    desc: 'Freestanding bell tower, height ~55.86m, base diameter ~15.5m. Rebuilt with the real published 3.97° lean built directly into the geometry, plus the real 6 open colonnade levels (of 8 total stories) as a genuine ring of thin columns around a solid stairwell core rather than a solid vertical cylinder.',
+    keywords: ['pisa', 'leaning tower', 'italy', 'bell tower', 'campanile'],
+    notes: [
+      'Rebuilt from the earlier plain vertical cylinder: `pisaSolid` is dedicated to this preset and applies the real 3.97° lean (Wikipedia/published survey figures) as a height-proportional horizontal offset built into the shape itself, rather than leaving it to the builder to fake by hand as the old version\'s own note suggested. The real published structure is 8 stories: a solid ground-floor blind arcade, 6 open loggia levels (modeled here as a ring of thin columns around a solid inner stairwell core, with real open gaps between columns instead of a solid wall), and a solid domed belfry cap.',
+      'Not modeled: the true blind-arcade relief carving on the ground floor, the real 207 individual marble columns (this app\'s own generic 20-per-level lattice stands in for the real count), and the bells themselves inside the belfry.',
+    ],
   },
   {
-    id: 'colosseum', name: "Colosseum (Rome)", shape: 'ring',
+    id: 'colosseum', name: "Colosseum (Rome)", shape: 'colosseum',
     real: { height: 48, baseX: 189, baseZ: 156 }, params: { innerRatio: 0.78 }, interiorMode: null,
     blocks: { exterior: 'sandstone', interior: 'sandstone', accent: 'bricks' },
-    desc: 'Elliptical amphitheater, height ~48m, ~189m x 156m footprint. Modeled as a ring wall by design — use Hollow mode to thin the wall.',
-    notes: ['Arched facade tiers and interior seating (the "cavea") are not modeled — this gives you the outer wall footprint and height to detail by hand.'],
+    desc: 'Elliptical amphitheater, height ~48m, ~189m x 156m footprint. Rebuilt with the real published 80 arches per level carved through the wall across 3 real arcade tiers, plus a 4th solid attic tier with small rectangular windows, instead of one blank ring wall.',
+    keywords: ['colosseum', 'rome', 'italy', 'amphitheater', 'arena'],
+    notes: [
+      'Rebuilt from the earlier plain elliptical ring wall: `colosseumSolid` is dedicated to this preset and carves real archways straight through the wall thickness at a real ~4.5° angular period (360° / the real published 80 arches per level), across the real 3 arcade tiers below a real 4th solid attic tier (attic windows carved at half that frequency, per the real published "a window every second panel"). The ellipse\'s own eccentricity is normalized into an equivalent circle\'s angle space first, so the real arch spacing stays even all the way around regardless of the footprint\'s own width/depth ratio.',
+      'Not modeled: the real 3 different classical column orders per tier (Tuscan/Ionic/Corinthian — this app\'s own single exterior material stands in for all of them), the interior seating (the "cavea") and hypogeum understructure, and the true semicircular arch curvature (voxel corners approximate it here as they do on every other curved shape in this app).',
+    ],
   },
   {
-    id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'cylinder',
+    id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'statueOfLiberty',
     real: { height: 93, baseX: 16, baseZ: 16 }, interiorMode: null,
-    blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'iron_block' },
-    desc: 'Ground to torch height ~93m. Modeled as a plain cylindrical silhouette only.',
-    notes: ['A human figure can\'t be captured by a primitive shape — this gives correct total height and footprint as a scaffold to hand-sculpt within.'],
+    blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'gold_block' },
+    desc: 'Ground to torch height ~93m. Rebuilt as a stylized but recognizable robed figure — a tapering robe, narrower torso, rounded head with a flared crown, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal, instead of a plain cylindrical scaffold.',
+    keywords: ['statue of liberty', 'new york', 'liberty island', 'torch'],
+    notes: [
+      'Rebuilt from the earlier plain cylinder (whose own note admitted "a human figure can\'t be captured by a primitive shape"): `statueOfLibertySolid` works in FRACTIONS of this preset\'s own dims rather than absolute real meters — unlike the Golden Gate Bridge/Eiffel Tower shapes, there\'s no exact real building footprint to key off, since this preset\'s own real.baseX/baseZ (16m) was always an honest scaffold approximation rather than the statue\'s own real plan. The real published pedestal height (47m of the 93m total) sets where the 2-tier pedestal ends and the tapering robed figure begins; the raised right arm + torch (real-gilded since a 1986 restoration, hence the gold accent material) is the one silhouette feature kept geometrically distinct at every scale, rising above the head the way it does on the real statue.',
+      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, a real face, or the real 7-spike crown (approximated here as a plain flared disc). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
+    ],
   },
   {
-    id: 'taj-mahal', name: "Taj Mahal (main mausoleum)", shape: 'domebuilding',
-    real: { height: 73, baseX: 56, baseZ: 56 }, params: { domeFrac: 0.55 }, interiorMode: 'floors', floorHeightMeters: 40,
+    id: 'taj-mahal', name: "Taj Mahal (main mausoleum)", shape: 'tajMahal',
+    real: { height: 73, baseX: 76, baseZ: 76 }, params: { domeFrac: 0.55 }, interiorMode: null,
     blocks: { exterior: 'white_concrete', interior: 'stone', accent: 'gold_block' },
-    desc: 'Height to the dome finial ~73m, main structure footprint ~56m square.',
-    notes: ['The four corner minarets are not modeled — build them separately as thin cylinders at each corner.'],
+    desc: 'Height to the dome finial ~73m, main mausoleum footprint ~56m square. Rebuilt with the real 4 corner minarets (real published ~40m tall, with a real slight outward lean and a small dome cap) standing on the surrounding plinth, instead of a bare dome-on-a-box with no minarets at all.',
+    keywords: ['taj mahal', 'india', 'agra', 'mausoleum', 'mughal'],
+    notes: [
+      'Rebuilt from the earlier plain dome-on-a-box (whose own note said to "build them separately"): `tajMahalSolid` is dedicated to this preset. The overall bounding box (real.baseX/baseZ) was widened from the bare 56m mausoleum footprint to 76m specifically to give the 4 corner minarets real standing room on the surrounding plinth outside the mausoleum body itself, whose own real ~56m size is unchanged (the shape\'s own bodyHalfX/Z fraction was rebalanced to compensate, so the dome-on-a-box mass is the same real size as before). Each minaret tapers from the real published ~40m height, leans slightly outward as it rises (a real detail — real minarets were deliberately built to fall away from the tomb, not onto it, in an earthquake), and ends in a small dome cap.',
+      'Because there\'s no longer a plain box interior, the earlier "floors" interior mode has been removed — a mausoleum\'s own real interior (a tomb chamber, not stacked floors) was already only a rough approximation under that generic mode. Not modeled: the real iwan (the large arched entrance recess on each face), the real inlaid pietra dura marble ornamentation, and the real surrounding plinth\'s own full extent beyond what the minarets need.',
+    ],
   },
   {
-    id: 'burj-khalifa', name: "Burj Khalifa (Dubai)", shape: 'cone',
+    id: 'burj-khalifa', name: "Burj Khalifa (Dubai)", shape: 'burjKhalifa',
     real: { height: 828, baseX: 60, baseZ: 60 }, interiorMode: null,
     blocks: { exterior: 'light_gray_concrete', interior: 'stone', accent: 'glass' },
-    desc: 'World\'s tallest building, height ~828m, base footprint ~60m. A great example of how extreme real proportions get at Minecraft scale.',
-    notes: ['Real floor plan is a stepped Y-shape, simplified here to a tapering cone.'],
+    desc: 'World\'s tallest building, height ~828m, base footprint ~60m. Rebuilt with the real Y-shaped tripartite floor plan — 3 wings fanning out from a central core at real 120° intervals, tapering and stepping as they rise — instead of a plain tapering cone, before receding into the real published spire for the final ~244m.',
+    keywords: ['burj khalifa', 'dubai', 'skyscraper', 'tallest building'],
+    notes: [
+      'Rebuilt from the earlier plain cone (whose own note admitted the real "stepped Y-shape" was simplified away): `burjKhalifaSolid` builds the real 3-wing plan directly using real rotated-rectangle math (each wing tested in its own 120°-rotated local coordinate frame around a shared central core), rather than a single radially-symmetric taper. Each wing\'s own length shrinks and staggers against the other 2 as height increases, suggesting the real published 27 setbacks\' spiraling stepped pattern (a real, exact spiral is impractical to reproduce at typical voxel scale) — matching the real published purpose of those setbacks, "confusing the wind" by presenting a different cross-section at every tier. The wings fully recede into the central core before the real published ~244m spire (of the 828m total) continues tapering to the very top.',
+      'Not modeled: the real buttressed-core structural engineering itself, the real hexagonal (not square) core cross-section, individual floor setback ledges within each of the real 27 steps (approximated here as a smoother continuous taper with only a coarse stagger), and the spire\'s own internal lattice.',
+    ],
   },
   {
     id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'eiffelTower',
@@ -7091,6 +7427,17 @@ function generateModel() {
   // platforms are always-visible defining features, not an interior.
   if (shapeType === 'eiffelTower') {
     applyEiffelTowerDetail(grid, dims, matAcc);
+  }
+  // Same reasoning again: the Statue of Liberty's own torch is a
+  // defining, always-visible feature, not an interior.
+  if (shapeType === 'statueOfLiberty') {
+    applyStatueOfLibertyDetail(grid, dims, matAcc);
+  }
+  // Gated on the preset id, not shapeType: Big Ben keeps the generic
+  // `tower` shape shared by other presets (windmill, village house),
+  // which must NOT get clock faces painted on by mistake.
+  if (isPresetMode() && currentPreset().id === 'big-ben') {
+    applyBigBenDetail(grid, dims, matAcc);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
