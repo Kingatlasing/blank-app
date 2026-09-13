@@ -2734,6 +2734,194 @@ function bridgeSolid(x, y, z, dims, params) {
   return false;
 }
 
+// A highly-detailed shape for the Golden Gate Bridge preset SPECIFICALLY —
+// unlike the generic bridgeSolid shared by every other suspension-bridge
+// preset above, every constant below is a real published Golden Gate
+// Bridge figure (tower height, main-span length, deck height, cable sag,
+// tower taper steps...) rather than a fraction of whatever real dims a
+// preset happens to supply, so this shape only makes sense driven by this
+// one preset's own fixed real dims (height 227m, length 2,737m, width
+// 27m) — intentionally not exposed as a selectable Custom shape. `scale`
+// (blocks per real meter) is recovered from dims.sy alone, since dims.sy
+// is always real.height(227) times whatever ratio the user chose.
+const GGB_REAL_HEIGHT = 227, GGB_REAL_LENGTH = 2737, GGB_REAL_CENTER_SPAN = 1280;
+const GGB_REAL_DECK_Y = 129, GGB_REAL_CABLE_LOW_Y = 132;
+const GGB_TOWER_BASE_HALF = 4.5, GGB_TOWER_TOP_HALF = 2.5, GGB_TOWER_STEPS = 6;
+const GGB_DECK_THICK = 3, GGB_CAMBER = 4, GGB_SUSPENDER_SPACING = 2.5, GGB_STRUT_LEVELS = 4;
+
+function ggbTowerXs(dims) {
+  const towerFrac = (GGB_REAL_LENGTH - GGB_REAL_CENTER_SPAN) / 2 / GGB_REAL_LENGTH;
+  return [Math.round(dims.sx * towerFrac), Math.round(dims.sx * (1 - towerFrac))];
+}
+// The 2 tower legs' shared Z line(s) — falls back to a single combined
+// center line when the bridge has been scaled down too narrow for 2
+// visually distinct legs, the same graceful-degrade lesson learned from
+// the generic bridgeSolid above.
+function ggbLegZs(dims, halfWidthBlocks) {
+  const legZFrac = 0.12;
+  const z1 = Math.round(dims.sz * legZFrac), z2 = Math.round(dims.sz * (1 - legZFrac));
+  return (z2 - z1 >= halfWidthBlocks * 2 + 1) ? [z1, z2] : [(dims.sz - 1) / 2];
+}
+// Tower leg cross-section half-width at a given height: steps inward at
+// GGB_TOWER_STEPS fixed real-world intervals (227/6 ≈ 38m, within the
+// real "every 30-40m" spec) from a ~9-wide base down to a ~5-wide top.
+function ggbTowerHalfWidth(y, dims, scale) {
+  const realY = y / (scale || 1e-9);
+  const stepIdx = Math.min(GGB_TOWER_STEPS, Math.floor(realY / (GGB_REAL_HEIGHT / GGB_TOWER_STEPS)));
+  const halfReal = GGB_TOWER_BASE_HALF - stepIdx * ((GGB_TOWER_BASE_HALF - GGB_TOWER_TOP_HALF) / GGB_TOWER_STEPS);
+  return Math.max(1, Math.min(Math.round(halfReal * scale), Math.floor(dims.sz / 2)));
+}
+// The deck's own local top-of-slab height at a given x, including the
+// real gentle upward camber (arch) between the 2 towers only — flat
+// everywhere else (the side/approach spans), matching the real bridge's
+// own slight midspan rise rather than a dead-flat roadway.
+function ggbDeckY(x, dims, scale, tower1X, tower2X) {
+  const deckY0 = Math.round(dims.sy * (GGB_REAL_DECK_Y / GGB_REAL_HEIGHT));
+  if (x > tower1X && x < tower2X) {
+    const midX = (tower1X + tower2X) / 2, halfSpan = (tower2X - tower1X) / 2 || 1e-9;
+    const t = (x - midX) / halfSpan;
+    return deckY0 + Math.round(GGB_CAMBER * scale * Math.max(0, 1 - t * t));
+  }
+  return deckY0;
+}
+// The main cable's own Y at a given x: 4 straight-segment stand-ins for
+// the real parabola (end anchor -> tower top -> a real deep midspan sag,
+// within a few real meters of the deck per the published figures ->
+// tower top -> end anchor), evaluated at an exact x rather than as a
+// distance-to-segment test, so vertical suspender ropes (below) can drop
+// straight down from the exact right point on the curve.
+function ggbCableYAtX(x, dims, scale, tower1X, tower2X, deckThickness) {
+  const towerTopY = dims.sy - 1;
+  const midX = (tower1X + tower2X) / 2;
+  const anchorY = ggbDeckY(0, dims, scale, tower1X, tower2X) + deckThickness;
+  const sagDrop = Math.max(1, Math.round((GGB_REAL_CABLE_LOW_Y - GGB_REAL_DECK_Y) * scale));
+  // The sag target is measured off the LOCAL (cambered) deck height at
+  // midspan, not the flat end-anchor height — camber already raises the
+  // deck itself at exactly this point, so reusing the flat anchor height
+  // here would silently cancel the real clearance out, leaving the cable
+  // sitting on/inside the deck at the one spot the spec calls out as
+  // "almost touching" but not touching.
+  const sagLowY = ggbDeckY(midX, dims, scale, tower1X, tower2X) + deckThickness + sagDrop;
+  let ax, ay, bx, by;
+  if (x <= tower1X) { ax = 0; ay = anchorY; bx = tower1X; by = towerTopY; }
+  else if (x <= midX) { ax = tower1X; ay = towerTopY; bx = midX; by = sagLowY; }
+  else if (x <= tower2X) { ax = midX; ay = sagLowY; bx = tower2X; by = towerTopY; }
+  else { ax = tower2X; ay = towerTopY; bx = dims.sx - 1; by = anchorY; }
+  const t = (bx - ax) !== 0 ? (x - ax) / (bx - ax) : 0;
+  return ay + (by - ay) * t;
+}
+function goldenGateBridgeSolid(x, y, z, dims) {
+  const scale = dims.sy / GGB_REAL_HEIGHT;
+  const [tower1X, tower2X] = ggbTowerXs(dims);
+  const towerTopY = dims.sy - 1;
+  const deckThickness = Math.max(1, Math.round(GGB_DECK_THICK * scale));
+  const deckY0 = ggbDeckY(x, dims, scale, tower1X, tower2X);
+
+  // The road deck slab itself, full width, at this column's own
+  // (possibly cambered) height.
+  if (y >= deckY0 && y < deckY0 + deckThickness) return true;
+
+  // Tower legs: run the FULL height, below the deck down to the real
+  // base and above it up to the real top (a real tower is one
+  // continuous shaft the deck merely crosses through, not 2 separate
+  // pieces stacked on top of a deck of its own), tapering inward in
+  // steps per ggbTowerHalfWidth.
+  const halfW = ggbTowerHalfWidth(y, dims, scale);
+  const legZs = ggbLegZs(dims, halfW);
+  const nearLegZ = legZs.some(lz => Math.abs(z - lz) <= halfW);
+  const nearTower1 = Math.abs(x - tower1X) <= halfW, nearTower2 = Math.abs(x - tower2X) <= halfW;
+  if (nearLegZ && (nearTower1 || nearTower2)) return true;
+
+  // 4 horizontal cross-struts per tower, evenly spaced between the deck
+  // and the tower top, filling the real gap between that tower's own 2
+  // legs (only when there's room for 2 legs at all).
+  if (legZs.length === 2 && (nearTower1 || nearTower2)) {
+    const strutThickness = Math.max(1, Math.round(2 * scale));
+    for (let i = 1; i <= GGB_STRUT_LEVELS; i++) {
+      const strutY = Math.round(deckY0 + deckThickness + (towerTopY - (deckY0 + deckThickness)) * i / (GGB_STRUT_LEVELS + 1));
+      if (y >= strutY && y < strutY + strutThickness && z >= legZs[0] && z <= legZs[1]) return true;
+    }
+  }
+
+  // Main cables and their vertical suspender ropes, along the same 2
+  // (or 1, degraded) lines as the tower legs — gated by a WIDTH-scaled
+  // threshold, not a length-scaled one (the exact bug fixed in
+  // bridgeSolid above: a length-scaled gate on a bridge this much
+  // longer than it is wide would cover the entire width).
+  const cableGate = Math.max(1, Math.round(0.8 * scale));
+  const nearCableZ = legZs.some(lz => Math.abs(z - lz) <= cableGate);
+  if (nearCableZ) {
+    const cableY = ggbCableYAtX(x, dims, scale, tower1X, tower2X, deckThickness);
+    const cableThickness = Math.max(1, Math.round(1.2 * scale));
+    if (Math.abs(y - cableY) <= cableThickness) return true;
+
+    const suspenderSpacing = Math.max(1, Math.round(GGB_SUSPENDER_SPACING * scale));
+    const onSuspenderLine = legZs.some(lz => z === Math.round(lz));
+    if (onSuspenderLine && x % suspenderSpacing === 0 && y >= deckY0 + deckThickness && y < cableY) return true;
+  }
+
+  return false;
+}
+// Always-on finishing pass for the Golden Gate Bridge shape only, run
+// unconditionally in generateModel (like applyVaderHelmetDetail — this
+// isn't an optional "interior," it's the bridge's own defining real
+// material palette). goldenGateBridgeSolid can only decide solid/air; this
+// re-derives the same regions to assign each one its own real material:
+// International-Orange-toned red sandstone for the towers (with a real
+// terracotta shadow band every other taper step for real color depth/
+// variation instead of one flat mass), dark deepslate-tile asphalt with
+// andesite sidewalks and a yellow-concrete-powder center divider on the
+// deck (only when there's real room for 5 distinct bands), and the
+// user's chosen accent material for every cable/strut/suspender.
+function applyGoldenGateBridgeDetail(grid, dims, matAcc) {
+  const scale = dims.sy / GGB_REAL_HEIGHT;
+  const [tower1X, tower2X] = ggbTowerXs(dims);
+  const deckThickness = Math.max(1, Math.round(GGB_DECK_THICK * scale));
+  const legZs = ggbLegZs(dims, ggbTowerHalfWidth(0, dims, scale));
+
+  const sandstoneIdx = MATERIAL_INDEX['red_sandstone'] + 1;
+  const terracottaIdx = MATERIAL_INDEX['red_terracotta'] + 1;
+  const roadIdx = MATERIAL_INDEX['deepslate_tiles'] + 1;
+  const sidewalkIdx = MATERIAL_INDEX['andesite'] + 1;
+  const lineIdx = MATERIAL_INDEX['yellow_concrete_powder'] + 1;
+
+  const wide = dims.sz >= 12;
+  const bandFracs = [3, 9, 3, 9, 3]; // real meters: sidewalk, lanes, divider, lanes, sidewalk (out of 27)
+  const bandTotal = bandFracs.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  const bandEdges = bandFracs.map(f => { acc += f; return Math.round(dims.sz * acc / bandTotal); });
+  const bandMat = [sidewalkIdx, roadIdx, lineIdx, roadIdx, sidewalkIdx];
+  function deckMatAtZ(z) {
+    if (!wide) return roadIdx;
+    for (let i = 0; i < bandEdges.length; i++) if (z < bandEdges[i]) return bandMat[i];
+    return sidewalkIdx;
+  }
+
+  for (let y = 0; y < dims.sy; y++) {
+    for (let z = 0; z < dims.sz; z++) {
+      for (let x = 0; x < dims.sx; x++) {
+        const i = idx(x, y, z, dims);
+        if (!grid[i]) continue;
+        const deckY0 = ggbDeckY(x, dims, scale, tower1X, tower2X);
+        if (y >= deckY0 && y < deckY0 + deckThickness) { grid[i] = deckMatAtZ(z); continue; }
+
+        const halfW = ggbTowerHalfWidth(y, dims, scale);
+        const nearTower1 = Math.abs(x - tower1X) <= halfW, nearTower2 = Math.abs(x - tower2X) <= halfW;
+        const nearLegZ = legZs.some(lz => Math.abs(z - lz) <= halfW);
+        if (nearLegZ && (nearTower1 || nearTower2)) {
+          const realY = y / (scale || 1e-9);
+          const stepIdx = Math.floor(realY / (GGB_REAL_HEIGHT / GGB_TOWER_STEPS));
+          grid[i] = (stepIdx % 2 === 0) ? sandstoneIdx : terracottaIdx;
+          continue;
+        }
+        // Anything else still solid here is a cross-strut, main cable, or
+        // suspender rope — all real structural ironwork.
+        grid[i] = matAcc;
+      }
+    }
+  }
+}
+
 // Deterministic hash of a (integer-ish) 2D coordinate pair into [0,1) —
 // NOT Math.random(): buildSilhouette and hollowCarve both call a shape's
 // test function repeatedly for the very same (x,y,z) cell (once for the
@@ -2853,12 +3041,18 @@ const SHAPES = {
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
   domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
   bridge: bridgeSolid, vaderHelmet: vaderHelmetSolid,
+  // Not listed in CUSTOM_SHAPE_LABELS or the Custom-shape dropdown:
+  // goldenGateBridgeSolid hardcodes this one preset's own real dims
+  // (see its own comment above), so it only makes sense driven by the
+  // golden-gate-bridge preset itself, never a user-typed custom size.
+  goldenGateBridge: goldenGateBridgeSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
   cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null,
+  goldenGateBridge: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -5070,14 +5264,14 @@ const PRESETS = [
     notes: [],
   },
   {
-    id: 'golden-gate-bridge', name: "Golden Gate Bridge (San Francisco)", shape: 'bridge',
-    real: { height: 227.4, baseX: 2737, baseZ: 27.4 },
-    blocks: { exterior: 'red_concrete', interior: 'red_concrete', accent: 'iron_block' },
-    desc: 'A real suspension bridge silhouette: 2 support towers, one main deck, and sagging main cables running the full span — height (water to tower top) ~227.4m, total length ~2,737m, deck width ~27.4m.',
+    id: 'golden-gate-bridge', name: "Golden Gate Bridge (San Francisco)", shape: 'goldenGateBridge',
+    real: { height: 227, baseX: 2737, baseZ: 27 },
+    blocks: { exterior: 'red_sandstone', interior: 'red_sandstone', accent: 'iron_block' },
+    desc: 'Rebuilt as a highly-detailed, Golden-Gate-specific model (not the generic bridge shape the other bridge presets share): tapered, stepped tower legs running the full height from base to top with real Art-Deco-style horizontal cross-braces, a cambered road deck with a real lane/divider/sidewalk material breakdown, and real sweeping main cables that dip down close to the deck at midspan with vertical suspender ropes throughout. Real figures: tower height 227m, total length 2,737m, deck width 27m, deck height 129m, cable low point 132m (only ~3m above the deck at midspan) — a real, published 1:1 profile. This app\'s in-browser voxel cap (6,000,000 cells) is well under the real bridge\'s own bounding box (~2,737×227×27 ≈ 16.7 million cells), so a literal 1:1 scale won\'t generate here — try a scale ratio around 1/3 or smaller; every proportion (taper steps, camber, cable sag, lane widths) scales down with it automatically.',
     keywords: ['golden gate', 'bridge', 'suspension', 'san francisco', 'tower'],
     notes: [
-      'This app\'s first shape whose own silhouette is mostly open space around a thin structure rather than one solid mass — every earlier shape here (pyramid, tower, dome, cone...) fills in a single continuous silhouette top to bottom, while a bridge is a deck and 2 towers connected by real cables with open air everywhere else. The new `bridgeSolid` places the 2 support towers near a real 1/4 and 3/4 of the way along the span (matching a real suspension bridge\'s own main-cable anchor towers, not the very ends), each as 2 separate legs straddling the deck\'s own width rather than a solid wall across it, and the real main cables as straight-line segments (not the real smooth parabola, which a voxel grid can\'t represent exactly) sagging visibly at midspan between the 2 towers before running down to each end anchor.',
-      'Real dimensions from published figures: total length ~8,980 ft (2,737m), height from water to the top of the towers ~746 ft (227.4m), deck width ~90 ft (27.4m) (Golden Gate Bridge, Wikipedia). Not modeled: the real Art Deco tower lattice detailing, the vertical suspender cables hanging from the main cables down to the deck (only the 2 main cables themselves are modeled), roadway lanes/sidewalks, and the real bridge\'s own International Orange paint scheme beyond the accent color chosen here.',
+      'Rebuilt from the earlier generic-bridgeSolid version at a user\'s request with a specific real-world construction spec: `goldenGateBridgeSolid` and `applyGoldenGateBridgeDetail` are dedicated to this one preset (the other bridge presets keep sharing the original generic `bridgeSolid`) and hardcode this bridge\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply. Tower legs run the FULL height (base to top, not just above a deck resting on separate tower bases) and taper inward in 6 discrete steps — matching the real "narrower every 30-40m" profile — from a ~9-block-wide base to a ~5-block-wide top, with 4 real horizontal cross-braces per tower between the deck and the tower top. The 27-wide deck is a real material breakdown (3-wide andesite sidewalk, 9-wide deepslate-tile lanes, 3-wide yellow-concrete-powder center divider, mirrored) when there\'s room for it, plus a gentle upward camber (arch) between the 2 towers only. The main cables run tower-top to a real deep midspan sag (~3m above the deck, from the real published deck/cable heights) with vertical single-block suspender ropes dropped every ~2.5m along the whole span — all in the accent material.',
+      'Real dimensions and this construction spec from published figures: total length 2,737m, tower height (base to top) 227m, center span between towers 1,280m, deck height 129m, deck width 27m, main-cable low point 132m at midspan (Golden Gate Bridge, Wikipedia/published engineering figures). Not modeled: the real Art Deco tower lattice/rivet detailing (only the tapered mass and cross-braces are modeled), the true smooth parabolic cable curve (approximated here as 4 straight segments, the same simplification the generic bridgeSolid above uses), and the water/seafloor the real towers actually rise from (this app has no terrain — only the bridge structure itself is modeled).',
     ],
   },
   {
@@ -6764,6 +6958,13 @@ function generateModel() {
   // optional interior the user has to opt into.
   if (shapeType === 'vaderHelmet') {
     applyVaderHelmetDetail(grid, dims, matAcc);
+  }
+  // Same reasoning: the Golden Gate Bridge's own real multi-material
+  // palette (sandstone/terracotta towers, deepslate/andesite/yellow-line
+  // deck, ironwork cables) is this shape's defining look, not an optional
+  // interior.
+  if (shapeType === 'goldenGateBridge') {
+    applyGoldenGateBridgeDetail(grid, dims, matAcc);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
