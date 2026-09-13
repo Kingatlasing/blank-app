@@ -79,6 +79,7 @@
   button.primary:hover { background: #386c41; }
   button:disabled { opacity: .45; cursor: not-allowed; }
   #generate-btn { width: 100%; margin-top: 4px; padding: 10px; font-size: 14px; }
+  #reset-btn { width: 100%; margin-top: 6px; padding: 8px; font-size: 13px; }
   .swatch { display: inline-block; width: 11px; height: 11px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; border: 1px solid rgba(255,255,255,.15); }
 
   main { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
@@ -246,6 +247,7 @@
 
       <div class="hint" id="volume-readout"></div>
       <button class="primary" id="generate-btn">Generate model</button>
+      <button id="reset-btn" title="Clear the current model and start over">Reset / Clear model</button>
     </aside>
 
     <main>
@@ -6498,6 +6500,26 @@ function generateModel() {
   renderStats(currentModel);
 }
 el('generate-btn').addEventListener('click', generateModel);
+// Clears whatever's currently built — back to the same blank slate as a
+// freshly-loaded page — without reloading (which would also lose the
+// user's own form selections/scale/material picks, unlike this).
+function clearModel() {
+  currentModel = null;
+  window.currentModel = null;
+  if (three && three.group) {
+    while (three.group.children.length) three.group.remove(three.group.children[0]);
+  }
+  interactiveObjects = [];
+  mobObjects = [];
+  waterAnimObjects = [];
+  el('empty-state').style.display = '';
+  el('render-note').style.display = 'none';
+  el('commands-output').value = '';
+  el('stats-grid').innerHTML = '';
+  el('legend').innerHTML = '';
+  el('layer-controls').style.display = 'none';
+}
+el('reset-btn').addEventListener('click', clearModel);
 
 /* =========================================================================
  * TEXTURED GEOMETRY HELPERS (atlas UVs baked onto cube/panel/cross meshes)
