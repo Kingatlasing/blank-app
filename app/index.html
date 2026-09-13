@@ -3095,20 +3095,28 @@ const LB_SPIKE_COUNT = 7;
 // [t, halfX, halfZ] keyframes for the bust's own overall silhouette,
 // interpolated LINEARLY between consecutive rows for the same
 // deliberate, sculpted-edge look real player-built statue busts use,
-// rather than a single smooth taper: wide shoulders, a real narrow neck,
-// then the head/hair mass flaring out again wider than the neck (real
-// photos show the hair is the widest part of the whole bust), narrowing
-// into the crown band before the spikes take over above it.
+// rather than a single smooth taper. Hand-traced (per-height width
+// estimates, not guessed math parameters) from the 3 reference photos:
+// wide shoulders, a real narrow neck with an actual visible cylindrical
+// portion (not a single knife-edge point), a jaw/chin that widens
+// gradually rather than in one abrupt jump into the hair mass, the hair
+// itself as the widest part of the whole bust (confirmed widest right
+// around ear height in the front-view photo), then narrowing into the
+// crown band before the spikes take over above it.
 const LB_KEYFRAMES = [
-  [0.0, 0.50, 0.36],  // shoulder base
-  [0.16, 0.46, 0.33], // upper chest
-  [0.20, 0.22, 0.17], // neck base
-  [0.30, 0.15, 0.12], // neck top — narrowest point, separates head from shoulders
-  [0.38, 0.33, 0.29], // jaw/hair flare begins
-  [0.52, 0.40, 0.36], // widest point of the hair mass (ear height)
-  [0.66, 0.36, 0.32], // upper head
-  [0.76, 0.30, 0.25], // crown band base
-  [0.84, 0.29, 0.24], // crown band top / spike base
+  [0.00, 0.50, 0.36], // shoulder base
+  [0.14, 0.47, 0.34], // upper chest / shoulder taper
+  [0.19, 0.30, 0.24], // collar / neck base
+  [0.24, 0.17, 0.14], // neck — narrowing
+  [0.30, 0.16, 0.13], // neck top — a short real cylindrical neck, not a point
+  [0.35, 0.24, 0.20], // chin/jaw begins widening out from the neck
+  [0.41, 0.33, 0.29], // jaw to cheek — hair starts framing the face
+  [0.48, 0.38, 0.34], // cheekbone / ear height approaching widest
+  [0.55, 0.40, 0.36], // widest point of the hair mass (ear height, per photo)
+  [0.63, 0.38, 0.34], // upper head narrows slightly
+  [0.70, 0.34, 0.30], // hair top
+  [0.78, 0.30, 0.25], // crown band base
+  [0.86, 0.29, 0.24], // crown band top / spike base
 ];
 const LB_CROWN_TOP_T = LB_KEYFRAMES[LB_KEYFRAMES.length - 1][0];
 function lbHalfWidths(t) {
@@ -3132,7 +3140,7 @@ function libertyBustSolid(x, y, z, dims) {
     // A subtle fluted ripple around the hair-covered portion (not the
     // shoulders/neck) suggests real wavy hair strands without needing
     // separate carved geometry for every strand.
-    if (t >= 0.38 && t <= LB_CROWN_TOP_T) {
+    if (t >= 0.41 && t <= LB_CROWN_TOP_T) {
       const angle = Math.atan2(z - cz, x - cx);
       const ripple = 1 + 0.035 * Math.cos(angle * 14);
       hx *= ripple; hz *= ripple;
@@ -3171,19 +3179,25 @@ function libertyBustSolid(x, y, z, dims) {
 // Always-on finishing pass: carves the crown's own window band, then
 // sculpts an actual reference-driven face — a real BROW RIDGE
 // (prominent and nearly continuous across both eyes, per every
-// reference photo), rounded eye sockets with a small dark pupil, a real
+// reference photo), rounded eye sockets (reading through shape/shadow
+// alone, since the real statue has no literal iris or pupil marking —
+// an earlier version's separate dark pupil dot is dropped), a real
 // 3-part nose (bridge, rounded tip, nostrils), an upper and lower lip,
 // and a strong jaw/chin — since libertyBustSolid's own boolean test can
 // shape the overall rounded mass but can't carve/protrude small features
 // relative to that mass's own already-computed surface. Every feature
 // uses the same rounded-relief technique (smooth radial falloff, not a
-// flat rectangular cutout) and a material distinct from the surrounding
-// copper skin, both proven out on the previous full-body version — a
-// uniform single-material face made every earlier attempt's raised
-// features nearly invisible in-engine. Everything is sized/positioned in
-// fractions of dims.sx, so the whole face scales up automatically with
-// this preset's own default scale or any scale chosen — a bigger model
-// gets a more finely detailed face for free, not a blurrier fixed-size one.
+// flat rectangular cutout) proven out on the previous full-body version,
+// but now painted in ONE softer same-family copper tone (weathered
+// copper against an oxidized-copper skin) rather than a stark
+// stone-gray/black contrast — the earlier stark contrast read as
+// disconnected painted-on patches rather than a single carved metal
+// surface; a subtler same-family tone still shows through this
+// renderer's own flat per-face lighting while looking like one unified
+// sculpture. Everything is sized/positioned in fractions of dims.sx, so
+// the whole face scales up automatically with this preset's own default
+// scale or any scale chosen — a bigger model gets a more finely detailed
+// face for free, not a blurrier fixed-size one.
 function applyLibertyBustDetail(grid, dims, matAcc, matExt, matInt) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
 
@@ -3250,7 +3264,7 @@ function applyLibertyBustDetail(grid, dims, matAcc, matExt, matInt) {
         for (let d = 0; d < windowDepth; d++) {
           const z = fz - d;
           if (z < 0) break;
-          grid[idx(x, y, z, dims)] = (d === windowDepth - 1) ? matInt : 0;
+          grid[idx(x, y, z, dims)] = (d === windowDepth - 1) ? matAcc : 0;
         }
       }
     }
@@ -3269,8 +3283,6 @@ function applyLibertyBustDetail(grid, dims, matAcc, matExt, matInt) {
   sculpt(cx, faceY(0.80), dims.sx * 0.16, bandH * 0.045, Math.round(dims.sx * 0.022), 'protrude', matInt);
   sculpt(cx - eyeOffset, faceY(0.62), dims.sx * 0.065, bandH * 0.09, Math.round(dims.sx * 0.035), 'carve', matInt);  // left eye socket
   sculpt(cx + eyeOffset, faceY(0.62), dims.sx * 0.065, bandH * 0.09, Math.round(dims.sx * 0.035), 'carve', matInt);  // right eye socket
-  sculpt(cx - eyeOffset, faceY(0.62), dims.sx * 0.014, bandH * 0.02, Math.round(dims.sx * 0.045), 'carve', matAcc); // left pupil
-  sculpt(cx + eyeOffset, faceY(0.62), dims.sx * 0.014, bandH * 0.02, Math.round(dims.sx * 0.045), 'carve', matAcc); // right pupil
   sculpt(cx, faceY(0.44), dims.sx * 0.035, bandH * 0.12, Math.round(dims.sx * 0.02), 'protrude', matInt);           // nose bridge
   sculpt(cx, faceY(0.26), dims.sx * 0.055, bandH * 0.07, Math.round(dims.sx * 0.045), 'protrude', matInt);          // nose tip
   sculpt(cx - dims.sx * 0.04, faceY(0.25), dims.sx * 0.022, bandH * 0.035, Math.round(dims.sx * 0.015), 'carve', matInt); // left nostril
@@ -5806,13 +5818,13 @@ const PRESETS = [
     id: 'statue-liberty', name: "Statue of Liberty (Bust)", shape: 'libertyBust',
     real: { height: 29, baseX: 17, baseZ: 11 }, interiorMode: null,
     defaultScaleNum: 10, defaultScaleDen: 1,
-    blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'black_concrete' },
-    desc: 'A bust (head, hair, crown, and shoulders only — no pedestal, no body, no torch arm) built from 3 real reference photos of the statue\'s own head: the real 7-spike radiating crown, its own window band, wavy hair, and a real sculpted face (a heavy near-continuous brow ridge, deep eye sockets with a dark pupil, a real 3-part nose, an upper and lower lip, a strong jaw/chin). Dropping the pedestal/body/torch arm entirely means the WHOLE voxel budget goes into this head alone — defaults to a 10x scale, deliberately huge relative to a single block, specifically for real facial resolution.',
+    blocks: { exterior: 'oxidized_copper', interior: 'weathered_copper', accent: 'oxidized_cut_copper' },
+    desc: 'A bust (head, hair, crown, and shoulders only — no pedestal, no body, no torch arm) hand-traced from 3 real reference photos of the statue\'s own head: the real 7-spike radiating crown, its own window band, wavy hair, and a real sculpted face (a heavy near-continuous brow ridge, deep eye sockets, a real 3-part nose, an upper and lower lip, a strong jaw/chin) in a single unified copper tone. Dropping the pedestal/body/torch arm entirely means the WHOLE voxel budget goes into this head alone — defaults to a 10x scale, deliberately huge relative to a single block, specifically for real facial resolution.',
     keywords: ['statue of liberty', 'new york', 'liberty island', 'bust', 'face', 'crown'],
     notes: [
-      'Replaces the earlier full-body-plus-pedestal version entirely, at a user\'s own request together with 3 real reference photos of the statue\'s head (a profile close-up, a front close-up showing tourists inside the crown windows, and a classic front view with the torch arm). A bust trades the real full-body silhouette for real facial/crown resolution: the same in-browser 6,000,000-cell cap that capped the old version\'s head at a few dozen blocks wide now buys a MUCH larger head, since none of that budget is spent on a pedestal, robe, or torch arm any more. `libertyBustSolid` (the overall rounded silhouette: shoulders, a real narrow neck, a wider hair mass, the crown band, and 7 real radiating spikes) and `applyLibertyBustDetail` (the crown\'s own window band plus the sculpted face) are new, dedicated to this preset, and — like the version they replace — work in fractions of this preset\'s own dims rather than absolute real meters, since there\'s no single documented "real bust" to key off.',
-      'The crown\'s real 7 spikes are built directly into the geometry for the first time (the version this replaces only approximated a "flared band") — evaluated in the head ellipse\'s own equivalent-circle angle space (the same technique `colosseumSolid` above uses for its arches) so the real 7-fold spacing stays even, with one spike centered at true front and the other 6 fanning out in symmetric pairs, matching every reference photo. The crown\'s own window band is carved as a row of small recessed openings across the front face, found the same dynamic way the facial features are (each column\'s own front-most solid cell) — it only works on the front-facing arc, since the band\'s side/back surfaces don\'t face the same direction at all.',
-      'The face itself reuses the rounded-relief sculpting technique (a smooth radial falloff per feature, not a flat rectangular cutout, plus a material distinct from the surrounding copper skin) already proven on the version this replaces, redrawn bigger and closer to the reference photos: one heavy, near-continuous brow ridge spanning both eyes (rather than 2 separate brows), deeper eye sockets with a small dark recessed pupil, and a more pronounced nose/lip/jaw structure. A subtle fluted ripple around the hair-covered portion of the head suggests real wavy hair strands without needing separately carved geometry for each one.',
+      'Replaces the earlier full-body-plus-pedestal version entirely, at a user\'s own request together with 3 real reference photos of the statue\'s head (a profile close-up, a front close-up showing tourists inside the crown windows, and a classic front view with the torch arm). A bust trades the real full-body silhouette for real facial/crown resolution: the same in-browser 6,000,000-cell cap that capped the old version\'s head at a few dozen blocks wide now buys a MUCH larger head, since none of that budget is spent on a pedestal, robe, or torch arm any more. `libertyBustSolid` (the overall rounded silhouette: shoulders, a real narrow neck, a wider hair mass, the crown band, and 7 real radiating spikes) and `applyLibertyBustDetail` (the crown\'s own window band plus the sculpted face) are dedicated to this preset, and — like the version they replace — work in fractions of this preset\'s own dims rather than absolute real meters, since there\'s no single documented "real bust" to key off.',
+      'The crown\'s real 7 spikes are built directly into the geometry (evaluated in the head ellipse\'s own equivalent-circle angle space, the same technique `colosseumSolid` above uses for its arches) so the real 7-fold spacing stays even, with one spike centered at true front and the other 6 fanning out in symmetric pairs, matching every reference photo. The crown\'s own window band is carved as a row of small recessed openings across the front face, found the same dynamic way the facial features are (each column\'s own front-most solid cell) — it only works on the front-facing arc, since the band\'s side/back surfaces don\'t face the same direction at all.',
+      'Revised after user feedback that an earlier pass "looked horrible": (1) `LB_KEYFRAMES` (the per-height front-width/side-depth silhouette) was re-traced with more, finer steps through the jaw-to-hair transition — the earlier version jumped from a knife-edge neck straight to the full hair width in one step, reading as a blobby ledge rather than a real chin/jaw curve; the neck now keeps a short real cylindrical section, and the jaw widens gradually across several extra keyframes before the hair mass takes over. (2) The stark stone-gray brow/nose/lips/chin against a black pupil dot — a material contrast that read as disconnected painted-on patches rather than one carved sculpture — is replaced with a single softer same-family copper tone (weathered copper) for every carved/protruding facial feature, with a separate but still copper-family tone (oxidized cut copper) reserved for the crown\'s own window openings. The pupil dot itself is dropped entirely: the real statue has no literal iris/pupil marking, and the eye reads through the recessed socket\'s own shape and shadow alone, same as the real statue\'s own patina surface.',
       'This remains a deliberately stylized sculptural simplification, not a photorealistic 3D scan — a voxel grid, however large, can shape a real brow/nose/lip/jaw structure and a real 7-spike crown (as it now does) but not fine skin detail, individual facial proportions, or real hair strand geometry. Also not modeled: visible ears (the reference photos show them mostly hair-covered) and the crown band\'s own real structural framing behind the windows.',
     ],
   },
