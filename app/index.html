@@ -2734,61 +2734,118 @@ function bridgeSolid(x, y, z, dims, params) {
   return false;
 }
 
+// Deterministic hash of a (integer-ish) 2D coordinate pair into [0,1) —
+// NOT Math.random(): buildSilhouette and hollowCarve both call a shape's
+// test function repeatedly for the very same (x,y,z) cell (once for the
+// silhouette pass, again while computing skin depth), so true randomness
+// would answer differently each call and corrupt the shape. Used only for
+// vaderHelmetSolid's own jagged bottom-hem noise below.
+function hash2(a, b) {
+  const s = Math.sin(a * 127.1 + b * 311.7) * 43758.5453;
+  return s - Math.floor(s);
+}
+
 // This app's first PROP/COSTUME-PIECE shape rather than a building or
 // civil structure — every earlier shape models something a person walks
 // through or across; a helmet is worn, with no usable interior at all
-// (hence its null SHAPE_DEFAULT_INTERIOR entry below). A rounded dome
-// narrows to the top, a wide flared cheek/jaw band fills the middle, and
-// a slightly wider collar flare sits right at the base, matching a real
-// reference description of Darth Vader's helmet — "a rounded dome with
-// slightly flared cheek panels" (darth-vader-fans.fandom.com/wiki/
-// Darth_Vader's_Helmet). 2 forward-protruding eye lens bumps and a
-// forward-protruding triangular mouth grille (wide at the bottom,
-// narrowing toward the top, matching the same real reference's "triangular
-// grill" description) are placed at fixed fractional positions on the
-// front (+Z) face — the same "explicit box region at a fixed fraction of
-// the overall silhouette" technique already used by decor part functions
-// elsewhere in this app — since expressing them as a function of the
-// head ellipsoid's own curved front boundary would need solving that
-// ellipsoid's own equation at every single (x,y) pair first.
+// (hence its null SHAPE_DEFAULT_INTERIOR entry below). Redesigned from an
+// earlier smooth-ellipsoid-plus-protruding-bumps version after the user
+// supplied real reference photos of a player-built Minecraft replica: a
+// single rounded, organic stone-skull mass (not a stepped dome/cheek-
+// band/collar-flare silhouette), an irregular jagged/"melted" bottom hem
+// instead of a clean geometric taper, and RECESSED (not protruding) eye
+// cavities and a recessed vertical-barred mouth grille carved into the
+// front face. The recess depth for both is measured back from this
+// column's own local front-surface z (the ellipse boundary at this x,y),
+// not a fixed z threshold, so both stay correctly recessed — never fully
+// punched through, never left un-carved — across every scale/proportion.
+// The eye cavities' own accent-colored "glow" is painted on afterward by
+// applyVaderHelmetDetail, since a boolean solid/air test like this one
+// can carve a recessed shape but can't itself assign a different material
+// to specific solid cells.
 function vaderHelmetSolid(x, y, z, dims) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const t = y / dims.sy;
+
+  // Irregular jagged/dripping bottom hem: most columns cut off within a
+  // fairly narrow noise band, with a sparse subset ("spikeNoise") of
+  // columns dripping noticeably further down, matching the real
+  // reference's uneven, weathered-looking bottom edge.
+  const baseNoise = hash2(x, z);
+  const spikeNoise = hash2(x + 91, z + 47);
+  let bottomCut = 0.14 + baseNoise * 0.14;
+  if (spikeNoise > 0.82) bottomCut += 0.16;
+  if (t < bottomCut) return false;
+
+  // A single rounded mass, full width through the middle and lower face
+  // and narrowing only near the very top for the dome — rounder and less
+  // geometric than the old separate dome/cheek-band/collar-flare steps.
   let rx, rz;
-  if (t > 0.7) {
-    const dt = (t - 0.7) / 0.3;
-    const shrink = Math.max(0.08, Math.sqrt(Math.max(0, 1 - dt * dt)));
-    rx = dims.sx * 0.4 * shrink;
-    rz = dims.sz * 0.38 * shrink;
-  } else if (t > 0.15) {
-    rx = dims.sx * 0.42;
-    rz = dims.sz * 0.4;
+  if (t > 0.62) {
+    const dt = (t - 0.62) / 0.38;
+    const shrink = Math.max(0.05, Math.sqrt(Math.max(0, 1 - dt * dt)));
+    rx = dims.sx * 0.47 * shrink;
+    rz = dims.sz * 0.45 * shrink;
   } else {
-    const ct = t / 0.15;
-    rx = dims.sx * (0.46 - 0.04 * ct);
-    rz = dims.sz * (0.44 - 0.04 * ct);
+    rx = dims.sx * 0.47;
+    rz = dims.sz * 0.45;
   }
-  const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
-  if (nx * nx + nz * nz <= 1.0) return true;
+  const nx = (x - cx) / (rx || 1e-9);
+  if (nx * nx > 1.0) return false; // outside the ellipse on the x axis alone, regardless of z
+  const nz = (z - cz) / (rz || 1e-9);
+  const localFrontZ = cz + rz * Math.sqrt(Math.max(0, 1 - nx * nx));
+  if (nx * nx + nz * nz > 1.0) return false;
 
-  // Eye lenses: 2 small forward bumps on the upper-front face.
-  const eyeY0 = dims.sy * 0.55, eyeY1 = dims.sy * 0.68;
-  const eyeZ0 = dims.sz * 0.78;
-  const eyeXOffset = dims.sx * 0.16;
-  const eyeHalfX = Math.max(1, dims.sx * 0.09);
-  if (y >= eyeY0 && y <= eyeY1 && z >= eyeZ0 && z <= dims.sz - 1 &&
-      (Math.abs(x - (cx - eyeXOffset)) <= eyeHalfX || Math.abs(x - (cx + eyeXOffset)) <= eyeHalfX)) return true;
-
-  // Mouth/grille: a forward protrusion below the eyes, wide at the
-  // bottom and narrowing toward the top — the real triangular shape.
-  const grilleY0 = dims.sy * 0.25, grilleY1 = dims.sy * 0.52;
-  const grilleZ0 = dims.sz * 0.75;
-  if (y >= grilleY0 && y <= grilleY1 && z >= grilleZ0 && z <= dims.sz - 1) {
-    const gt = (y - grilleY0) / (grilleY1 - grilleY0);
-    const halfWidth = dims.sx * (0.22 - 0.14 * gt);
-    if (Math.abs(x - cx) <= halfWidth) return true;
+  // Recessed glowing eye cavities: a shallow pocket open to the outside
+  // air, carved in from this column's own local front surface.
+  const eyeY0 = dims.sy * 0.56, eyeY1 = dims.sy * 0.7;
+  const eyeXOffset = dims.sx * 0.15;
+  const eyeHalfX = Math.max(1, dims.sx * 0.085);
+  const inEyeX = Math.abs(x - (cx - eyeXOffset)) <= eyeHalfX || Math.abs(x - (cx + eyeXOffset)) <= eyeHalfX;
+  if (y >= eyeY0 && y <= eyeY1 && inEyeX) {
+    const pocketDepth = Math.max(1, dims.sz * 0.1);
+    if (z >= localFrontZ - pocketDepth) return false;
   }
-  return false;
+
+  // Recessed vertical-barred mouth grille: the same shallow-pocket idea,
+  // but with alternating solid bar / carved-air columns inside the recess
+  // for a real barred-grille look instead of one flat carved rectangle.
+  const grilleY0 = dims.sy * 0.22, grilleY1 = dims.sy * 0.5;
+  const grilleHalfX = dims.sx * 0.16;
+  if (y >= grilleY0 && y <= grilleY1 && Math.abs(x - cx) <= grilleHalfX) {
+    const pocketDepth = Math.max(1, dims.sz * 0.08);
+    const isBarColumn = x % 2 === 0;
+    if (z >= localFrontZ - pocketDepth && !isBarColumn) return false;
+  }
+
+  return true;
+}
+
+// Always-on finishing pass for the Vader helmet shape only, run
+// unconditionally in generateModel (NOT gated by the interior-mode
+// toggle — recessed glowing eyes are a defining, always-visible part of
+// this shape's exterior, not an optional interior detail the user might
+// leave off). Paints the back wall of each carved eye-socket cavity with
+// the chosen accent material for the real glowing-lens look. The back
+// wall is found by scanning each eye column from the outside in for the
+// front-most SOLID cell, rather than recomputing vaderHelmetSolid's own
+// recess-depth math here — robust to that math regardless of exact scale.
+function applyVaderHelmetDetail(grid, dims, matAcc) {
+  const cx = (dims.sx - 1) / 2;
+  const eyeY0 = dims.sy * 0.56, eyeY1 = dims.sy * 0.7;
+  const eyeXOffset = dims.sx * 0.15;
+  const eyeHalfX = Math.max(1, dims.sx * 0.085);
+  for (let y = Math.floor(eyeY0); y <= Math.ceil(Math.min(dims.sy - 1, eyeY1)); y++) {
+    for (let x = 0; x < dims.sx; x++) {
+      const inEyeX = Math.abs(x - (cx - eyeXOffset)) <= eyeHalfX || Math.abs(x - (cx + eyeXOffset)) <= eyeHalfX;
+      if (!inEyeX) continue;
+      let backZ = -1;
+      for (let z = dims.sz - 1; z >= 0; z--) {
+        if (grid[idx(x, y, z, dims)]) { backZ = z; break; }
+      }
+      if (backZ >= 0) grid[idx(x, y, backZ, dims)] = matAcc;
+    }
+  }
 }
 
 const SHAPES = {
@@ -5037,13 +5094,13 @@ const PRESETS = [
   {
     id: 'darth-vader-helmet', name: "Darth Vader Helmet (Star Wars)", shape: 'vaderHelmet',
     real: { height: 0.36, baseX: 0.38, baseZ: 0.36 },
-    blocks: { exterior: 'black_concrete', interior: 'black_concrete', accent: 'iron_block' },
-    desc: 'This app\'s first prop/costume shape rather than a building — a rounded dome narrowing to the top, a wide flared cheek/jaw band through the middle, and forward-protruding eye lenses and a triangular mouth grille on the front face, matching a real reference description of Darth Vader\'s helmet. Real dimensions are tiny (a real, wearable prop replica, ~36cm tall), so unlike every pyramid or building here, this one needs real SCALE-UP, not scale-down — try a scale ratio of 10/1 or more.',
+    blocks: { exterior: 'black_concrete', interior: 'black_concrete', accent: 'red_stained_glass' },
+    desc: 'This app\'s first prop/costume shape rather than a building — a single rounded, organic stone-skull mass (not a flat wearable-prop silhouette) with an irregular jagged/"melted" bottom hem, recessed glowing eye cavities, and a recessed vertical-barred mouth grille, matching a real player-built Minecraft replica supplied as a reference. Real dimensions are tiny (a real, wearable prop replica, ~36cm tall), so unlike every pyramid or building here, this one needs real SCALE-UP, not scale-down — try a scale ratio of 10/1 or more.',
     keywords: ['darth vader', 'helmet', 'star wars', 'mask', 'sith', 'prop'],
     notes: [
-      'Every earlier shape here (pyramid, tower, dome, bridge...) is either a building someone walks through/across, or open civil-engineering space; a helmet is worn, with no usable interior at all, which is why it has no available interior mode. The new `vaderHelmetSolid` shapes the overall dome-plus-flared-cheeks silhouette with a stepped ellipsoid radius (narrower near the top for the dome, full width through the middle for the cheek/jaw flare, a touch wider again right at the base for the real neck-collar flare), then adds 2 small forward-protruding bumps for the eye lenses and one forward-protruding triangular shape (wide at the bottom, narrowing toward the top) for the real mouth grille, both placed at fixed fractional positions on the front face — matching a real reference description: "a rounded dome with slightly flared cheek panels," bulbous eye lenses, and "a triangular grill" for the mouth (darth-vader-fans.fandom.com/wiki/Darth_Vader\'s_Helmet).',
+      'Every earlier shape here (pyramid, tower, dome, bridge...) is either a building someone walks through/across, or open civil-engineering space; a helmet is worn, with no usable interior at all, which is why it has no available interior mode. Redesigned from an earlier smooth-ellipsoid-plus-forward-protruding-bumps version after real reference photos of a player-built Minecraft replica showed a rounder, more organic weathered-stone skull instead: `vaderHelmetSolid` now shapes one continuous rounded mass (full width through the middle and lower face, narrowing only near the very top for the dome) cut off at the bottom by deterministic per-column noise for a real irregular, dripping hem instead of a clean geometric edge, and carves RECESSED eye cavities and a recessed vertical-barred mouth grille into the front face (measured back from each column\'s own local front-surface curve, not a flat forward bump). `applyVaderHelmetDetail` then paints the back wall of each eye cavity with the accent material (red stained glass by default) for the glowing-lens look, since the shape\'s own solid/air test can carve a recess but can\'t assign a different material to specific cells itself.',
       'Real dimensions from a commonly-cited 1:1 scale prop replica: height ~14in (36cm), width ~15in (38cm), depth ~14in (36cm) (EFX Collectibles Darth Vader Helmet replica, via Sideshow Collectibles). Since this is a small worn prop rather than a building, its own real footprint is far smaller than a single Minecraft block at 1:1 scale — every other real-world preset here needs SCALE-DOWN to become a buildable size, while this is this app\'s first preset that instead needs real scale-UP (try 10/1 or higher) to become one, exercising the exact same Scale panel from the opposite direction.',
-      'Not modeled: the real side "tubes" running along the mask\'s own edges down to silver studs, the hermetic neck collar\'s own separate flared ring geometry (only implied by the base\'s own slightly wider radius), the real two-tone gloss finish (a more polished front, a duller back), and the true smooth, curved surfacing real fiberglass/ABS replicas have — this app renders everything as flat voxel cubes, the same blocky approximation every other curved shape here (dome, cylinder, cone) already accepts.',
+      'Not modeled: a mounting pedestal/stand (the reference photos show the helmet mounted for display, not the helmet\'s own geometry), the real side "tubes" running along the mask\'s own edges down to silver studs, the real two-tone gloss finish, and the true smooth, curved surfacing real fiberglass/ABS replicas have — this app renders everything as flat voxel cubes, the same blocky approximation every other curved shape here (dome, cylinder, cone) already accepts. The jagged bottom hem uses a deterministic noise function of each column\'s own (x,z) position, not a hand-placed pattern, so its exact shape will vary with scale/proportions rather than exactly reproducing the specific hem seen in the reference build.',
     ],
   },
   {
@@ -6700,6 +6757,13 @@ function generateModel() {
     buildPolarBearDenInterior(grid, silhouette, dims, matExt, matAcc, decor);
   } else if (wantInterior && interiorMode === 'magmaCubeCavern') {
     buildMagmaCubeCavernInterior(grid, silhouette, dims, matExt, matAcc, decor);
+  }
+
+  // Not part of the interior-mode system above: the Vader helmet's own
+  // glowing eye cavities are always visible on the exterior, not an
+  // optional interior the user has to opt into.
+  if (shapeType === 'vaderHelmet') {
+    applyVaderHelmetDetail(grid, dims, matAcc);
   }
 
   const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
