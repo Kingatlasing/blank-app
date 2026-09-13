@@ -3077,146 +3077,126 @@ function applyEiffelTowerDetail(grid, dims, matAcc) {
   }
 }
 
-// A highly-detailed shape for the Statue of Liberty preset SPECIFICALLY —
-// a human figure genuinely can't be captured by a primitive cylinder
-// (the shape this preset used before this rebuild, with its own honest
-// note admitting exactly that), and a first rebuild attempt using
-// smooth stacked ellipsoids didn't read as a human figure either — real
-// player-built Minecraft statues almost always use a hand-authored,
-// BLOCKY front-profile silhouette (like pixel art extruded into 3D)
-// with a real visible neck/waist, not smooth geometric curves, which is
-// what this version switches to: a keyframed, piecewise-LINEAR
-// rectangular cross-section per row (SOL_KEYFRAMES below), giving a
-// deliberately sculpted outline — a wide robe hem, a real narrow waist,
-// broader shoulders, a distinct narrow neck separating a rounder head,
-// then a flared crown band tapering to a spike tip — plus the raised
-// torch arm and tablet as separate offset appendages. Works in
-// FRACTIONS of this preset's own dims rather than absolute real meters
-// (unlike the Golden Gate Bridge/Eiffel Tower shapes above): its
-// real.baseX/baseZ was always an honest scaffold approximation of the
-// statue's own footprint (per the original preset's own old note), not
-// a real building's exact plan, and was widened further here (16m to
-// 26m) purely to give this silhouette enough voxel columns to actually
-// read as a figure rather than a blur.
-const SOL_PEDESTAL_TOP = 0.505; // 47m of the real published 93m total (real pedestal height)
-// [t, halfX, halfZ] keyframes for the robed figure above the pedestal —
-// interpolated LINEARLY between consecutive rows (not a smooth curve)
-// for the same deliberate, sculpted-edge look real blocky statue builds
-// have, with a real waist/neck instead of one continuous taper.
-const SOL_KEYFRAMES = [
-  [0.505, 0.30, 0.26], // robe hem, flared out from under the robe
-  [0.58, 0.24, 0.22],  // knee
-  [0.65, 0.15, 0.14],  // waist — the real cinched point that reads as a body, not a cone
-  [0.75, 0.20, 0.17],  // chest/shoulders, broadening again
-  [0.795, 0.09, 0.09],  // neck — narrow on purpose so the head reads as its own separate mass
-  [0.84, 0.135, 0.125], // head — a touch larger than pure body proportions would give, deliberately
-                        // sized up for real facial detail (eyes/nose/mouth, carved below in
-                        // applyStatueOfLibertyDetail) to have enough voxel width to read at all
-  [0.865, 0.18, 0.13],  // crown band flares out past the head
-  [0.90, 0.03, 0.03],   // crown spike tip
+// A highly-detailed BUST for the Statue of Liberty preset SPECIFICALLY —
+// replaces an earlier full-body-plus-pedestal version at the user's own
+// request, together with 3 real reference photos of the statue's own
+// head, crown, and face: dropping the pedestal, robe hem, and raised
+// torch arm entirely means the ENTIRE voxel budget (up to this app's own
+// in-browser cell cap) goes into the head/shoulders alone, which is what
+// "huge compared to block size" (real facial resolution) actually needs.
+// Like the earlier version, this works in FRACTIONS of this preset's own
+// dims rather than absolute real meters — there's no single documented
+// "real bust" to key off — and reuses the same relief-sculpting
+// technique (rounded, not flat-cutout, facial features) proven out on
+// that version, just with much more voxel room per feature and 2 new
+// reference-driven details neither version had: the real 7-spike radial
+// crown and its own window band.
+const LB_SPIKE_COUNT = 7;
+// [t, halfX, halfZ] keyframes for the bust's own overall silhouette,
+// interpolated LINEARLY between consecutive rows for the same
+// deliberate, sculpted-edge look real player-built statue busts use,
+// rather than a single smooth taper: wide shoulders, a real narrow neck,
+// then the head/hair mass flaring out again wider than the neck (real
+// photos show the hair is the widest part of the whole bust), narrowing
+// into the crown band before the spikes take over above it.
+const LB_KEYFRAMES = [
+  [0.0, 0.50, 0.36],  // shoulder base
+  [0.16, 0.46, 0.33], // upper chest
+  [0.20, 0.22, 0.17], // neck base
+  [0.30, 0.15, 0.12], // neck top — narrowest point, separates head from shoulders
+  [0.38, 0.33, 0.29], // jaw/hair flare begins
+  [0.52, 0.40, 0.36], // widest point of the hair mass (ear height)
+  [0.66, 0.36, 0.32], // upper head
+  [0.76, 0.30, 0.25], // crown band base
+  [0.84, 0.29, 0.24], // crown band top / spike base
 ];
-function solBodyHalfWidths(t) {
-  if (t <= SOL_KEYFRAMES[0][0]) return [SOL_KEYFRAMES[0][1], SOL_KEYFRAMES[0][2]];
-  for (let i = 1; i < SOL_KEYFRAMES.length; i++) {
-    if (t <= SOL_KEYFRAMES[i][0]) {
-      const [t0, x0, z0] = SOL_KEYFRAMES[i - 1], [t1, x1, z1] = SOL_KEYFRAMES[i];
+const LB_CROWN_TOP_T = LB_KEYFRAMES[LB_KEYFRAMES.length - 1][0];
+function lbHalfWidths(t) {
+  if (t <= LB_KEYFRAMES[0][0]) return [LB_KEYFRAMES[0][1], LB_KEYFRAMES[0][2]];
+  for (let i = 1; i < LB_KEYFRAMES.length; i++) {
+    if (t <= LB_KEYFRAMES[i][0]) {
+      const [t0, x0, z0] = LB_KEYFRAMES[i - 1], [t1, x1, z1] = LB_KEYFRAMES[i];
       const f = (t - t0) / (t1 - t0 || 1e-9);
       return [x0 + (x1 - x0) * f, z0 + (z1 - z0) * f];
     }
   }
-  const last = SOL_KEYFRAMES[SOL_KEYFRAMES.length - 1];
+  const last = LB_KEYFRAMES[LB_KEYFRAMES.length - 1];
   return [last[1], last[2]];
 }
-function statueOfLibertySolid(x, y, z, dims) {
+function libertyBustSolid(x, y, z, dims) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const t = y / dims.sy;
 
-  if (t <= SOL_PEDESTAL_TOP) {
-    // A 2-tier rectangular pedestal, narrower on top.
-    const tierT = t / SOL_PEDESTAL_TOP;
-    const half = tierT < 0.65 ? dims.sx * 0.46 : dims.sx * 0.34;
-    return Math.abs(x - cx) <= half && Math.abs(z - cz) <= half;
-  }
-
-  // The raised right arm + torch: an offset column, thinner than the
-  // body, starting at shoulder height and rising above the head — the
-  // statue's own single most recognizable silhouette feature.
-  const armX = cx + dims.sx * 0.19;
-  if (t >= 0.72) {
-    const armHalf = Math.max(1, dims.sx * 0.05);
-    if (Math.abs(x - armX) <= armHalf && Math.abs(z - cz) <= armHalf) return true;
-    if (t >= 0.97) {
-      const torchHalf = Math.max(1, dims.sx * 0.09); // the torch head, a touch wider than the arm
-      if (Math.abs(x - armX) <= torchHalf && Math.abs(z - cz) <= torchHalf) return true;
+  if (t <= LB_CROWN_TOP_T) {
+    let [hx, hz] = lbHalfWidths(t);
+    // A subtle fluted ripple around the hair-covered portion (not the
+    // shoulders/neck) suggests real wavy hair strands without needing
+    // separate carved geometry for every strand.
+    if (t >= 0.38 && t <= LB_CROWN_TOP_T) {
+      const angle = Math.atan2(z - cz, x - cx);
+      const ripple = 1 + 0.035 * Math.cos(angle * 14);
+      hx *= ripple; hz *= ripple;
     }
-  }
-  // The tablet: a flat rectangular slab held against the body's other side.
-  if (t >= 0.66 && t <= 0.745) {
-    const tabX = cx - dims.sx * 0.21;
-    if (Math.abs(x - tabX) <= dims.sx * 0.07 && Math.abs(z - cz) <= dims.sz * 0.16) return true;
+    const rx = dims.sx * hx, rz = dims.sz * hz;
+    const nx = (x - cx) / (rx || 1e-9), nz = (z - cz) / (rz || 1e-9);
+    return nx * nx + nz * nz <= 1.0;
   }
 
-  if (t > SOL_KEYFRAMES[SOL_KEYFRAMES.length - 1][0]) return false;
-  const [hx, hz] = solBodyHalfWidths(t);
-  return Math.abs(x - cx) <= dims.sx * hx && Math.abs(z - cz) <= dims.sz * hz;
+  // 7 radiating crown spikes above the band, tilted outward as they
+  // rise (real photos: the spikes lean away from the head, not straight
+  // up) and tapering to a point — evaluated in the ellipse's own
+  // equivalent-circle angle space (see colosseumSolid above for the same
+  // technique) so the 7-fold spacing stays even despite the head not
+  // being perfectly circular in cross-section.
+  const spikeT = (t - LB_CROWN_TOP_T) / (1 - LB_CROWN_TOP_T);
+  if (spikeT > 1) return false;
+  const [bandHx, bandHz] = lbHalfWidths(LB_CROWN_TOP_T);
+  const aspect = bandHx / (bandHz || 1e-9);
+  const dx = x - cx, dz = (z - cz) * aspect;
+  const r = Math.hypot(dx, dz);
+  const angle = Math.atan2(dz, dx);
+  const crownRadius = dims.sx * bandHx;
+  const spikeR = crownRadius * (1 + 0.7 * spikeT);
+  const spikeHalfWidth = Math.max(1, dims.sx * 0.026 * (1 - spikeT * 0.85));
+  for (let k = 0; k < LB_SPIKE_COUNT; k++) {
+    // Phase offset puts one spike at true front (+Z) with the other 6
+    // fanning out in symmetric left/right pairs — matching every real
+    // reference photo, which all show one spike centered above the brow.
+    const targetAngle = Math.PI / 2 + k * ((2 * Math.PI) / LB_SPIKE_COUNT);
+    const diff = Math.atan2(Math.sin(angle - targetAngle), Math.cos(angle - targetAngle));
+    if (Math.abs(diff) * r <= spikeHalfWidth && Math.abs(r - spikeR) <= spikeHalfWidth * 1.4) return true;
+  }
+  return false;
 }
-// Always-on finishing pass: paints the torch head in the accent material
-// (a real flame color), then carves an actual face into the head — 2
-// recessed eyes, a small forward-protruding nose, and a recessed mouth
-// line — since statueOfLibertySolid's own boolean solid/air test can
-// shape the head's overall rounded mass but can't carve/protrude
-// specific small features relative to that mass's own already-computed
-// surface. Every feature is found via each column's own front-most
-// SOLID cell (the same dynamic, scale-independent technique used for
-// the Vader helmet's recessed eyes) and sized in fractions of dims.sx,
-// so the face scales up automatically with this preset's own default
-// scale (see the preset's defaultScaleNum/Den) or any scale the user
-// picks — a bigger model gets a more finely detailed face for free,
-// not a blurrier fixed-size one.
-function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt, matInt) {
+// Always-on finishing pass: carves the crown's own window band, then
+// sculpts an actual reference-driven face — a real BROW RIDGE
+// (prominent and nearly continuous across both eyes, per every
+// reference photo), rounded eye sockets with a small dark pupil, a real
+// 3-part nose (bridge, rounded tip, nostrils), an upper and lower lip,
+// and a strong jaw/chin — since libertyBustSolid's own boolean test can
+// shape the overall rounded mass but can't carve/protrude small features
+// relative to that mass's own already-computed surface. Every feature
+// uses the same rounded-relief technique (smooth radial falloff, not a
+// flat rectangular cutout) and a material distinct from the surrounding
+// copper skin, both proven out on the previous full-body version — a
+// uniform single-material face made every earlier attempt's raised
+// features nearly invisible in-engine. Everything is sized/positioned in
+// fractions of dims.sx, so the whole face scales up automatically with
+// this preset's own default scale or any scale chosen — a bigger model
+// gets a more finely detailed face for free, not a blurrier fixed-size one.
+function applyLibertyBustDetail(grid, dims, matAcc, matExt, matInt) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
-  const armX = Math.round(cx + dims.sx * 0.19);
-  const torchHalf = Math.max(1, Math.round(dims.sx * 0.09));
-  const y0 = Math.max(0, Math.round(dims.sy * 0.97)), y1 = dims.sy - 1;
-  for (let y = y0; y <= y1; y++) {
-    for (let x = Math.max(0, armX - torchHalf); x <= Math.min(dims.sx - 1, armX + torchHalf); x++) {
-      for (let z = Math.max(0, Math.round(cz - torchHalf)); z <= Math.min(dims.sz - 1, Math.round(cz + torchHalf)); z++) {
-        const i = idx(x, y, z, dims);
-        if (grid[i]) grid[i] = matAcc;
-      }
-    }
-  }
 
   function frontMostSolidZ(x, y) {
     for (let z = dims.sz - 1; z >= 0; z--) if (grid[idx(x, y, z, dims)]) return z;
     return -1;
   }
-  // Smooth radial falloff for sculpting facial relief: 1.0 at a
-  // feature's own center, easing to 0.0 at its own elliptical edge, so
-  // scaling a max depth by this gives every feature a rounded, domed
-  // (or basin-shaped, if carved) form instead of a flat-bottomed
-  // rectangular block-out — the previous version's hard rectangular
-  // eye/mouth cutouts read as flat icon shapes, not sculpted anatomy.
   function relief(dx, dy, halfX, halfY) {
     const nx = dx / (halfX || 1e-9), ny = dy / (halfY || 1e-9);
     const r2 = nx * nx + ny * ny;
     if (r2 > 1) return 0;
     return Math.cos(Math.sqrt(r2) * Math.PI / 2);
   }
-  // Carves (mode 'carve') or protrudes (mode 'protrude') one rounded
-  // relief feature centered at (cxFeat, cyFeat) in the face plane, found
-  // relative to each affected column's own current front-most solid
-  // cell — so features layer correctly regardless of order (a nose tip
-  // protrusion added after the bridge starts from the bridge's own new
-  // surface, not the plain head surface underneath it). Every feature
-  // is also painted a material distinct from the surrounding copper
-  // skin (matInt for a recessed/shadowed carve, matExt2 for a raised
-  // protrusion) — a uniform single-material face left every earlier
-  // version's raised features (nose, lips, chin, brows) essentially
-  // invisible, since geometry alone barely reads at this voxel scale
-  // without a real light/shadow render; a real weathered bronze/copper
-  // statue's raised, more-exposed surfaces DO patina differently from
-  // its recessed ones in practice, so this isn't an invented effect.
   function sculpt(cxFeat, cyFeat, halfX, halfY, maxDepth, mode, mat) {
     const y0 = Math.max(0, Math.floor(cyFeat - halfY)), y1 = Math.min(dims.sy - 1, Math.ceil(cyFeat + halfY));
     const xSpan = Math.ceil(halfX);
@@ -3247,30 +3227,57 @@ function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt, matInt) {
     }
   }
 
-  // A real sculpted-relief face, not flat rectangular cutouts: brow
-  // ridge, almond eye sockets, a 3-part nose (bridge, rounded tip,
-  // nostrils), an upper and lower lip, and a chin — built top-to-bottom
-  // so each later feature's own front-most-cell lookup already sees the
-  // earlier ones. Everything is sized/positioned in fractions of
-  // dims.sx and the head's own real vertical band (headY0-headY1, from
-  // SOL_KEYFRAMES' own neck-to-crown range), so the whole face scales up
-  // together with this preset's own default scale or any scale chosen.
-  const headY0 = dims.sy * 0.795, headY1 = dims.sy * 0.865;
+  // The crown's own window band: a row of small recessed openings
+  // across the front of the band, the real detail visible in every
+  // reference photo (tourists lean out of them) — carved only across
+  // the front-facing arc, found via the same front-most-solid-cell scan,
+  // since the band's own side/back surfaces don't face +Z at all.
+  const crownY0 = Math.round(dims.sy * 0.76), crownY1 = Math.round(dims.sy * 0.84);
+  const [crownHx] = lbHalfWidths(0.80);
+  const bandFrontHalfX = dims.sx * crownHx * 0.85;
+  const windowCount = 7;
+  const windowPeriod = (2 * bandFrontHalfX) / windowCount;
+  const windowHalfWidth = Math.max(1, Math.round(windowPeriod * 0.28));
+  const windowDepth = Math.max(1, Math.round(dims.sx * 0.018));
+  for (let i = 0; i < windowCount; i++) {
+    const wx = Math.round(cx - bandFrontHalfX + windowPeriod * (i + 0.5));
+    for (let dxw = -windowHalfWidth; dxw <= windowHalfWidth; dxw++) {
+      const x = wx + dxw;
+      if (x < 0 || x >= dims.sx) continue;
+      for (let y = crownY0 + 1; y < crownY1 - 1; y++) {
+        const fz = frontMostSolidZ(x, y);
+        if (fz < 0) continue;
+        for (let d = 0; d < windowDepth; d++) {
+          const z = fz - d;
+          if (z < 0) break;
+          grid[idx(x, y, z, dims)] = (d === windowDepth - 1) ? matInt : 0;
+        }
+      }
+    }
+  }
+
+  // The face itself, built top-to-bottom so each later feature's own
+  // front-most-cell lookup already sees the earlier ones.
+  const headY0 = dims.sy * 0.34, headY1 = dims.sy * 0.70;
   const bandH = headY1 - headY0;
   const faceY = (frac) => headY0 + bandH * frac;
-  const eyeOffset = dims.sx * 0.052;
+  const eyeOffset = dims.sx * 0.10;
 
-  sculpt(cx - eyeOffset, faceY(0.74), dims.sx * 0.048, bandH * 0.045, Math.round(dims.sx * 0.03), 'protrude', matInt); // left brow
-  sculpt(cx + eyeOffset, faceY(0.74), dims.sx * 0.048, bandH * 0.045, Math.round(dims.sx * 0.03), 'protrude', matInt); // right brow
-  sculpt(cx - eyeOffset, faceY(0.58), dims.sx * 0.034, bandH * 0.08, Math.round(dims.sx * 0.05), 'carve', matInt);     // left eye socket
-  sculpt(cx + eyeOffset, faceY(0.58), dims.sx * 0.034, bandH * 0.08, Math.round(dims.sx * 0.05), 'carve', matInt);     // right eye socket
-  sculpt(cx, faceY(0.42), dims.sx * 0.018, bandH * 0.11, Math.round(dims.sx * 0.028), 'protrude', matInt);             // nose bridge
-  sculpt(cx, faceY(0.27), dims.sx * 0.028, bandH * 0.06, Math.round(dims.sx * 0.055), 'protrude', matInt);             // nose tip
-  sculpt(cx - dims.sx * 0.02, faceY(0.26), dims.sx * 0.011, bandH * 0.035, Math.round(dims.sx * 0.02), 'carve', matInt);  // left nostril
-  sculpt(cx + dims.sx * 0.02, faceY(0.26), dims.sx * 0.011, bandH * 0.035, Math.round(dims.sx * 0.02), 'carve', matInt);  // right nostril
-  sculpt(cx, faceY(0.16), dims.sx * 0.052, bandH * 0.04, Math.round(dims.sx * 0.022), 'carve', matInt);                // upper lip groove
-  sculpt(cx, faceY(0.09), dims.sx * 0.044, bandH * 0.05, Math.round(dims.sx * 0.04), 'protrude', matInt);              // lower lip
-  sculpt(cx, faceY(0.0), dims.sx * 0.055, bandH * 0.07, Math.round(dims.sx * 0.032), 'protrude', matInt);              // chin
+  // A single, near-continuous brow ridge spanning both eyes — every
+  // reference photo shows this as one heavy, almost unbroken ridge
+  // rather than 2 separate eyebrows.
+  sculpt(cx, faceY(0.80), dims.sx * 0.16, bandH * 0.045, Math.round(dims.sx * 0.022), 'protrude', matInt);
+  sculpt(cx - eyeOffset, faceY(0.62), dims.sx * 0.065, bandH * 0.09, Math.round(dims.sx * 0.035), 'carve', matInt);  // left eye socket
+  sculpt(cx + eyeOffset, faceY(0.62), dims.sx * 0.065, bandH * 0.09, Math.round(dims.sx * 0.035), 'carve', matInt);  // right eye socket
+  sculpt(cx - eyeOffset, faceY(0.62), dims.sx * 0.014, bandH * 0.02, Math.round(dims.sx * 0.045), 'carve', matAcc); // left pupil
+  sculpt(cx + eyeOffset, faceY(0.62), dims.sx * 0.014, bandH * 0.02, Math.round(dims.sx * 0.045), 'carve', matAcc); // right pupil
+  sculpt(cx, faceY(0.44), dims.sx * 0.035, bandH * 0.12, Math.round(dims.sx * 0.02), 'protrude', matInt);           // nose bridge
+  sculpt(cx, faceY(0.26), dims.sx * 0.055, bandH * 0.07, Math.round(dims.sx * 0.045), 'protrude', matInt);          // nose tip
+  sculpt(cx - dims.sx * 0.04, faceY(0.25), dims.sx * 0.022, bandH * 0.035, Math.round(dims.sx * 0.015), 'carve', matInt); // left nostril
+  sculpt(cx + dims.sx * 0.04, faceY(0.25), dims.sx * 0.022, bandH * 0.035, Math.round(dims.sx * 0.015), 'carve', matInt); // right nostril
+  sculpt(cx, faceY(0.14), dims.sx * 0.10, bandH * 0.045, Math.round(dims.sx * 0.018), 'carve', matInt);             // upper lip groove
+  sculpt(cx, faceY(0.07), dims.sx * 0.085, bandH * 0.055, Math.round(dims.sx * 0.03), 'protrude', matInt);          // lower lip
+  sculpt(cx, faceY(0.0), dims.sx * 0.10, bandH * 0.07, Math.round(dims.sx * 0.025), 'protrude', matInt);            // chin/jaw
 }
 
 // Big Ben keeps the generic tapered-box `tower` shape (its gross box +
@@ -3617,7 +3624,7 @@ const SHAPES = {
   eiffelTower: eiffelTowerSolid,
   // Same reasoning again for every dedicated preset-specific shape below:
   // none are exposed as selectable Custom shapes.
-  statueOfLiberty: statueOfLibertySolid,
+  libertyBust: libertyBustSolid,
   colosseum: colosseumSolid,
   pisa: pisaSolid,
   tajMahal: tajMahalSolid,
@@ -3629,7 +3636,7 @@ const SHAPE_DEFAULT_INTERIOR = {
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
   cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null,
   goldenGateBridge: null, eiffelTower: null,
-  statueOfLiberty: null, colosseum: null, pisa: null, tajMahal: null, burjKhalifa: null,
+  libertyBust: null, colosseum: null, pisa: null, tajMahal: null, burjKhalifa: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -5796,17 +5803,17 @@ const PRESETS = [
     ],
   },
   {
-    id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'statueOfLiberty',
-    real: { height: 93, baseX: 26, baseZ: 26 }, interiorMode: null,
-    defaultScaleNum: 9, defaultScaleDen: 2,
-    blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'gold_block' },
-    desc: 'Ground to torch height ~93m. A hand-authored, blocky front-profile silhouette — a real narrow waist and neck separating a flared robe hem, broader shoulders, and a head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal. Now has a real sculpted-relief face (a brow ridge, rounded eye sockets, a 3-part nose with nostrils, an upper and lower lip, a chin), and defaults to a 4.5x scale specifically so that face has real voxel room to read instead of blurring into a handful of blocks.',
-    keywords: ['statue of liberty', 'new york', 'liberty island', 'torch', 'face'],
+    id: 'statue-liberty', name: "Statue of Liberty (Bust)", shape: 'libertyBust',
+    real: { height: 29, baseX: 17, baseZ: 11 }, interiorMode: null,
+    defaultScaleNum: 10, defaultScaleDen: 1,
+    blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'black_concrete' },
+    desc: 'A bust (head, hair, crown, and shoulders only — no pedestal, no body, no torch arm) built from 3 real reference photos of the statue\'s own head: the real 7-spike radiating crown, its own window band, wavy hair, and a real sculpted face (a heavy near-continuous brow ridge, deep eye sockets with a dark pupil, a real 3-part nose, an upper and lower lip, a strong jaw/chin). Dropping the pedestal/body/torch arm entirely means the WHOLE voxel budget goes into this head alone — defaults to a 10x scale, deliberately huge relative to a single block, specifically for real facial resolution.',
+    keywords: ['statue of liberty', 'new york', 'liberty island', 'bust', 'face', 'crown'],
     notes: [
-      'Rebuilt a 4th time after a user\'s "not enough, make it look like a human face" feedback on the previous flat-cutout face: every facial feature (`applyStatueOfLibertyDetail`\'s new `sculpt` helper) is now a rounded RELIEF shape, not a hard rectangular carve/bump — each feature\'s own depth is scaled by a smooth radial falloff (`relief`: 1.0 at the feature\'s own center, easing to 0.0 at its edge, the same cosine falloff a dome/sphere would use) so it comes out as a real domed bump or basin-shaped socket. The face now has a brow ridge, rounded almond eye sockets, a real 3-part nose (a raised bridge, a rounder protruding tip, and 2 small recessed nostrils), a recessed upper lip and a fuller protruding lower lip, and a chin — built top-to-bottom so, e.g., the nose tip\'s own relief is added on top of the bridge\'s already-raised surface rather than the plain head underneath it. The default scale was also bumped from 4x to 4.5x (`defaultScaleNum`/`defaultScaleDen` = 9/2), the largest this preset\'s own real proportions allow while staying under this app\'s in-browser 6,000,000-cell cap (~5.7 million cells) — a hard technical ceiling this specific voxel medium can\'t exceed at any preset\'s proportions, not a choice that could simply be turned up further for more resolution.',
-      'Rebuilt a third time to add a face at all, after the body-silhouette rebuild below still had a blank head: carved 2 recessed eye cavities, a small forward-protruding nose, and a recessed mouth line, found dynamically via each column\'s own front-most solid cell (the same technique the Darth Vader helmet\'s recessed eyes use) — since superseded by the relief-based version above, this flat-cutout approach is what actually prompted the "not enough" feedback that led to it.',
-      'Rebuilt a second time from an earlier version that used smooth stacked ellipsoids for the body — those still just looked like a stepped cylinder, not a human figure, because the transitions between robe/torso/head were too gradual to read at all. This version instead hand-authors a piecewise-LINEAR (not smoothly curved) rectangular half-width per height keyframe (`SOL_KEYFRAMES`) the same way real player-built Minecraft statues do it — as a deliberate front-profile silhouette with a real cinched WAIST and a genuinely narrow NECK separating the head from the shoulders, rather than one continuous taper. The overall footprint (real.baseX/baseZ) was also widened from 16m to 26m specifically to give this silhouette enough voxel columns per row to hold its shape.',
-      'This remains a deliberately stylized, low-resolution sculptural simplification, not a photorealistic 3D scan — a voxel grid this size can shape a real brow/nose/lip/chin structure (as it now does) but not fine skin detail, individual facial proportions, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
+      'Replaces the earlier full-body-plus-pedestal version entirely, at a user\'s own request together with 3 real reference photos of the statue\'s head (a profile close-up, a front close-up showing tourists inside the crown windows, and a classic front view with the torch arm). A bust trades the real full-body silhouette for real facial/crown resolution: the same in-browser 6,000,000-cell cap that capped the old version\'s head at a few dozen blocks wide now buys a MUCH larger head, since none of that budget is spent on a pedestal, robe, or torch arm any more. `libertyBustSolid` (the overall rounded silhouette: shoulders, a real narrow neck, a wider hair mass, the crown band, and 7 real radiating spikes) and `applyLibertyBustDetail` (the crown\'s own window band plus the sculpted face) are new, dedicated to this preset, and — like the version they replace — work in fractions of this preset\'s own dims rather than absolute real meters, since there\'s no single documented "real bust" to key off.',
+      'The crown\'s real 7 spikes are built directly into the geometry for the first time (the version this replaces only approximated a "flared band") — evaluated in the head ellipse\'s own equivalent-circle angle space (the same technique `colosseumSolid` above uses for its arches) so the real 7-fold spacing stays even, with one spike centered at true front and the other 6 fanning out in symmetric pairs, matching every reference photo. The crown\'s own window band is carved as a row of small recessed openings across the front face, found the same dynamic way the facial features are (each column\'s own front-most solid cell) — it only works on the front-facing arc, since the band\'s side/back surfaces don\'t face the same direction at all.',
+      'The face itself reuses the rounded-relief sculpting technique (a smooth radial falloff per feature, not a flat rectangular cutout, plus a material distinct from the surrounding copper skin) already proven on the version this replaces, redrawn bigger and closer to the reference photos: one heavy, near-continuous brow ridge spanning both eyes (rather than 2 separate brows), deeper eye sockets with a small dark recessed pupil, and a more pronounced nose/lip/jaw structure. A subtle fluted ripple around the hair-covered portion of the head suggests real wavy hair strands without needing separately carved geometry for each one.',
+      'This remains a deliberately stylized sculptural simplification, not a photorealistic 3D scan — a voxel grid, however large, can shape a real brow/nose/lip/jaw structure and a real 7-spike crown (as it now does) but not fine skin detail, individual facial proportions, or real hair strand geometry. Also not modeled: visible ears (the reference photos show them mostly hair-covered) and the crown band\'s own real structural framing behind the windows.',
     ],
   },
   {
@@ -7592,10 +7599,11 @@ function generateModel() {
   if (shapeType === 'eiffelTower') {
     applyEiffelTowerDetail(grid, dims, matAcc);
   }
-  // Same reasoning again: the Statue of Liberty's own torch is a
-  // defining, always-visible feature, not an interior.
-  if (shapeType === 'statueOfLiberty') {
-    applyStatueOfLibertyDetail(grid, dims, matAcc, matExt, matInt);
+  // Same reasoning again: the Statue of Liberty bust's own crown windows
+  // and sculpted face are defining, always-visible features, not an
+  // interior.
+  if (shapeType === 'libertyBust') {
+    applyLibertyBustDetail(grid, dims, matAcc, matExt, matInt);
   }
   // Gated on the preset id, not shapeType: Big Ben keeps the generic
   // `tower` shape shared by other presets (windmill, village house),
