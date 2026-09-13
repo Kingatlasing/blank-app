@@ -20426,6 +20426,39 @@ function onResizeThree() {
   three.camera.updateProjectionMatrix();
 }
 
+// A solid block whose own 6 neighbors are ALL solid, opaque blocks is
+// never visible from any camera angle at all, inside or outside — the
+// classic voxel-engine "hidden face/block culling" optimization. Filled
+// (solid-core) structures previously instanced every single interior
+// block anyway, even though most of them can never be seen; a 40x40x40
+// filled cube, for example, instanced all 64,000 blocks when only the
+// ~9,100 on its own outer skin are ever actually visible. This changes
+// nothing about what's drawn — only opaque-on-every-side blocks (which
+// contribute zero pixels either way) are skipped — and only affects the
+// 3D preview; the real, full grid (interior included) is untouched for
+// Stats/Build Commands/the layer blueprint. A neighbor counts as "open"
+// (making the cell exposed) if it's out of bounds, air, OR a transparent
+// glass block — glass panes must still expose whatever sits behind them.
+function computeExposedMask(grid, dims) {
+  const { sx, sy, sz } = dims;
+  const mask = new Uint8Array(grid.length);
+  const isOpen = (x, y, z) => {
+    if (x < 0 || x >= sx || y < 0 || y >= sy || z < 0 || z >= sz) return true;
+    const v = grid[idx(x, y, z, dims)];
+    return !v || isTransparentGlassMaterial(v);
+  };
+  for (let y = 0; y < sy; y++) {
+    for (let z = 0; z < sz; z++) {
+      for (let x = 0; x < sx; x++) {
+        const i = idx(x, y, z, dims);
+        if (!grid[i]) continue;
+        if (isOpen(x + 1, y, z) || isOpen(x - 1, y, z) || isOpen(x, y + 1, z) ||
+            isOpen(x, y - 1, z) || isOpen(x, y, z + 1) || isOpen(x, y, z - 1)) mask[i] = 1;
+      }
+    }
+  }
+  return mask;
+}
 function renderThree(model, preserveCamera) {
   const t = initThree();
   while (t.group.children.length) t.group.remove(t.group.children[0]); // geometries/materials are cached & reused, not disposed
@@ -20437,9 +20470,13 @@ function renderThree(model, preserveCamera) {
   let total = 0;
   for (let i = 0; i < grid.length; i++) if (grid[i]) total++;
 
-  let sourceGrid = grid;
+  const exposedMask = computeExposedMask(grid, dims);
+  let exposedTotal = 0;
+  for (let i = 0; i < exposedMask.length; i++) if (exposedMask[i]) exposedTotal++;
+
+  let sourceGrid;
   const note = el('render-note');
-  if (total > RENDER_INSTANCE_CAP) {
+  if (exposedTotal > RENDER_INSTANCE_CAP) {
     const surface = hollowCarve(silhouette, dims, 1);
     // Uint16Array, matching grid itself — this copies real material-index
     // values out of grid, and a Uint8Array here would silently re-truncate
@@ -20450,6 +20487,9 @@ function renderThree(model, preserveCamera) {
     note.style.display = 'block';
     note.textContent = `Preview showing surface blocks only (${total.toLocaleString()} total blocks is too many to render fully) — the full interior is still included in Stats and Build Commands.`;
   } else {
+    const trimmed = new Uint16Array(grid.length);
+    for (let i = 0; i < grid.length; i++) trimmed[i] = exposedMask[i] ? grid[i] : 0;
+    sourceGrid = trimmed;
     note.style.display = 'none';
   }
 
