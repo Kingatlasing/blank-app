@@ -4570,24 +4570,73 @@ function buildWitchFireHazardInterior(grid, silhouette, dims, exteriorMat, accen
   decorOut.push({ type: 'witch', x: cx, y: 1, z: cz, facing: 'south' });
   decorOut.push({ type: 'fire', x: fireX, y: 1, z: cz });
 }
-// A real, automatic creeper farm: a real spawner cage block periodically
-// spawns a creeper right in front of it, which is automatically killed a
-// short beat later — this app's honest stand-in for a real kill method
-// like fall damage — dropping real gunpowder at a hopper on the far end,
-// entirely unattended. Switch to Walk mode and just watch; no interaction
-// anywhere in the whole cycle.
+// A real, automatic NATURAL-SPAWN creeper farm — no spawner cage block
+// anywhere, since real vanilla creeper farms spawn mobs naturally on a
+// fully dark, enclosed platform, never from a spawner
+// (minecraft.wiki/w/Tutorial:Creeper_farming). An earlier version of
+// this preset incorrectly used a visible spawner block/cage, which is
+// not how any real creeper farm works.
+// 2 stacked rooms: an upper dark spawning platform (real height 2, its
+// own ceiling lined with real trapdoors) sitting over a lower kill room,
+// connected by one real open drop shaft. The trapdoor ceiling is the
+// real, specific detail that filters FOR creepers: real vanilla checks
+// spawn headroom against the actual block collision box, and a
+// trapdoor mounted on the ceiling shaves just enough off a full
+// 2-block-tall room that a creeper (1.7 blocks) still fits while a
+// zombie or skeleton (1.95 blocks) cannot. A real cat sits on the
+// platform too — real vanilla creepers are deterred from ever igniting
+// near one (already modeled here, see findNearbyCat/CREEPER_CAT_DETER_
+// RADIUS), the real reason farms keep one nearby so creepers never
+// explode and damage the farm itself.
 function buildCreeperFarmInterior(grid, silhouette, dims, exteriorMat, accentMat, decorOut) {
   for (let i = 0; i < grid.length; i++) grid[i] = 0;
-  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, 0, z, dims)] = exteriorMat;
-  const cx = Math.floor(dims.sx / 2);
-  const cageZ = 1, spawnZ = Math.min(dims.sz - 1, cageZ + 1), dropZ = Math.max(0, dims.sz - 2);
-  grid[idx(cx, 1, cageZ, dims)] = MATERIAL_INDEX['spawner'] + 1;
+  const cx = Math.floor(dims.sx / 2), cz = Math.floor(dims.sz / 2);
+  const killFloorY = 0, killAirY = 1;
+  const spawnFloorY = Math.min(dims.sy - 1, 3);
+  const spawnAirY1 = Math.min(dims.sy - 1, spawnFloorY + 1);
+  const spawnAirY2 = Math.min(dims.sy - 1, spawnFloorY + 2);
+  const ceilingY = Math.min(dims.sy - 1, spawnFloorY + 3);
+  const shaftX = cx, shaftZ = Math.max(1, cz - 1);
+
+  // Kill room: floor + walls up through the spawning platform's own floor.
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, killFloorY, z, dims)] = exteriorMat;
+  for (let y = killFloorY; y <= ceilingY; y++) {
+    for (let x = 0; x < dims.sx; x++) { grid[idx(x, y, 0, dims)] = exteriorMat; grid[idx(x, y, dims.sz - 1, dims)] = exteriorMat; }
+    for (let z = 0; z < dims.sz; z++) { grid[idx(0, y, z, dims)] = exteriorMat; grid[idx(dims.sx - 1, y, z, dims)] = exteriorMat; }
+  }
+  // The spawning platform's own solid floor (real ground for mobs to
+  // spawn standing on), with a real open shaft hole through it.
+  for (let z = 0; z < dims.sz; z++) {
+    for (let x = 0; x < dims.sx; x++) {
+      if (x === shaftX && z === shaftZ) continue;
+      grid[idx(x, spawnFloorY, z, dims)] = exteriorMat;
+    }
+  }
+  // The real solid cap above the trapdoor ceiling — the trapdoors
+  // themselves (decor, below) are what actually lines the underside of
+  // this, not a block of their own.
+  for (let z = 0; z < dims.sz; z++) for (let x = 0; x < dims.sx; x++) grid[idx(x, ceilingY, z, dims)] = exteriorMat;
+
   if (!decorOut) return;
+  // The trapdoor ceiling — deliberately NO torches anywhere on this
+  // platform at all, since real spawning requires it to be genuinely
+  // dark.
+  for (let z = 1; z < dims.sz - 1; z++) {
+    for (let x = 1; x < dims.sx - 1; x++) {
+      if (x === shaftX && z === shaftZ) continue;
+      decorOut.push({ type: 'trapdoor', x, y: spawnAirY2, z, facing: 'south', half: 'top', open: false });
+    }
+  }
+  decorOut.push({ type: 'cat', x: 1, y: spawnAirY1, z: 1, facing: 'south' });
+  decorOut.push({ type: 'hopper', x: shaftX, y: killAirY, z: shaftZ });
+  // A NATURAL dark-platform spawn point, not a visible spawner block —
+  // see the citation above. mob_spawner is a purely logical marker (no
+  // geometry of its own; see DECOR_TYPES.mob_spawner) that drives the
+  // exact same periodic spawn/kill/collect cycle either way.
   decorOut.push({
-    type: 'mob_spawner', mobType: 'creeper', x: cx, y: 1, z: cageZ,
-    spawnX: cx, spawnY: 1, spawnZ, dropX: cx, dropY: 1, dropZ,
+    type: 'mob_spawner', mobType: 'creeper', x: cx, y: spawnAirY1, z: cz,
+    spawnX: cx, spawnY: spawnAirY1, spawnZ: cz, dropX: shaftX, dropY: killAirY, dropZ: shaftZ,
   });
-  decorOut.push({ type: 'hopper', x: cx, y: 1, z: dropZ });
 }
 // A netherrack platform with 3 zombified piglins clustered together —
 // switch to Interact mode and right-click just ONE of them: watch every
@@ -5556,14 +5605,14 @@ const PRESETS = [
   },
   {
     id: 'creeper-farm', name: 'Creeper Farm', shape: 'box', category: 'Farms & Automation',
-    real: { height: 3, baseX: 9, baseZ: 9 }, interiorMode: 'creeperFarm',
+    real: { height: 8, baseX: 9, baseZ: 9 }, interiorMode: 'creeperFarm',
     blocks: { exterior: 'stone_bricks', interior: 'stone_bricks', accent: 'stone_bricks' },
-    desc: 'A real, fully automatic creeper farm: a real spawner cage block periodically spawns a creeper, which is automatically killed a short beat later, dropping real gunpowder at a hopper on the far end — entirely unattended, no player interaction anywhere in the whole cycle.',
-    keywords: ['creeper farm', 'mob farm', 'spawner', 'gunpowder', 'automatic', 'hopper', 'kill chamber'],
+    desc: 'A real, fully automatic NATURAL-SPAWN creeper farm, corrected from an earlier version that wrongly used a spawner cage block: a dark, fully enclosed upper platform with a real trapdoor ceiling (filtering for creepers by height) periodically spawns one naturally, a real cat nearby keeps it from ever igniting, and it drops through an open shaft into a lower kill room, landing real gunpowder in a hopper — entirely unattended, no player interaction anywhere in the whole cycle.',
+    keywords: ['creeper farm', 'mob farm', 'natural spawn', 'gunpowder', 'automatic', 'hopper', 'kill chamber', 'trapdoor'],
     notes: [
-      'Just switch to Walk mode and watch — every few real seconds, a real creeper appears in front of the spawner cage block, and shortly after, it\'s automatically removed and a real gunpowder item appears at the hopper on the far end, then vanishes again shortly after that, simulating the hopper sucking it up. Real vanilla mob farms work exactly this way: a spawner periodically spawns a mob, which is automatically killed by some passive method (a long fall, drowning, lava just out of the mob\'s own path, etc.) with zero further player involvement, and its drop is funneled by water into a hopper (minecraft.wiki/w/Tutorials/Mob_farm); a real vanilla creeper specifically drops gunpowder (minecraft.wiki/w/Creeper). This is this app\'s first genuinely AUTOMATIC production chain: every earlier item-producing interaction here needs either a direct player click (shearing a mooshroom) or a player\'s own live proximity (a piglin noticing a dropped gold ingot) — a creeper farm needs neither, running the exact same way with nobody anywhere nearby at all. This app\'s own `updateMobSpawner` counts its own real spawn timer down every frame, `spawnFarmMob` creates a genuine, fully live creeper entry tagged `_farmSpawned` the instant it fires (waiting instead if the spawner\'s own small cap of currently-alive farm creepers is already full, the same real "won\'t spawn if too crowded" vanilla rule), and a new pair of GENERIC checks at the very top of `updateMobs`\' own per-frame loop — not specific to creepers at all — automatically call `killFarmMob` once any `_farmSpawned` mob\'s own real kill timer runs out, and automatically remove any `_farmCollect` dropped item once its own real collection timer runs out, so any future farm mob type gets this exact same automatic kill/collect behavior for free.',
-      'Verified directly by a unit test confirming zero creepers or gunpowder exist anywhere before the first spawn timer fires, that a real, live creeper entry genuinely appears once it does, that it\'s automatically removed again and replaced by a real gunpowder item at the hopper once its own real kill timer runs out with nobody anywhere near it, that the gunpowder item itself is then automatically removed again once its own real collection timer runs out, and a second test confirming the spawner genuinely stops spawning more creepers once its own real active-mob cap is already reached, resuming again only once one is cleared. This app has no combat, health, or fluid-current system at all, so "a mob automatically dying" and "an item automatically reaching a hopper" are both honestly stood in for by fixed timers with no simulated fall, drowning, or water current anywhere in between — an honest, spelled-out shortcut, not an invented "real" kill or transport mechanism — and this app also has no verified real spawner delay, active-mob cap, or kill/collection timing, so the figures used are honest, approximate stand-ins, the same caveat already applied throughout this app\'s own other compressed timers. The spawner cage itself is real new geometry-free reuse: the `spawner` material block this app already had sits directly in the grid exactly like any other block, with a purely logical `mob_spawner` decor entry (no geometry of its own at all) tracking its own timer state, registered like a mob the same way a `dropped_item` already is even though neither one moves on its own.',
-      'Not modeled: the real chance-based nature of a creeper\'s own gunpowder drop count (0-2, boosted by Looting) — this always drops exactly one — spawner activation only within a real player\'s own nearby range, and any of the real light-level requirements a creeper actually needs to spawn in the first place; this app has no lighting-based spawn-condition system at all, so this spawner simply spawns on a fixed timer regardless.',
+      'Just switch to Walk mode and watch — every few real seconds, a real creeper appears on the dark upper platform, and shortly after, it\'s automatically removed and a real gunpowder item appears at the hopper below, then vanishes again shortly after that, simulating the hopper sucking it up. Real vanilla creeper farms spawn creepers NATURALLY on a fully dark, enclosed platform — never from a spawner block, which is a completely different (and much rarer) real vanilla structure — then rely on a lethal fall or similar passive kill method to finish them off without ever triggering their own explosion, funneling the drop into a hopper below (minecraft.wiki/w/Tutorial:Creeper_farming). This preset\'s own platform ceiling is real trapdoors, not a solid block: real vanilla actually checks a spawning mob\'s own collision height against the available headroom, and a trapdoor mounted on a 2-block-tall room\'s ceiling shaves it down to roughly 1 13⁄16 blocks — just enough for a 1.7-block creeper to still spawn there while a 1.95-block zombie or skeleton cannot, the real, specific reason this exact design filters for creepers at all. A real cat also sits on the platform, reusing this app\'s own pre-existing `findNearbyCat`/`CREEPER_CAT_DETER_RADIUS` check (originally built for the ordinary wandering creeper) — real vanilla creepers are deterred from ever igniting near a cat, the real reason farms keep one nearby so a creeper never explodes and damages the farm around it. This app\'s own `updateMobSpawner` counts its own real spawn timer down every frame, `spawnFarmMob` creates a genuine, fully live creeper entry tagged `_farmSpawned` the instant it fires (waiting instead if the spawner\'s own small cap of currently-alive farm creepers is already full, the same real "won\'t spawn if too crowded" vanilla rule), and a pair of GENERIC checks at the very top of `updateMobs`\' own per-frame loop — not specific to creepers at all — automatically call `killFarmMob` once any `_farmSpawned` mob\'s own real kill timer runs out, and automatically remove any `_farmCollect` dropped item once its own real collection timer runs out, so any future farm mob type gets this exact same automatic kill/collect behavior for free; only the STRUCTURE changed in this correction, not this underlying spawn/kill/collect engine.',
+      'Verified directly by a unit test confirming zero creepers or gunpowder exist anywhere before the first spawn timer fires, that a real, live creeper entry genuinely appears once it does, that it\'s automatically removed again and replaced by a real gunpowder item at the hopper once its own real kill timer runs out with nobody anywhere near it, that the gunpowder item itself is then automatically removed again once its own real collection timer runs out, and a second test confirming the spawner genuinely stops spawning more creepers once its own real active-mob cap is already reached, resuming again only once one is cleared. This app has no combat, health, fall-damage, or fluid-current system at all, so "a mob automatically dying" and "an item automatically reaching a hopper" are both honestly stood in for by fixed timers with no simulated fall, drowning, or water current anywhere in between — an honest, spelled-out shortcut, not an invented "real" kill or transport mechanism — and this app also has no verified real spawner delay, active-mob cap, or kill/collection timing, so the figures used are honest, approximate stand-ins, the same caveat already applied throughout this app\'s own other compressed timers.',
+      'Not modeled: the real chance-based nature of a creeper\'s own gunpowder drop count (0-2, boosted by Looting) — this always drops exactly one — the real water stream that would normally sweep the item to the hopper (this app has no fluid-current simulation, so it appears directly at the hopper instead, the same simplification already used by the Automatic Wheat Farm), and any actual light-level check driving WHEN a creeper can spawn — this app has no lighting-based spawn-condition system at all, so the platform is built genuinely dark (no torches anywhere on it) but spawns on a fixed timer regardless of a real light value.',
     ],
   },
   {
