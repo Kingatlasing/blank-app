@@ -3102,10 +3102,12 @@ const SOL_KEYFRAMES = [
   [0.58, 0.24, 0.22],  // knee
   [0.65, 0.15, 0.14],  // waist — the real cinched point that reads as a body, not a cone
   [0.75, 0.20, 0.17],  // chest/shoulders, broadening again
-  [0.795, 0.09, 0.09], // neck — narrow on purpose so the head reads as its own separate mass
-  [0.84, 0.115, 0.105],// head
-  [0.865, 0.16, 0.11], // crown band flares out past the head
-  [0.90, 0.03, 0.03],  // crown spike tip
+  [0.795, 0.09, 0.09],  // neck — narrow on purpose so the head reads as its own separate mass
+  [0.84, 0.135, 0.125], // head — a touch larger than pure body proportions would give, deliberately
+                        // sized up for real facial detail (eyes/nose/mouth, carved below in
+                        // applyStatueOfLibertyDetail) to have enough voxel width to read at all
+  [0.865, 0.18, 0.13],  // crown band flares out past the head
+  [0.90, 0.03, 0.03],   // crown spike tip
 ];
 function solBodyHalfWidths(t) {
   if (t <= SOL_KEYFRAMES[0][0]) return [SOL_KEYFRAMES[0][1], SOL_KEYFRAMES[0][2]];
@@ -3153,9 +3155,19 @@ function statueOfLibertySolid(x, y, z, dims) {
   return Math.abs(x - cx) <= dims.sx * hx && Math.abs(z - cz) <= dims.sz * hz;
 }
 // Always-on finishing pass: paints the torch head in the accent material
-// (a real flame color) since statueOfLibertySolid can only decide
-// solid/air.
-function applyStatueOfLibertyDetail(grid, dims, matAcc) {
+// (a real flame color), then carves an actual face into the head — 2
+// recessed eyes, a small forward-protruding nose, and a recessed mouth
+// line — since statueOfLibertySolid's own boolean solid/air test can
+// shape the head's overall rounded mass but can't carve/protrude
+// specific small features relative to that mass's own already-computed
+// surface. Every feature is found via each column's own front-most
+// SOLID cell (the same dynamic, scale-independent technique used for
+// the Vader helmet's recessed eyes) and sized in fractions of dims.sx,
+// so the face scales up automatically with this preset's own default
+// scale (see the preset's defaultScaleNum/Den) or any scale the user
+// picks — a bigger model gets a more finely detailed face for free,
+// not a blurrier fixed-size one.
+function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const armX = Math.round(cx + dims.sx * 0.19);
   const torchHalf = Math.max(1, Math.round(dims.sx * 0.09));
@@ -3166,6 +3178,70 @@ function applyStatueOfLibertyDetail(grid, dims, matAcc) {
         const i = idx(x, y, z, dims);
         if (grid[i]) grid[i] = matAcc;
       }
+    }
+  }
+
+  function frontMostSolidZ(x, y) {
+    for (let z = dims.sz - 1; z >= 0; z--) if (grid[idx(x, y, z, dims)]) return z;
+    return -1;
+  }
+  // The face sits in the upper-middle of the head band (t 0.795-0.865
+  // from SOL_KEYFRAMES) — roughly where the head is at its widest,
+  // avoiding the narrow neck below and the crown flare above.
+  const headY0 = dims.sy * 0.81, headY1 = dims.sy * 0.855;
+  const bandH = headY1 - headY0;
+
+  // Eyes: shallow recessed cavities, one on each side of center.
+  const eyeY0 = Math.round(headY0 + bandH * 0.5), eyeY1 = Math.round(headY0 + bandH * 0.72);
+  const eyeOffset = Math.max(1, Math.round(dims.sx * 0.05));
+  const eyeHalf = Math.max(1, Math.round(dims.sx * 0.022));
+  const eyeDepth = Math.max(1, Math.round(dims.sx * 0.03));
+  for (let y = eyeY0; y <= eyeY1; y++) {
+    for (const side of [-1, 1]) {
+      const ex = Math.round(cx + side * eyeOffset);
+      for (let dx = -eyeHalf; dx <= eyeHalf; dx++) {
+        const x = ex + dx;
+        if (x < 0 || x >= dims.sx) continue;
+        const fz = frontMostSolidZ(x, y);
+        if (fz < 0) continue;
+        for (let d = 0; d < eyeDepth; d++) {
+          const z = fz - d;
+          if (z < 0) break;
+          grid[idx(x, y, z, dims)] = 0;
+        }
+      }
+    }
+  }
+  // Nose: a small forward protrusion at center, between the eyes and mouth.
+  const noseY0 = Math.round(headY0 + bandH * 0.28), noseY1 = Math.round(headY0 + bandH * 0.50);
+  const noseHalf = Math.max(1, Math.round(dims.sx * 0.018));
+  const noseProtrude = Math.max(1, Math.round(dims.sx * 0.022));
+  for (let y = noseY0; y <= noseY1; y++) {
+    for (let dx = -noseHalf; dx <= noseHalf; dx++) {
+      const x = Math.round(cx + dx);
+      if (x < 0 || x >= dims.sx) continue;
+      const fz = frontMostSolidZ(x, y);
+      if (fz < 0) continue;
+      for (let d = 1; d <= noseProtrude; d++) {
+        const z = fz + d;
+        if (z >= dims.sz) break;
+        grid[idx(x, y, z, dims)] = matExt;
+      }
+    }
+  }
+  // Mouth: a thin recessed horizontal line below the nose.
+  const mouthY = Math.round(headY0 + bandH * 0.16);
+  const mouthHalf = Math.max(1, Math.round(dims.sx * 0.04));
+  const mouthDepth = Math.max(1, Math.round(dims.sx * 0.015));
+  for (let dx = -mouthHalf; dx <= mouthHalf; dx++) {
+    const x = Math.round(cx + dx);
+    if (x < 0 || x >= dims.sx) continue;
+    const fz = frontMostSolidZ(x, mouthY);
+    if (fz < 0) continue;
+    for (let d = 0; d < mouthDepth; d++) {
+      const z = fz - d;
+      if (z < 0) break;
+      grid[idx(x, mouthY, z, dims)] = 0;
     }
   }
 }
@@ -5695,12 +5771,14 @@ const PRESETS = [
   {
     id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'statueOfLiberty',
     real: { height: 93, baseX: 26, baseZ: 26 }, interiorMode: null,
+    defaultScaleNum: 4, defaultScaleDen: 1,
     blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'gold_block' },
-    desc: 'Ground to torch height ~93m. Rebuilt with a hand-authored, blocky front-profile silhouette — a real narrow waist and neck (not a smooth taper) separating a flared robe hem, broader shoulders, and a distinct head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal, replacing both the original plain cylinder and a first rebuild attempt that used smooth stacked ellipsoids and still didn\'t read as a figure.',
-    keywords: ['statue of liberty', 'new york', 'liberty island', 'torch'],
+    desc: 'Ground to torch height ~93m. A hand-authored, blocky front-profile silhouette — a real narrow waist and neck separating a flared robe hem, broader shoulders, and a head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal. Now includes a carved face (2 recessed eyes, a protruding nose, a recessed mouth), and defaults to a 4x scale specifically so that face has real voxel room to read instead of blurring into a handful of blocks.',
+    keywords: ['statue of liberty', 'new york', 'liberty island', 'torch', 'face'],
     notes: [
-      'Rebuilt a second time from an earlier version that used smooth stacked ellipsoids for the body — those still just looked like a stepped cylinder, not a human figure, because the transitions between robe/torso/head were too gradual to read at all. This version instead hand-authors a piecewise-LINEAR (not smoothly curved) rectangular half-width per height keyframe (`SOL_KEYFRAMES`) the same way real player-built Minecraft statues do it — as a deliberate front-profile silhouette with a real cinched WAIST and a genuinely narrow NECK separating the head from the shoulders, rather than one continuous taper — since those 2 sharp transitions are what actually make a voxel silhouette read as "a body with a head" instead of a tapered pillar. The overall footprint (real.baseX/baseZ) was also widened from 16m to 26m specifically to give this silhouette enough voxel columns per row to hold that shape at typical scales instead of collapsing to a handful of blocks.',
-      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, a real face, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
+      'Rebuilt a third time to add a real face, at a user\'s request, after the body-silhouette rebuild below still had a blank head: `applyStatueOfLibertyDetail` now carves 2 recessed eye cavities, a small forward-protruding nose, and a recessed mouth line into the head — found dynamically via each column\'s own front-most solid cell (the same technique the Darth Vader helmet\'s recessed eyes use), so the face sizes itself in fractions of dims.sx rather than fixed block counts. The head\'s own keyframe half-width was also enlarged beyond what pure body proportions would give it (deliberately, for real facial room), and this preset now DEFAULTS to a 4x scale (`defaultScaleNum`/`defaultScaleDen`, a new preset field honored by `applyPresetDefaults`) instead of this panel\'s own generic 3/8 default — at 1/1 the real 26m-wide scaffold footprint gives the head only a handful of blocks, nowhere near enough to hold a recognizable face at all. 4x keeps the whole model safely under this app\'s in-browser 6,000,000-cell cap (~4.0 million cells) while giving the head real room; users who want more can scale up further from there, and the same in-browser cap simply prevents going far past what a browser can handle either way.',
+      'Rebuilt a second time from an earlier version that used smooth stacked ellipsoids for the body — those still just looked like a stepped cylinder, not a human figure, because the transitions between robe/torso/head were too gradual to read at all. This version instead hand-authors a piecewise-LINEAR (not smoothly curved) rectangular half-width per height keyframe (`SOL_KEYFRAMES`) the same way real player-built Minecraft statues do it — as a deliberate front-profile silhouette with a real cinched WAIST and a genuinely narrow NECK separating the head from the shoulders, rather than one continuous taper. The overall footprint (real.baseX/baseZ) was also widened from 16m to 26m specifically to give this silhouette enough voxel columns per row to hold its shape.',
+      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, fine facial proportions, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
     ],
   },
   {
@@ -7072,6 +7150,17 @@ function applyPresetDefaults() {
   el('mat-interior').value = p.blocks.interior;
   el('mat-accent').value = p.blocks.accent;
   el('floor-height').value = p.floorHeightMeters || 3;
+  // A preset can request its own default scale (e.g. the Statue of
+  // Liberty, whose real-world footprint alone is too small at 1/1 to
+  // hold real facial detail) instead of always falling back to this
+  // panel's own generic 3/8 default.
+  if (p.defaultScaleNum && p.defaultScaleDen) {
+    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
+    ratioRadio.checked = true;
+    ratioRadio.dispatchEvent(new Event('change'));
+    el('scale-num').value = p.defaultScaleNum;
+    el('scale-den').value = p.defaultScaleDen;
+  }
   updateInteriorAvailability();
   updateVolumeReadout();
 }
@@ -7477,7 +7566,7 @@ function generateModel() {
   // Same reasoning again: the Statue of Liberty's own torch is a
   // defining, always-visible feature, not an interior.
   if (shapeType === 'statueOfLiberty') {
-    applyStatueOfLibertyDetail(grid, dims, matAcc);
+    applyStatueOfLibertyDetail(grid, dims, matAcc, matExt);
   }
   // Gated on the preset id, not shapeType: Big Ben keeps the generic
   // `tower` shape shared by other presets (windmill, village house),
