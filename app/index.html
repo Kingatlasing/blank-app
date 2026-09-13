@@ -2931,15 +2931,27 @@ function applyGoldenGateBridgeDetail(grid, dims, matAcc) {
 // goldenGateBridgeSolid above — this shape only makes sense driven by
 // this one preset's own fixed real dims and isn't exposed as a Custom
 // shape.
-const ET_REAL_HEIGHT = 330, ET_BASE = 125, ET_MERGE_Y = 115, ET_STRUCTURE_TOP = 300;
+const ET_REAL_HEIGHT = 330, ET_BASE = 125, ET_STRUCTURE_TOP = 300;
+// The 4 legs fully converge at the real 1st-platform height (57m), NOT
+// the 2nd (115m) — an earlier version of this shape used 115m and
+// spread the whole convergence over more than double the real height,
+// diluting the tower's own dramatic, tightly-closed arch into a gentle
+// slope. Real photos (and this preset's own reference image) show the
+// legs meeting almost at a single point right under the 1st platform,
+// with only a single already-merged, much more gently tapering mass
+// continuing above it up through the 2nd platform to the top.
+const ET_MERGE_Y = 57;
 // Platform half-widths are real sqrt(published floor area)/2 (4,200 /
 // 1,650 / 350 sq.m for the 1st/2nd/3rd floors) rather than derived from
 // the leg/shaft width at that height — a real platform is a walkway deck
 // bracketed out well beyond the narrow structural member it surrounds,
 // not merely a wide spot on the leg/shaft itself.
 const ET_PLATFORM_YS = [57, 115, 276], ET_PLATFORM_HALFW = [32, 20, 9], ET_PLATFORM_THICK = 4;
-const ET_LEG_HALF_BASE = 8, ET_LEG_HALF_MERGE = 3, ET_SHAFT_HALF_TOP = 1, ET_ANTENNA_HALF = 1;
-const ET_BRACE_PERIOD = 12, ET_BRACE_THICK = 2;
+const ET_LEG_HALF_BASE = 8, ET_LEG_HALF_MERGE = 4, ET_SHAFT_HALF_TOP = 1, ET_ANTENNA_HALF = 1;
+// A denser brace period than an earlier version's 12m — real photos show
+// a much busier, richer criss-cross lattice pattern than a brace band
+// every 12 real meters produced.
+const ET_BRACE_PERIOD = 7, ET_BRACE_THICK = 1.5;
 
 // One leg's own cross-section half-width at a given real height — shared
 // by all 4 legs, since only their X/Z position differs, not their width.
@@ -5717,12 +5729,13 @@ const PRESETS = [
     id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'eiffelTower',
     real: { height: 330, baseX: 125, baseZ: 125 }, interiorMode: null,
     blocks: { exterior: 'iron_block', interior: 'iron_block', accent: 'stone_bricks' },
-    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs sweep inward along a real graceful ARCH curve (not a straight diagonal) from the real 125m-square base and merge into a single tapering shaft at the real 2nd-platform height, both built as real hollow-tube ironwork with periodic diagonal cross-braces instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
+    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs sweep inward along a real graceful ARCH curve, closing to a real tight point right under the 1st platform (57m) the way every real photo shows, then continue as one already-merged, much more gently tapering mass up through the 2nd platform to the top. Both the legs and the upper mast are built as real hollow-tube ironwork with a dense diagonal cross-brace lattice instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
     keywords: ['eiffel', 'tower', 'paris', 'france', 'lattice', 'iron'],
     notes: [
-      'Rebuilt a second time after user feedback that the legs still read as straight diagonal beams rather than the tower\'s own iconic arch: `etLegCenter`\'s convergence curve was replaced with a real quarter-ellipse (offset = baseOffset * sqrt(1-t^2) for t = height/mergeHeight) — a VERTICAL tangent right at the real base (the legs plant into the ground close to straight up, not already leaning inward) sweeping to a HORIZONTAL tangent at the merge height (swooping into the central shaft the way every real photo shows), instead of the constant-slope straight line a plain linear taper produces. Each real observation platform\'s own half-width now also takes whichever is larger of its real published floor area or however far that arch curve has actually reached at that exact height, so a platform low on the arch (the real 1st floor, 57m) can\'t end up narrower than the legs it\'s supposed to meet.',
-      'Rebuilt from an original solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Each leg tapers from a real ~8m half-width at the base to ~3m where all 4 merge into the shaft, and the shaft continues tapering to ~1m just below the real structure top (300m) — both rendered as a hollow square tube (only the outer wall is solid) with a real full diagonal X cross-brace band every ~12m, the same repeating truss pattern visible in every photo of the real tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
-      'Real dimensions and this construction spec from published figures: base 125m square, total height 330m with antennas (~300m of actual structure), leg-merge/2nd-platform height 115m, 1st platform height 57m, 3rd (summit) platform height 276m, and real published floor areas per platform (1st ~4,200 sq.m, 2nd ~1,650 sq.m, 3rd ~350 sq.m). Not modeled: the real elevators/machinery inside the legs, individual rivets/beams, and the tower\'s real paint color (only the block palette chosen here).',
+      'Rebuilt a third time against a real reference photo the user supplied directly: the previous version\'s arch curve shape was correct but its PROPORTIONS were wrong — it spread the legs\' whole convergence across the full 115m up to the 2nd platform, which dilutes the real tower\'s tight, dramatic arch into a gentle, unconvincing slope. The reference photo (and real technical drawings) show the 4 legs converging almost to a single point right under the 1ST platform (57m), with only a single already-merged, much more gently tapering mass continuing above it — so `ET_MERGE_Y` moved from 115 to 57. The brace lattice was also densified (a band every ~7m instead of ~12m) to match the busier, richer criss-cross ironwork visible in the reference.',
+      'Also rebuilt earlier from a version whose legs converged along a straight linear taper (a constant-slope diagonal, not a curve at all): `etLegCenter` uses a real quarter-ellipse (offset = baseOffset * sqrt(1-t^2)) — a VERTICAL tangent right at the real base sweeping to a HORIZONTAL tangent at the merge height — instead. Each real observation platform\'s own half-width takes whichever is larger of its real published floor area or however far the arch has actually reached at that exact height, so a platform can\'t end up narrower than the legs it\'s supposed to meet.',
+      'Rebuilt from an original solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Both the legs and the upper shaft are rendered as a hollow square tube (only the outer wall is solid) with the real diagonal X cross-brace pattern visible in every photo of the tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
+      'Real dimensions and this construction spec from published figures: base 125m square, total height 330m with antennas (~300m of actual structure), leg-merge/1st-platform height 57m, 2nd platform height 115m, 3rd (summit) platform height 276m, and real published floor areas per platform (1st ~4,200 sq.m, 2nd ~1,650 sq.m, 3rd ~350 sq.m). Not modeled: the real elevators/machinery inside the legs, individual rivets/beams, and the tower\'s real paint color (only the block palette chosen here).',
     ],
   },
   {
