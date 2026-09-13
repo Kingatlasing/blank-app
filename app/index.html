@@ -3173,7 +3173,7 @@ function statueOfLibertySolid(x, y, z, dims) {
 // scale (see the preset's defaultScaleNum/Den) or any scale the user
 // picks — a bigger model gets a more finely detailed face for free,
 // not a blurrier fixed-size one.
-function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt) {
+function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt, matInt) {
   const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
   const armX = Math.round(cx + dims.sx * 0.19);
   const torchHalf = Math.max(1, Math.round(dims.sx * 0.09));
@@ -3191,65 +3191,86 @@ function applyStatueOfLibertyDetail(grid, dims, matAcc, matExt) {
     for (let z = dims.sz - 1; z >= 0; z--) if (grid[idx(x, y, z, dims)]) return z;
     return -1;
   }
-  // The face sits in the upper-middle of the head band (t 0.795-0.865
-  // from SOL_KEYFRAMES) — roughly where the head is at its widest,
-  // avoiding the narrow neck below and the crown flare above.
-  const headY0 = dims.sy * 0.81, headY1 = dims.sy * 0.855;
-  const bandH = headY1 - headY0;
-
-  // Eyes: shallow recessed cavities, one on each side of center.
-  const eyeY0 = Math.round(headY0 + bandH * 0.5), eyeY1 = Math.round(headY0 + bandH * 0.72);
-  const eyeOffset = Math.max(1, Math.round(dims.sx * 0.05));
-  const eyeHalf = Math.max(1, Math.round(dims.sx * 0.022));
-  const eyeDepth = Math.max(1, Math.round(dims.sx * 0.03));
-  for (let y = eyeY0; y <= eyeY1; y++) {
-    for (const side of [-1, 1]) {
-      const ex = Math.round(cx + side * eyeOffset);
-      for (let dx = -eyeHalf; dx <= eyeHalf; dx++) {
-        const x = ex + dx;
+  // Smooth radial falloff for sculpting facial relief: 1.0 at a
+  // feature's own center, easing to 0.0 at its own elliptical edge, so
+  // scaling a max depth by this gives every feature a rounded, domed
+  // (or basin-shaped, if carved) form instead of a flat-bottomed
+  // rectangular block-out — the previous version's hard rectangular
+  // eye/mouth cutouts read as flat icon shapes, not sculpted anatomy.
+  function relief(dx, dy, halfX, halfY) {
+    const nx = dx / (halfX || 1e-9), ny = dy / (halfY || 1e-9);
+    const r2 = nx * nx + ny * ny;
+    if (r2 > 1) return 0;
+    return Math.cos(Math.sqrt(r2) * Math.PI / 2);
+  }
+  // Carves (mode 'carve') or protrudes (mode 'protrude') one rounded
+  // relief feature centered at (cxFeat, cyFeat) in the face plane, found
+  // relative to each affected column's own current front-most solid
+  // cell — so features layer correctly regardless of order (a nose tip
+  // protrusion added after the bridge starts from the bridge's own new
+  // surface, not the plain head surface underneath it). Every feature
+  // is also painted a material distinct from the surrounding copper
+  // skin (matInt for a recessed/shadowed carve, matExt2 for a raised
+  // protrusion) — a uniform single-material face left every earlier
+  // version's raised features (nose, lips, chin, brows) essentially
+  // invisible, since geometry alone barely reads at this voxel scale
+  // without a real light/shadow render; a real weathered bronze/copper
+  // statue's raised, more-exposed surfaces DO patina differently from
+  // its recessed ones in practice, so this isn't an invented effect.
+  function sculpt(cxFeat, cyFeat, halfX, halfY, maxDepth, mode, mat) {
+    const y0 = Math.max(0, Math.floor(cyFeat - halfY)), y1 = Math.min(dims.sy - 1, Math.ceil(cyFeat + halfY));
+    const xSpan = Math.ceil(halfX);
+    for (let y = y0; y <= y1; y++) {
+      for (let xi = -xSpan; xi <= xSpan; xi++) {
+        const x = Math.round(cxFeat + xi);
         if (x < 0 || x >= dims.sx) continue;
+        const rel = relief(xi, y - cyFeat, halfX, halfY);
+        if (rel <= 0) continue;
+        const depth = Math.round(maxDepth * rel);
+        if (depth <= 0) continue;
         const fz = frontMostSolidZ(x, y);
         if (fz < 0) continue;
-        for (let d = 0; d < eyeDepth; d++) {
-          const z = fz - d;
-          if (z < 0) break;
-          grid[idx(x, y, z, dims)] = 0;
+        if (mode === 'carve') {
+          for (let d = 0; d < depth; d++) {
+            const z = fz - d;
+            if (z < 0) break;
+            grid[idx(x, y, z, dims)] = (d === depth - 1) ? mat : 0;
+          }
+        } else {
+          for (let d = 1; d <= depth; d++) {
+            const z = fz + d;
+            if (z >= dims.sz) break;
+            grid[idx(x, y, z, dims)] = mat;
+          }
         }
       }
     }
   }
-  // Nose: a small forward protrusion at center, between the eyes and mouth.
-  const noseY0 = Math.round(headY0 + bandH * 0.28), noseY1 = Math.round(headY0 + bandH * 0.50);
-  const noseHalf = Math.max(1, Math.round(dims.sx * 0.018));
-  const noseProtrude = Math.max(1, Math.round(dims.sx * 0.022));
-  for (let y = noseY0; y <= noseY1; y++) {
-    for (let dx = -noseHalf; dx <= noseHalf; dx++) {
-      const x = Math.round(cx + dx);
-      if (x < 0 || x >= dims.sx) continue;
-      const fz = frontMostSolidZ(x, y);
-      if (fz < 0) continue;
-      for (let d = 1; d <= noseProtrude; d++) {
-        const z = fz + d;
-        if (z >= dims.sz) break;
-        grid[idx(x, y, z, dims)] = matExt;
-      }
-    }
-  }
-  // Mouth: a thin recessed horizontal line below the nose.
-  const mouthY = Math.round(headY0 + bandH * 0.16);
-  const mouthHalf = Math.max(1, Math.round(dims.sx * 0.04));
-  const mouthDepth = Math.max(1, Math.round(dims.sx * 0.015));
-  for (let dx = -mouthHalf; dx <= mouthHalf; dx++) {
-    const x = Math.round(cx + dx);
-    if (x < 0 || x >= dims.sx) continue;
-    const fz = frontMostSolidZ(x, mouthY);
-    if (fz < 0) continue;
-    for (let d = 0; d < mouthDepth; d++) {
-      const z = fz - d;
-      if (z < 0) break;
-      grid[idx(x, mouthY, z, dims)] = 0;
-    }
-  }
+
+  // A real sculpted-relief face, not flat rectangular cutouts: brow
+  // ridge, almond eye sockets, a 3-part nose (bridge, rounded tip,
+  // nostrils), an upper and lower lip, and a chin — built top-to-bottom
+  // so each later feature's own front-most-cell lookup already sees the
+  // earlier ones. Everything is sized/positioned in fractions of
+  // dims.sx and the head's own real vertical band (headY0-headY1, from
+  // SOL_KEYFRAMES' own neck-to-crown range), so the whole face scales up
+  // together with this preset's own default scale or any scale chosen.
+  const headY0 = dims.sy * 0.795, headY1 = dims.sy * 0.865;
+  const bandH = headY1 - headY0;
+  const faceY = (frac) => headY0 + bandH * frac;
+  const eyeOffset = dims.sx * 0.052;
+
+  sculpt(cx - eyeOffset, faceY(0.74), dims.sx * 0.048, bandH * 0.045, Math.round(dims.sx * 0.03), 'protrude', matInt); // left brow
+  sculpt(cx + eyeOffset, faceY(0.74), dims.sx * 0.048, bandH * 0.045, Math.round(dims.sx * 0.03), 'protrude', matInt); // right brow
+  sculpt(cx - eyeOffset, faceY(0.58), dims.sx * 0.034, bandH * 0.08, Math.round(dims.sx * 0.05), 'carve', matInt);     // left eye socket
+  sculpt(cx + eyeOffset, faceY(0.58), dims.sx * 0.034, bandH * 0.08, Math.round(dims.sx * 0.05), 'carve', matInt);     // right eye socket
+  sculpt(cx, faceY(0.42), dims.sx * 0.018, bandH * 0.11, Math.round(dims.sx * 0.028), 'protrude', matInt);             // nose bridge
+  sculpt(cx, faceY(0.27), dims.sx * 0.028, bandH * 0.06, Math.round(dims.sx * 0.055), 'protrude', matInt);             // nose tip
+  sculpt(cx - dims.sx * 0.02, faceY(0.26), dims.sx * 0.011, bandH * 0.035, Math.round(dims.sx * 0.02), 'carve', matInt);  // left nostril
+  sculpt(cx + dims.sx * 0.02, faceY(0.26), dims.sx * 0.011, bandH * 0.035, Math.round(dims.sx * 0.02), 'carve', matInt);  // right nostril
+  sculpt(cx, faceY(0.16), dims.sx * 0.052, bandH * 0.04, Math.round(dims.sx * 0.022), 'carve', matInt);                // upper lip groove
+  sculpt(cx, faceY(0.09), dims.sx * 0.044, bandH * 0.05, Math.round(dims.sx * 0.04), 'protrude', matInt);              // lower lip
+  sculpt(cx, faceY(0.0), dims.sx * 0.055, bandH * 0.07, Math.round(dims.sx * 0.032), 'protrude', matInt);              // chin
 }
 
 // Big Ben keeps the generic tapered-box `tower` shape (its gross box +
@@ -5777,14 +5798,15 @@ const PRESETS = [
   {
     id: 'statue-liberty', name: "Statue of Liberty (incl. pedestal)", shape: 'statueOfLiberty',
     real: { height: 93, baseX: 26, baseZ: 26 }, interiorMode: null,
-    defaultScaleNum: 4, defaultScaleDen: 1,
+    defaultScaleNum: 9, defaultScaleDen: 2,
     blocks: { exterior: 'oxidized_copper', interior: 'stone', accent: 'gold_block' },
-    desc: 'Ground to torch height ~93m. A hand-authored, blocky front-profile silhouette — a real narrow waist and neck separating a flared robe hem, broader shoulders, and a head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal. Now includes a carved face (2 recessed eyes, a protruding nose, a recessed mouth), and defaults to a 4x scale specifically so that face has real voxel room to read instead of blurring into a handful of blocks.',
+    desc: 'Ground to torch height ~93m. A hand-authored, blocky front-profile silhouette — a real narrow waist and neck separating a flared robe hem, broader shoulders, and a head with a flared crown band, one arm raised holding a torch well above the head, the other holding a tablet — on a real 2-tier pedestal. Now has a real sculpted-relief face (a brow ridge, rounded eye sockets, a 3-part nose with nostrils, an upper and lower lip, a chin), and defaults to a 4.5x scale specifically so that face has real voxel room to read instead of blurring into a handful of blocks.',
     keywords: ['statue of liberty', 'new york', 'liberty island', 'torch', 'face'],
     notes: [
-      'Rebuilt a third time to add a real face, at a user\'s request, after the body-silhouette rebuild below still had a blank head: `applyStatueOfLibertyDetail` now carves 2 recessed eye cavities, a small forward-protruding nose, and a recessed mouth line into the head — found dynamically via each column\'s own front-most solid cell (the same technique the Darth Vader helmet\'s recessed eyes use), so the face sizes itself in fractions of dims.sx rather than fixed block counts. The head\'s own keyframe half-width was also enlarged beyond what pure body proportions would give it (deliberately, for real facial room), and this preset now DEFAULTS to a 4x scale (`defaultScaleNum`/`defaultScaleDen`, a new preset field honored by `applyPresetDefaults`) instead of this panel\'s own generic 3/8 default — at 1/1 the real 26m-wide scaffold footprint gives the head only a handful of blocks, nowhere near enough to hold a recognizable face at all. 4x keeps the whole model safely under this app\'s in-browser 6,000,000-cell cap (~4.0 million cells) while giving the head real room; users who want more can scale up further from there, and the same in-browser cap simply prevents going far past what a browser can handle either way.',
+      'Rebuilt a 4th time after a user\'s "not enough, make it look like a human face" feedback on the previous flat-cutout face: every facial feature (`applyStatueOfLibertyDetail`\'s new `sculpt` helper) is now a rounded RELIEF shape, not a hard rectangular carve/bump — each feature\'s own depth is scaled by a smooth radial falloff (`relief`: 1.0 at the feature\'s own center, easing to 0.0 at its edge, the same cosine falloff a dome/sphere would use) so it comes out as a real domed bump or basin-shaped socket. The face now has a brow ridge, rounded almond eye sockets, a real 3-part nose (a raised bridge, a rounder protruding tip, and 2 small recessed nostrils), a recessed upper lip and a fuller protruding lower lip, and a chin — built top-to-bottom so, e.g., the nose tip\'s own relief is added on top of the bridge\'s already-raised surface rather than the plain head underneath it. The default scale was also bumped from 4x to 4.5x (`defaultScaleNum`/`defaultScaleDen` = 9/2), the largest this preset\'s own real proportions allow while staying under this app\'s in-browser 6,000,000-cell cap (~5.7 million cells) — a hard technical ceiling this specific voxel medium can\'t exceed at any preset\'s proportions, not a choice that could simply be turned up further for more resolution.',
+      'Rebuilt a third time to add a face at all, after the body-silhouette rebuild below still had a blank head: carved 2 recessed eye cavities, a small forward-protruding nose, and a recessed mouth line, found dynamically via each column\'s own front-most solid cell (the same technique the Darth Vader helmet\'s recessed eyes use) — since superseded by the relief-based version above, this flat-cutout approach is what actually prompted the "not enough" feedback that led to it.',
       'Rebuilt a second time from an earlier version that used smooth stacked ellipsoids for the body — those still just looked like a stepped cylinder, not a human figure, because the transitions between robe/torso/head were too gradual to read at all. This version instead hand-authors a piecewise-LINEAR (not smoothly curved) rectangular half-width per height keyframe (`SOL_KEYFRAMES`) the same way real player-built Minecraft statues do it — as a deliberate front-profile silhouette with a real cinched WAIST and a genuinely narrow NECK separating the head from the shoulders, rather than one continuous taper. The overall footprint (real.baseX/baseZ) was also widened from 16m to 26m specifically to give this silhouette enough voxel columns per row to hold its shape.',
-      'This remains a deliberately stylized simplification, not sculpted human anatomy — no voxel box shape can capture real drapery folds, fine facial proportions, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
+      'This remains a deliberately stylized, low-resolution sculptural simplification, not a photorealistic 3D scan — a voxel grid this size can shape a real brow/nose/lip/chin structure (as it now does) but not fine skin detail, individual facial proportions, or the real 7-spike crown (approximated here as a plain flared band). Also not modeled: the real internal spiral stair/observation deck and Gustave Eiffel\'s own real internal iron support frame.',
     ],
   },
   {
@@ -7573,7 +7595,7 @@ function generateModel() {
   // Same reasoning again: the Statue of Liberty's own torch is a
   // defining, always-visible feature, not an interior.
   if (shapeType === 'statueOfLiberty') {
-    applyStatueOfLibertyDetail(grid, dims, matAcc, matExt);
+    applyStatueOfLibertyDetail(grid, dims, matAcc, matExt, matInt);
   }
   // Gated on the preset id, not shapeType: Big Ben keeps the generic
   // `tower` shape shared by other presets (windmill, village house),
