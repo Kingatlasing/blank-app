@@ -2960,22 +2960,27 @@ function etLegHalfWidth(yReal, scale) {
   return Math.max(1, Math.round((ET_LEG_HALF_BASE + (ET_LEG_HALF_MERGE - ET_LEG_HALF_BASE) * t) * scale));
 }
 // A leg's own curving centerline: a real graceful ARCH, not a straight
-// diagonal line — the exact detail an earlier version of this shape was
-// missing (a straight linear taper reads as a sloped beam, not the
-// tower's own iconic swooping curve). Parametrized as a quarter-ellipse:
-// offset = baseOffset * cos(theta), height = ET_MERGE_Y * sin(theta) for
-// theta 0..90°, which is the same as offset(y) = baseOffset *
-// sqrt(1-t^2) for t = y/ET_MERGE_Y. At t=0 (the real base) this has a
-// VERTICAL tangent — the real legs plant into the ground close to
-// straight up, not already leaning inward — and at t=1 (the merge
-// height) a HORIZONTAL tangent, swooping the 4 legs into the central
-// shaft the way they do in every real photo, rather than meeting it at
-// a sharp angle.
+// diagonal line. A quarter-ellipse (offset = baseOffset*sqrt(1-t^2))
+// used here previously bowed the WRONG way — that curve stays farther
+// out than a straight line for most of its height before swooping in
+// only right at the very end, which reads as the leg arching OUTWARD
+// (convex, bulging away from the tower) rather than the real tower's
+// own leg, which arches INWARD (concave — curving in toward the central
+// axis for essentially its whole length, staying INSIDE a straight line
+// drawn corner-to-merge-point rather than outside it). This is the same
+// quarter-ellipse REFLECTED (offset(t) = baseOffset*(1-sqrt(1-s^2)) for
+// s=1-t) rather than a plain power curve: a power curve's concavity is
+// concentrated right near the merge point and stays almost straight for
+// most of the length, while this reflected ellipse keeps the same
+// constant, continuous roundness the entire way — a smooth arch, not a
+// bent straight beam — while still starting at the full base offset
+// (t=0) and reaching exactly 0 at the merge (t=1).
 function etLegCenter(legIdx, yReal, dims, scale, cx, cz) {
   const offset = (ET_BASE / 2) * scale;
   const signX = (legIdx & 1) ? 1 : -1, signZ = (legIdx & 2) ? 1 : -1;
   const t = Math.min(1, yReal / ET_MERGE_Y);
-  const archT = Math.sqrt(Math.max(0, 1 - t * t));
+  const s = 1 - t;
+  const archT = 1 - Math.sqrt(Math.max(0, 1 - s * s));
   return [cx + signX * offset * archT, cz + signZ * offset * archT];
 }
 // The single shaft above the leg-merge height, tapering to a thin point
@@ -3010,7 +3015,8 @@ function etPlatformHalfWidth(p, dims, scale) {
   let legReach = 0;
   if (ET_PLATFORM_YS[p] <= ET_MERGE_Y) {
     const t = ET_PLATFORM_YS[p] / ET_MERGE_Y;
-    const archT = Math.sqrt(Math.max(0, 1 - t * t));
+    const s = 1 - t;
+    const archT = 1 - Math.sqrt(Math.max(0, 1 - s * s)); // must match etLegCenter's own curve
     legReach = Math.round((ET_BASE / 2) * scale * archT + etLegHalfWidth(ET_PLATFORM_YS[p], scale));
   }
   return Math.min(Math.round(dims.sx / 2), Math.max(realHalf, legReach));
@@ -5807,9 +5813,10 @@ const PRESETS = [
     id: 'eiffel-tower', name: "Eiffel Tower (Paris)", shape: 'eiffelTower',
     real: { height: 330, baseX: 125, baseZ: 125 }, interiorMode: null,
     blocks: { exterior: 'iron_block', interior: 'iron_block', accent: 'stone_bricks' },
-    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs sweep inward along a real graceful ARCH curve, closing to a real tight point right under the 1st platform (57m) the way every real photo shows, then continue as one already-merged, much more gently tapering mass up through the 2nd platform to the top. Both the legs and the upper mast are built as real hollow-tube ironwork with a dense diagonal cross-brace lattice instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
+    desc: 'Rebuilt as a highly-detailed, Eiffel-Tower-specific model rather than a solid tapered silhouette: 4 separate legs sweep INWARD (concave, curving toward the central axis, not bulging outward) along a real graceful ARCH curve, closing to a real tight point right under the 1st platform (57m) the way every real photo shows, then continue as one already-merged, much more gently tapering mass up through the 2nd platform to the top. Both the legs and the upper mast are built as real hollow-tube ironwork with a dense diagonal cross-brace lattice instead of a solid mass, topped by a real antenna mast. The 3 real observation platforms (57m/115m/276m, sized to their own real published floor areas) cut across as solid decks in a distinct material. Height ~330m (incl. antennas, ~300m of structure), base ~125m square at the feet.',
     keywords: ['eiffel', 'tower', 'paris', 'france', 'lattice', 'iron'],
     notes: [
+      'Rebuilt a 4th time after user feedback that the legs were arching the wrong way — OUTWARD (bulging away from the tower) instead of INWARD: the previous quarter-ellipse (offset = baseOffset*sqrt(1-t^2)) stays farther out than a straight corner-to-merge-point line for most of its height, which is a convex/outward bow. Replaced with that same quarter-ellipse REFLECTED (offset = baseOffset*(1-sqrt(1-s^2)) for s=1-t), which stays INSIDE that straight-line reference the whole way — a real concave/inward bow — while keeping the same constant, continuous roundness throughout (unlike a plain power-curve alternative tried in between, whose concavity concentrates right near the merge point and looks like a bent straight beam rather than a smooth arch).',
       'Rebuilt a third time against a real reference photo the user supplied directly: the previous version\'s arch curve shape was correct but its PROPORTIONS were wrong — it spread the legs\' whole convergence across the full 115m up to the 2nd platform, which dilutes the real tower\'s tight, dramatic arch into a gentle, unconvincing slope. The reference photo (and real technical drawings) show the 4 legs converging almost to a single point right under the 1ST platform (57m), with only a single already-merged, much more gently tapering mass continuing above it — so `ET_MERGE_Y` moved from 115 to 57. The brace lattice was also densified (a band every ~7m instead of ~12m) to match the busier, richer criss-cross ironwork visible in the reference.',
       'Also rebuilt earlier from a version whose legs converged along a straight linear taper (a constant-slope diagonal, not a curve at all): `etLegCenter` uses a real quarter-ellipse (offset = baseOffset * sqrt(1-t^2)) — a VERTICAL tangent right at the real base sweeping to a HORIZONTAL tangent at the merge height — instead. Each real observation platform\'s own half-width takes whichever is larger of its real published floor area or however far the arch has actually reached at that exact height, so a platform can\'t end up narrower than the legs it\'s supposed to meet.',
       'Rebuilt from an original solid-pyramid version: `eiffelTowerSolid` and `applyEiffelTowerDetail` are dedicated to this preset and hardcode this tower\'s own real published figures rather than a fraction of whatever real dims a preset happens to supply — every earlier "tapered box/pyramid/cone" shape in this app fills its whole silhouette solid, while a real lattice tower is mostly open air around a hollow-tube frame. Both the legs and the upper shaft are rendered as a hollow square tube (only the outer wall is solid) with the real diagonal X cross-brace pattern visible in every photo of the tower, rather than a continuous diagonal lattice (much harder to keep correct on a curving, tapering member).',
