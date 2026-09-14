@@ -96,6 +96,7 @@
   #camera-toolbar label { margin: 0; color: var(--text-dim); font-size: 12px; white-space: nowrap; }
   #camera-toolbar select { width: auto; }
   #camera-toolbar input[type=range] { width: 120px; }
+  .rotate-btn { padding: 5px 9px; font-size: 12px; }
   #three-container { flex: 1 1 auto; min-height: 300px; border-radius: 8px; overflow: hidden; background: #0b1a24; position: relative; }
   #three-container canvas { display: block; }
   #render-note { position: absolute; bottom: 8px; left: 8px; font-size: 11px; color: #cdd6e3; background: rgba(0,0,0,.45); padding: 4px 8px; border-radius: 5px; max-width: 70%; }
@@ -288,6 +289,15 @@
             <option value="bow">Bow</option>
             <option value="crossbow">Crossbow</option>
           </select>
+          <span class="checkbox-row" id="rotate-toolbar" style="margin:0; gap:4px;" title="Rotate the generated model 90° at a time — an exact transform of the block/decor data itself, not just this camera view">
+            <label style="margin:0;">Rotate</label>
+            <button type="button" class="rotate-btn" id="rotate-x-neg" title="Rotate 90° around the X axis">X⟲</button>
+            <button type="button" class="rotate-btn" id="rotate-x-pos" title="Rotate 90° around the X axis (other direction)">X⟳</button>
+            <button type="button" class="rotate-btn" id="rotate-y-neg" title="Rotate 90° around the vertical (Y) axis — turn to face a different direction">Y⟲</button>
+            <button type="button" class="rotate-btn" id="rotate-y-pos" title="Rotate 90° around the vertical (Y) axis (other direction)">Y⟳</button>
+            <button type="button" class="rotate-btn" id="rotate-z-neg" title="Rotate 90° around the Z axis">Z⟲</button>
+            <button type="button" class="rotate-btn" id="rotate-z-pos" title="Rotate 90° around the Z axis (other direction)">Z⟳</button>
+          </span>
           <span id="camera-hint" class="hint" style="margin:0;"></span>
         </div>
         <div id="three-container">
@@ -7580,6 +7590,115 @@ function clearModel() {
   el('layer-controls').style.display = 'none';
 }
 el('reset-btn').addEventListener('click', clearModel);
+
+// ---------------------------------------------------------------------
+// Rotate the generated model 90° at a time around any axis — a real
+// voxel-to-voxel array permutation of the actual block/decor data (the
+// same lossless technique this app's own real-model presets used
+// offline to fix their orientation, now exposed live as a modeler tool),
+// not just moving the camera. Verified to be a genuine rotation (4
+// applications on the same axis return every cell to its original spot),
+// not a mirror.
+//
+// Best-effort on decor, matching this app's actual variety of stored
+// orientation fields: `facing` (north/south/east/west, used by mobs and
+// other oriented decor) and `axis` (x/z, used by doors, ladders, windows,
+// rails, redstone wire, tripwire, bars) both rotate correctly for a turn
+// around the vertical (Y) axis, including a redstone wire's own manually
+// -trimmed `sides`. A door's own `hinge` (left/right) needs no change —
+// it's defined relative to the door's own local frame, which a rigid
+// rotation preserves. Tipping the model onto its side (X or Z axis)
+// leaves `facing`/`axis`/`sides` as-is: compass directions stop meaning
+// anything once the model isn't upright, an accepted limitation rather
+// than a bug. Any lazily-cached, position-keyed derived state (water/
+// lava cell sets, the redstone latch's carried-over power) is dropped by
+// rebuilding a fresh model object below, exactly like a normal Generate
+// does, so nothing stale gets looked up at the wrong cell after cells
+// move.
+const FACING_ROTATE_Y = {
+  1: { north: 'west', west: 'south', south: 'east', east: 'north' },
+  '-1': { north: 'east', east: 'south', south: 'west', west: 'north' },
+};
+const WIRE_SIDE_ROTATE_Y = {
+  1: { n: 'w', w: 's', s: 'e', e: 'n' },
+  '-1': { n: 'e', e: 's', s: 'w', w: 'n' },
+};
+function rotatedDimsForAxis(dims, axis) {
+  if (axis === 'y') return { sx: dims.sz, sy: dims.sy, sz: dims.sx };
+  if (axis === 'x') return { sx: dims.sx, sy: dims.sz, sz: dims.sy };
+  return { sx: dims.sy, sy: dims.sx, sz: dims.sz }; // z
+}
+// Maps an OLD (x,y,z) cell in `dims` to its NEW cell after rotating 90°
+// around `axis`; dir (+1/-1) picks which of the 2 possible turns.
+function rotateCoordForAxis(x, y, z, dims, axis, dir) {
+  if (axis === 'y') return dir > 0 ? [z, y, dims.sx - 1 - x] : [dims.sz - 1 - z, y, x];
+  if (axis === 'x') return dir > 0 ? [x, z, dims.sy - 1 - y] : [x, dims.sz - 1 - z, y];
+  return dir > 0 ? [y, dims.sx - 1 - x, z] : [dims.sy - 1 - y, x, z]; // z
+}
+function rotateCurrentModel(axis, dir) {
+  if (!currentModel) return;
+  const old = currentModel;
+  const oldDims = old.dims;
+  const newDims = rotatedDimsForAxis(oldDims, axis);
+  const newGrid = new Uint16Array(newDims.sx * newDims.sy * newDims.sz);
+  const newSilhouette = new Uint8Array(newDims.sx * newDims.sy * newDims.sz);
+  for (let y = 0; y < oldDims.sy; y++) {
+    for (let z = 0; z < oldDims.sz; z++) {
+      for (let x = 0; x < oldDims.sx; x++) {
+        const oi = idx(x, y, z, oldDims);
+        const v = old.grid[oi];
+        const s = old.silhouette[oi];
+        if (!v && !s) continue;
+        const [nx, ny, nz] = rotateCoordForAxis(x, y, z, oldDims, axis, dir);
+        const ni = idx(nx, ny, nz, newDims);
+        newGrid[ni] = v;
+        newSilhouette[ni] = s;
+      }
+    }
+  }
+  const newDecor = old.decor.map((d) => {
+    const [nx, ny, nz] = rotateCoordForAxis(d.x, d.y, d.z, oldDims, axis, dir);
+    const nd = Object.assign({}, d, { x: nx, y: ny, z: nz });
+    if (axis === 'y') {
+      if (nd.axis === 'x') nd.axis = 'z';
+      else if (nd.axis === 'z') nd.axis = 'x';
+      const facingRot = FACING_ROTATE_Y[dir];
+      if (nd.facing && facingRot[nd.facing]) nd.facing = facingRot[nd.facing];
+      if (nd.sides) {
+        const sideRot = WIRE_SIDE_ROTATE_Y[dir];
+        const src = nd.sides;
+        const out = {};
+        for (const k of ['n', 'e', 's', 'w']) out[sideRot[k]] = src[k];
+        nd.sides = out;
+      }
+    }
+    return nd;
+  });
+  // Rebuild from scratch (same field set generateModel itself produces)
+  // rather than mutating `old` in place, so no stale `_waterCells`/
+  // `_lavaCells`/`_blockPoweredExternal`/`_lampCells` cache tags along.
+  currentModel = {
+    grid: newGrid, silhouette: newSilhouette, dims: newDims,
+    scale: old.scale, real: old.real, fillMode: old.fillMode, wallThickness: old.wallThickness,
+    wantInterior: old.wantInterior, interiorMode: old.interiorMode, label: old.label, notes: old.notes,
+    decor: newDecor, blockNames: old.blockNames,
+  };
+  window.currentModel = currentModel;
+
+  computeWaterFlow(currentModel);
+  computeLavaFlow(currentModel);
+  computeRedstone(currentModel);
+  renderThree(currentModel);
+  renderBlueprint(currentModel);
+  renderCommands(currentModel);
+  renderStats(currentModel);
+}
+el('rotate-x-neg').addEventListener('click', () => rotateCurrentModel('x', -1));
+el('rotate-x-pos').addEventListener('click', () => rotateCurrentModel('x', 1));
+el('rotate-y-neg').addEventListener('click', () => rotateCurrentModel('y', -1));
+el('rotate-y-pos').addEventListener('click', () => rotateCurrentModel('y', 1));
+el('rotate-z-neg').addEventListener('click', () => rotateCurrentModel('z', -1));
+el('rotate-z-pos').addEventListener('click', () => rotateCurrentModel('z', 1));
 
 /* =========================================================================
  * TEXTURED GEOMETRY HELPERS (atlas UVs baked onto cube/panel/cross meshes)
