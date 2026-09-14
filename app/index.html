@@ -3607,9 +3607,15 @@ function vaderScanGrid() {
 }
 function vaderHelmetScanSolid(x, y, z, dims) {
   const { W, H, D, grid } = vaderScanGrid();
+  // Rotated 90° from the source mesh's own raw axes: the reference
+  // model's longest axis (its own Z, the fin-to-jaw depth, baked into D)
+  // is remapped here to this preset's vertical (app y) axis instead of
+  // its own depth (app z) — fixing a "lying on its side" look the user
+  // reported with the un-rotated mapping, where that longest axis ran
+  // horizontal in the default view instead of upright.
   const rx = Math.min(W - 1, Math.floor((x / dims.sx) * W));
-  const ry = Math.min(H - 1, Math.floor((y / dims.sy) * H));
-  const rz = Math.min(D - 1, Math.floor((z / dims.sz) * D));
+  const ry = Math.min(H - 1, Math.floor((z / dims.sz) * H));
+  const rz = Math.min(D - 1, Math.floor((y / dims.sy) * D));
   return !!grid[(rx * H + ry) * D + rz];
 }
 
@@ -5908,13 +5914,13 @@ const PRESETS = [
   },
   {
     id: 'darth-vader-helmet', name: "Darth Vader Helmet (Star Wars)", shape: 'vaderHelmetScan',
-    real: { height: 0.36, baseX: 0.29, baseZ: 0.44 },
+    real: { height: 0.44, baseX: 0.29, baseZ: 0.36 },
     blocks: { exterior: 'black_concrete', interior: 'black_concrete', accent: 'black_concrete' },
     desc: 'Voxelized directly from a real 3D-scanned Darth Vader helmet model, not hand-tuned geometry — every earlier version of this preset (a smooth-ellipsoid original, then a hand-redesigned organic-mass/jagged-hem version) still read as an approximation. This is a real detailed sculpt: the actual dome, the rear vertical crest fin, and the forward-jutting chin/mask are all the source model\'s own real proportions. Real dimensions are tiny (a real, wearable prop replica, ~36cm tall), so unlike every pyramid or building here, this one needs real SCALE-UP, not scale-down — try a scale ratio of 10/1 or more.',
     keywords: ['darth vader', 'helmet', 'star wars', 'mask', 'sith', 'prop'],
     notes: [
       'Replaces every earlier version of this preset (a smooth-ellipsoid original, then a hand-redesigned organic-mass/jagged-hem version built from reference photos) with a real imported 3D model, voxelized directly. The source ("Darth Vader Helmet" by JJTale, via Sketchfab, CC-BY-4.0 — https://sketchfab.com/3d-models/darth-vader-helmet-7c49aaf5121643189a4ac40fdfd0a35b) is a normal smooth sculpted mesh, not pre-existing voxel art on a grid like the Statue of Liberty\'s own source turned out to be, so it needed a different technique: every triangle across the source model\'s 3 parts is rasterized directly into a voxel grid (subdivided finer than one output voxel and marked solid) rather than ray-cast-and-filled, since this is a worn, hollow prop open at the real neck opening — a full ray-parity fill (which assumes a closed solid, correct for a statue) produced a very high fraction of unpaired crossings here, because a ray through the open neck only ever crosses the dome once from outside, never a second surface closing it off from within. A multi-source flood fill of air from outside the model\'s own bounding box then seals any genuinely fully-enclosed cavity solid while leaving the real neck opening genuinely open. See `vaderHelmetScanSolid` above for the full technical writeup and the required license attribution.',
-      '`vaderHelmetScanSolid` maps any (x,y,z) cell in the OUTPUT grid down into a fixed 116x144x175 reference grid by nearest-neighbor, so this preset still works at any scale like every other shape here. `real.height`/`baseX`/`baseZ` (0.36m/0.29m/0.44m) keep this preset\'s own previously-documented real ~36cm prop height, with baseX/baseZ rescaled to the new source model\'s own real width/depth ratio (its real chin-to-crest depth is genuinely greater than its width, matching the classic helmet\'s own forward-jutting jaw and rear crest fin).',
+      '`vaderHelmetScanSolid` maps any (x,y,z) cell in the OUTPUT grid down into a fixed 116x144x175 reference grid by nearest-neighbor, so this preset still works at any scale like every other shape here. That mapping is rotated 90° from the source model\'s own raw axes: the reference mesh\'s own longest dimension (its real chin-to-crest depth, genuinely longer than its width and its own raw "up" axis) is remapped to this preset\'s vertical (app y) axis rather than its own depth (app z) axis. Without that rotation, the default 3/4 camera made the helmet read as "lying on its side" — confirmed directly against a user-supplied screenshot of that exact default view — even though the un-rotated mesh geometry was itself internally correct (verified separately from a true side elevation). `real.height`/`baseX`/`baseZ` (0.44m/0.29m/0.36m) reflect this rotation: height now carries the mesh\'s own real chin-to-crest depth, baseZ its own real head-height range.',
       'The original `vaderHelmet`/`vaderHelmetSolid` shape (a reusable, parameterized helmet silhouette) is untouched and still available as its own "Custom shape" option — only this PRESET was switched to the new dedicated, real-model-derived shape, the same pattern already used for the Statue of Liberty, Eiffel Tower, and Golden Gate Bridge presets above.',
       'Not modeled: eye-lens color. This specific sculpt has no separately carved recess or distinctly colored texture region for the eye lenses (checked directly: a depth-map scan of the front face found no recess, and a texture-color scan found no red-toned region), so no accent color is placed there — guessing a position back in would reintroduce exactly the kind of made-up detail this real-model upgrade was meant to replace. Also not modeled: the real two-tone gloss finish and true smooth curved surfacing real fiberglass/ABS replicas have (this app renders everything as flat voxel cubes, the same blocky approximation every other curved shape here already accepts).',
     ],
