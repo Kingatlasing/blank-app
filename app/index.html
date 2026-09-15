@@ -7744,6 +7744,12 @@ function generateModel() {
   currentModel = {
     grid, silhouette, dims, scale, real, fillMode, wallThickness, wantInterior, interiorMode, label, notes, decor,
     blockNames: { exterior: el('mat-exterior').value, interior: el('mat-interior').value, accent: el('mat-accent').value },
+    // The Golden Gate Bridge scan is a real suspension bridge spanning open
+    // water, not a structure that stands on solid ground like every other
+    // preset here — the shared grass-block ground layer renderThree() adds
+    // under every other model would be wrong (and wasn't part of the real
+    // scanned bridge itself), so this one preset alone skips it.
+    noGroundPlane: shapeType === 'goldenGateBridgeScan',
   };
   window.currentModel = currentModel; // exposed for debugging in the browser console
 
@@ -7868,7 +7874,7 @@ function rotateCurrentModel(axis, dir) {
     grid: newGrid, silhouette: newSilhouette, dims: newDims,
     scale: old.scale, real: old.real, fillMode: old.fillMode, wallThickness: old.wallThickness,
     wantInterior: old.wantInterior, interiorMode: old.interiorMode, label: old.label, notes: old.notes,
-    decor: newDecor, blockNames: old.blockNames,
+    decor: newDecor, blockNames: old.blockNames, noGroundPlane: old.noGroundPlane,
   };
   window.currentModel = currentModel;
 
@@ -21915,19 +21921,23 @@ function renderThree(model, preserveCamera) {
 
   // A real grass-block ground layer one cell below the model, extending
   // past its footprint, so every model reads as sitting on solid ground
-  // instead of floating in empty space.
-  const margin = Math.min(12, Math.max(4, Math.round(Math.max(dims.sx, dims.sz) * 0.3)));
-  const groundCells = [];
-  for (let z = -margin; z < dims.sz + margin; z++) {
-    for (let x = -margin; x < dims.sx + margin; x++) groundCells.push([x, -1, z]);
+  // instead of floating in empty space. Skipped for models that shouldn't
+  // read as resting on solid ground at all (currently only the Golden Gate
+  // Bridge scan, a real suspension bridge spanning open water).
+  if (!model.noGroundPlane) {
+    const margin = Math.min(12, Math.max(4, Math.round(Math.max(dims.sx, dims.sz) * 0.3)));
+    const groundCells = [];
+    for (let z = -margin; z < dims.sz + margin; z++) {
+      for (let x = -margin; x < dims.sx + margin; x++) groundCells.push([x, -1, z]);
+    }
+    const groundMesh = new THREE.InstancedMesh(getGrassGroundGeometry(), grassGroundMaterial(), groundCells.length);
+    groundCells.forEach(([x, y, z], i) => {
+      dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
+      dummy.updateMatrix();
+      groundMesh.setMatrixAt(i, dummy.matrix);
+    });
+    t.group.add(groundMesh);
   }
-  const groundMesh = new THREE.InstancedMesh(getGrassGroundGeometry(), grassGroundMaterial(), groundCells.length);
-  groundCells.forEach(([x, y, z], i) => {
-    dummy.position.set(x + offX + 0.5, y + offY + 0.5, z + offZ + 0.5);
-    dummy.updateMatrix();
-    groundMesh.setMatrixAt(i, dummy.matrix);
-  });
-  t.group.add(groundMesh);
 
   if (!preserveCamera) {
     // Build-mode edits call this with preserveCamera=true so placing or
