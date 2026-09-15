@@ -182,6 +182,7 @@
             <option value="ring">Ring / arena wall (hollow annulus)</option>
             <option value="freeform">Freeform (blank canvas — build anything, block by block)</option>
             <option value="bridge">Suspension bridge (2 towers + deck + sagging cables)</option>
+            <option value="person">Person (generic human figure, real body proportions)</option>
             <option value="vaderHelmet">Helmet (dome + flared cheeks + grille)</option>
           </select>
           <div class="hint">Don't see it in the library? Look up its real height &amp; footprint and approximate it with the closest primitive shape here — that's how you can build a scale model of literally anything.</div>
@@ -2734,6 +2735,95 @@ function ringSolid(x, y, z, dims, params) {
   return (inx * inx + inz * inz) > 1.0;
 }
 
+// A generic standing human figure — real average adult body proportions
+// (the standard "7.5 heads tall" figure canon used across anatomy,
+// anthropometry, and figure drawing: head ~1/7.5 of total height, legs
+// ~half of total height, shoulders about 2 head-widths wide), not any
+// specific real or fictional individual. All proportions are derived
+// from the shape's own real height (dims.sy) rather than the
+// independently-set width/depth inputs, since a real body's own
+// proportions scale with height, not with an arbitrary custom footprint;
+// baseX/baseZ just set the bounding box the figure sits inside.
+function personSolid(x, y, z, dims) {
+  const H = dims.sy;
+  const t = y / H; // 0 = feet, 1 = top of head
+  const cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+  const halfDepth = Math.max(0.5, H * 0.12);
+
+  // Head-unit breakpoints, measured down from the top of the head in a
+  // real 7.5-head-tall figure.
+  const shoulderT = 1 - 1.0 / 7.5;
+  const chestT = 1 - 1.5 / 7.5;
+  const waistT = 1 - 3.0 / 7.5;
+  const hipT = 1 - 4.0 / 7.5;
+  const kneeT = 1 - 6.0 / 7.5;
+  const ankleT = 1 - 7.25 / 7.5;
+  const armBottomT = 1 - 5.0 / 7.5; // arms hang to roughly mid-thigh
+
+  const headWidth = H * 0.16;
+  const shoulderWidth = H * 0.27;
+  const chestWidth = H * 0.24;
+  const waistWidth = H * 0.19;
+  const hipWidth = H * 0.22;
+  const armWidth = H * 0.08;
+  const legGap = H * 0.03;
+  const legWidthTop = H * 0.11;
+  const legWidthBottom = H * 0.06;
+
+  if (t >= shoulderT) {
+    // Head: a simple ellipsoid.
+    const headCenterT = (shoulderT + 1) / 2;
+    const rY = Math.max(0.5, (1 - shoulderT) / 2 * H);
+    const rX = headWidth / 2, rZ = halfDepth * 0.85;
+    const dy = (t - headCenterT) * H;
+    const dx = x - cx, dz = z - cz;
+    return (dx * dx) / (rX * rX) + (dy * dy) / (rY * rY) + (dz * dz) / (rZ * rZ) <= 1.0;
+  }
+
+  if (t >= hipT) {
+    // Torso: width tapers shoulder -> chest -> waist -> hip, plus arms
+    // hanging alongside it from the shoulder down to mid-thigh.
+    let halfWidth;
+    if (t >= chestT) {
+      const f = (t - chestT) / Math.max(1e-6, shoulderT - chestT);
+      halfWidth = (chestWidth + (shoulderWidth - chestWidth) * f) / 2;
+    } else if (t >= waistT) {
+      const f = (t - waistT) / Math.max(1e-6, chestT - waistT);
+      halfWidth = (waistWidth + (chestWidth - waistWidth) * f) / 2;
+    } else {
+      const f = (t - hipT) / Math.max(1e-6, waistT - hipT);
+      halfWidth = (hipWidth + (waistWidth - hipWidth) * f) / 2;
+    }
+    const dx = Math.abs(x - cx);
+    const dz = Math.abs(z - cz);
+    const inTorso = dx <= halfWidth && dz <= halfDepth;
+
+    let inArm = false;
+    if (t <= shoulderT && t >= armBottomT) {
+      const armCx = shoulderWidth / 2 + armWidth / 2;
+      const inLeftArm = Math.abs(x - (cx - armCx)) <= armWidth / 2 && dz <= halfDepth * 0.75;
+      const inRightArm = Math.abs(x - (cx + armCx)) <= armWidth / 2 && dz <= halfDepth * 0.75;
+      inArm = inLeftArm || inRightArm;
+    }
+    return inTorso || inArm;
+  }
+
+  // Legs: two columns, tapering thigh -> ankle, with a small gap between them.
+  let legHalfWidth;
+  if (t >= kneeT) {
+    const f = (t - kneeT) / Math.max(1e-6, hipT - kneeT);
+    legHalfWidth = (legWidthBottom + (legWidthTop - legWidthBottom) * f) / 2;
+  } else if (t >= ankleT) {
+    legHalfWidth = legWidthBottom / 2;
+  } else {
+    legHalfWidth = (legWidthBottom / 2) * 1.2; // a slightly wider foot
+  }
+  const legCenterOffset = legGap / 2 + legHalfWidth;
+  const inLeftLeg = Math.abs(x - (cx - legCenterOffset)) <= legHalfWidth && Math.abs(z - cz) <= halfDepth * 0.6;
+  const inRightLeg = Math.abs(x - (cx + legCenterOffset)) <= legHalfWidth && Math.abs(z - cz) <= halfDepth * 0.6;
+  return inLeftLeg || inRightLeg;
+}
+
 // A single flat floor slab and nothing else — a blank canvas for Build mode
 // (see attemptBuild) rather than an auto-generated silhouette, so the user
 // places every block themselves and can make literally anything: a
@@ -4332,7 +4422,7 @@ const SHAPES = {
   box: boxSolid, pyramid: pyramidSolid, cylinder: cylinderSolid, cone: coneSolid,
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
   domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
-  bridge: bridgeSolid, vaderHelmet: vaderHelmetSolid, vaderHelmetScan: vaderHelmetScanSolid,
+  bridge: bridgeSolid, person: personSolid, vaderHelmet: vaderHelmetSolid, vaderHelmetScan: vaderHelmetScanSolid,
   // Not listed in CUSTOM_SHAPE_LABELS or the Custom-shape dropdown:
   // goldenGateBridgeSolid hardcodes this one preset's own real dims
   // (see its own comment above), so it only makes sense driven by the
@@ -4359,7 +4449,7 @@ const SHAPES = {
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
-  cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null, vaderHelmetScan: null,
+  cone: null, ring: null, freeform: null, bridge: null, person: null, vaderHelmet: null, vaderHelmetScan: null,
   goldenGateBridge: null, goldenGateBridgeScan: null, eiffelTower: null,
   libertyScan: null, colosseum: null, colosseumScan: null, kipScan: null, pisa: null, tajMahal: null, burjKhalifa: null,
   importedScan: null,
@@ -7800,7 +7890,8 @@ const PRESETS = [
 const CUSTOM_SHAPE_LABELS = {
   box: 'Box', pyramid: 'Custom Pyramid', cylinder: 'Cylinder', cone: 'Cone', dome: 'Dome',
   ziggurat: 'Ziggurat', tower: 'Tower', domebuilding: 'Domed Building', ring: 'Ring / Arena Wall',
-  freeform: 'Freeform Build', bridge: 'Suspension Bridge', vaderHelmet: 'Helmet (dome + flared cheeks + grille)',
+  freeform: 'Freeform Build', bridge: 'Suspension Bridge', person: 'Person (generic human figure)',
+  vaderHelmet: 'Helmet (dome + flared cheeks + grille)',
 };
 
 /* =========================================================================
