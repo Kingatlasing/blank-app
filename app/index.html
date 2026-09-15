@@ -8081,7 +8081,7 @@ const CUSTOM_SHAPE_LABELS = {
 /* =========================================================================
  * STATE + DOM WIRING
  * ==================================================================== */
-const MAX_VOXEL_VOLUME = 18_000_000;  // bounding-box cell cap to protect the browser
+const MAX_VOXEL_VOLUME = 360_000_000; // bounding-box cell cap to protect the browser
 const RENDER_INSTANCE_CAP = 150_000;  // 3D preview only; stats/commands always use the full grid
 const MAX_COMMANDS = 20_000;
 
@@ -8325,6 +8325,10 @@ function updateVolumeReadout() {
     readout.classList.add('danger');
     readout.textContent = `⚠ Bounding box is ${vol.toLocaleString()} cells — too large to generate in-browser (limit ${MAX_VOXEL_VOLUME.toLocaleString()}). Reduce the scale.`;
     el('generate-btn').disabled = true;
+  } else if (vol > 50_000_000) {
+    readout.classList.add('danger');
+    readout.textContent = `⚠ Bounding box ~${vol.toLocaleString()} cells. This is extremely large — hollow/interior fill mode alone can need several GB of memory at this size and may hang or crash the browser tab. Proceed with caution, or reduce the scale.`;
+    el('generate-btn').disabled = false;
   } else if (vol > 1_500_000) {
     readout.classList.add('warn');
     readout.textContent = `Bounding box ~${vol.toLocaleString()} cells. This will generate but may render slowly.`;
