@@ -246,43 +246,68 @@
           </div>
         </div>
         <div id="scale-quickpick">
-          <span class="hint">Quick pick:</span>
-          <button type="button" class="scale-quick-btn" data-num="1" data-den="16">1/16</button>
-          <button type="button" class="scale-quick-btn" data-num="1" data-den="8">1/8</button>
-          <button type="button" class="scale-quick-btn" data-num="1" data-den="4">1/4</button>
-          <button type="button" class="scale-quick-btn" data-num="1" data-den="2">1/2</button>
-          <button type="button" class="scale-quick-btn" data-num="1" data-den="1">1×</button>
-          <button type="button" class="scale-quick-btn" data-num="2" data-den="1">2×</button>
-          <button type="button" class="scale-quick-btn" data-num="3" data-den="1">3×</button>
-          <button type="button" class="scale-quick-btn" data-num="4" data-den="1">4×</button>
-          <button type="button" class="scale-quick-btn" data-num="5" data-den="1">5×</button>
-          <button type="button" class="scale-quick-btn" data-num="6" data-den="1">6×</button>
-          <button type="button" class="scale-quick-btn" data-num="7" data-den="1">7×</button>
-          <button type="button" class="scale-quick-btn" data-num="8" data-den="1">8×</button>
-          <button type="button" class="scale-quick-btn" data-num="9" data-den="1">9×</button>
-          <button type="button" class="scale-quick-btn" data-num="10" data-den="1">10×</button>
-          <button type="button" class="scale-quick-btn" data-num="11" data-den="1">11×</button>
-          <button type="button" class="scale-quick-btn" data-num="12" data-den="1">12×</button>
-          <button type="button" class="scale-quick-btn" data-num="13" data-den="1">13×</button>
-          <button type="button" class="scale-quick-btn" data-num="14" data-den="1">14×</button>
-          <button type="button" class="scale-quick-btn" data-num="15" data-den="1">15×</button>
-          <button type="button" class="scale-quick-btn" data-num="20" data-den="1">20×</button>
-          <button type="button" class="scale-quick-btn" data-num="25" data-den="1">25×</button>
-          <button type="button" class="scale-quick-btn" data-num="30" data-den="1">30×</button>
-          <button type="button" class="scale-quick-btn" data-num="35" data-den="1">35×</button>
-          <button type="button" class="scale-quick-btn" data-num="40" data-den="1">40×</button>
-          <button type="button" class="scale-quick-btn" data-num="45" data-den="1">45×</button>
-          <button type="button" class="scale-quick-btn" data-num="50" data-den="1">50×</button>
-          <button type="button" class="scale-quick-btn" data-num="55" data-den="1">55×</button>
-          <button type="button" class="scale-quick-btn" data-num="60" data-den="1">60×</button>
-          <button type="button" class="scale-quick-btn" data-num="65" data-den="1">65×</button>
-          <button type="button" class="scale-quick-btn" data-num="70" data-den="1">70×</button>
-          <button type="button" class="scale-quick-btn" data-num="75" data-den="1">75×</button>
-          <button type="button" class="scale-quick-btn" data-num="80" data-den="1">80×</button>
-          <button type="button" class="scale-quick-btn" data-num="85" data-den="1">85×</button>
-          <button type="button" class="scale-quick-btn" data-num="90" data-den="1">90×</button>
-          <button type="button" class="scale-quick-btn" data-num="95" data-den="1">95×</button>
-          <button type="button" class="scale-quick-btn" data-num="100" data-den="1">100×</button>
+          <span class="hint">Quick pick (relative to this preset/shape's own default size):</span>
+          <button type="button" class="scale-quick-btn" data-factor="0.0625">1/16</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.125">1/8</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.1875">3/16</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.25">1/4</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.375">3/8</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.5">1/2</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.625">5/8</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.75">3/4</button>
+          <button type="button" class="scale-quick-btn" data-factor="0.875">7/8</button>
+          <button type="button" class="scale-quick-btn" data-factor="1">1× (default)</button>
+          <button type="button" class="scale-quick-btn" data-factor="2">2×</button>
+          <button type="button" class="scale-quick-btn" data-factor="3">3×</button>
+          <button type="button" class="scale-quick-btn" data-factor="4">4×</button>
+          <button type="button" class="scale-quick-btn" data-factor="5">5×</button>
+          <button type="button" class="scale-quick-btn" data-factor="6">6×</button>
+          <button type="button" class="scale-quick-btn" data-factor="7">7×</button>
+          <button type="button" class="scale-quick-btn" data-factor="8">8×</button>
+          <button type="button" class="scale-quick-btn" data-factor="9">9×</button>
+          <button type="button" class="scale-quick-btn" data-factor="10">10×</button>
+          <button type="button" class="scale-quick-btn" data-factor="11">11×</button>
+          <button type="button" class="scale-quick-btn" data-factor="12">12×</button>
+          <button type="button" class="scale-quick-btn" data-factor="13">13×</button>
+          <button type="button" class="scale-quick-btn" data-factor="14">14×</button>
+          <button type="button" class="scale-quick-btn" data-factor="15">15×</button>
+          <button type="button" class="scale-quick-btn" data-factor="20">20×</button>
+          <button type="button" class="scale-quick-btn" data-factor="25">25×</button>
+          <button type="button" class="scale-quick-btn" data-factor="30">30×</button>
+          <button type="button" class="scale-quick-btn" data-factor="35">35×</button>
+          <button type="button" class="scale-quick-btn" data-factor="40">40×</button>
+          <button type="button" class="scale-quick-btn" data-factor="45">45×</button>
+          <button type="button" class="scale-quick-btn" data-factor="50">50×</button>
+          <button type="button" class="scale-quick-btn" data-factor="55">55×</button>
+          <button type="button" class="scale-quick-btn" data-factor="60">60×</button>
+          <button type="button" class="scale-quick-btn" data-factor="65">65×</button>
+          <button type="button" class="scale-quick-btn" data-factor="70">70×</button>
+          <button type="button" class="scale-quick-btn" data-factor="75">75×</button>
+          <button type="button" class="scale-quick-btn" data-factor="80">80×</button>
+          <button type="button" class="scale-quick-btn" data-factor="85">85×</button>
+          <button type="button" class="scale-quick-btn" data-factor="90">90×</button>
+          <button type="button" class="scale-quick-btn" data-factor="95">95×</button>
+          <button type="button" class="scale-quick-btn" data-factor="100">100×</button>
+          <button type="button" class="scale-quick-btn" data-factor="105">105×</button>
+          <button type="button" class="scale-quick-btn" data-factor="110">110×</button>
+          <button type="button" class="scale-quick-btn" data-factor="115">115×</button>
+          <button type="button" class="scale-quick-btn" data-factor="120">120×</button>
+          <button type="button" class="scale-quick-btn" data-factor="125">125×</button>
+          <button type="button" class="scale-quick-btn" data-factor="130">130×</button>
+          <button type="button" class="scale-quick-btn" data-factor="135">135×</button>
+          <button type="button" class="scale-quick-btn" data-factor="140">140×</button>
+          <button type="button" class="scale-quick-btn" data-factor="145">145×</button>
+          <button type="button" class="scale-quick-btn" data-factor="150">150×</button>
+          <button type="button" class="scale-quick-btn" data-factor="155">155×</button>
+          <button type="button" class="scale-quick-btn" data-factor="160">160×</button>
+          <button type="button" class="scale-quick-btn" data-factor="165">165×</button>
+          <button type="button" class="scale-quick-btn" data-factor="170">170×</button>
+          <button type="button" class="scale-quick-btn" data-factor="175">175×</button>
+          <button type="button" class="scale-quick-btn" data-factor="180">180×</button>
+          <button type="button" class="scale-quick-btn" data-factor="185">185×</button>
+          <button type="button" class="scale-quick-btn" data-factor="190">190×</button>
+          <button type="button" class="scale-quick-btn" data-factor="195">195×</button>
+          <button type="button" class="scale-quick-btn" data-factor="200">200×</button>
         </div>
         <div id="scale-height-controls" style="display:none;">
           <label for="scale-target-height">Target height (blocks)</label>
@@ -4186,6 +4211,7 @@ async function handleImportedFile(file) {
     ratioRadio.dispatchEvent(new Event('change'));
     el('scale-num').value = targetLong;
     el('scale-den').value = Number(maxExt.toFixed(6));
+    baselineScale = currentScale();
     updateScaleQuickpickActive();
     updateVolumeReadout();
 
@@ -8055,12 +8081,21 @@ const CUSTOM_SHAPE_LABELS = {
 /* =========================================================================
  * STATE + DOM WIRING
  * ==================================================================== */
-const MAX_VOXEL_VOLUME = 6_000_000;   // bounding-box cell cap to protect the browser
+const MAX_VOXEL_VOLUME = 18_000_000;  // bounding-box cell cap to protect the browser
 const RENDER_INSTANCE_CAP = 150_000;  // 3D preview only; stats/commands always use the full grid
 const MAX_COMMANDS = 20_000;
 
 const el = (id) => document.getElementById(id);
 let currentModel = null; // { grid, silhouette, dims, blocksLabel:{exterior,interior,accent}, meta }
+// The scale quick-pick buttons multiply THIS value, not a fixed literal
+// ratio — a hardcoded "10x" button would shrink a tiny real object (the
+// Vader Helmet's real 0.29-0.44m) down to a handful of blocks instead of
+// scaling it up, since its own correct default scale is ~400x, not
+// 1x-100x. Snapshotting the just-applied default scale here (see
+// applyPresetDefaults/handleImportedFile/the mode-change handler) means
+// "2x" always means "2x THIS preset's own correct baseline," which stays
+// sane regardless of whether the real object is a helmet or a pyramid.
+let baselineScale = 0.375;
 
 function populateSelect(select, options, getVal, getLabel) {
   select.innerHTML = '';
@@ -8191,6 +8226,7 @@ function applyPresetDefaults() {
     el('scale-num').value = p.defaultScaleNum;
     el('scale-den').value = p.defaultScaleDen;
   }
+  baselineScale = currentScale();
   updateScaleQuickpickActive();
   updateInteriorAvailability();
   updateVolumeReadout();
@@ -8339,8 +8375,8 @@ document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('c
   el('custom-controls').style.display = mode === 'custom' ? 'block' : 'none';
   el('import-controls').style.display = mode === 'import' ? 'block' : 'none';
   if (mode === 'preset') applyPresetDefaults();
-  else if (mode === 'custom') { renderCustomExtra(); updateVolumeReadout(); }
-  else { el('generate-btn').disabled = !importedScanGridData; updateInteriorAvailability(); updateVolumeReadout(); }
+  else if (mode === 'custom') { renderCustomExtra(); baselineScale = currentScale(); updateScaleQuickpickActive(); updateVolumeReadout(); }
+  else { el('generate-btn').disabled = !importedScanGridData; updateInteriorAvailability(); baselineScale = currentScale(); updateScaleQuickpickActive(); updateVolumeReadout(); }
 }));
 el('preset-select').addEventListener('change', applyPresetDefaults);
 el('custom-shape').addEventListener('change', renderCustomExtra);
@@ -8365,14 +8401,16 @@ document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListen
 }));
 function updateScaleQuickpickActive() {
   const num = parseFloat(el('scale-num').value), den = parseFloat(el('scale-den').value);
+  const current = num / den;
   document.querySelectorAll('.scale-quick-btn').forEach((btn) => {
-    const match = num === parseFloat(btn.dataset.num) && den === parseFloat(btn.dataset.den);
-    btn.classList.toggle('active', match);
+    const target = baselineScale * parseFloat(btn.dataset.factor);
+    btn.classList.toggle('active', Math.abs(current - target) < target * 1e-6);
   });
 }
 document.querySelectorAll('.scale-quick-btn').forEach((btn) => btn.addEventListener('click', () => {
-  el('scale-num').value = btn.dataset.num;
-  el('scale-den').value = btn.dataset.den;
+  const target = baselineScale * parseFloat(btn.dataset.factor);
+  el('scale-num').value = Number(target.toPrecision(6));
+  el('scale-den').value = 1;
   updateScaleQuickpickActive();
   updateVolumeReadout();
 }));
