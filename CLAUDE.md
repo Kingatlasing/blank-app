@@ -60,3 +60,40 @@ affected the same way):
    dims/volume stay well under `MAX_VOXEL_VOLUME` (6,000,000) and that
    generation time is still reasonable (a few seconds) before defaulting
    to it.
+
+## Live in-browser .glb import ("Import 3D model" mode)
+
+Added an "Import 3D model (.glb)" mode (third radio option alongside
+"Famous structure"/"Custom shape") that runs the exact same shell +
+flood-fill technique above LIVE in the browser instead of as an offline
+one-off script: `parseGLBContainer`/`extractGLBTriangles` hand-parse the
+glTF binary container (no library — the same manual approach already used
+offline for every scan preset, just ported to JS), and
+`IMPORT_VOXELIZE_WORKER_SRC` runs the rasterize + flood-fill in a Web
+Worker (built from an inline string via a Blob URL, keeping this a single
+HTML file) so a large model doesn't freeze the tab. The resulting grid is
+sampled by `importedScanSolid` exactly like every embedded preset's own
+scan shape.
+
+Explicitly scoped to **.glb only, never USDZ** (per direct user
+instruction): USDZ is a zip around Pixar's USD format with no simple
+binary spec to hand-parse the way glTF has — every USDZ handled in this
+app's history was read by pulling raw strings out of the binary, never a
+real parse. A genuine USD parser (or a large WASM build of Pixar's own USD
+library) would be a much bigger undertaking than this feature; don't
+attempt to extend this import mode to USDZ without that being a
+deliberate, separately-scoped decision.
+
+Unlike every hand-built preset, there's no human calibration step here:
+real-world scale and orientation are taken directly from the file's own
+raw units/axes (glTF spec mandates meters + Y-up), which can be wrong in
+practice — this app's own manual pipeline has hit exactly that twice
+(the Golden Gate Bridge's un-calibrated raw units needed a real-dimension
+calibration factor; Kip's own vertical axis needed checking against its
+raw axes directly rather than assumed). This import mode's fix-up path
+for that is the existing live Rotate tool + editable detected
+height/width/depth fields, not a guessed automatic correction — don't try
+to add automatic up-axis detection or scale calibration heuristics here;
+they'd be guessing at exactly the kind of thing this app's own hand-built
+presets needed real research or direct silhouette verification to get
+right.

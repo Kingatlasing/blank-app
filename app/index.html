@@ -70,6 +70,12 @@
   .hint { font-size: 11px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
   .hint.warn { color: var(--warn); }
   .hint.danger { color: var(--danger); }
+  #import-dropzone {
+    border: 2px dashed var(--border); border-radius: 8px; padding: 18px 12px; text-align: center;
+    color: var(--text-dim); font-size: 12px; margin: 8px 0; transition: border-color .15s, color .15s;
+  }
+  #import-dropzone.drag-over { border-color: var(--accent); color: var(--text); }
+  #import-dropzone input[type=file] { display: block; margin: 8px auto 0; font-size: 12px; }
   button {
     cursor: pointer; border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     border-radius: 6px; padding: 7px 12px; font-size: 13px;
@@ -145,6 +151,7 @@
         <div class="radio-row">
           <label><input type="radio" name="mode" value="preset" checked /> Famous structure</label>
           <label><input type="radio" name="mode" value="custom" /> Custom shape</label>
+          <label><input type="radio" name="mode" value="import" /> Import 3D model (.glb)</label>
         </div>
 
         <div id="preset-controls">
@@ -189,6 +196,31 @@
             </div>
           </div>
           <div id="custom-extra"></div>
+        </div>
+
+        <div id="import-controls" style="display:none;">
+          <label for="import-name">Name (for your reference)</label>
+          <input type="text" id="import-name" placeholder="e.g. my character, a prop, a vehicle..." />
+          <div id="import-dropzone">
+            <div>Drop a .glb file here, or choose one:</div>
+            <input type="file" id="import-file" accept=".glb,model/gltf-binary" />
+          </div>
+          <div class="hint" id="import-status">No file loaded yet. Only .glb is supported — USDZ is not (Pixar's USD format has no simple spec to parse in-browser). Export or convert your model to .glb first.</div>
+          <div class="row">
+            <div>
+              <label for="import-height">Detected height (m)</label>
+              <input type="number" id="import-height" value="1" min="0.001" step="0.001" />
+            </div>
+            <div>
+              <label for="import-basex">Detected width X (m)</label>
+              <input type="number" id="import-basex" value="1" min="0.001" step="0.001" />
+            </div>
+            <div>
+              <label for="import-basez">Detected depth Z (m)</label>
+              <input type="number" id="import-basez" value="1" min="0.001" step="0.001" />
+            </div>
+          </div>
+          <div class="hint">Auto-filled from the file's own raw units (assumed meters, and assumed Y-up — both per the glTF spec, though real-world exports don't always follow it). Override these if the size looks wrong, and use the 3D Preview's Rotate tool if it doesn't stand upright.</div>
         </div>
       </fieldset>
 
@@ -3522,6 +3554,392 @@ function kipScanSolid(x, y, z, dims) {
   return !!grid[(rx * H + ry) * D + rz];
 }
 
+// ---------------------------------------------------------------------
+// Live in-browser .glb import: drop a real 3D model in and voxelize it
+// with the exact same shell + flood-fill technique this app's own
+// real-scanned-model presets use (Vader Helmet, Golden Gate Bridge,
+// Colosseum, Kip) - just running live here instead of as a one-off
+// offline Python script. USDZ is deliberately NOT supported: Pixar's USD
+// format (what a .usdz actually contains) has no simple binary spec to
+// hand-parse the way glTF does - every USDZ file handled in this app's
+// own history was read by pulling raw strings out of the binary, never a
+// real parse, and a genuine USD parser (or a large WASM build of Pixar's
+// own USD library) is a much bigger undertaking than this feature.
+//
+// Also unlike this app's hand-tuned real-model PRESETS, there's no
+// human calibration step here: real-world scale is taken directly from
+// the file's own raw units (the glTF spec mandates meters) and "up" is
+// assumed to be the file's own Y axis (also the glTF spec's
+// requirement). Both assumptions can be wrong in practice - exactly as
+// they were, respectively, for the Golden Gate Bridge preset's own
+// un-calibrated raw units and for Kip's own Z-up source mesh - which is
+// why the height/width/depth fields here are editable (not just a
+// read-only detected value) and the app's existing live Rotate tool
+// (3D Preview toolbar) is the fix-up path for a sideways or upside-down
+// result, rather than this code guessing at a correction.
+const GLB_COMPONENT_TYPE_ARRAYS = {
+  5120: Int8Array, 5121: Uint8Array, 5122: Int16Array, 5123: Uint16Array,
+  5125: Uint32Array, 5126: Float32Array,
+};
+const GLB_ACCESSOR_NUM_COMPONENTS = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT2: 4, MAT3: 9, MAT4: 16 };
+
+function parseGLBContainer(arrayBuffer) {
+  const dv = new DataView(arrayBuffer);
+  if (dv.getUint32(0, true) !== 0x46546c67) throw new Error("Not a .glb file (missing 'glTF' magic header)");
+  const length = dv.getUint32(8, true);
+  let offset = 12, json = null, bin = null;
+  while (offset < length) {
+    const chunkLength = dv.getUint32(offset, true);
+    const chunkType = dv.getUint32(offset + 4, true);
+    const chunkStart = offset + 8;
+    if (chunkType === 0x4e4f534a) { // 'JSON'
+      json = JSON.parse(new TextDecoder().decode(new Uint8Array(arrayBuffer, chunkStart, chunkLength)));
+    } else if (chunkType === 0x004e4942) { // 'BIN\0'
+      bin = arrayBuffer.slice(chunkStart, chunkStart + chunkLength);
+    }
+    offset = chunkStart + chunkLength;
+  }
+  if (!json) throw new Error('No JSON chunk found in this .glb file');
+  return { json, bin };
+}
+
+function readGLTFComponent(view, byteOffset, componentType) {
+  switch (componentType) {
+    case 5120: return view.getInt8(byteOffset);
+    case 5121: return view.getUint8(byteOffset);
+    case 5122: return view.getInt16(byteOffset, true);
+    case 5123: return view.getUint16(byteOffset, true);
+    case 5125: return view.getUint32(byteOffset, true);
+    case 5126: return view.getFloat32(byteOffset, true);
+    default: throw new Error('Unsupported glTF accessor componentType ' + componentType);
+  }
+}
+
+function readGLBAccessor(json, bin, accessorIdx) {
+  const acc = json.accessors[accessorIdx];
+  const bufferView = json.bufferViews[acc.bufferView];
+  const TypedArr = GLB_COMPONENT_TYPE_ARRAYS[acc.componentType];
+  const numComp = GLB_ACCESSOR_NUM_COMPONENTS[acc.type];
+  const byteOffset = (bufferView.byteOffset || 0) + (acc.byteOffset || 0);
+  const count = acc.count;
+  const elementBytes = TypedArr.BYTES_PER_ELEMENT * numComp;
+  const stride = bufferView.byteStride || elementBytes;
+  const view = new DataView(bin);
+  const out = new Float64Array(count * numComp);
+  for (let i = 0; i < count; i++) {
+    const base = byteOffset + i * stride;
+    for (let c = 0; c < numComp; c++) {
+      out[i * numComp + c] = readGLTFComponent(view, base + c * TypedArr.BYTES_PER_ELEMENT, acc.componentType);
+    }
+  }
+  return { data: out, numComp, count };
+}
+
+function mat4Identity() { return [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1]; }
+// Column-major 4x4 multiply (glTF's own convention): returns a*b.
+function mat4Multiply(a, b) {
+  const out = new Array(16);
+  for (let c = 0; c < 4; c++) {
+    for (let r = 0; r < 4; r++) {
+      let sum = 0;
+      for (let k = 0; k < 4; k++) sum += a[k * 4 + r] * b[c * 4 + k];
+      out[c * 4 + r] = sum;
+    }
+  }
+  return out;
+}
+function mat4FromTRS(t, r, s) {
+  const [x, y, z, w] = r;
+  const x2 = x + x, y2 = y + y, z2 = z + z;
+  const xx = x * x2, xy = x * y2, xz = x * z2;
+  const yy = y * y2, yz = y * z2, zz = z * z2;
+  const wx = w * x2, wy = w * y2, wz = w * z2;
+  const sx = s[0], sy = s[1], sz = s[2];
+  return [
+    (1 - (yy + zz)) * sx, (xy + wz) * sx, (xz - wy) * sx, 0,
+    (xy - wz) * sy, (1 - (xx + zz)) * sy, (yz + wx) * sy, 0,
+    (xz + wy) * sz, (yz - wx) * sz, (1 - (xx + yy)) * sz, 0,
+    t[0], t[1], t[2], 1,
+  ];
+}
+function mat4TransformPoint(m, x, y, z) {
+  return [
+    m[0] * x + m[4] * y + m[8] * z + m[12],
+    m[1] * x + m[5] * y + m[9] * z + m[13],
+    m[2] * x + m[6] * y + m[10] * z + m[14],
+  ];
+}
+
+// Walks the node hierarchy composing each node's own world transform
+// (matrix or TRS), then reads every mesh primitive's POSITION/indices
+// and transforms them into one flat world-space triangle list — the
+// exact same approach used offline (in Python) for every scan preset
+// above, just running live here.
+function extractGLBTriangles(json, bin) {
+  const nodes = json.nodes || [];
+  const worldMats = new Array(nodes.length);
+  function computeWorld(i, parentMat) {
+    const n = nodes[i];
+    const local = n.matrix ? n.matrix : mat4FromTRS(n.translation || [0, 0, 0], n.rotation || [0, 0, 0, 1], n.scale || [1, 1, 1]);
+    const world = mat4Multiply(parentMat, local);
+    worldMats[i] = world;
+    (n.children || []).forEach((c) => computeWorld(c, world));
+  }
+  const IDENTITY = mat4Identity();
+  const sceneIdx = json.scene || 0;
+  const rootNodes = (json.scenes && json.scenes[sceneIdx]) ? json.scenes[sceneIdx].nodes : nodes.map((_, i) => i);
+  rootNodes.forEach((root) => computeWorld(root, IDENTITY));
+
+  // First pass: count total triangles so the output array can be
+  // preallocated once instead of growing an array across millions of
+  // pushes.
+  let totalTris = 0;
+  const meshNodeIdx = [];
+  nodes.forEach((n, i) => {
+    if (n.mesh === undefined) return;
+    const mesh = json.meshes[n.mesh];
+    mesh.primitives.forEach((prim) => {
+      if (prim.mode !== undefined && prim.mode !== 4) return; // TRIANGLES only
+      const idxCount = prim.indices !== undefined ? json.accessors[prim.indices].count : json.accessors[prim.attributes.POSITION].count;
+      totalTris += Math.floor(idxCount / 3);
+    });
+    meshNodeIdx.push(i);
+  });
+
+  const triangles = new Float64Array(totalTris * 9);
+  let triCursor = 0;
+  meshNodeIdx.forEach((i) => {
+    const n = nodes[i];
+    const world = worldMats[i] || IDENTITY;
+    const mesh = json.meshes[n.mesh];
+    mesh.primitives.forEach((prim) => {
+      if (prim.mode !== undefined && prim.mode !== 4) return;
+      const pos = readGLBAccessor(json, bin, prim.attributes.POSITION);
+      let indices;
+      if (prim.indices !== undefined) {
+        indices = readGLBAccessor(json, bin, prim.indices).data;
+      } else {
+        indices = new Float64Array(pos.count);
+        for (let k = 0; k < pos.count; k++) indices[k] = k;
+      }
+      const triCount = Math.floor(indices.length / 3);
+      for (let t = 0; t < triCount; t++) {
+        const ia = indices[t * 3] | 0, ib = indices[t * 3 + 1] | 0, ic = indices[t * 3 + 2] | 0;
+        const a = mat4TransformPoint(world, pos.data[ia * 3], pos.data[ia * 3 + 1], pos.data[ia * 3 + 2]);
+        const b = mat4TransformPoint(world, pos.data[ib * 3], pos.data[ib * 3 + 1], pos.data[ib * 3 + 2]);
+        const c = mat4TransformPoint(world, pos.data[ic * 3], pos.data[ic * 3 + 1], pos.data[ic * 3 + 2]);
+        const o = triCursor * 9;
+        triangles[o] = a[0]; triangles[o+1] = a[1]; triangles[o+2] = a[2];
+        triangles[o+3] = b[0]; triangles[o+4] = b[1]; triangles[o+5] = b[2];
+        triangles[o+6] = c[0]; triangles[o+7] = c[1]; triangles[o+8] = c[2];
+        triCursor++;
+      }
+    });
+  });
+  return { triangles, triCount: triCursor };
+}
+
+function computeTriangleBBox(triangles) {
+  let xmin = Infinity, xmax = -Infinity, ymin = Infinity, ymax = -Infinity, zmin = Infinity, zmax = -Infinity;
+  for (let i = 0; i < triangles.length; i += 3) {
+    const x = triangles[i], y = triangles[i + 1], z = triangles[i + 2];
+    if (x < xmin) xmin = x; if (x > xmax) xmax = x;
+    if (y < ymin) ymin = y; if (y > ymax) ymax = y;
+    if (z < zmin) zmin = z; if (z > zmax) zmax = z;
+  }
+  return { xmin, xmax, ymin, ymax, zmin, zmax };
+}
+
+// The heavy rasterize + flood-fill work runs in a Web Worker (built from
+// an inline source string via a Blob URL, so this stays a single HTML
+// file) so voxelizing a large model doesn't freeze the tab. Mirrors the
+// same shell + flood-fill technique as the offline Python pipeline used
+// for every other real-scan preset here: adaptive barycentric
+// rasterization (capped subdivision to bound worst-case cost for an
+// outlier huge triangle, since this runs in plain JS rather than
+// vectorized numpy), then an iterative stack-based multi-source flood
+// fill of AIR from the padded border, sealing enclosed cavities while
+// leaving real open structure genuinely open.
+const IMPORT_VOXELIZE_WORKER_SRC = `
+self.onmessage = function (e) {
+  try {
+    const { triangles, W, H, D, step, ox, oy, oz, density } = e.data;
+    const shell = new Uint8Array(W * H * D);
+    function cellIdx(ix, iy, iz) { return (ix * H + iy) * D + iz; }
+    function mark(px, py, pz) {
+      const ix = Math.floor((px - ox) / step);
+      const iy = Math.floor((py - oy) / step);
+      const iz = Math.floor((pz - oz) / step);
+      if (ix >= 0 && ix < W && iy >= 0 && iy < H && iz >= 0 && iz < D) shell[cellIdx(ix, iy, iz)] = 1;
+    }
+    const triCount = triangles.length / 9;
+    let lastReport = Date.now();
+    for (let t = 0; t < triCount; t++) {
+      const o = t * 9;
+      const ax = triangles[o], ay = triangles[o+1], az = triangles[o+2];
+      const bx = triangles[o+3], by = triangles[o+4], bz = triangles[o+5];
+      const cx = triangles[o+6], cy = triangles[o+7], cz = triangles[o+8];
+      const e1x = bx-ax, e1y = by-ay, e1z = bz-az;
+      const e2x = cx-ax, e2y = cy-ay, e2z = cz-az;
+      const len1 = Math.sqrt(e1x*e1x+e1y*e1y+e1z*e1z);
+      const len2 = Math.sqrt(e2x*e2x+e2y*e2y+e2z*e2z);
+      const maxlen = Math.max(len1, len2);
+      let n = Math.max(1, Math.ceil(density * maxlen / step));
+      if (n > 48) n = 48;
+      for (let i = 0; i <= n; i++) {
+        const u = i / n;
+        const vmax = n - i;
+        for (let j = 0; j <= vmax; j++) {
+          const v = j / n;
+          mark(ax + e1x*u + e2x*v, ay + e1y*u + e2y*v, az + e1z*u + e2z*v);
+        }
+      }
+      if ((t & 4095) === 0) {
+        const now = Date.now();
+        if (now - lastReport > 200) { self.postMessage({ type: 'progress', phase: 'rasterize', done: t, total: triCount }); lastReport = now; }
+      }
+    }
+    self.postMessage({ type: 'progress', phase: 'flood-fill', done: 0, total: 1 });
+    const outside = new Uint8Array(W * H * D);
+    const stack = [];
+    function tryPush(ix, iy, iz) {
+      if (ix < 0 || ix >= W || iy < 0 || iy >= H || iz < 0 || iz >= D) return;
+      const i = cellIdx(ix, iy, iz);
+      if (!shell[i] && !outside[i]) { outside[i] = 1; stack.push(i); }
+    }
+    for (let ix = 0; ix < W; ix++) for (let iy = 0; iy < H; iy++) { tryPush(ix, iy, 0); tryPush(ix, iy, D - 1); }
+    for (let ix = 0; ix < W; ix++) for (let iz = 0; iz < D; iz++) { tryPush(ix, 0, iz); tryPush(ix, H - 1, iz); }
+    for (let iy = 0; iy < H; iy++) for (let iz = 0; iz < D; iz++) { tryPush(0, iy, iz); tryPush(W - 1, iy, iz); }
+    while (stack.length) {
+      const i = stack.pop();
+      const ix = Math.floor(i / (H * D));
+      const rem = i - ix * H * D;
+      const iy = Math.floor(rem / D);
+      const iz = rem - iy * D;
+      if (ix > 0) tryPush(ix - 1, iy, iz);
+      if (ix < W - 1) tryPush(ix + 1, iy, iz);
+      if (iy > 0) tryPush(ix, iy - 1, iz);
+      if (iy < H - 1) tryPush(ix, iy + 1, iz);
+      if (iz > 0) tryPush(ix, iy, iz - 1);
+      if (iz < D - 1) tryPush(ix, iy, iz + 1);
+    }
+    const solid = new Uint8Array(W * H * D);
+    let solidCount = 0;
+    for (let i = 0; i < solid.length; i++) { if (shell[i] || !outside[i]) { solid[i] = 1; solidCount++; } }
+    self.postMessage({ type: 'done', W, H, D, grid: solid, solidCount }, [solid.buffer]);
+  } catch (err) {
+    self.postMessage({ type: 'error', message: err.message });
+  }
+};
+`;
+
+let _importVoxelizeWorkerURL = null;
+function getImportVoxelizeWorkerURL() {
+  if (!_importVoxelizeWorkerURL) {
+    const blob = new Blob([IMPORT_VOXELIZE_WORKER_SRC], { type: 'application/javascript' });
+    _importVoxelizeWorkerURL = URL.createObjectURL(blob);
+  }
+  return _importVoxelizeWorkerURL;
+}
+
+// State for whatever .glb the user currently has loaded — sampled by
+// `importedScanSolid` (nearest-neighbor, exactly like every embedded
+// scan preset's own shape function) at generateModel() time, so the
+// existing scale slider/fill-mode/material pickers all keep working
+// unchanged once a model is loaded.
+let importedScanGridData = null;
+let importedModelName = null;
+function importedScanSolid(x, y, z, dims) {
+  if (!importedScanGridData) return false;
+  const { W, H, D, grid } = importedScanGridData;
+  const rx = Math.min(W - 1, Math.floor((x / dims.sx) * W));
+  const ry = Math.min(H - 1, Math.floor((y / dims.sy) * H));
+  const rz = Math.min(D - 1, Math.floor((z / dims.sz) * D));
+  return !!grid[(rx * H + ry) * D + rz];
+}
+
+function isImportMode() { return document.querySelector('input[name=mode]:checked').value === 'import'; }
+
+async function handleImportedFile(file) {
+  const status = el('import-status');
+  el('generate-btn').disabled = true;
+  importedScanGridData = null;
+  if (!/\.glb$/i.test(file.name)) {
+    status.textContent = 'Only .glb files are supported (got "' + file.name + '") — USDZ and .gltf-with-separate-files are not.';
+    return;
+  }
+  status.textContent = 'Reading ' + file.name + '...';
+  try {
+    const buf = await file.arrayBuffer();
+    const { json, bin } = parseGLBContainer(buf);
+    if (!bin) throw new Error('This .glb has no embedded binary buffer — a .gltf split across separate files is not supported, only a single self-contained .glb.');
+    status.textContent = 'Reading mesh geometry...';
+    const { triangles, triCount } = extractGLBTriangles(json, bin);
+    if (triCount === 0) throw new Error('No triangle mesh geometry found in this file.');
+    const bbox = computeTriangleBBox(triangles);
+    const xext = bbox.xmax - bbox.xmin, yext = bbox.ymax - bbox.ymin, zext = bbox.zmax - bbox.zmin;
+    if (!(xext > 0) || !(yext > 0) || !(zext > 0)) throw new Error('This model has no volume along one axis — cannot voxelize.');
+
+    importedModelName = file.name.replace(/\.glb$/i, '');
+    el('import-name').value = importedModelName;
+    el('import-height').value = yext.toFixed(3);
+    el('import-basex').value = xext.toFixed(3);
+    el('import-basez').value = zext.toFixed(3);
+    updateVolumeReadout();
+
+    // Native voxelization resolution: aim the longest axis around 220
+    // blocks (comparable to this app's own offline real-scan presets),
+    // backing off if that would exceed the volume cap.
+    const maxExt = Math.max(xext, yext, zext);
+    let targetLong = 220;
+    let step = maxExt / targetLong;
+    const PAD = 2;
+    let W = Math.round(xext / step) + 2 * PAD, H = Math.round(yext / step) + 2 * PAD, D = Math.round(zext / step) + 2 * PAD;
+    while (W * H * D > 5_000_000 && targetLong > 40) {
+      targetLong -= 20;
+      step = maxExt / targetLong;
+      W = Math.round(xext / step) + 2 * PAD; H = Math.round(yext / step) + 2 * PAD; D = Math.round(zext / step) + 2 * PAD;
+    }
+    const density = triCount > 300000 ? 1.5 : 2.5;
+    const ox = bbox.xmin - PAD * step, oy = bbox.ymin - PAD * step, oz = bbox.zmin - PAD * step;
+
+    // Default the scale slider so the FIRST generate already comes out
+    // near this native resolution (mirrors every preset's own
+    // defaultScaleNum/Den) instead of leaving whatever unrelated ratio
+    // the sidebar happened to have from a previous preset/custom shape.
+    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
+    ratioRadio.checked = true;
+    ratioRadio.dispatchEvent(new Event('change'));
+    el('scale-num').value = targetLong;
+    el('scale-den').value = Number(maxExt.toFixed(6));
+    updateVolumeReadout();
+
+    status.textContent = `Voxelizing ${triCount.toLocaleString()} triangles into a ${W}x${H}x${D} grid...`;
+    const worker = new Worker(getImportVoxelizeWorkerURL());
+    worker.onmessage = (e) => {
+      const msg = e.data;
+      if (msg.type === 'progress') {
+        status.textContent = msg.phase === 'rasterize'
+          ? `Rasterizing: ${msg.done.toLocaleString()} / ${msg.total.toLocaleString()} triangles...`
+          : 'Sealing enclosed cavities (flood fill)...';
+      } else if (msg.type === 'done') {
+        importedScanGridData = { W: msg.W, H: msg.H, D: msg.D, grid: msg.grid };
+        status.textContent = `Ready — ${msg.solidCount.toLocaleString()} solid voxels in a ${msg.W}x${msg.H}x${msg.D} native grid. Click "Generate model" (or drop a different file to replace it).`;
+        if (isImportMode()) el('generate-btn').disabled = false;
+        worker.terminate();
+      } else if (msg.type === 'error') {
+        status.textContent = 'Voxelization error: ' + msg.message;
+        worker.terminate();
+      }
+    };
+    worker.onerror = (err) => { status.textContent = 'Worker error: ' + err.message; };
+    worker.postMessage({ triangles, W, H, D, step, ox, oy, oz, density }, [triangles.buffer]);
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+}
+
+
 // A highly-detailed shape for the Leaning Tower of Pisa preset
 // SPECIFICALLY — the generic `cylinder` shape this preset used before
 // this rebuild was modeled perfectly vertical with no arcade detail at
@@ -3888,6 +4306,10 @@ const SHAPES = {
   pisa: pisaSolid,
   tajMahal: tajMahalSolid,
   burjKhalifa: burjKhalifaSolid,
+  // The live in-browser .glb import shape — not driven by embedded scan
+  // data like every shape above, but by whatever `importedScanGridData`
+  // the user currently has loaded via the "Import 3D model" mode.
+  importedScan: importedScanSolid,
 };
 // Which structures get an auto-generated interior when the shape is chosen in Custom mode.
 const SHAPE_DEFAULT_INTERIOR = {
@@ -3896,6 +4318,7 @@ const SHAPE_DEFAULT_INTERIOR = {
   cone: null, ring: null, freeform: null, bridge: null, vaderHelmet: null, vaderHelmetScan: null,
   goldenGateBridge: null, goldenGateBridgeScan: null, eiffelTower: null,
   libertyScan: null, colosseum: null, colosseumScan: null, kipScan: null, pisa: null, tajMahal: null, burjKhalifa: null,
+  importedScan: null,
 };
 
 function idx(x, y, z, dims) { return (y * dims.sz + z) * dims.sx + x; }
@@ -7481,6 +7904,7 @@ function applyPresetDefaults() {
 
 function currentInteriorMode() {
   if (isPresetMode()) return currentPreset().interiorMode;
+  if (isImportMode()) return null;
   return SHAPE_DEFAULT_INTERIOR[el('custom-shape').value];
 }
 
@@ -7517,6 +7941,14 @@ function currentRealDims() {
     const p = currentPreset();
     return { height: p.real.height, baseX: p.real.baseX, baseZ: p.real.baseZ, params: p.params || {} };
   }
+  if (isImportMode()) {
+    return {
+      height: parseFloat(el('import-height').value) || 1,
+      baseX: parseFloat(el('import-basex').value) || 1,
+      baseZ: parseFloat(el('import-basez').value) || 1,
+      params: {},
+    };
+  }
   const shape = el('custom-shape').value;
   const params = {};
   if (shape === 'ziggurat') params.tiers = parseInt(el('cx-tiers') ? el('cx-tiers').value : 4, 10) || 4;
@@ -7531,7 +7963,7 @@ function currentRealDims() {
   };
 }
 
-function currentShapeType() { return isPresetMode() ? currentPreset().shape : el('custom-shape').value; }
+function currentShapeType() { return isPresetMode() ? currentPreset().shape : isImportMode() ? 'importedScan' : el('custom-shape').value; }
 
 function currentScale() {
   const mode = document.querySelector('input[name=scalemode]:checked').value;
@@ -7571,6 +8003,9 @@ function updateVolumeReadout() {
     readout.textContent = `Bounding box ~${vol.toLocaleString()} cells.`;
     el('generate-btn').disabled = false;
   }
+  // No .glb voxelized yet in Import mode: never enable Generate purely
+  // because the (placeholder) real-dims volume happens to be in range.
+  if (isImportMode() && !importedScanGridData) el('generate-btn').disabled = true;
 }
 
 function fracString(scale) {
@@ -7605,14 +8040,29 @@ function renderCustomExtra() {
 
 /* ---- event wiring for controls ---- */
 document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('change', () => {
-  const preset = isPresetMode();
-  el('preset-controls').style.display = preset ? 'block' : 'none';
-  el('custom-controls').style.display = preset ? 'none' : 'block';
-  if (preset) applyPresetDefaults(); else { renderCustomExtra(); updateVolumeReadout(); }
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  el('preset-controls').style.display = mode === 'preset' ? 'block' : 'none';
+  el('custom-controls').style.display = mode === 'custom' ? 'block' : 'none';
+  el('import-controls').style.display = mode === 'import' ? 'block' : 'none';
+  if (mode === 'preset') applyPresetDefaults();
+  else if (mode === 'custom') { renderCustomExtra(); updateVolumeReadout(); }
+  else { el('generate-btn').disabled = !importedScanGridData; updateInteriorAvailability(); updateVolumeReadout(); }
 }));
 el('preset-select').addEventListener('change', applyPresetDefaults);
 el('custom-shape').addEventListener('change', renderCustomExtra);
 ['custom-height', 'custom-basex', 'custom-basez'].forEach(id => el(id).addEventListener('input', updateVolumeReadout));
+['import-height', 'import-basex', 'import-basez'].forEach(id => el(id).addEventListener('input', updateVolumeReadout));
+const importDropzone = el('import-dropzone');
+['dragenter', 'dragover'].forEach(evt => importDropzone.addEventListener(evt, (e) => { e.preventDefault(); importDropzone.classList.add('drag-over'); }));
+['dragleave', 'drop'].forEach(evt => importDropzone.addEventListener(evt, (e) => { e.preventDefault(); importDropzone.classList.remove('drag-over'); }));
+importDropzone.addEventListener('drop', (e) => {
+  const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (file) handleImportedFile(file);
+});
+el('import-file').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) handleImportedFile(file);
+});
 document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListener('change', () => {
   const ratio = document.querySelector('input[name=scalemode]:checked').value === 'ratio';
   el('scale-ratio-controls').style.display = ratio ? 'flex' : 'block';
@@ -7648,6 +8098,7 @@ function generateModel() {
   const dims = scaledDims(real, scale);
   const volume = dims.sx * dims.sy * dims.sz;
   if (volume > MAX_VOXEL_VOLUME) { alert('This structure is too large to generate at this scale. Reduce the scale first.'); return; }
+  if (isImportMode() && !importedScanGridData) { alert('Load a .glb file first (drop it into the box on the left).'); return; }
 
   const silhouette = buildSilhouette(shapeType, dims, real.params);
   const matExt = MATERIAL_INDEX[el('mat-exterior').value] + 1;
@@ -7891,8 +8342,12 @@ function generateModel() {
     applyBigBenDetail(grid, dims, matAcc);
   }
 
-  const label = isPresetMode() ? currentPreset().name : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
-  const notes = isPresetMode() ? (currentPreset().notes || []) : [];
+  const label = isPresetMode() ? currentPreset().name
+    : isImportMode() ? (el('import-name').value.trim() || importedModelName || 'Imported model')
+    : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
+  const notes = isPresetMode() ? (currentPreset().notes || [])
+    : isImportMode() ? ['Voxelized live in your browser from a dropped .glb file — real-world scale and up-axis are assumed from the file itself (glTF spec: meters, Y-up), not independently verified, so double-check the height/width/depth fields and use the Rotate tool if it doesn\'t stand upright.']
+    : [];
 
   currentModel = {
     grid, silhouette, dims, scale, real, fillMode, wallThickness, wantInterior, interiorMode, label, notes, decor,
