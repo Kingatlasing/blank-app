@@ -2908,6 +2908,147 @@ function bridgeSolid(x, y, z, dims, params) {
   return false;
 }
 
+// A real perched Bald Eagle (Haliaeetus leucocephalus), researched from
+// real published dimensions (dimensions.com / Britannica / raptor.umn.edu):
+// perched standing height ~43-61.5cm, perched body width ~24-33cm — this
+// preset uses 0.55m / 0.30m / 0.30m, near the upper (female — females run
+// ~25% larger than males) end of that real range for a good-sized,
+// visually clear model. Wings are folded against the body (a perched
+// pose, not flight, since a folded silhouette is far more tractable to
+// voxelize clearly than a spread wingspan) with the body tapering from
+// rounded shoulders down to a narrower tail base, a tail fanning out
+// behind and slightly below the body, and a forward-tilted head with a
+// real hooked beak shape. Real adult bald eagles (the white head/tail
+// only develops at ~4-5 years old) have a distinct two-tone plumage —
+// see applyBaldEagleDetail for the real white head/tail vs. dark brown
+// body/wing coloring, and the real bright yellow beak/legs.
+function baldEagleSolid(x, y, z, dims) {
+  const H = dims.sy;
+  const t = y / H; // 0 = perch, 1 = top of head
+  const cx = (dims.sx - 1) / 2;
+  const cz = dims.sz / 2; // z=0 is the tail side, z=dims.sz is the chest/front side
+
+  const perchT = 0.08;
+  const legTopT = 0.22;
+  const shoulderT = 0.45;
+  const neckT = 0.78;
+
+  if (t < perchT) {
+    // A short branch/perch, spanning the full width, for the feet to grip.
+    const perchHalfHeight = Math.max(0.5, H * perchT * 0.4);
+    return Math.abs((y - H * perchT * 0.5)) <= perchHalfHeight && Math.abs(z - cz) <= dims.sz * 0.12;
+  }
+
+  if (t < legTopT) {
+    // Two legs, real bright-yellow (painted below), gripping the perch.
+    const legHalfWidth = Math.max(0.5, dims.sx * 0.09);
+    const legOffset = dims.sx * 0.16;
+    const inLeft = Math.abs(x - (cx - legOffset)) <= legHalfWidth;
+    const inRight = Math.abs(x - (cx + legOffset)) <= legHalfWidth;
+    return (inLeft || inRight) && Math.abs(z - cz) <= dims.sz * 0.16;
+  }
+
+  // Body + folded wings: rounded shoulders tapering toward the tail base,
+  // with a real fanned tail extending back and slightly down. Computed
+  // with a small margin PAST neckT (rather than a hard cutoff) so it
+  // overlaps the head ellipsoid below instead of leaving a gap between
+  // them — an earlier version of this shape had exactly that gap, a
+  // visibly floating head, until caught in a per-layer connectivity check.
+  let inBody = false;
+  if (t < neckT + 0.04) {
+    const bodyT = Math.max(0, Math.min(1, (t - legTopT) / (neckT - legTopT)));
+    const shoulderFrac = (shoulderT - legTopT) / (neckT - legTopT);
+    let halfWidth, depthFront, depthBack;
+    if (bodyT < shoulderFrac) {
+      const f = bodyT / shoulderFrac;
+      halfWidth = dims.sx * (0.16 + 0.09 * Math.sin(f * Math.PI * 0.5));
+      depthFront = dims.sz * 0.32 * (0.5 + 0.5 * f);
+      depthBack = dims.sz * 0.1;
+    } else {
+      const f = (bodyT - shoulderFrac) / (1 - shoulderFrac);
+      halfWidth = dims.sx * (0.25 - 0.10 * f);
+      depthFront = dims.sz * 0.32 * (1 - 0.2 * f);
+      depthBack = dims.sz * (0.1 + 0.35 * f); // the tail fans out behind
+    }
+    const dx = Math.abs(x - cx);
+    const dz = z - cz;
+    inBody = dx <= halfWidth && dz <= depthFront && dz >= -depthBack;
+    // The tail also droops a little below the body's own bottom, a real
+    // perched silhouette detail.
+    const tailDroopT = 1 - (bodyT - shoulderFrac) / Math.max(1e-6, 1 - shoulderFrac);
+    const inTailDroop = bodyT > shoulderFrac && dz < -depthBack * 0.4 && dx <= halfWidth * 0.7
+      && tailDroopT < 0.5;
+    inBody = inBody || inTailDroop;
+  }
+
+  // Head + hooked beak: a real ellipsoid positioned so its own bottom
+  // edge sits flush at neckT (matching the body's own top), guaranteeing
+  // no gap regardless of voxel rounding at any scale.
+  let inHead = false, inBeak = false;
+  const headR = dims.sx * 0.15;
+  const headRy = headR * 1.15;
+  const headCenterT = neckT + headRy / H;
+  if (t > neckT - 0.04) {
+    const dy = (t - headCenterT) * H;
+    const headT = Math.max(0, Math.min(1, (t - neckT) / (1 - neckT)));
+    const headCenterZ = cz + dims.sz * 0.10 * headT; // head leans toward the front
+    const dx = x - cx, dz = z - headCenterZ;
+    inHead = (dx * dx) / (headR * headR) + (dz * dz) / (headR * headR) + (dy * dy) / (headRy * headRy) <= 1.0;
+    // The beak: a small tapered wedge at the lower-front of the head.
+    if (t > neckT + 0.03 && t < headCenterT + (headRy * 0.15) / H) {
+      const beakTaper = Math.max(0, 1 - Math.abs(t - (neckT + 0.10)) / 0.10);
+      const beakLen = Math.max(1, dims.sz * 0.09) * beakTaper;
+      const beakFront = headCenterZ + headR * 0.9;
+      inBeak = Math.abs(x - cx) <= Math.max(0.5, dims.sx * 0.035) && z > headCenterZ + headR * 0.55 && z <= beakFront + beakLen;
+    }
+  }
+
+  return inBody || inHead || inBeak;
+}
+
+// Paints the real adult Bald Eagle two-tone plumage over the silhouette
+// above: a white head and tail (the real field mark that gives the
+// species its name — only present on mature adults), a dark
+// chocolate-brown body/wings, and real bright yellow legs/beak. Always
+// on, like every other real-animal/landmark detail pass here — this
+// coloring is the defining, always-visible look, not the exterior/
+// interior/accent picker.
+function applyBaldEagleDetail(grid, dims) {
+  const cx = (dims.sx - 1) / 2, cz = dims.sz / 2;
+  const bodyIdx = MATERIAL_INDEX['brown_terracotta'] + 1;
+  const whiteIdx = MATERIAL_INDEX['white_wool'] + 1;
+  const beakIdx = MATERIAL_INDEX['yellow_concrete'] + 1;
+  const perchIdx = MATERIAL_INDEX['dark_oak_log'] !== undefined ? MATERIAL_INDEX['dark_oak_log'] + 1 : MATERIAL_INDEX['dark_oak_wood'] + 1;
+  const neckT = 0.78, legTopT = 0.22, shoulderT = 0.45;
+  for (let y = 0; y < dims.sy; y++) {
+    const t = y / dims.sy;
+    for (let z = 0; z < dims.sz; z++) {
+      for (let x = 0; x < dims.sx; x++) {
+        const i = idx(x, y, z, dims);
+        if (!grid[i]) continue;
+        if (t < 0.08) { grid[i] = perchIdx; continue; }
+        if (t < legTopT) { grid[i] = beakIdx; continue; }
+        if (t >= neckT - 0.04) {
+          // Head is white; the beak (identified the same way the shape
+          // function itself carves it: past the head's own front edge)
+          // is yellow.
+          const headR = dims.sx * 0.15;
+          const headT = Math.max(0, Math.min(1, (t - neckT) / (1 - neckT)));
+          const headCenterZ = cz + dims.sz * 0.10 * headT;
+          grid[i] = (z > headCenterZ + headR * 0.55) ? beakIdx : whiteIdx;
+          continue;
+        }
+        // Body: brown, except the tail (the rearmost, z < cz region past
+        // the shoulder point) which is white like the head.
+        const bodyT = (t - legTopT) / (neckT - legTopT);
+        const shoulderFrac = (shoulderT - legTopT) / (neckT - legTopT);
+        const isTailRegion = bodyT > shoulderFrac && (z - cz) < -dims.sz * 0.08;
+        grid[i] = isTailRegion ? whiteIdx : bodyIdx;
+      }
+    }
+  }
+}
+
 // A highly-detailed shape for the Golden Gate Bridge preset SPECIFICALLY —
 // unlike the generic bridgeSolid shared by every other suspension-bridge
 // preset above, every constant below is a real published Golden Gate
@@ -4423,6 +4564,10 @@ const SHAPES = {
   dome: domeSolid, ziggurat: zigguratSolid, tower: towerSolid,
   domebuilding: domebuildingSolid, ring: ringSolid, freeform: freeformSolid,
   bridge: bridgeSolid, person: personSolid, vaderHelmet: vaderHelmetSolid, vaderHelmetScan: vaderHelmetScanSolid,
+  // Not listed in CUSTOM_SHAPE_LABELS: baldEagleSolid hardcodes this real
+  // species' own real perched dimensions, so it only makes sense driven
+  // by the bald-eagle preset itself, never a user-typed custom size.
+  baldEagle: baldEagleSolid,
   // Not listed in CUSTOM_SHAPE_LABELS or the Custom-shape dropdown:
   // goldenGateBridgeSolid hardcodes this one preset's own real dims
   // (see its own comment above), so it only makes sense driven by the
@@ -4449,7 +4594,7 @@ const SHAPES = {
 const SHAPE_DEFAULT_INTERIOR = {
   box: 'floors', cylinder: 'floors', dome: 'floors', ziggurat: 'floors',
   tower: 'floors', domebuilding: 'floors', pyramid: 'pyramidChambers',
-  cone: null, ring: null, freeform: null, bridge: null, person: null, vaderHelmet: null, vaderHelmetScan: null,
+  cone: null, ring: null, freeform: null, bridge: null, person: null, baldEagle: null, vaderHelmet: null, vaderHelmetScan: null,
   goldenGateBridge: null, goldenGateBridgeScan: null, eiffelTower: null,
   libertyScan: null, colosseum: null, colosseumScan: null, kipScan: null, pisa: null, tajMahal: null, burjKhalifa: null,
   importedScan: null,
@@ -6750,6 +6895,19 @@ const PRESETS = [
     ],
   },
   {
+    id: 'bald-eagle', name: "Bald Eagle (perched)", shape: 'baldEagle', category: 'Animals & Wildlife',
+    real: { height: 0.55, baseX: 0.3, baseZ: 0.3 },
+    defaultScaleNum: 250, defaultScaleDen: 3,
+    blocks: { exterior: 'brown_terracotta', interior: 'brown_terracotta', accent: 'yellow_concrete' },
+    desc: 'A real perched Bald Eagle (Haliaeetus leucocephalus), built from real published perched dimensions (standing height ~43-61.5cm, body width ~24-33cm) rather than a generic bird silhouette: the real two-tone adult plumage (white head/tail, dark brown body/wings), a real hooked beak, and real bright-yellow legs and beak color.',
+    keywords: ['bald eagle', 'eagle', 'bird', 'raptor', 'animal', 'wildlife'],
+    notes: [
+      'Real dimensions from published sources: perched standing height 43-61.5cm and perched body width 24-33cm (dimensions.com, raptor.umn.edu); this preset uses 0.55m/0.30m/0.30m, toward the larger end of that real range (real female bald eagles run about 25% larger than males). A perched, wings-folded pose was used rather than a flight pose with wings spread, since a folded silhouette voxelizes far more clearly than a wide flat wingspan at this scale.',
+      'The real distinguishing field mark — a white head and tail against a dark chocolate-brown body — is a real adult-only trait (juveniles are mottled brown all over until 4-5 years old) painted on always, via `applyBaldEagleDetail`, the same way this app paints Big Ben\'s clock faces or the Statue of Liberty\'s real recovered materials: a defining, always-visible look, not the exterior/interior/accent picker.',
+      'Not modeled: individual feathers (this app\'s own blocky voxel approximation, same as every curved/organic shape here), real talons as separate geometry (folded into the leg color instead), and a flight pose with the real ~2m (male) to 2.5m (female) wingspan — a genuinely separate, much harder voxelization problem than a folded perched silhouette.',
+    ],
+  },
+  {
     id: 'mechanism-demo', name: "Redstone Mechanism Demo Room", shape: 'box', category: 'Traps & Mechanisms',
     real: { height: 6, baseX: 9, baseZ: 9 }, interiorMode: 'mechanismDemo',
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'gold_block' },
@@ -8483,6 +8641,12 @@ function generateModel() {
   // interior/accent picker.
   if (shapeType === 'libertyScan') {
     applyLibertyScanMaterials(grid, dims);
+  }
+  // Same reasoning again: a real adult Bald Eagle's white head/tail vs.
+  // dark brown body is the species' own defining field mark, not an
+  // optional exterior/interior/accent choice.
+  if (shapeType === 'baldEagle') {
+    applyBaldEagleDetail(grid, dims);
   }
   // Gated on the preset id, not shapeType: Big Ben keeps the generic
   // `tower` shape shared by other presets (windmill, village house),
