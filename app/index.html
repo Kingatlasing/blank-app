@@ -76,6 +76,10 @@
   }
   #import-dropzone.drag-over { border-color: var(--accent); color: var(--text); }
   #import-dropzone input[type=file] { display: block; margin: 8px auto 0; font-size: 12px; }
+  #scale-quickpick { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+  #scale-quickpick .hint { margin: 0; }
+  .scale-quick-btn { padding: 3px 9px; font-size: 12px; }
+  .scale-quick-btn.active { background: var(--accent-dim); border-color: var(--accent); color: #eafcec; }
   button {
     cursor: pointer; border: 1px solid var(--border); background: var(--panel-2); color: var(--text);
     border-radius: 6px; padding: 7px 12px; font-size: 13px;
@@ -239,6 +243,16 @@
             <label for="scale-den">Denominator</label>
             <input type="number" id="scale-den" value="8" min="0.001" step="1" />
           </div>
+        </div>
+        <div id="scale-quickpick">
+          <span class="hint">Quick pick:</span>
+          <button type="button" class="scale-quick-btn" data-num="1" data-den="16">1/16</button>
+          <button type="button" class="scale-quick-btn" data-num="1" data-den="8">1/8</button>
+          <button type="button" class="scale-quick-btn" data-num="1" data-den="4">1/4</button>
+          <button type="button" class="scale-quick-btn" data-num="1" data-den="2">1/2</button>
+          <button type="button" class="scale-quick-btn" data-num="1" data-den="1">1:1</button>
+          <button type="button" class="scale-quick-btn" data-num="2" data-den="1">2×</button>
+          <button type="button" class="scale-quick-btn" data-num="4" data-den="1">4×</button>
         </div>
         <div id="scale-height-controls" style="display:none;">
           <label for="scale-target-height">Target height (blocks)</label>
@@ -3912,6 +3926,7 @@ async function handleImportedFile(file) {
     ratioRadio.dispatchEvent(new Event('change'));
     el('scale-num').value = targetLong;
     el('scale-den').value = Number(maxExt.toFixed(6));
+    updateScaleQuickpickActive();
     updateVolumeReadout();
 
     status.textContent = `Voxelizing ${triCount.toLocaleString()} triangles into a ${W}x${H}x${D} grid...`;
@@ -7898,6 +7913,7 @@ function applyPresetDefaults() {
     el('scale-num').value = p.defaultScaleNum;
     el('scale-den').value = p.defaultScaleDen;
   }
+  updateScaleQuickpickActive();
   updateInteriorAvailability();
   updateVolumeReadout();
 }
@@ -8069,7 +8085,20 @@ document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListen
   el('scale-height-controls').style.display = ratio ? 'none' : 'block';
   updateVolumeReadout();
 }));
-['scale-num', 'scale-den', 'scale-target-height'].forEach(id => el(id).addEventListener('input', updateVolumeReadout));
+function updateScaleQuickpickActive() {
+  const num = parseFloat(el('scale-num').value), den = parseFloat(el('scale-den').value);
+  document.querySelectorAll('.scale-quick-btn').forEach((btn) => {
+    const match = num === parseFloat(btn.dataset.num) && den === parseFloat(btn.dataset.den);
+    btn.classList.toggle('active', match);
+  });
+}
+document.querySelectorAll('.scale-quick-btn').forEach((btn) => btn.addEventListener('click', () => {
+  el('scale-num').value = btn.dataset.num;
+  el('scale-den').value = btn.dataset.den;
+  updateScaleQuickpickActive();
+  updateVolumeReadout();
+}));
+['scale-num', 'scale-den', 'scale-target-height'].forEach(id => el(id).addEventListener('input', () => { updateScaleQuickpickActive(); updateVolumeReadout(); }));
 el('fill-mode').addEventListener('change', () => {
   el('wall-thickness-row').style.display = el('fill-mode').value === 'hollow' ? 'block' : 'none';
 });
