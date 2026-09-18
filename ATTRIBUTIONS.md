@@ -65,6 +65,15 @@ frame with its own "HP" tag and fill slot) and `mods/tuxemon/gfx/borders/
 borders-blue.png` (a 9-slice panel border, applied via CSS `border-image`
 so it can stretch to any button/panel size without being redrawn).
 
+Each creature's real per-monster cry (`mods/tuxemon/sounds/monster/*`, real
+audio, mapped via that project's own `db/sounds/monster_calls.yaml`) plays
+when it's sent out in battle and from its Bestiary page. The 13 type icons,
+the 6 move-range icons, and 6 of the pause-menu icons (`mods/tuxemon/gfx/ui/
+icons/element/`, `.../icons/range/`, `.../gfx/ui/menu/`) are also real art
+from that project, not drawn for this one; that menu folder's own mascot
+icon (`tuxemon.png`) was left out since it's Tuxemon's specific branded
+character rather than generic UI.
+
 ## Guardian Monsters Artwork
 https://github.com/limbusdev/guardian_monsters_artwork
 

@@ -9,8 +9,10 @@ This is a self-contained HTML/CSS/JS game (`app/index.html`, canvas-rendered)
 served full-screen through a thin Streamlit wrapper (`streamlit_app.py`), in
 the same self-contained-single-file style as this repo's previous games.
 
-- **165 original creatures** — full stat lines, movesets, and evolution
-  chains across 13 elemental types, browsable in an in-game Bestiary
+- **165 original creatures** — full stat lines, movesets, evolution chains,
+  and real per-monster cries across 13 elemental types, each with a full
+  Pokédex-style Bestiary entry (species, height/weight, flavor text, stats,
+  evolution chain) that unlocks once caught, silhouetted until then
 - **A connected world** — twelve real-Tiled-map locations (Cottonwood Town,
   Route 1, Ashveld Town, Route 2, Crysthaven City, then seven more cities and
   eight connecting routes north of Crysthaven) plus a villain hideout and a

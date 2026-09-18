@@ -187,6 +187,14 @@ const TYPE_COLORS = {
   lightning:'#e0c72b', frost:'#7fd6e0', sky:'#8fb8e6', shadow:'#5a4a7a', venom:'#8a4fae',
   cosmic:'#4a3a8a', normal:'#b7b2a3', heroic:'#e0b23c'
 };
+// Real Tuxemon type icons (mods/tuxemon/gfx/ui/icons/element/*_type_small.png,
+// 12x12) inside the same colored pill used everywhere a type badge shows.
+function typeBadge(type, cls) {
+  const icon = ASSET_B64.elements[type]
+    ? `<img src="data:image/png;base64,${ASSET_B64.elements[type]}" style="width:10px;height:10px;image-rendering:pixelated;vertical-align:middle;margin-right:3px">`
+    : '';
+  return `<span class="${cls || 'typebadge'}" style="background:${TYPE_COLORS[type]||'#888'}">${icon}${type}</span>`;
+}
 
 /* ---------------------------- Custom (non-Tuxemon) narrative items ---------------------------- */
 ITEMS_DB.bridge_pass = { slug: 'bridge_pass', name: 'Bridge Pass', description: 'Proof you cleared the Enforcer Outpost. Lets you cross into the Summit.', category: 'key', cost: 0 };
@@ -1401,6 +1409,20 @@ function updateHud() {
 
 /* ============================ BATTLE SYSTEM ============================ */
 let battle = null;
+// Real per-monster cry audio (Tuxemon's own mods/tuxemon/sounds/monster/*,
+// mapped via db/sounds/monster_calls.yaml) - wrapped in try/catch since
+// browsers can reject audio.play() if it's called before any user gesture,
+// which shouldn't happen here (battles/menu clicks only) but must never
+// throw and break the caller.
+function playCry(slug) {
+  const c = ASSET_B64.cries && ASSET_B64.cries[slug];
+  if (!c) return;
+  try {
+    const audio = new Audio('data:' + c);
+    audio.volume = 0.55;
+    audio.play().catch(() => {});
+  } catch (e) {}
+}
 function startWildBattle(slug, level, isFixed) {
   battle = {
     kind: 'wild', isFixed,
@@ -1410,6 +1432,7 @@ function startWildBattle(slug, level, isFixed) {
     log: [], turnLock: false,
   };
   markDexSeen(slug);
+  playCry(slug);
   state.screen = 'battle';
   openBattleUI();
 }
@@ -1422,6 +1445,7 @@ function startTrainerBattle(trainerDef, trainerSprite) {
     log: [], turnLock: false,
   };
   for (const m of battle.enemyTeam) markDexSeen(m.slug);
+  playCry(battle.enemyTeam[0].slug);
   state.screen = 'battle';
   if (trainerDef.preBattle) pushDialogue(trainerDef.preBattle);
   openBattleUI();
@@ -1506,7 +1530,7 @@ function renderBattleScene() {
 
 function battleHpBar(m, side) {
   const pct = Math.max(0, Math.floor(m.currentHP / m.derived.hp * 100));
-  const typeBadges = MONSTERS[m.slug].types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
+  const typeBadges = MONSTERS[m.slug].types.map(t => typeBadge(t)).join('');
   return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbarframe"><div class="hpfilltrack"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
 }
 
@@ -1543,7 +1567,7 @@ function battleShowMoves() {
   const menu = document.getElementById('battleMenu');
   menu.innerHTML = `<div class="fightpanel">
     <div class="movegrid">
-      ${moves.map((mv, i) => `<button onmouseover="showMoveInfo(${i})" onfocus="showMoveInfo(${i})" onclick="playerUseMove(${i})">${mv.name} <span class="movetype" style="background:${TYPE_COLORS[mv.type]||'#888'}">${mv.type}</span></button>`).join('')}
+      ${moves.map((mv, i) => `<button onmouseover="showMoveInfo(${i})" onfocus="showMoveInfo(${i})" onclick="playerUseMove(${i})">${mv.name} ${typeBadge(mv.type, 'movetype')}</button>`).join('')}
     </div>
     <div class="moveinfo" id="moveInfoPanel"></div>
   </div>
@@ -1554,10 +1578,17 @@ function showMoveInfo(i) {
   const mv = battle.currentMoves[i];
   const panel = document.getElementById('moveInfoPanel');
   if (!mv || !panel) return;
-  panel.innerHTML = `<span class="movetype" style="background:${TYPE_COLORS[mv.type]||'#888'}">${mv.type}</span>
+  // Real Tuxemon range-category icon (mods/tuxemon/gfx/ui/icons/range/*.png) -
+  // the move's own real "range" field (melee/ranged/reach/reliable/special/
+  // touch), never shown anywhere in the UI before now.
+  const rangeIcon = ASSET_B64.range[mv.range]
+    ? `<img src="data:image/png;base64,${ASSET_B64.range[mv.range]}" style="height:18px;image-rendering:pixelated;margin-top:4px">`
+    : '';
+  panel.innerHTML = `${typeBadge(mv.type, 'movetype')}
     <div class="hptext" style="margin-top:6px">Power ${mv.power}</div>
     <div class="hptext">Accuracy ${Math.round(mv.accuracy * 100)}%</div>
-    <div class="hptext">Recharge ${mv.recharge}</div>`;
+    <div class="hptext">Recharge ${mv.recharge}</div>
+    ${rangeIcon}`;
 }
 
 function appendBattleLog(lines) {
@@ -1611,6 +1642,7 @@ function resolveBattleTurn() {
     if (battle.enemyIdx >= battle.enemyTeam.length) {
       finishBattle(true); return;
     } else {
+      playCry(currentEnemy().slug);
       battle.turnLock = false; renderBattleMain(); return;
     }
   }
@@ -1763,17 +1795,23 @@ function openMenu() {
   renderMenu();
 }
 function closeMenu() { document.getElementById('menuOverlay').style.display = 'none'; state.screen = 'overworld'; }
+// Real Tuxemon menu icons (mods/tuxemon/gfx/ui/menu/*.png) next to each
+// label instead of plain text buttons - not the mascot icon from that same
+// folder (tuxemon.png), which is that project's own branded character.
+function menuIcon(key) {
+  return `<img src="data:image/png;base64,${ASSET_B64.menuicons[key]}" style="width:16px;height:16px;image-rendering:pixelated;vertical-align:middle;margin-right:8px">`;
+}
 function renderMenu() {
   const el = document.getElementById('menuOverlay');
   el.innerHTML = `<div class="panel">
     <h2>Menu</h2>
-    <button onclick="renderPartyMenu()">Creatures</button>
-    <button onclick="renderBagMenu()">Bag</button>
+    <button onclick="renderPartyMenu()">${menuIcon('creatures')}Creatures</button>
+    <button onclick="renderBagMenu()">${menuIcon('bag')}Bag</button>
     <button onclick="renderBadgesMenu()">Badges</button>
-    <button onclick="renderBestiaryMenu()">Bestiary</button>
-    <button onclick="renderFastTravelMenu()">Fast Travel</button>
-    <button onclick="saveGame()">Save Game</button>
-    <button onclick="closeMenu()">Close</button>
+    <button onclick="renderBestiaryMenu()">${menuIcon('bestiary')}Bestiary</button>
+    <button onclick="renderFastTravelMenu()">${menuIcon('fasttravel')}Fast Travel</button>
+    <button onclick="saveGame()">${menuIcon('save')}Save Game</button>
+    <button onclick="closeMenu()">${menuIcon('close')}Close</button>
   </div>`;
 }
 function renderPartyMenu() {
@@ -1821,7 +1859,7 @@ function renderBestiaryMenu() {
     if (status === 'unseen') {
       return `<div class="battlecard" style="text-align:center;opacity:0.5"><div style="width:64px;height:44px;margin:0 auto;background:#333;border-radius:4px"></div><b>???</b></div>`;
     }
-    const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
+    const types = mon.types.map(t => typeBadge(t)).join('');
     const img = status === 'seen'
       ? silhouetteImg(slug, 64)
       : `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:64px">`;
@@ -1844,7 +1882,7 @@ function renderDexDetail(slug) {
   const status = dexStatus(slug);
   const mon = MONSTERS[slug];
   const caught = status === 'caught';
-  const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
+  const types = mon.types.map(t => typeBadge(t)).join('');
   const classification = mon.species ? mon.species.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : '???';
   const img = caught
     ? `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:120px">`
@@ -1875,6 +1913,7 @@ function renderDexDetail(slug) {
     <div style="text-align:center">${img}</div>
     <div style="text-align:center;margin:4px 0">${types}</div>
     <p style="color:#ffd76b;font-size:13px;text-align:center;margin:2px 0">The ${classification} Creature</p>
+    ${status !== 'unseen' && ASSET_B64.cries && ASSET_B64.cries[slug] ? `<div style="text-align:center;margin:4px 0"><button style="width:auto;padding:6px 16px" onclick="playCry('${slug}')">&#9835; Play Cry</button></div>` : ''}
     ${caught ? `<div style="display:flex;justify-content:space-around;font-size:12px;color:#9fb4d8;margin:6px 0">
         <span>Height: ${(mon.height/100).toFixed(2)} m</span><span>Weight: ${mon.weight} kg</span>
       </div>

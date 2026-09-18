@@ -185,6 +185,34 @@ UI in `ATTRIBUTIONS.md`) don't include. Drawn by `renderBattleScene()` under
 both combatants, sized/positioned separately for the (smaller, further-back)
 opponent and the (larger, closer) player creature.
 
+## 9. Monster cries (`ASSET_B64.cries`)
+
+Source: `Tuxemon/Tuxemon`, `mods/tuxemon/sounds/monster/*` (258 real sound
+effects), mapped to each of the 165 monsters via that project's own
+`db/sounds/monster_calls.yaml` (`monster.sounds.combat_call.sfx` -> yaml
+`slug` -> `file`) - not invented pairings. The 51 that were `.wav` (5.1MB)
+were re-encoded to 64kbps mono MP3 with `lameenc` (a pure-Python LAME
+binding, no re-recording or new audio) since raw PCM would have roughly
+doubled this file's size for no audible gain at "short cry" length; the
+`.ogg`/`.mp3` files were already compressed and are embedded as-is. Played
+via `playCry(slug)` - on `startWildBattle`/`startTrainerBattle` (and each
+enemy switch-in), and from a "Play Cry" button on any seen-or-caught
+Bestiary detail page.
+
+## 10. Type icons, move-range icons, menu icons (`ASSET_B64.elements` / `.range` / `.menuicons`)
+
+Source: `Tuxemon/Tuxemon`, `mods/tuxemon/gfx/ui/icons/element/*_type_small.png`
+(the 13 type icons - extracted earlier, unused until now), `.../icons/range/
+*.png` (6 icons matching `TECHNIQUES[x].range`'s 6 real values exactly -
+melee/ranged/reach/reliable/special/touch), and `.../gfx/ui/menu/*.png` (the
+pause menu's icons - `backpack`→Bag, `journal`→Bestiary, `save`→Save Game,
+`map_cross`→Fast Travel, `player`→Creatures, `exit`→Close). Type icons show
+inside every type-colored pill in the game (`typeBadge()` in `engine.js`);
+range icons show in the Fight submenu's move-info panel. `menu/tuxemon.png`
+(that project's own mascot/logo) was deliberately not used - it's their
+specific branded character, not generic UI, unlike everything else in that
+folder.
+
 ## What's NOT here (by design)
 
 No real Pokémon assets, sprites, or species data anywhere — verified both
