@@ -70,7 +70,10 @@
   .hpbarframe { position:relative; width:150px; height:16px; margin:3px 0 1px; background-image:var(--hp-bar-frame); background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated; }
   .hpfilltrack { position:absolute; left:30%; top:16.7%; width:63.3%; height:66.6%; overflow:hidden; }
   .hpfilltrack .hpfill { height:100%; }
-  #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:flex; flex-direction:column-reverse; }
+  /* display:none by default - shown only once appendBattleLog() has an actual
+     message to put in it (a fresh battle otherwise starts with this box empty
+     and fully visible, reading as a stray gray bar over the background art). */
+  #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:none; flex-direction:column-reverse; }
   /* bottom:10px (not the old 98px, which left #app's own black background showing
      as a dead bar under the menu - there's no party bar to leave room for once a
      battle is on screen, so the footer can sit right at the bottom edge). */

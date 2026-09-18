@@ -1433,6 +1433,9 @@ function openBattleUI() {
   document.getElementById('dialogueBox').style.display = 'none';
   const ui = document.getElementById('battleUI');
   ui.style.display = 'block';
+  const log = document.getElementById('battleLog');
+  log.innerHTML = '';
+  log.style.display = 'none';
   renderBattleMain();
 }
 function closeBattleUI() {
@@ -1560,6 +1563,7 @@ function showMoveInfo(i) {
 function appendBattleLog(lines) {
   const log = document.getElementById('battleLog');
   log.innerHTML = lines.map(l => `<div>${l}</div>`).join('') + log.innerHTML;
+  log.style.display = 'flex';
 }
 
 function playerUseMove(i) {
