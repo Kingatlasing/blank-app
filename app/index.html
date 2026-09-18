@@ -1633,11 +1633,25 @@ function charFrame(spriteKey, facing, frame) {
   const c = frame % 3;
   return { sx: c * 16, sy: r * 32, sw: 16, sh: 32 };
 }
-function drawChar(spriteKey, facing, frame, dx, dy, scale) {
+// Real Tuxemon character sheets (mods/tuxemon/sprites/*.png) are exactly 3
+// walk frames x 4 directions each - no dedicated idle/blink frame exists to
+// draw, on any of the 208 sheets. Rather than invent one, a standing
+// character gets a small procedural bob instead: the same real "stand"
+// frame (0), animated in place by a couple of pixels so it doesn't just
+// freeze - no new art, just motion of the art that's already there.
+// idleSeed varies the bob's phase per-character (screen position works well)
+// so a crowd of NPCs isn't all breathing in perfect unison.
+function idleBobOffset(idleSeed) {
+  if (idleSeed == null) return 0;
+  const phase = (idleSeed * 137) % 1000;
+  return Math.sin((performance.now() + phase) / 480) * 1.3;
+}
+function drawChar(spriteKey, facing, frame, dx, dy, scale, idleSeed) {
   const im = IMG.chars[spriteKey];
   if (!im || !im.complete) return;
   const f = charFrame(spriteKey, facing, frame);
   const w = 16 * scale, h = 32 * scale;
+  dy -= idleBobOffset(idleSeed);
   ctx.drawImage(im, f.sx, f.sy, f.sw, f.sh, dx, dy - (h - TILE), w, h);
 }
 
@@ -1693,11 +1707,11 @@ function renderOverworld() {
   }
   for (const n of (map.npcs || [])) {
     const dx = n.x * TILE - cam.x, dy = n.y * TILE - cam.y;
-    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
+    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4, n.x * 3 + n.y * 7) });
   }
   const pdx = camX * TILE - cam.x, pdy = camY * TILE - cam.y;
   const playerSprite = state.playerSprite || 'player_boy';
-  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
+  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4, state.moving ? null : 1) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 }
@@ -1752,11 +1766,11 @@ function renderTiledOverworld(map) {
   const drawables = [];
   for (const n of (map.npcs || [])) {
     const dx = n.x * TILE - cam.x, dy = n.y * TILE - cam.y;
-    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
+    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4, n.x * 3 + n.y * 7) });
   }
   const pdx = camX * TILE - cam.x, pdy = camY * TILE - cam.y;
   const playerSprite = state.playerSprite || 'player_boy';
-  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
+  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4, state.moving ? null : 1) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
@@ -1798,6 +1812,10 @@ function gameLoop() {
   // is the authoritative "a fight is in progress" flag regardless of which
   // screen value dialogue plumbing leaves behind, so gate on it too.
   if (!battle && (state.screen === 'overworld' || state.screen === 'dialogue')) renderOverworld();
+  // Keeps the trainer sprites' idle bob animating smoothly while a battle is
+  // up - renderBattleScene() alone (not the full renderBattleMain(), which
+  // also rebuilds the HP cards/menu HTML) is all a canvas-only bob needs.
+  if (battle && state.screen === 'battle') renderBattleScene();
   updateHud();
   requestAnimationFrame(gameLoop);
 }
@@ -1906,7 +1924,7 @@ function renderBattleScene() {
   // Opponent trainer (trainer battles only) - stands behind/above their own
   // monster, same convention as their name banner already shown up top.
   if (battle.trainerSprite) {
-    drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.78, canvas.height * 0.14, 4);
+    drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.78, canvas.height * 0.14, 4, 2);
   }
   // Ground platform under each creature's feet, the oval convention from the
   // classic games - drawn before the creature so its feet overlap the front
@@ -1930,7 +1948,7 @@ function renderBattleScene() {
     const pw = 64 * 3.8 * 1.35, ph = pw * 0.29;
     ctx.drawImage(platform, canvas.width * 0.05 + 64 * 3.8 * 0.5 - pw / 2, canvas.height * 0.38 + 44 * 3.8 * 0.74, pw, ph);
   }
-  drawChar(playerSprite, 'up', 0, canvas.width * 0.02, canvas.height * 0.55, 4.3);
+  drawChar(playerSprite, 'up', 0, canvas.width * 0.02, canvas.height * 0.55, 4.3, 3);
   if (pm) {
     const im = IMG.monsters[pm.slug];
     if (im && im.complete) ctx.drawImage(im, canvas.width * 0.05, canvas.height * 0.38, 64 * 3.8, 44 * 3.8);

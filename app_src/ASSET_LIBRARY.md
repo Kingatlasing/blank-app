@@ -81,6 +81,15 @@ beachcomber variants), `enforcer_grunt`/`enforcer_boss` (boss variants),
 `champion` (boss_orange), `townsfolk1`/`townsfolk2`. 209 total sprites
 exist in that folder if more NPC variety is wanted later.
 
+Checked all 208 of that folder's sheets (`mods/tuxemon/sprites/*.png`, one
+size check across the whole directory) for a dedicated idle/blink frame
+before adding an idle animation - every single one is exactly 3 walk
+frames x 4 directions, nothing more. So standing characters (every NPC,
+and the player when not moving) get a small procedural bob instead
+(`idleBobOffset()` in `engine.js`, a few px of vertical sine motion,
+phase-seeded per character so a crowd isn't all breathing in unison) -
+motion applied to the real "stand" frame already extracted, not new art.
+
 ## 5. Element/type icons (`ASSET_B64.elements`)
 
 Source: Tuxemon `mods/tuxemon/gfx/ui/icons/element/*_type_small.png`,
