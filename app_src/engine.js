@@ -1811,12 +1811,62 @@ function renderBestiaryMenu() {
     }
     const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
     const img = `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:64px;${status==='seen'?'filter:grayscale(1) brightness(0.6)':''}">`;
-    return `<div class="battlecard" style="text-align:center">${img}<br><b>${mon.name}</b><br>${types}${status==='caught' ? '<div style="color:#7fd87f;font-size:11px;margin-top:2px">&#10003; Caught</div>' : '<div style="color:#9fb4d8;font-size:11px;margin-top:2px">Seen</div>'}</div>`;
+    return `<div class="battlecard" style="text-align:center;cursor:pointer" onclick="renderDexDetail('${slug}')">${img}<br><b>${mon.name}</b><br>${types}${status==='caught' ? '<div style="color:#7fd87f;font-size:11px;margin-top:2px">&#10003; Caught</div>' : '<div style="color:#9fb4d8;font-size:11px;margin-top:2px">Seen</div>'}</div>`;
   }).join('');
   el.innerHTML = `<div class="panel" style="max-width:640px">
     <h2>Bestiary (${caughtCount}/${slugs.length} caught)</h2>
+    <p style="color:#9fb4d8;font-size:12px;margin-top:-8px">Tap an entry you've seen or caught for its full Dex page.</p>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;max-height:420px;overflow-y:auto">${cards}</div>
     <button onclick="renderMenu()">Back</button>
+  </div>`;
+}
+
+const STAT_LABELS = { hp: 'HP', melee: 'Melee', ranged: 'Ranged', armour: 'Armour', dodge: 'Dodge', speed: 'Speed' };
+// Real Tuxemon species/height(cm)/weight(kg) data (mods/tuxemon/db/monster/*.yaml) -
+// the classification/height/weight readout below is the same real per-species
+// data the classic Pokedex-style entry shows, not invented flavor text.
+function renderDexDetail(slug) {
+  const el = document.getElementById('menuOverlay');
+  const status = dexStatus(slug);
+  const mon = MONSTERS[slug];
+  const caught = status === 'caught';
+  const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
+  const classification = mon.species ? mon.species.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : '???';
+  const img = `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:120px;${caught?'':'filter:grayscale(1) brightness(0.6)'}">`;
+  const statBars = Object.keys(STAT_LABELS).map(k => {
+    const v = mon.stats[k] || 0;
+    const pct = Math.min(100, v / 14 * 100);
+    return `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:2px 0">
+      <span style="width:52px;flex-shrink:0">${STAT_LABELS[k]}</span>
+      <div style="flex:1;background:#2a2f45;border-radius:4px;height:8px;overflow:hidden"><div style="width:${pct}%;height:100%;background:#4caf50"></div></div>
+      <span style="width:22px;text-align:right;flex-shrink:0">${v}</span>
+    </div>`;
+  }).join('');
+  const evoChain = (mon.evolutions || []).map(e => {
+    const evoMon = MONSTERS[e.to];
+    if (!evoMon) return '';
+    const evoStatus = dexStatus(e.to);
+    const evoImg = evoStatus !== 'unseen'
+      ? `<img src="data:image/png;base64,${ASSET_B64.monsters[e.to]}" style="image-rendering:pixelated;width:48px;${evoStatus==='caught'?'':'filter:grayscale(1) brightness(0.6)'}">`
+      : `<div style="width:48px;height:33px;background:#333;border-radius:4px"></div>`;
+    const evoName = evoStatus !== 'unseen' ? evoMon.name : '???';
+    return `<div style="text-align:center;cursor:pointer" onclick="renderDexDetail('${e.to}')">${evoImg}<br><span style="font-size:10px">Lv${e.at_level != null ? e.at_level : e.level}&#8594;${evoName}</span></div>`;
+  }).join('');
+  el.innerHTML = `<div class="panel" style="max-width:420px">
+    <h2>No. ${mon.txmn_id || '???'} &middot; ${mon.name}</h2>
+    <div style="text-align:center">${img}</div>
+    <div style="text-align:center;margin:4px 0">${types}</div>
+    <p style="color:#ffd76b;font-size:13px;text-align:center;margin:2px 0">The ${classification} Creature</p>
+    ${caught ? `<div style="display:flex;justify-content:space-around;font-size:12px;color:#9fb4d8;margin:6px 0">
+        <span>Height: ${(mon.height/100).toFixed(2)} m</span><span>Weight: ${mon.weight} kg</span>
+      </div>
+      <p style="font-size:13px;color:#eee">${mon.description || 'No data recorded.'}</p>
+      <div style="margin-top:8px">${statBars}</div>
+      ${evoChain ? `<div style="display:flex;gap:14px;justify-content:center;margin-top:10px">${evoChain}</div>` : ''}
+      <p style="color:#7fd87f;font-size:12px;text-align:center;margin-top:8px">&#10003; Caught</p>`
+    : `<p style="font-size:13px;color:#9fb4d8;text-align:center">Height, weight, and full data are recorded once this creature is caught.</p>
+      <p style="color:#9fb4d8;font-size:12px;text-align:center">Seen in the wild</p>`}
+    <button onclick="renderBestiaryMenu()">Back</button>
   </div>`;
 }
 

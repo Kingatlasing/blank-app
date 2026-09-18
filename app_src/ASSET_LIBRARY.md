@@ -48,7 +48,20 @@ Source: `Tuxemon/Tuxemon`, `mods/tuxemon/db/monster/*.yaml` +
 165 of the project's 411 creatures are included (full evolution families,
 spread across all 13 types). To add more: re-run the extraction against
 a fresh slug list — `MONSTERS[slug]` gives `types`, `shape`, `stats`
-(shape attributes), `moveset` (level→technique), `evolutions`, `catch_rate`.
+(shape attributes), `moveset` (level→technique), `evolutions`, `catch_rate`,
+plus (added for the Bestiary detail page) `species` (a real classification
+tag, e.g. `false_dragon`), `height`/`weight` (real cm/kg from each monster's
+own yaml), and `description` (real flavor text, pulled from that project's
+own `l18n/en_US/LC_MESSAGES/base.po` locale file — the first extraction
+pass mishandled that file's multi-line `msgstr` entries and silently
+dropped 124 of 165 descriptions; re-parsed properly, all 165 are real text
+from that file, none written for this project).
+
+Real audio "cries" also exist in that repo (`mods/tuxemon/sounds/monster/`,
+mapped per-monster via `db/sounds/monster_calls.yaml`) but weren't added -
+embedding all 165 as base64 would add roughly 11MB to this single-file
+app (currently ~1.3MB), which seemed like the wrong tradeoff to make
+silently. Add them the same way if that tradeoff is wanted after all.
 
 ## 3. Moves / Items / Type chart (`data.js`)
 

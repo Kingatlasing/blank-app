@@ -17,7 +17,9 @@ https://github.com/Tuxemon/Tuxemon
   tamashihoshi, Leo, josepharaoh99, and others)
 
 Used for: the 165-creature roster (names, types, base stats, movesets,
-evolutions), moves/techniques, items, and monster battle sprites. Also used
+evolutions, species classification, height/weight, and Bestiary flavor text -
+the last of these from that project's own `l18n/en_US/LC_MESSAGES/base.po`
+locale file), moves/techniques, items, and monster battle sprites. Also used
 for the thirteen interior maps buildings can be entered into (Monster Center,
 Mart, Professor's Lab, player's house bedroom + downstairs, eight Arena Hall
 layouts), taken directly from that project's own Tiled interior maps
