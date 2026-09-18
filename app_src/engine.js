@@ -278,7 +278,9 @@ const state = {
   stepCounter: 0,
   encounterCooldown: 0,
   camera: { x: 0, y: 0 },
-  dex: {} // slug -> 'seen' | 'caught', for the Bestiary screen
+  dex: {}, // slug -> 'seen' | 'caught', for the Bestiary screen
+  visitedCenters: {}, // MAPS key of every healing_center_* interior visited, for Fast Travel
+  biking: false
 };
 
 function markDexSeen(slug) { if (!state.dex[slug]) state.dex[slug] = 'seen'; }
@@ -550,9 +552,9 @@ MAPS.gym_ashveld = {
   npcs: [{ id: 'leader_sylva', x: 10, y: 5, sprite: 'leader_sylva', facing: 'down', trainer: {
       name: 'Arena Leader Sylva', team: [
         { slug: 'anoleaf', level: 9 }, { slug: 'budaye', level: 9 }, { slug: 'chloragon', level: 10 },
-      ], prizeMoney: 300, flag: 'sylva_defeated', badge: 'Bramble Badge',
+      ], prizeMoney: 300, flag: 'sylva_defeated', badge: 'Bramble Badge', givesBike: true,
       preBattle: ["I am Sylva, Leader of the Ashveld Hall.", "Let's see if your team has truly grown!"],
-      postWin: ["Impressive. Take this Bramble Badge as proof of your victory."],
+      postWin: ["Impressive. Take this Bramble Badge as proof of your victory.", "Here, take my old bike too - you'll cover ground a lot faster with it. Press B to ride!"],
     } }],
   extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'ashveld', tx: 11, ty: 26 }],
 };
@@ -689,6 +691,7 @@ function handleNpcInteract(npc) {
   }
   if (npc.heal) {
     for (const m of state.party) m.currentHP = m.derived.hp;
+    if (npc.fastTravel) state.visitedCenters[state.map] = true;
   }
   if (npc.shop) { openShop(); return; }
   if (npc.minigame) { openMinigame(); return; }
@@ -833,6 +836,10 @@ window.addEventListener('keydown', e => {
   if (state.screen === 'dialogue' && ['Enter', ' '].includes(e.key)) { e.preventDefault(); advanceDialogue(); }
   if (state.screen === 'battle') handleBattleKey(e.key);
   if (e.key === 'Escape') toggleMenu();
+  if ((e.key === 'b' || e.key === 'B') && state.screen === 'overworld' && state.flags.hasBike) {
+    state.biking = !state.biking;
+    pushDialogue([state.biking ? "Hopped on the bike!" : "Hopped off the bike."]);
+  }
 });
 window.addEventListener('keyup', e => { keys[e.key] = false; });
 
@@ -1026,7 +1033,7 @@ function renderTiledOverworld(map) {
 /* ---------------------------- Game loop / movement animation ---------------------------- */
 function updateMovementAnim() {
   if (state.moving) {
-    state.moveProgress = (state.moveProgress || 0) + 0.22;
+    state.moveProgress = (state.moveProgress || 0) + (state.biking ? 0.44 : 0.22);
     state.animTimer++;
     state.px = state.moveFrom.x + (state.x - state.moveFrom.x) * Math.min(1, state.moveProgress);
     state.py = state.moveFrom.y + (state.y - state.moveFrom.y) * Math.min(1, state.moveProgress);
@@ -1236,6 +1243,7 @@ function finishBattle(playerWon) {
       state.money += t.prizeMoney || 0;
       state.flags[t.flag] = true;
       if (t.badge) state.badges.push(t.badge);
+      if (t.givesBike) state.flags.hasBike = true;
       if (t.keyItem) addItem('bridge_pass', 1);
       if (t.story) state.flags[t.story] = true;
       const lines = (t.postWin || []).slice();
@@ -1368,6 +1376,7 @@ function renderMenu() {
     <button onclick="renderBagMenu()">Bag</button>
     <button onclick="renderBadgesMenu()">Badges</button>
     <button onclick="renderBestiaryMenu()">Bestiary</button>
+    <button onclick="renderFastTravelMenu()">Fast Travel</button>
     <button onclick="saveGame()">Save Game</button>
     <button onclick="closeMenu()">Close</button>
   </div>`;
@@ -1414,6 +1423,21 @@ function renderBestiaryMenu() {
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;max-height:420px;overflow-y:auto">${cards}</div>
     <button onclick="renderMenu()">Back</button>
   </div>`;
+}
+
+function renderFastTravelMenu() {
+  const el = document.getElementById('menuOverlay');
+  const centers = Object.keys(state.visitedCenters).filter(k => state.visitedCenters[k]);
+  const rows = centers.length
+    ? centers.map(k => `<div class="shoprow"><span>${MAPS[k].name}</span><button onclick="fastTravelTo('${k}')">Go</button></div>`).join('')
+    : `<p>You haven't healed at a Monster Center yet - visit one first to add it here.</p>`;
+  el.innerHTML = `<div class="panel"><h2>Fast Travel</h2>${rows}<button onclick="renderMenu()">Back</button></div>`;
+}
+function fastTravelTo(centerKey) {
+  const warp = MAPS[centerKey].extraWarps.find(w => MAPS[w.to] && MAPS[w.to].tiledSrc !== 'interior');
+  if (!warp) return;
+  state.map = warp.to; state.x = warp.tx; state.y = warp.ty; state.px = warp.tx; state.py = warp.ty;
+  closeMenu();
 }
 
 /* ============================ SAVE / LOAD ============================ */
