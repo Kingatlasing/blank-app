@@ -34,7 +34,12 @@ function loadAllImages(cb) {
 }
 
 /* ---------------------------- Constants ---------------------------- */
-const TILE = 32; // rendered tile size (upscaled from 16px source art, crisp nearest-neighbor)
+const SRC_TILE = 32; // native pixel size of the source tile/atlas art
+const TILE = 64; // on-screen rendered tile size - a clean 2x integer upscale of SRC_TILE.
+// IMPORTANT: canvas.width/height are set to exactly VIEW_COLS*TILE / VIEW_ROWS*TILE, and the
+// canvas's CSS box is given those same pixel dimensions (see shell CSS) so the browser never
+// stretches the canvas by a fractional amount. A non-integer CSS scale on a pixel-art canvas
+// causes 1px seams right at tile boundaries (this is what made trees look "cut in half").
 const VIEW_COLS = 15, VIEW_ROWS = 10;
 const TYPE_COLORS = {
   fire:'#e0562b', water:'#2f8fd6', wood:'#4a9c3e', earth:'#a9752f', metal:'#8c95a3',
@@ -656,8 +661,8 @@ function drawChar(spriteKey, facing, frame, dx, dy, scale) {
 function drawAtlasTile(slot, dx, dy) {
   if (!slot || !ATLAS_IMG || !ATLAS_IMG.complete) return;
   const idx = slot - 1;
-  const sx = (idx % ATLAS_COLS) * TILE, sy = Math.floor(idx / ATLAS_COLS) * TILE;
-  ctx.drawImage(ATLAS_IMG, sx, sy, TILE, TILE, dx, dy, TILE, TILE);
+  const sx = (idx % ATLAS_COLS) * SRC_TILE, sy = Math.floor(idx / ATLAS_COLS) * SRC_TILE;
+  ctx.drawImage(ATLAS_IMG, sx, sy, SRC_TILE, SRC_TILE, dx, dy, TILE, TILE);
 }
 
 function renderOverworld() {
@@ -695,11 +700,11 @@ function renderOverworld() {
   }
   for (const n of (map.npcs || [])) {
     const dx = (n.x - originCol) * TILE - offX, dy = (n.y - originRow) * TILE - offY;
-    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 2) });
+    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
   }
   const pdx = (camX - originCol) * TILE - offX, pdy = (camY - originRow) * TILE - offY;
   const playerSprite = state.playerSprite || 'player_boy';
-  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 2) });
+  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 }
@@ -731,11 +736,11 @@ function renderTiledOverworld(map) {
   const drawables = [];
   for (const n of (map.npcs || [])) {
     const dx = (n.x - originCol) * TILE - offX, dy = (n.y - originRow) * TILE - offY;
-    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 2) });
+    drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
   }
   const pdx = (camX - originCol) * TILE - offX, pdy = (camY - originRow) * TILE - offY;
   const playerSprite = state.playerSprite || 'player_boy';
-  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 2) });
+  drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
 
