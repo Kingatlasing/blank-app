@@ -18,13 +18,20 @@ const ATLAS_COLS = TILED.atlasCols;
 let INTERIOR_ATLAS_IMG = null;
 const INTERIOR_ATLAS_COLS = INTERIOR_TILED.atlasCols;
 const INTERIOR_SRC_TILE = 16;
+// A third atlas: the "classic continent" outdoor maps (7 cities + 8 routes, real
+// Tuxemon TMX data) use yet another 16px tileset family (core_city_and_country/
+// core_outdoor/core_buildings/etc.) distinct from both the tuxmon-sample outdoor
+// set and the core_indoor_* interior set, so it gets its own atlas/image too.
+let CLASSIC_ATLAS_IMG = null;
+const CLASSIC_ATLAS_COLS = CLASSIC_TILED.atlasCols;
+const CLASSIC_SRC_TILE = 16;
 let imagesLoaded = 0, imagesTotal = 0;
 function loadAllImages(cb) {
   const cats = ['monsters', 'items', 'tiles', 'chars', 'elements', 'buildings'];
   for (const cat of cats) {
     for (const key in ASSET_B64[cat]) imagesTotal++;
   }
-  imagesTotal += 2; // world atlas + interior atlas
+  imagesTotal += 3; // world atlas + interior atlas + classic atlas
   ATLAS_IMG = new Image();
   ATLAS_IMG.onload = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
   ATLAS_IMG.onerror = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
@@ -33,6 +40,10 @@ function loadAllImages(cb) {
   INTERIOR_ATLAS_IMG.onload = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
   INTERIOR_ATLAS_IMG.onerror = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
   INTERIOR_ATLAS_IMG.src = 'data:image/png;base64,' + INTERIOR_TILED.atlas;
+  CLASSIC_ATLAS_IMG = new Image();
+  CLASSIC_ATLAS_IMG.onload = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
+  CLASSIC_ATLAS_IMG.onerror = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
+  CLASSIC_ATLAS_IMG.src = 'data:image/png;base64,' + CLASSIC_TILED.atlas;
   for (const cat of cats) {
     for (const key in ASSET_B64[cat]) {
       const im = new Image();
@@ -126,6 +137,15 @@ function loadAllImages(cb) {
     const td = TILED.maps[mapKey];
     td.collide[y * td.w + x] = false;
   }
+})();
+
+(function patchCrysthavenNorthRoad() {
+  // Crysthaven's entire north border is a solid tree line except the existing
+  // 6-tile route2 gap (x21-26) - confirmed by scanning the whole row. The new
+  // road north to Hearthrock (see crysthaven's extraWarps) needs its own gap,
+  // clear of that one, rather than colliding with the real route2 exit.
+  const t = TILED.maps.crysthaven;
+  for (const y of [0, 1]) t.collide[y * t.w + 35] = false;
 })();
 
 (function patchBadSpawnPoints() {
@@ -393,15 +413,19 @@ MAPS.crysthaven = {
       dialogue: () => (state.flags.enforcerDefeated ? ["The Enforcer Outpost is cleared out for good."] :
         ["The Enforcers are holed up south of here.", "Someone should really do something about that..."]) },
     { id: 'summit_sign', x: 28, y: 35, sprite: 'townsfolk2', facing: 'down',
-      dialogue: () => (state.flags.enforcerDefeated ? ["The path south leads to the Summit and the Champion.", "Good luck out there."] :
-        ["This path is closed until the Enforcer trouble is dealt with."]) },
+      dialogue: () => (!state.flags.enforcerDefeated ? ["This path is closed until the Enforcer trouble is dealt with."] :
+        state.badges.length < 8 ? ["The Summit only opens to a trainer holding all eight badges.", "You have " + state.badges.length + " so far."] :
+        ["The path south leads to the Summit and the Champion.", "Good luck out there."]) },
+    { id: 'north_road_sign', x: 35, y: 1, sprite: 'townsfolk1', facing: 'down',
+      dialogue: () => ["The road north leads out of Crysthaven into the wider Emberwild region.", "Hearthrock, Steamshore, and five more Halls lie that way - plenty more badges to earn."] },
   ],
   extraWarps: [
     { x: 24, y: 36, w: 1, h: 1, to: 'enforcerhideout', tx: 6, ty: 10, requires: null },
-    { x: 28, y: 36, w: 1, h: 1, to: 'summitplateau', tx: 7, ty: 12, requires: 'enforcerDefeated' },
+    { x: 28, y: 36, w: 1, h: 1, to: 'summitplateau', tx: 7, ty: 12, requires: 'enforcerDefeated', requiresBadges: 8 },
     { x: 6, y: 7, w: 1, h: 1, to: 'healing_center_crysthaven', tx: 6, ty: 10 },
     { x: 15, y: 7, w: 1, h: 1, to: 'mart_crysthaven', tx: 6, ty: 10 },
     { x: 34, y: 18, w: 1, h: 1, to: 'gym_crysthaven', tx: 10, ty: 19 },
+    { x: 35, y: 0, w: 1, h: 1, to: 'hearthrock', tx: 20, ty: 19 },
   ],
   encounterTable: [],
 };
@@ -570,6 +594,302 @@ MAPS.gym_crysthaven = {
   extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'crysthaven', tx: 34, ty: 18 }],
 };
 
+/* ------------------- The wider Emberwild region (6 more Halls) -------------------
+   Real Tuxemon "classic continent" data: 7 cities + 8 connecting routes
+   (mods/tuxemon/maps/classic_*.tmx) plus 6 of its Gym buildings - reachable north of
+   Crysthaven. Connections below (which tile warps to which map, at which arrival
+   tile) are taken directly from each map's own real Tiled "Events" teleport objects,
+   not invented - the only design choices made here are: which 6 of that data's real,
+   reachable gyms to use (skipping classic_gym_astra/bravion, already used by
+   Ashveld/Crysthaven, to avoid two towns sharing an identical-looking gym), and where
+   to put a 6th gym (aerolume) since that city's real data has none - a real, unused
+   gym map (classic_gym_zephra.tmx) placed there rather than inventing new art.
+   Leader names/sprites (leader_mila, leader_granite, leader_marin, leader_voltessa,
+   leader_zephra) are Tuxemon's own real NPC sprites for these exact gyms - only team
+   rosters and dialogue are original, since Tuxemon's own db leaves those blank
+   (mods/tuxemon/db/npc/classic_gym_people.yaml has no team data for any of them).
+   The steamshore gym on the real classic_gym_pyra.tmx map is named "Orion" (using the
+   unused leader_orion sprite) rather than "Pyra" to avoid clashing with the existing
+   Crysthaven leader of that name, who uses a different real map (gym_bravion). */
+MAPS.gym_hearthrock1 = {
+  tiledKey: 'gym_mila', tiledSrc: 'interior', name: 'Hearthrock Hall (Mila)',
+  npcs: [{ id: 'leader_mila', x: 10, y: 5, sprite: 'leader_mila', facing: 'down', trainer: {
+      name: 'Arena Leader Mila', team: [
+        { slug: 'krokivip', level: 19 }, { slug: 'bigfin', level: 19 }, { slug: 'galasces', level: 20 },
+      ], prizeMoney: 800, flag: 'mila_defeated', badge: 'Torrent Badge',
+      preBattle: ["Welcome to Hearthrock. I'm Mila.", "Let's see how you handle the current!"],
+      postWin: ["Well fought. Take the Torrent Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'hearthrock', tx: 18, ty: 12 }],
+};
+MAPS.gym_hearthrock2 = {
+  tiledKey: 'gym_granite', tiledSrc: 'interior', name: 'Hearthrock Hall (Granite)',
+  npcs: [{ id: 'leader_granite', x: 10, y: 5, sprite: 'leader_granite', facing: 'down', trainer: {
+      name: 'Arena Leader Granite', team: [
+        { slug: 'grintrock', level: 22 }, { slug: 'bricgard', level: 22 }, { slug: 'deviraptor', level: 23 },
+      ], prizeMoney: 900, flag: 'granite_defeated', badge: 'Boulder Badge',
+      preBattle: ["Hearthrock's second Hall. I'm Granite.", "My team won't budge easily."],
+      postWin: ["Solid effort. Take the Boulder Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'hearthrock', tx: 23, ty: 12 }],
+};
+MAPS.gym_steamshore1 = {
+  tiledKey: 'gym_marin', tiledSrc: 'interior', name: 'Steamshore Hall (Marin)',
+  npcs: [{ id: 'leader_marin', x: 10, y: 5, sprite: 'leader_marin', facing: 'down', trainer: {
+      name: 'Arena Leader Marin', team: [
+        { slug: 'katacoon', level: 25 }, { slug: 'tigrock', level: 25 }, { slug: 'dynastor', level: 26 },
+      ], prizeMoney: 1000, flag: 'marin_defeated', badge: 'Anchor Badge',
+      preBattle: ["Steamshore's harbor Hall. I'm Marin.", "My team is built like the docks - unshakable."],
+      postWin: ["Good match. Take the Anchor Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'steamshore', tx: 31, ty: 5 }],
+};
+MAPS.gym_steamshore2 = {
+  tiledKey: 'gym_pyra', tiledSrc: 'interior', name: 'Steamshore Hall (Orion)',
+  npcs: [{ id: 'leader_orion', x: 10, y: 5, sprite: 'leader_orion', facing: 'down', trainer: {
+      name: 'Arena Leader Orion', team: [
+        { slug: 'eyesore', level: 28 }, { slug: 'dragarbor', level: 28 }, { slug: 'seraphice', level: 29 },
+      ], prizeMoney: 1100, flag: 'orion_defeated', badge: 'Starfall Badge',
+      preBattle: ["I'm Orion. My team answers to the stars.", "Let's see if your journey has aligned you well."],
+      postWin: ["A battle well written in the stars. Take the Starfall Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'steamshore', tx: 23, ty: 15 }],
+};
+MAPS.gym_stormpeak = {
+  tiledKey: 'gym_voltessa', tiledSrc: 'interior', name: 'Stormpeak Hall',
+  npcs: [{ id: 'leader_voltessa', x: 10, y: 5, sprite: 'leader_voltessa', facing: 'down', trainer: {
+      name: 'Arena Leader Voltessa', team: [
+        { slug: 'apeoro', level: 31 }, { slug: 'ouroboutlet', level: 31 }, { slug: 'lightmare', level: 32 },
+      ], prizeMoney: 1300, flag: 'voltessa_defeated', badge: 'Storm Badge',
+      preBattle: ["Stormpeak's Hall, up where the lightning lives.", "I'm Voltessa. Try to keep up."],
+      postWin: ["You held your ground up here. Take the Storm Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'stormpeak', tx: 5, ty: 4 }],
+};
+MAPS.gym_aerolume = {
+  tiledKey: 'gym_zephra', tiledSrc: 'interior', name: 'Aerolume Hall',
+  npcs: [{ id: 'leader_zephra', x: 10, y: 5, sprite: 'leader_zephra', facing: 'down', trainer: {
+      name: 'Arena Leader Zephra', team: [
+        { slug: 'eaglace', level: 34 }, { slug: 'elostorm', level: 34 }, { slug: 'gryfix', level: 35 },
+      ], prizeMoney: 1500, flag: 'zephra_defeated', badge: 'Gale Badge',
+      preBattle: ["Aerolume's Hall - just a gym in an open field, but don't underestimate it.", "I'm Zephra. Let's fly."],
+      postWin: ["You matched my pace. Take the Gale Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'aerolume', tx: 20, ty: 11 }],
+};
+
+MAPS.healing_center_hearthrock = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Hearthrock Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Welcome to the Monster Center!", "Hearthrock's Halls are tough - rest up before you challenge them."] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'hearthrock', tx: 8, ty: 12 }],
+};
+MAPS.mart_hearthrock = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Hearthrock Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Take a look at my wares!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'hearthrock', tx: 13, ty: 12 }],
+};
+MAPS.healing_center_steamshore = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Steamshore Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Welcome to the Monster Center!", "Your creatures are fighting fit. Take care out there!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'steamshore', tx: 33, ty: 15 }],
+};
+MAPS.mart_steamshore = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Steamshore Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Take a look at my wares!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'steamshore', tx: 28, ty: 15 }],
+};
+MAPS.healing_center_stormpeak = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Stormpeak Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Welcome to the Monster Center!", "It's cold up here - rest up before heading back out."] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'stormpeak', tx: 16, ty: 8 }],
+};
+MAPS.mart_stormpeak = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Stormpeak Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Take a look at my wares!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'stormpeak', tx: 21, ty: 8 }],
+};
+
+MAPS.hearthrock = {
+  tiledKey: 'hearthrock', tiledSrc: 'classic', name: 'Hearthrock City',
+  npcs: [],
+  extraWarps: [
+    { x: 32, y: 0, w: 1, h: 1, to: 'classic_route1', tx: 33, ty: 19 },
+    { x: 39, y: 15, w: 1, h: 1, to: 'classic_route8', tx: 0, ty: 16 },
+    { x: 18, y: 13, w: 1, h: 1, to: 'gym_hearthrock1', tx: 10, ty: 19 },
+    { x: 23, y: 13, w: 1, h: 1, to: 'gym_hearthrock2', tx: 10, ty: 19 },
+    { x: 8, y: 13, w: 1, h: 1, to: 'healing_center_hearthrock', tx: 6, ty: 10 },
+    { x: 13, y: 13, w: 1, h: 1, to: 'mart_hearthrock', tx: 6, ty: 10 },
+    { x: 20, y: 19, w: 1, h: 1, to: 'crysthaven', tx: 23, ty: 1 },
+  ],
+  encounterTable: [],
+};
+MAPS.steamshore = {
+  tiledKey: 'steamshore', tiledSrc: 'classic', name: 'Steamshore City',
+  npcs: [],
+  extraWarps: [
+    { x: 5, y: 19, w: 1, h: 1, to: 'classic_route1', tx: 6, ty: 0 },
+    { x: 39, y: 2, w: 1, h: 1, to: 'classic_route2', tx: 0, ty: 3 },
+    { x: 23, y: 14, w: 1, h: 1, to: 'gym_steamshore2', tx: 10, ty: 19 },
+    { x: 31, y: 4, w: 1, h: 1, to: 'gym_steamshore1', tx: 10, ty: 19 },
+    { x: 28, y: 14, w: 1, h: 1, to: 'mart_steamshore', tx: 6, ty: 10 },
+    { x: 33, y: 14, w: 1, h: 1, to: 'healing_center_steamshore', tx: 6, ty: 10 },
+  ],
+  encounterTable: [],
+};
+MAPS.stormpeak = {
+  tiledKey: 'stormpeak', tiledSrc: 'classic', name: 'Stormpeak City',
+  npcs: [],
+  extraWarps: [
+    { x: 5, y: 3, w: 1, h: 1, to: 'gym_stormpeak', tx: 10, ty: 19 },
+    { x: 15, y: 19, w: 1, h: 1, to: 'classic_route4', tx: 18, ty: 0 },
+    { x: 16, y: 7, w: 1, h: 1, to: 'healing_center_stormpeak', tx: 6, ty: 10 },
+    { x: 21, y: 7, w: 1, h: 1, to: 'mart_stormpeak', tx: 6, ty: 10 },
+  ],
+  encounterTable: [],
+};
+MAPS.valorhold = {
+  tiledKey: 'valorhold', tiledSrc: 'classic', name: 'Valorhold',
+  npcs: [{ id: 'valorhold_sign', x: 12, y: 10, sprite: 'townsfolk1', facing: 'down',
+    dialogue: () => ["The old lighthouse tower here is said to hold a fierce trainer.", "No one's beaten them yet - but there's no badge in it, just bragging rights."] }],
+  extraWarps: [
+    { x: 0, y: 16, w: 1, h: 1, to: 'classic_route8', tx: 39, ty: 17 },
+    { x: 2, y: 0, w: 1, h: 1, to: 'classic_route7', tx: 3, ty: 19 },
+  ],
+  encounterTable: [],
+};
+MAPS.aerolume = {
+  tiledKey: 'aerolume', tiledSrc: 'classic', name: 'Aerolume',
+  npcs: [],
+  extraWarps: [
+    { x: 39, y: 1, w: 1, h: 1, to: 'classic_route6', tx: 0, ty: 2 },
+    { x: 0, y: 16, w: 1, h: 1, to: 'classic_route5', tx: 39, ty: 17 },
+    { x: 20, y: 10, w: 1, h: 1, to: 'gym_aerolume', tx: 10, ty: 19 },
+  ],
+  encounterTable: [],
+};
+MAPS.thornwood = {
+  tiledKey: 'thornwood', tiledSrc: 'classic', name: 'Thornwood',
+  npcs: [{ id: 'thornwood_sign', x: 20, y: 10, sprite: 'townsfolk2', facing: 'down',
+    dialogue: () => ["Thornwood sits at the crossroads of the whole region.", "Steamshore's east, Stormpeak and Valorhold are south, Aerolume's west."] }],
+  extraWarps: [
+    { x: 0, y: 16, w: 1, h: 1, to: 'classic_route2', tx: 39, ty: 17 },
+    { x: 39, y: 1, w: 1, h: 1, to: 'classic_route5', tx: 0, ty: 2 },
+    { x: 35, y: 19, w: 1, h: 1, to: 'classic_route7', tx: 36, ty: 0 },
+    { x: 16, y: 0, w: 1, h: 1, to: 'classic_route3', tx: 17, ty: 19 },
+  ],
+  encounterTable: [],
+};
+MAPS.umbrastar = {
+  tiledKey: 'umbrastar', tiledSrc: 'classic', name: 'Umbrastar',
+  npcs: [{ id: 'umbrastar_sign', x: 20, y: 10, sprite: 'townsfolk1', facing: 'down',
+    dialogue: () => ["Umbrastar's the end of the road out here.", "Quiet place. Good for training away from the crowds."] }],
+  extraWarps: [{ x: 0, y: 16, w: 1, h: 1, to: 'classic_route6', tx: 39, ty: 17 }],
+  encounterTable: [],
+};
+
+MAPS.classic_route1 = {
+  tiledKey: 'classic_route1', tiledSrc: 'classic', name: 'Route 1 (Hearthrock-Steamshore)',
+  npcs: [],
+  extraWarps: [
+    { x: 32, y: 19, w: 1, h: 1, to: 'hearthrock', tx: 33, ty: 0 },
+    { x: 5, y: 0, w: 1, h: 1, to: 'steamshore', tx: 6, ty: 19 },
+  ],
+  encounterTable: [
+    { slug: 'grintot', min: 18, max: 21, w: 4 }, { slug: 'boltnu', min: 18, max: 21, w: 4 },
+    { slug: 'gupphish', min: 18, max: 21, w: 4 }, { slug: 'chickadee', min: 18, max: 21, w: 3 },
+  ],
+};
+MAPS.classic_route2 = {
+  tiledKey: 'classic_route2', tiledSrc: 'classic', name: 'Route 2 (Steamshore-Thornwood)',
+  npcs: [],
+  extraWarps: [
+    { x: 0, y: 2, w: 1, h: 1, to: 'steamshore', tx: 39, ty: 3 },
+    { x: 39, y: 16, w: 1, h: 1, to: 'thornwood', tx: 0, ty: 17 },
+  ],
+  encounterTable: [
+    { slug: 'kroki', min: 20, max: 23, w: 4 }, { slug: 'katapill', min: 20, max: 23, w: 4 },
+    { slug: 'fancair', min: 20, max: 23, w: 3 }, { slug: 'lesmagu', min: 20, max: 23, w: 3 },
+  ],
+};
+MAPS.classic_route3 = {
+  tiledKey: 'classic_route3', tiledSrc: 'classic', name: 'Route 3',
+  npcs: [],
+  extraWarps: [
+    { x: 16, y: 0, w: 1, h: 1, to: 'classic_route4', tx: 20, ty: 0 },
+    { x: 16, y: 19, w: 1, h: 1, to: 'thornwood', tx: 17, ty: 0 },
+  ],
+  encounterTable: [
+    { slug: 'metesaur', min: 22, max: 25, w: 4 }, { slug: 'cataspike', min: 22, max: 25, w: 4 },
+    { slug: 'dollfin', min: 22, max: 25, w: 3 }, { slug: 'pipis', min: 22, max: 25, w: 3 },
+  ],
+};
+MAPS.classic_route4 = {
+  tiledKey: 'classic_route4', tiledSrc: 'classic', name: 'Route 4',
+  npcs: [],
+  extraWarps: [
+    { x: 15, y: 0, w: 1, h: 1, to: 'stormpeak', tx: 18, ty: 19 },
+    { x: 16, y: 19, w: 1, h: 1, to: 'classic_route3', tx: 20, ty: 19 },
+  ],
+  encounterTable: [
+    { slug: 'claymorior', min: 24, max: 27, w: 4 }, { slug: 'angrito', min: 24, max: 27, w: 4 },
+    { slug: 'nebufin', min: 24, max: 27, w: 3 }, { slug: 'hatchling', min: 24, max: 27, w: 3 },
+  ],
+};
+MAPS.classic_route5 = {
+  tiledKey: 'classic_route5', tiledSrc: 'classic', name: 'Route 5 (Thornwood-Aerolume)',
+  npcs: [],
+  extraWarps: [
+    { x: 0, y: 1, w: 1, h: 1, to: 'thornwood', tx: 39, ty: 2 },
+    { x: 39, y: 16, w: 1, h: 1, to: 'aerolume', tx: 0, ty: 17 },
+  ],
+  encounterTable: [
+    { slug: 'devidin', min: 26, max: 29, w: 4 }, { slug: 'botbot', min: 26, max: 29, w: 4 },
+    { slug: 'jelillow', min: 26, max: 29, w: 3 }, { slug: 'noctula', min: 26, max: 29, w: 3 },
+  ],
+};
+MAPS.classic_route6 = {
+  tiledKey: 'classic_route6', tiledSrc: 'classic', name: 'Route 6 (Aerolume-Umbrastar)',
+  npcs: [],
+  extraWarps: [
+    { x: 39, y: 16, w: 1, h: 1, to: 'umbrastar', tx: 0, ty: 17 },
+    { x: 0, y: 1, w: 1, h: 1, to: 'aerolume', tx: 39, ty: 2 },
+  ],
+  encounterTable: [
+    { slug: 'imbrickcile', min: 28, max: 31, w: 4 }, { slug: 'sadito', min: 28, max: 31, w: 4 },
+    { slug: 'bedoo', min: 28, max: 31, w: 3 }, { slug: 'birdling', min: 28, max: 31, w: 3 },
+  ],
+};
+MAPS.classic_route7 = {
+  tiledKey: 'classic_route7', tiledSrc: 'classic', name: 'Route 7 (Thornwood-Valorhold)',
+  npcs: [],
+  extraWarps: [
+    { x: 2, y: 19, w: 1, h: 1, to: 'valorhold', tx: 3, ty: 0 },
+    { x: 35, y: 0, w: 1, h: 1, to: 'thornwood', tx: 36, ty: 19 },
+  ],
+  encounterTable: [
+    { slug: 'grintot', min: 24, max: 27, w: 4 }, { slug: 'happito', min: 24, max: 27, w: 4 },
+    { slug: 'galasces', min: 24, max: 27, w: 3 }, { slug: 'elofly', min: 24, max: 27, w: 3 },
+  ],
+};
+MAPS.classic_route8 = {
+  tiledKey: 'classic_route8', tiledSrc: 'classic', name: 'Route 8 (Hearthrock-Valorhold)',
+  npcs: [],
+  extraWarps: [
+    { x: 0, y: 15, w: 1, h: 1, to: 'hearthrock', tx: 39, ty: 16 },
+    { x: 39, y: 16, w: 1, h: 1, to: 'valorhold', tx: 0, ty: 17 },
+  ],
+  encounterTable: [
+    { slug: 'baddrscratch', min: 18, max: 21, w: 4 }, { slug: 'picc', min: 18, max: 21, w: 4 },
+    { slug: 'dollfin', min: 18, max: 21, w: 3 }, { slug: 'cardiling', min: 18, max: 21, w: 3 },
+  ],
+};
+
 (function patchBrokenWarps() {
   // Each town has one warp into a "pokemon_center_*" building interior, but
   // those interior maps were never included in this build (ASSET_LIBRARY.md:
@@ -586,11 +906,12 @@ MAPS.gym_crysthaven = {
   // build, everywhere, rather than special-casing the three known ones -
   // the door tile is left walkable (same as this project's other purely
   // decorative doors) but no longer tries to warp anywhere.
+  const tiledSourceByName = { interior: INTERIOR_TILED, classic: CLASSIC_TILED };
   const targetExists = (key) => {
     const m = MAPS[key];
     if (!m) return false;
     if (!m.tiledKey) return true;
-    return !!(m.tiledSrc === 'interior' ? INTERIOR_TILED : TILED).maps[m.tiledKey];
+    return !!(tiledSourceByName[m.tiledSrc] || TILED).maps[m.tiledKey];
   };
   for (const name in TILED.maps) {
     const td = TILED.maps[name];
@@ -757,6 +1078,11 @@ function onArrive() {
         state.x = state.moveFrom.x; state.y = state.moveFrom.y;
         return;
       }
+      if (hit.requiresBadges && state.badges.length < hit.requiresBadges) {
+        pushDialogue(["The Summit only opens to a trainer holding all " + hit.requiresBadges + " badges.", "You have " + state.badges.length + " so far."]);
+        state.x = state.moveFrom.x; state.y = state.moveFrom.y;
+        return;
+      }
       const targetKey = hit.to;
       const targetMap = MAPS[targetKey];
       const targetTd = targetMap.tiledKey ? tiledSourceFor(targetMap).data : null;
@@ -914,9 +1240,9 @@ function drawAtlasTile(slot, dx, dy) {
 // it with - outdoor maps use TILED (32px tuxmon-sample atlas), building interiors use
 // INTERIOR_TILED (16px core_indoor_* atlas, a separate source-art family).
 function tiledSourceFor(map) {
-  return map.tiledSrc === 'interior'
-    ? { data: INTERIOR_TILED.maps[map.tiledKey], img: INTERIOR_ATLAS_IMG, cols: INTERIOR_ATLAS_COLS, srcTile: INTERIOR_SRC_TILE }
-    : { data: TILED.maps[map.tiledKey], img: ATLAS_IMG, cols: ATLAS_COLS, srcTile: SRC_TILE };
+  if (map.tiledSrc === 'interior') return { data: INTERIOR_TILED.maps[map.tiledKey], img: INTERIOR_ATLAS_IMG, cols: INTERIOR_ATLAS_COLS, srcTile: INTERIOR_SRC_TILE };
+  if (map.tiledSrc === 'classic') return { data: CLASSIC_TILED.maps[map.tiledKey], img: CLASSIC_ATLAS_IMG, cols: CLASSIC_ATLAS_COLS, srcTile: CLASSIC_SRC_TILE };
+  return { data: TILED.maps[map.tiledKey], img: ATLAS_IMG, cols: ATLAS_COLS, srcTile: SRC_TILE };
 }
 
 function renderOverworld() {

@@ -18,15 +18,35 @@ https://github.com/Tuxemon/Tuxemon
 
 Used for: the 165-creature roster (names, types, base stats, movesets,
 evolutions), moves/techniques, items, and monster battle sprites. Also used
-for the seven interior maps buildings can be entered into (Monster Center,
-Mart, Professor's Lab, player's house bedroom + downstairs, two Arena Hall
+for the thirteen interior maps buildings can be entered into (Monster Center,
+Mart, Professor's Lab, player's house bedroom + downstairs, eight Arena Hall
 layouts), taken directly from that project's own Tiled interior maps
 (`mods/tuxemon/maps/healing_center.tmx`, `tuxe_mart_taba.tmx`,
 `professor_lab.tmx`, `player_house_bedroom.tmx`, `player_house_downstairs.tmx`,
-`classic_gym_astra.tmx`, `classic_gym_bravion.tmx`) and their matching
+`classic_gym_astra.tmx`, `classic_gym_bravion.tmx`, `classic_gym_mila.tmx`,
+`classic_gym_granite.tmx`, `classic_gym_marin.tmx`, `classic_gym_pyra.tmx`,
+`classic_gym_voltessa.tmx`, `classic_gym_zephra.tmx`) and their matching
 `core_indoor_floors`/`core_indoor_walls`/`core_set pieces` tileset art —
 extracted tile-for-tile with their original furniture/collision layout,
 nothing hand-built or invented.
+
+Also used for a second connected region north of Crysthaven: seven more
+cities and eight connecting routes from Tuxemon's own "classic continent" map
+set (`mods/tuxemon/maps/classic_*.tmx` - `classic_hearthrock_city.tmx`,
+`classic_steamshore_city.tmx`, `classic_stormpeak_city.tmx`,
+`classic_valorhold_city.tmx`, `classic_aerolume_city.tmx`,
+`classic_thornwood_city.tmx`, `classic_umbrastar_city.tmx`,
+`classic_route_1.tmx` through `classic_route_8.tmx`) and their tileset art
+(`core_city_and_country`/`core_outdoor`/`core_buildings`/`core_outdoor_water`/
+`core_outdoor_nature`/`core_set pieces`), extracted the same tile-for-tile
+way. Which map connects to which, and at what tile, is taken directly from
+each map's own real Tiled warp/teleport data, not invented. The six new Arena
+Leaders (Mila, Granite, Marin, Orion, Voltessa, Zephra) use Tuxemon's own
+real NPC sprites for those exact gym slugs (`leader_mila`, `leader_granite`,
+etc., from `mods/tuxemon/sprites/`); their team rosters and dialogue are
+original, since Tuxemon's own NPC database
+(`mods/tuxemon/db/npc/classic_gym_people.yaml`) defines no teams for any of
+them.
 
 ## PokeMMO-Online-Realtime-Multiplayer-Game
 https://github.com/aaron5670/PokeMMO-Online-Realtime-Multiplayer-Game

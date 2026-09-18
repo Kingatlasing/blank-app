@@ -2,22 +2,27 @@
 
 An original creature-taming RPG in the spirit of classic Game Boy Advance-era
 monster games — pick a starter, explore a connected world of towns and
-routes, catch and train creatures, battle Arena Leaders and a rival crime
-syndicate, and take on the Champion.
+routes, catch and train creatures, earn all 8 Hall badges from Arena Leaders,
+take down a rival crime syndicate, and challenge the Champion.
 
 This is a self-contained HTML/CSS/JS game (`app/index.html`, canvas-rendered)
 served full-screen through a thin Streamlit wrapper (`streamlit_app.py`), in
 the same self-contained-single-file style as this repo's previous games.
 
 - **165 original creatures** — full stat lines, movesets, and evolution
-  chains across 13 elemental types
-- **A connected world** — five hand-built-into-real-Tiled-maps locations
-  (Cottonwood Town, Route 1, Ashveld Town, Route 2, Crysthaven City) plus a
-  villain hideout and a final Summit, all rendered from real tile art (roads,
-  buildings, fences, fountains, trees)
+  chains across 13 elemental types, browsable in an in-game Bestiary
+- **A connected world** — twelve real-Tiled-map locations (Cottonwood Town,
+  Route 1, Ashveld Town, Route 2, Crysthaven City, then seven more cities and
+  eight connecting routes north of Crysthaven) plus a villain hideout and a
+  final Summit, all rendered from real tile art (roads, buildings, fences,
+  fountains, trees, water)
+- **13 enterable building interiors** — Monster Centers, Marts, a lab, the
+  player's own house, and 8 Arena Halls, each a real furnished interior map
+- **The Bike** — faster overworld movement, awarded by the first Hall you
+  clear; **Fast Travel** to any Monster Center you've visited
 - **Turn-based battles** — type effectiveness, capture mechanics, leveling,
-  evolution, trainer battles
-- **Story & side quests** — a main quest through two Arena Leaders and the
+  evolution, trainer battles, with both trainers' sprites and creatures shown
+- **Story & side quests** — a main quest through 8 Arena Leaders and the
   "Enforcers" crime syndicate, plus a lost-pet quest and a hidden-item hunt
 - **A mini-game** — Berry Toss, a timing reflex game
 - **Save/continue** — autosave-style save via `localStorage`

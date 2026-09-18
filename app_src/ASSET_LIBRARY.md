@@ -106,6 +106,45 @@ layouts. The Center/Mart layout is reused per-town (one real map, three
 `MAPS.*` entries each with their own return-warp) since the source repo only
 has one of each.
 
+## 7. The wider Emberwild region (`classic_tiled.js` → `CLASSIC_TILED.atlas`, `.maps`)
+
+Source: `Tuxemon/Tuxemon`, the real "classic continent" Tiled maps from
+`mods/tuxemon/maps/classic_*.tmx` - 7 cities (`hearthrock`, `steamshore`,
+`stormpeak`, `valorhold`, `aerolume`, `thornwood`, `umbrastar`) and 8
+connecting routes (`classic_route1`..`classic_route8`), reachable from
+Crysthaven's north edge. Yet another 16px tileset family
+(`core_city_and_country`/`core_outdoor`/`core_buildings`/`core_outdoor_water`/
+`core_outdoor_nature`/`core_set pieces`), distinct from both the outdoor
+tuxmon-sample set and the `core_indoor_*` interior set, so it gets its own
+atlas/image (`CLASSIC_ATLAS_IMG`) - `map.tiledSrc: 'classic'` on a `MAPS.*`
+entry routes it there via the same `tiledSourceFor()` dispatch the interiors
+use. Same render contract as `TILED`/`INTERIOR_TILED` (`w`/`h`/`below`/
+`world`/`above`/`collide`, explicit `tx`/`ty` on every warp).
+
+Every city-to-route and route-to-route connection (which tile warps to which
+map, and exactly where you land) is copied directly from that map's own real
+Tiled "Events" teleport objects - not invented. 6 of this region's real,
+reachable Gym buildings are wired in as new Halls (`gym_hearthrock1/2`,
+`gym_steamshore1/2`, `gym_stormpeak`, `gym_aerolume` - tiledSrc `'interior'`,
+sharing `INTERIOR_TILED`'s atlas since gym interiors use the same
+`core_indoor_*` family), each with a real Tuxemon leader sprite
+(`leader_mila`, `leader_granite`, `leader_marin`, `leader_voltessa`,
+`leader_zephra`, plus `leader_orion` standing in for the `classic_gym_pyra.tmx`
+gym to avoid a same-name clash with Crysthaven's existing "Pyra"). Two of the
+real gyms (`classic_gym_astra`/`classic_gym_bravion`) are deliberately not
+reused here since Ashveld/Crysthaven already use them; `classic_gym_zephra`
+is placed in Aerolume, which has no gym in the source data, rather than
+inventing new art for a 6th Hall. Team rosters are original (Tuxemon's own
+`db/npc/classic_gym_people.yaml` defines no teams for any of these leaders).
+`healing_center`/`mart` (from section 6) are reused again for Hearthrock,
+Steamshore, and Stormpeak, the 3 of these 7 cities whose real map data
+includes an actual Center/Mart building (found by tile-ID matching against
+Hearthrock's, then confirming each door via its own real collision gap - see
+`patchBuildingDoors`-style comments in `engine.js`); the other 4 cities have
+none in the source data, so none was added - Fast Travel covers healing
+there instead. Valorhold/Thornwood/Umbrastar are real but sparse
+(forest/open-field) connector cities with no gym.
+
 ## What's NOT here (by design)
 
 No real Pokémon assets, sprites, or species data anywhere — verified both
