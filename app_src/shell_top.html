@@ -47,31 +47,65 @@
      sprite top-right), player's own card lower-right (beside their own sprite,
      which stands lower-left) - not both cards stacked together at the very top. */
   #battleTop { position:absolute; top:14px; left:14px; }
-  #battlePlayerHp { position:absolute; top:300px; right:14px; }
-  .battlecard { color:#2a2016; padding:8px 16px 6px; font-size:12px; box-sizing:border-box;
+  /* top:280 (not the card's more "natural" ~300+) and the shorter card height
+     below are both deliberately tight - the only vertical gap on the right side
+     of the battle canvas sits between the enemy's sprite/platform and the
+     bottom menu footer, so the card has to fit inside that gap rather than the
+     other way around. */
+  #battlePlayerHp { position:absolute; top:280px; right:14px; }
+  .battlecard { color:#2a2016; padding:6px 16px 4px; font-size:12px; box-sizing:border-box;
     background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated; }
   /* Heights match each real frame PNG's own aspect ratio (100x29 / 104x37) at this
      width, so the pixel art isn't stretched out of proportion; text is allowed to
      spill past the bottom edge if it needs more room rather than clipping. */
   .battlecard.opponent { background-image:var(--hp-frame-opponent); width:260px; height:75px; }
-  .battlecard.player { background-image:var(--hp-frame-player); width:280px; height:100px; padding-top:10px; }
+  .battlecard.player { background-image:var(--hp-frame-player); width:280px; height:76px; padding-top:6px; }
   .typebadge, .movetype { display:inline-block; font-size:9px; padding:1px 5px; border-radius:8px; margin-left:4px; color:#fff; text-transform:uppercase; }
   .hptext { font-size:11px; opacity:0.8; }
+  /* Real Tuxemon HP-bar frame (mods/tuxemon/gfx/ui/monster/hp_bar.png) in place of a
+     flat CSS bar - the frame's interior is semi-transparent by design (shades
+     whatever's drawn under it), so the colored fill sits underneath and the frame
+     draws on top, same layering as the source game. Interior offsets (30%/16.7%
+     from each edge) are that PNG's own fill-slot bounds, not arbitrary. */
+  .hpbarframe { position:relative; width:150px; height:16px; margin:3px 0 1px; background-image:var(--hp-bar-frame); background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated; }
+  .hpfilltrack { position:absolute; left:30%; top:16.7%; width:63.3%; height:66.6%; overflow:hidden; }
+  .hpfilltrack .hpfill { height:100%; }
   #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:flex; flex-direction:column-reverse; }
   #battleFooter { position:absolute; bottom:98px; left:10px; right:10px; display:flex; flex-direction:column; gap:8px; }
   /* Classic "What will X do?" prompt line above the action grid - hidden (display:none)
      while a submenu (Fight/Bag/Creatures) is open, same as the real games only show it
      on the root action menu. */
-  #battlePrompt { background:rgba(10,15,30,0.75); color:#fff; padding:10px 14px; border-radius:8px; font-size:15px; display:none; }
+  /* Real Tuxemon 9-slice panel border (mods/tuxemon/gfx/borders/borders-blue.png)
+     via CSS border-image, in place of flat CSS border-radius/border boxes, for
+     every box in the bottom battle menu area - the prompt line, the action
+     buttons, the move grid/info panel, and the Bag/Creatures button lists.
+     "fill" paints the 9-slice's own (navy) center tile as the box's background
+     too, matching the dark buttons already used elsewhere in this UI; the
+     move-info panel keeps its own cream background instead (no "fill"), so
+     the border wraps it without recoloring it - same dark-border/light-panel
+     contrast as the real PP box it's echoing. */
+  #battlePrompt, #battleMenu button {
+    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 10px;
+    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+  }
+  .moveinfo {
+    border-image-source: var(--menu-border); border-image-slice: 6; border-image-width: 10px;
+    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+  }
+  #battlePrompt { color:#fff; padding:10px 14px; font-size:15px; display:none; }
   #battleMenu { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  #battleMenu button { padding:12px; font-size:15px; background:#1b2440; color:#fff; border:2px solid #4a5a8a; border-radius:6px; cursor:pointer; }
+  #battleMenu button { padding:12px; font-size:15px; color:#fff; cursor:pointer; }
   /* Fight submenu: classic 2x2 move grid + a side info panel (type/power/accuracy/
      recharge - real Tuxemon move data, not a fabricated PP number) that updates on
      hover, echoing the move-grid+PP-box layout of the reference screens. */
   .fightpanel { grid-column: 1 / -1; display:flex; gap:8px; }
   .movegrid { flex:2; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .movegrid button { padding:10px; font-size:14px; background:#1b2440; color:#fff; border:2px solid #4a5a8a; border-radius:6px; cursor:pointer; text-align:left; }
-  .moveinfo { flex:1; background:#eee3c6; color:#2a2016; border:2px solid #4a5a8a; border-radius:6px; padding:10px 12px; font-size:12px; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  .movegrid button {
+    padding:10px; font-size:14px; color:#fff; cursor:pointer; text-align:left;
+    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 10px;
+    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+  }
+  .moveinfo { flex:1; background:#eee3c6; color:#2a2016; padding:10px 12px; font-size:12px; display:flex; flex-direction:column; justify-content:center; gap:3px; }
   .backbtn { grid-column: 1 / -1; }
   #battleTrainerName { position:absolute; top:8px; left:0; right:0; text-align:center; }
   .trainername { color:#fff; background:rgba(10,15,30,0.85); padding:4px 10px; border-radius:6px; font-size:13px; display:inline-block; }

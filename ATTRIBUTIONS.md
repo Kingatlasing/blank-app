@@ -56,6 +56,13 @@ backgrounds/boxes used before - picked by context (a Hall battle gets the
 real stadium art, everything else gets the real forest/grass art), not drawn
 or invented for this project.
 
+The actual HP fill bar (previously a flat CSS `<div>`) and every button/panel
+in the bottom battle menu (previously flat `border-radius` CSS boxes) also
+use real Tuxemon UI art: `mods/tuxemon/gfx/ui/monster/hp_bar.png` (the HP-bar
+frame with its own "HP" tag and fill slot) and `mods/tuxemon/gfx/borders/
+borders-blue.png` (a 9-slice panel border, applied via CSS `border-image`
+so it can stretch to any button/panel size without being redrawn).
+
 ## Guardian Monsters Artwork
 https://github.com/limbusdev/guardian_monsters_artwork
 

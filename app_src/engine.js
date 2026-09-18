@@ -1475,7 +1475,10 @@ function renderBattleScene() {
   // Eckert/lucidtanooki, CC BY-4.0), not drawn/invented for this project.
   const platform = IMG.battleui.platform_oval;
   if (platform && platform.complete && enemy) {
-    const pw = 64 * 3.3 * 1.55, ph = pw * 0.29;
+    // Smaller than the player's own platform below (1.15x vs 1.35x) - the
+    // opponent side has less vertical room before the player's own HP card,
+    // which floats in the gap between here and the bottom menu.
+    const pw = 64 * 3.3 * 1.15, ph = pw * 0.29;
     ctx.drawImage(platform, canvas.width * 0.58 + 64 * 3.3 * 0.5 - pw / 2, canvas.height * 0.16 + 44 * 3.3 * 0.86, pw, ph);
   }
   if (enemy) {
@@ -1501,7 +1504,7 @@ function renderBattleScene() {
 function battleHpBar(m, side) {
   const pct = Math.max(0, Math.floor(m.currentHP / m.derived.hp * 100));
   const typeBadges = MONSTERS[m.slug].types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
-  return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
+  return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbarframe"><div class="hpfilltrack"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
 }
 
 function setBattlePrompt(text) {
@@ -1917,5 +1920,7 @@ window.addEventListener('load', () => {
     // set as CSS vars here since the base64 data isn't known until ASSET_B64 loads.
     document.documentElement.style.setProperty('--hp-frame-player', "url(data:image/png;base64," + ASSET_B64.battleui.hp_player_frame + ")");
     document.documentElement.style.setProperty('--hp-frame-opponent', "url(data:image/png;base64," + ASSET_B64.battleui.hp_opponent_frame + ")");
+    document.documentElement.style.setProperty('--hp-bar-frame', "url(data:image/png;base64," + ASSET_B64.battleui.hp_bar_frame + ")");
+    document.documentElement.style.setProperty('--menu-border', "url(data:image/png;base64," + ASSET_B64.battleui.menu_border + ")");
   });
 });

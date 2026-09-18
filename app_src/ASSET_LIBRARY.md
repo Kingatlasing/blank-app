@@ -145,6 +145,21 @@ none in the source data, so none was added - Fast Travel covers healing
 there instead. Valorhold/Thornwood/Umbrastar are real but sparse
 (forest/open-field) connector cities with no gym.
 
+## 7b. Battle HP bar and menu buttons (`ASSET_B64.battleui.hp_bar_frame` / `.menu_border`)
+
+Source: `Tuxemon/Tuxemon`, `mods/tuxemon/gfx/ui/monster/hp_bar.png` (the real
+HP-bar frame - a red "HP" tag plus a semi-transparent fill slot, 30x12 native)
+and `mods/tuxemon/gfx/borders/borders-blue.png` (an 18x18 9-slice panel
+border). Both replace flat CSS-drawn boxes that were there before. The HP
+bar's colored fill (`.hpfill`, same green/yellow/red threshold logic as
+before) is drawn under the frame image inside its real fill-slot bounds
+(`.hpfilltrack`, offset 30%/16.7% from each edge - that PNG's own slot, not
+guessed); the frame's semi-transparent interior shades it slightly, same
+layering the source game uses. The border is applied via CSS
+`border-image-slice`/`border-image-width` so its four corner/edge/center
+tiles stretch to fit the prompt line, every battle-menu button, the move
+grid, and the move-info panel, without needing a separate image per size.
+
 ## 8. Battle platform (`ASSET_B64.battleui.platform_oval`)
 
 Source: `limbusdev/guardian_monsters_artwork` (CC BY-4.0), `backdrops/battle/
