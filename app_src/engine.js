@@ -33,6 +33,51 @@ function loadAllImages(cb) {
   }
 }
 
+/* ---------------------------- Map data patch ---------------------------- */
+// The source maps leave a walkable gap directly at the base of some border
+// trees (e.g. narrow alleys between buildings). Standing there is never
+// actually broken - the player sprite still draws correctly in front of the
+// tree - but it looks wrong at a glance (player squeezed right against/under
+// the canopy), so we extend each such tree's collision by one tile downward
+// at load time. This only touches collision, never the visuals/tile data.
+(function patchUnreachableWarps() {
+  // town's south wall (row 37, a solid fence/railing tile per the source
+  // tileset's own "collides" property) has no gap aligned with the route1
+  // exit corridor directly below it (row 38-39, x17-22) - a dead end in the
+  // source map that leaves the plaza with no way to actually reach route1.
+  // Verified with a full flood-fill from the spawn point: every other warp
+  // in every map is reachable; this is the one exception. Open a matching
+  // gate in that wall so the exit is actually usable.
+  const t = TILED.maps.town;
+  for (let x = 17; x <= 22; x++) t.collide[37 * t.w + x] = false;
+})();
+
+(function patchBadSpawnPoints() {
+  // crysthaven's own "Spawn Point"/"from-route2" marker sits on a solid tile
+  // in the source map (inside a building's footprint) - a pre-existing
+  // authoring issue in that map file, not something this project introduced.
+  // Nudge it to the nearest open tile so arriving from route2 never drops
+  // the player inside a wall.
+  const c = TILED.maps.crysthaven;
+  if (c && c.spawns['from-route2']) {
+    c.spawns['from-route2'] = { x: 24, y: 4 };
+    c.spawns['Spawn Point'] = { x: 24, y: 4 };
+  }
+})();
+
+(function patchTreeCollision() {
+  const TREE_SLOTS = new Set([12, 13, 16, 17]);
+  for (const name in TILED.maps) {
+    const td = TILED.maps[name];
+    const w = td.w, h = td.h;
+    for (let y = 0; y < h - 1; y++) {
+      for (let x = 0; x < w; x++) {
+        if (TREE_SLOTS.has(td.world[y * w + x])) td.collide[(y + 1) * w + x] = true;
+      }
+    }
+  }
+})();
+
 /* ---------------------------- Constants ---------------------------- */
 const SRC_TILE = 32; // native pixel size of the source tile/atlas art
 const TILE = 64; // on-screen rendered tile size - a clean 2x integer upscale of SRC_TILE.
