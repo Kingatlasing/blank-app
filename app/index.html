@@ -794,17 +794,16 @@ function renderOverworld() {
   ctx.fillStyle = map.indoor ? '#111' : '#87ceeb';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  let camX = state.px !== undefined ? state.px : state.x;
-  let camY = state.py !== undefined ? state.py : state.y;
-  const originCol = Math.floor(camX - VIEW_COLS / 2);
-  const originRow = Math.floor(camY - VIEW_ROWS / 2);
-  const offX = (Math.floor(camX * TILE) - Math.floor(originCol * TILE)) - canvas.width / 2 + TILE / 2;
-  const offY = (Math.floor(camY * TILE) - Math.floor(originRow * TILE)) - canvas.height / 2 + TILE / 2;
+  const camX = state.px !== undefined ? state.px : state.x;
+  const camY = state.py !== undefined ? state.py : state.y;
+  const cam = cameraPixelPos(camX, camY, map.w, map.h);
+  const originCol = Math.floor(cam.x / TILE) - 1;
+  const originRow = Math.floor(cam.y / TILE) - 1;
 
   for (let ry = -1; ry <= VIEW_ROWS + 1; ry++) {
     for (let rx = -1; rx <= VIEW_COLS + 1; rx++) {
       const tx = originCol + rx, ty = originRow + ry;
-      const dx = rx * TILE - offX, dy = ry * TILE - offY;
+      const dx = tx * TILE - cam.x, dy = ty * TILE - cam.y;
       let ch = '.';
       if (tx >= 0 && ty >= 0 && ty < map.h && tx < map.w) ch = map.tiles[ty][tx];
       const def = TILE_DEF[ch] || TILE_DEF['.'];
@@ -815,21 +814,35 @@ function renderOverworld() {
 
   const drawables = [];
   for (const o of (map.objects || [])) {
-    const dx = (o.x - originCol) * TILE - offX, dy = (o.y - originRow) * TILE - offY;
+    const dx = o.x * TILE - cam.x, dy = o.y * TILE - cam.y;
     drawables.push({ y: o.y + o.h, draw: () => {
       if (o.building) drawBuildingImg(o.building, dx, dy, o.w * TILE, o.h * TILE, o.label);
       else drawTileImg(o.key, dx, dy, o.w * TILE, o.h * TILE);
     }});
   }
   for (const n of (map.npcs || [])) {
-    const dx = (n.x - originCol) * TILE - offX, dy = (n.y - originRow) * TILE - offY;
+    const dx = n.x * TILE - cam.x, dy = n.y * TILE - cam.y;
     drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
   }
-  const pdx = (camX - originCol) * TILE - offX, pdy = (camY - originRow) * TILE - offY;
+  const pdx = camX * TILE - cam.x, pdy = camY * TILE - cam.y;
   const playerSprite = state.playerSprite || 'player_boy';
   drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
   drawables.sort((a, b) => a.y - b.y);
   for (const d of drawables) d.draw();
+}
+
+// Converts a camera "look-at" position (in tile units) into a clamped top-left
+// pixel offset for the viewport, so tiles/sprites draw at worldPos*TILE - cam.
+// Clamping keeps the viewport inside the map (matching the source game's own
+// camera.setBounds()) instead of always force-centering the player, which is
+// what was producing empty space / misaligned tiles near map edges.
+function cameraPixelPos(camX, camY, mapW, mapH) {
+  let px = Math.floor(camX * TILE) - canvas.width / 2 + TILE / 2;
+  let py = Math.floor(camY * TILE) - canvas.height / 2 + TILE / 2;
+  const maxX = mapW * TILE - canvas.width, maxY = mapH * TILE - canvas.height;
+  px = maxX > 0 ? Math.max(0, Math.min(px, maxX)) : Math.floor(maxX / 2);
+  py = maxY > 0 ? Math.max(0, Math.min(py, maxY)) : Math.floor(maxY / 2);
+  return { x: px, y: py };
 }
 
 function renderTiledOverworld(map) {
@@ -839,16 +852,19 @@ function renderTiledOverworld(map) {
 
   const camX = state.px !== undefined ? state.px : state.x;
   const camY = state.py !== undefined ? state.py : state.y;
-  const originCol = Math.floor(camX - VIEW_COLS / 2);
-  const originRow = Math.floor(camY - VIEW_ROWS / 2);
-  const offX = (Math.floor(camX * TILE) - Math.floor(originCol * TILE)) - canvas.width / 2 + TILE / 2;
-  const offY = (Math.floor(camY * TILE) - Math.floor(originRow * TILE)) - canvas.height / 2 + TILE / 2;
+  // Camera is clamped to the map's own bounds (matching the source game's
+  // camera.setBounds() convention) so the viewport never shows empty space
+  // past an edge, and the player naturally moves off-center near borders
+  // instead of the whole tile grid ending up misaligned.
+  const cam = cameraPixelPos(camX, camY, td.w, td.h);
+  const originCol = Math.floor(cam.x / TILE) - 1;
+  const originRow = Math.floor(cam.y / TILE) - 1;
 
   for (let ry = -1; ry <= VIEW_ROWS + 1; ry++) {
     for (let rx = -1; rx <= VIEW_COLS + 1; rx++) {
       const tx = originCol + rx, ty = originRow + ry;
       if (tx < 0 || ty < 0 || tx >= td.w || ty >= td.h) continue;
-      const dx = rx * TILE - offX, dy = ry * TILE - offY;
+      const dx = tx * TILE - cam.x, dy = ty * TILE - cam.y;
       const i = ty * td.w + tx;
       drawAtlasTile(td.below[i], dx, dy);
       drawAtlasTile(td.world[i], dx, dy);
@@ -858,10 +874,10 @@ function renderTiledOverworld(map) {
 
   const drawables = [];
   for (const n of (map.npcs || [])) {
-    const dx = (n.x - originCol) * TILE - offX, dy = (n.y - originRow) * TILE - offY;
+    const dx = n.x * TILE - cam.x, dy = n.y * TILE - cam.y;
     drawables.push({ y: n.y, draw: () => drawChar(n.sprite, n.facing, 0, dx, dy, 4) });
   }
-  const pdx = (camX - originCol) * TILE - offX, pdy = (camY - originRow) * TILE - offY;
+  const pdx = camX * TILE - cam.x, pdy = camY * TILE - cam.y;
   const playerSprite = state.playerSprite || 'player_boy';
   drawables.push({ y: camY + 0.5, draw: () => drawChar(playerSprite, state.facing, state.moving ? (Math.floor(state.animTimer / 6) % 2 + 1) : 0, pdx, pdy, 4) });
   drawables.sort((a, b) => a.y - b.y);
@@ -871,7 +887,7 @@ function renderTiledOverworld(map) {
     for (let rx = -1; rx <= VIEW_COLS + 1; rx++) {
       const tx = originCol + rx, ty = originRow + ry;
       if (tx < 0 || ty < 0 || tx >= td.w || ty >= td.h) continue;
-      const dx = rx * TILE - offX, dy = ry * TILE - offY;
+      const dx = tx * TILE - cam.x, dy = ty * TILE - cam.y;
       drawAtlasTile(td.above[ty * td.w + tx], dx, dy);
     }
   }
