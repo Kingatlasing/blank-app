@@ -17,7 +17,16 @@ https://github.com/Tuxemon/Tuxemon
   tamashihoshi, Leo, josepharaoh99, and others)
 
 Used for: the 165-creature roster (names, types, base stats, movesets,
-evolutions), moves/techniques, items, and monster battle sprites.
+evolutions), moves/techniques, items, and monster battle sprites. Also used
+for the seven interior maps buildings can be entered into (Monster Center,
+Mart, Professor's Lab, player's house bedroom + downstairs, two Arena Hall
+layouts), taken directly from that project's own Tiled interior maps
+(`mods/tuxemon/maps/healing_center.tmx`, `tuxe_mart_taba.tmx`,
+`professor_lab.tmx`, `player_house_bedroom.tmx`, `player_house_downstairs.tmx`,
+`classic_gym_astra.tmx`, `classic_gym_bravion.tmx`) and their matching
+`core_indoor_floors`/`core_indoor_walls`/`core_set pieces` tileset art —
+extracted tile-for-tile with their original furniture/collision layout,
+nothing hand-built or invented.
 
 ## PokeMMO-Online-Realtime-Multiplayer-Game
 https://github.com/aaron5670/PokeMMO-Online-Realtime-Multiplayer-Game

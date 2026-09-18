@@ -75,6 +75,37 @@ one per type slug. Not currently drawn anywhere in the UI (type badges use
 flat color chips via `TYPE_COLORS` instead) — available if real icons are
 wanted in the battle/party UI.
 
+## 6. Building interiors (`interior_tiled.js` → `INTERIOR_TILED.atlas`, `.maps`)
+
+Source: `Tuxemon/Tuxemon`, real Tiled interior maps from `mods/tuxemon/maps/`
+(`healing_center.tmx`, `tuxe_mart_taba.tmx`, `professor_lab.tmx`,
+`player_house_bedroom.tmx`, `player_house_downstairs.tmx`,
+`classic_gym_astra.tmx`, `classic_gym_bravion.tmx`) and their `core_indoor_*`
+tileset PNGs (16px tiles - a separate, more detailed art family from the 32px
+outdoor `tuxmon-sample` set, so it gets its own atlas/image rather than
+sharing the outdoor one). Packed the same way as the outdoor atlas: every
+unique tile actually used across all 7 maps, deduped and slot-indexed into
+one 384x112 PNG.
+
+**Render contract:** same shape as `TILED` (`w`, `h`, `below`/`world`/`above`
+flat slot arrays, `collide`) but no `grass`/`spawns` - interior warps always
+carry explicit `tx`/`ty`. `map.tiledSrc: 'interior'` on a `MAPS.*` entry
+switches the renderer/collision code (`tiledSourceFor()` in `engine.js`) from
+`TILED`/`ATLAS_IMG` to `INTERIOR_TILED`/`INTERIOR_ATLAS_IMG`.
+
+Seven interiors, wired to real building doors in the outdoor maps via
+`extraWarps` (town/ashveld/crysthaven's own doors, plus 3 door tiles in
+ashveld/crysthaven that had no walkable gap in the source collision data at
+all - opened via `patchBuildingDoors()`, same pattern as the town gate fix):
+`healing_center_town/_ashveld/_crysthaven` (nurse, heals party), `mart_town/
+_ashveld/_crysthaven` (shopkeeper, opens the shop UI), `lab` (Professor
+Larkspur, starter selection), `house_downstairs` + `house_bedroom` (player's
+house, linked by their own stairs tile), `gym_ashveld` (Leader Sylva) /
+`gym_crysthaven` (Leader Pyra) using the two different `classic_gym_*`
+layouts. The Center/Mart layout is reused per-town (one real map, three
+`MAPS.*` entries each with their own return-warp) since the source repo only
+has one of each.
+
 ## What's NOT here (by design)
 
 No real Pokémon assets, sprites, or species data anywhere — verified both

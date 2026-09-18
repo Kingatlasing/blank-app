@@ -11,17 +11,28 @@
 const IMG = { monsters: {}, items: {}, tiles: {}, chars: {}, elements: {}, buildings: {} };
 let ATLAS_IMG = null;
 const ATLAS_COLS = TILED.atlasCols;
+// Building interiors (Pokemon Center, Mart, Lab, player's house, Gyms) use a second,
+// separate atlas: real Tuxemon TMX interior maps, a different tileset (16px "core_indoor_*"
+// furniture/walls/floors) from the 32px outdoor tuxmon-sample set. Kept as its own
+// atlas/image rather than merged into the outdoor one since the source art is a distinct family.
+let INTERIOR_ATLAS_IMG = null;
+const INTERIOR_ATLAS_COLS = INTERIOR_TILED.atlasCols;
+const INTERIOR_SRC_TILE = 16;
 let imagesLoaded = 0, imagesTotal = 0;
 function loadAllImages(cb) {
   const cats = ['monsters', 'items', 'tiles', 'chars', 'elements', 'buildings'];
   for (const cat of cats) {
     for (const key in ASSET_B64[cat]) imagesTotal++;
   }
-  imagesTotal++; // world atlas
+  imagesTotal += 2; // world atlas + interior atlas
   ATLAS_IMG = new Image();
   ATLAS_IMG.onload = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
   ATLAS_IMG.onerror = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
   ATLAS_IMG.src = 'data:image/png;base64,' + TILED.atlas;
+  INTERIOR_ATLAS_IMG = new Image();
+  INTERIOR_ATLAS_IMG.onload = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
+  INTERIOR_ATLAS_IMG.onerror = () => { imagesLoaded++; if (imagesLoaded >= imagesTotal) cb(); };
+  INTERIOR_ATLAS_IMG.src = 'data:image/png;base64,' + INTERIOR_TILED.atlas;
   for (const cat of cats) {
     for (const key in ASSET_B64[cat]) {
       const im = new Image();
@@ -95,6 +106,26 @@ function loadAllImages(cb) {
   // gate in that wall so the exit is actually usable.
   const t = TILED.maps.town;
   for (let x = 17; x <= 22; x++) t.collide[37 * t.w + x] = false;
+})();
+
+(function patchBuildingDoors() {
+  // The Pokemon Center / Mart / Gym buildings in ashveld and crysthaven (unlike
+  // their equivalents in town) have a fully solid bottom wall in the source map -
+  // no door tile was ever cut into the collision data anywhere along their front,
+  // confirmed by scanning every tile of each building's footprint. These are the
+  // exact buildings these interiors are now wired to (see the new healing_center_*/
+  // mart_*/gym_* MAPS entries and their matching extraWarps below), so each needs
+  // one real, walkable doorway. Open a single tile at the spot the original NPCs
+  // (nurse/shopkeeper/leader) already stood at, which lines up with the middle of
+  // each building's front wall.
+  const doors = [
+    ['ashveld', 7, 7], ['ashveld', 32, 7], ['ashveld', 11, 26],
+    ['crysthaven', 6, 7], ['crysthaven', 15, 7], ['crysthaven', 34, 18],
+  ];
+  for (const [mapKey, x, y] of doors) {
+    const td = TILED.maps[mapKey];
+    td.collide[y * td.w + x] = false;
+  }
 })();
 
 (function patchBadSpawnPoints() {
@@ -285,14 +316,16 @@ const MAPS = {};
 MAPS.town = {
   tiledKey: 'town', name: 'Cottonwood Town',
   npcs: [
-    { id: 'mom', x: 8, y: 35, sprite: 'townsfolk2', facing: 'down',
-      dialogue: () => ["Off on an adventure already? Don't forget to visit Professor Larkspur first!"] },
     { id: 'rival', x: 18, y: 35, sprite: 'rival', facing: 'down', dialogue: rivalHometownDialogue },
-    { id: 'nurse', x: 9, y: 17, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
-      dialogue: () => ["Welcome to the Monster Center!", "Your creatures are fighting fit. Take care out there!"] },
-    { id: 'shopkeeper', x: 17, y: 17, sprite: 'shopkeeper', facing: 'down', shop: true,
-      dialogue: () => ["Take a look at my wares!"] },
-    { id: 'professor', x: 26, y: 17, sprite: 'professor', facing: 'down', dialogue: professorDialogue },
+  ],
+  // Nurse, shopkeeper, professor and mom used to stand outside on these exact
+  // tiles; they've moved inside their buildings (see the new interior MAPS
+  // entries below) and these are now the buildings' front doors instead.
+  extraWarps: [
+    { x: 9, y: 17, w: 1, h: 1, to: 'healing_center_town', tx: 6, ty: 10 },
+    { x: 17, y: 17, w: 1, h: 1, to: 'mart_town', tx: 6, ty: 10 },
+    { x: 26, y: 17, w: 1, h: 1, to: 'lab', tx: 6, ty: 17 },
+    { x: 8, y: 35, w: 1, h: 1, to: 'house_downstairs', tx: 4, ty: 6 },
   ],
   encounterTable: [],
 };
@@ -317,19 +350,13 @@ MAPS.route1 = {
 MAPS.ashveld = {
   tiledKey: 'ashveld', name: 'Ashveld Town',
   npcs: [
-    { id: 'nurse', x: 7, y: 7, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
-      dialogue: () => ["Welcome to the Monster Center!", "Your creatures are fighting fit. Take care out there!"] },
-    { id: 'shopkeeper', x: 32, y: 7, sprite: 'shopkeeper', facing: 'down', shop: true,
-      dialogue: () => ["Take a look at my wares!"] },
-    { id: 'leader_sylva', x: 11, y: 26, sprite: 'leader_sylva', facing: 'down', trainer: {
-        name: 'Arena Leader Sylva', team: [
-          { slug: 'anoleaf', level: 9 }, { slug: 'budaye', level: 9 }, { slug: 'chloragon', level: 10 },
-        ], prizeMoney: 300, flag: 'sylva_defeated', badge: 'Bramble Badge',
-        preBattle: ["I am Sylva, Leader of the Ashveld Hall.", "Let's see if your team has truly grown!"],
-        postWin: ["Impressive. Take this Bramble Badge as proof of your victory."],
-      } },
     { id: 'sidequest_giver', x: 8, y: 16, sprite: 'townsfolk1', facing: 'down', dialogue: lostPetDialogue },
     { id: 'minigame_host', x: 18, y: 16, sprite: 'townsfolk2', facing: 'down', minigame: true },
+  ],
+  extraWarps: [
+    { x: 7, y: 7, w: 1, h: 1, to: 'healing_center_ashveld', tx: 6, ty: 10 },
+    { x: 32, y: 7, w: 1, h: 1, to: 'mart_ashveld', tx: 6, ty: 10 },
+    { x: 11, y: 26, w: 1, h: 1, to: 'gym_ashveld', tx: 10, ty: 19 },
   ],
   encounterTable: [],
 };
@@ -355,16 +382,6 @@ MAPS.route2 = {
 MAPS.crysthaven = {
   tiledKey: 'crysthaven', name: 'Crysthaven City',
   npcs: [
-    { id: 'nurse', x: 6, y: 7, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
-      dialogue: () => ["Rest up before you challenge Pyra - she battles hot!"] },
-    { id: 'shopkeeper', x: 15, y: 7, sprite: 'shopkeeper', facing: 'down', shop: true, dialogue: () => ["Welcome!"] },
-    { id: 'leader_pyra', x: 34, y: 18, sprite: 'leader_pyra', facing: 'down', trainer: {
-        name: 'Arena Leader Pyra', team: [
-          { slug: 'embra', level: 16 }, { slug: 'agnidon', level: 17 }, { slug: 'cardiling', level: 16 },
-        ], prizeMoney: 600, flag: 'pyra_defeated', badge: 'Cinder Badge',
-        preBattle: ["I'm Pyra. My creatures burn brighter than any rival's.", "Show me your fire!"],
-        postWin: ["You've got real heat. Take the Cinder Badge."],
-      } },
     { id: 'guide', x: 25, y: 7, sprite: 'townsfolk2', facing: 'down', dialogue: bridgeGuideDialogue },
     { id: 'outpost_gate', x: 24, y: 35, sprite: 'townsfolk1', facing: 'down',
       dialogue: () => (state.flags.enforcerDefeated ? ["The Enforcer Outpost is cleared out for good."] :
@@ -376,6 +393,9 @@ MAPS.crysthaven = {
   extraWarps: [
     { x: 24, y: 36, w: 1, h: 1, to: 'enforcerhideout', tx: 6, ty: 10, requires: null },
     { x: 28, y: 36, w: 1, h: 1, to: 'summitplateau', tx: 7, ty: 12, requires: 'enforcerDefeated' },
+    { x: 6, y: 7, w: 1, h: 1, to: 'healing_center_crysthaven', tx: 6, ty: 10 },
+    { x: 15, y: 7, w: 1, h: 1, to: 'mart_crysthaven', tx: 6, ty: 10 },
+    { x: 34, y: 18, w: 1, h: 1, to: 'gym_crysthaven', tx: 10, ty: 19 },
   ],
   encounterTable: [],
 };
@@ -458,6 +478,92 @@ MAPS.summitplateau = {
   encounterTable: [],
 };
 
+/* ---------------------------- Building interiors ---------------------------- */
+// Real, complete Tuxemon interior maps (mods/tuxemon/maps/*.tmx - healing_center.tmx,
+// tuxe_mart_taba.tmx, professor_lab.tmx, player_house_bedroom/downstairs.tmx,
+// classic_gym_astra/bravion.tmx), extracted tile-for-tile with their own furniture and
+// counter/collision layout (see INTERIOR_TILED in interior_tiled.js) - not hand-built.
+// The Pokemon Center and Mart layout is reused per-town (three separate MAPS entries
+// sharing one tiledKey) since only one of each exists in the source repo; each still
+// has its own door/return-warp back to its own town.
+MAPS.healing_center_town = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Cottonwood Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Welcome to the Monster Center!", "Your creatures are fighting fit. Take care out there!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'town', tx: 9, ty: 17 }],
+};
+MAPS.healing_center_ashveld = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Ashveld Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Welcome to the Monster Center!", "Your creatures are fighting fit. Take care out there!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'ashveld', tx: 7, ty: 7 }],
+};
+MAPS.healing_center_crysthaven = {
+  tiledKey: 'healing_center', tiledSrc: 'interior', name: 'Crysthaven Monster Center',
+  npcs: [{ id: 'nurse', x: 5, y: 4, sprite: 'nurse', facing: 'down', heal: true, fastTravel: true,
+    dialogue: () => ["Rest up before you challenge Pyra - she battles hot!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'crysthaven', tx: 6, ty: 7 }],
+};
+MAPS.mart_town = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Cottonwood Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Take a look at my wares!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'town', tx: 17, ty: 17 }],
+};
+MAPS.mart_ashveld = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Ashveld Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Take a look at my wares!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'ashveld', tx: 32, ty: 7 }],
+};
+MAPS.mart_crysthaven = {
+  tiledKey: 'mart', tiledSrc: 'interior', name: 'Crysthaven Mart',
+  npcs: [{ id: 'shopkeeper', x: 1, y: 5, sprite: 'shopkeeper', facing: 'down', shop: true,
+    dialogue: () => ["Welcome!"] }],
+  extraWarps: [{ x: 6, y: 10, w: 1, h: 1, to: 'crysthaven', tx: 15, ty: 7 }],
+};
+MAPS.lab = {
+  tiledKey: 'lab', tiledSrc: 'interior', name: "Professor Larkspur's Lab",
+  npcs: [{ id: 'professor', x: 4, y: 6, sprite: 'professor', facing: 'down', dialogue: professorDialogue }],
+  extraWarps: [{ x: 6, y: 17, w: 1, h: 1, to: 'town', tx: 26, ty: 17 }],
+};
+MAPS.house_downstairs = {
+  tiledKey: 'house_downstairs', tiledSrc: 'interior', name: "Player's House",
+  npcs: [{ id: 'mom', x: 8, y: 3, sprite: 'townsfolk2', facing: 'down',
+    dialogue: () => ["Off on an adventure already? Don't forget to visit Professor Larkspur first!"] }],
+  extraWarps: [
+    { x: 4, y: 6, w: 1, h: 1, to: 'town', tx: 8, ty: 35 },
+    { x: 0, y: 1, w: 1, h: 1, to: 'house_bedroom', tx: 8, ty: 2 },
+  ],
+};
+MAPS.house_bedroom = {
+  tiledKey: 'house_bedroom', tiledSrc: 'interior', name: "Player's Bedroom",
+  npcs: [],
+  extraWarps: [{ x: 8, y: 2, w: 1, h: 1, to: 'house_downstairs', tx: 0, ty: 1 }],
+};
+MAPS.gym_ashveld = {
+  tiledKey: 'gym_astra', tiledSrc: 'interior', name: 'Ashveld Hall',
+  npcs: [{ id: 'leader_sylva', x: 10, y: 5, sprite: 'leader_sylva', facing: 'down', trainer: {
+      name: 'Arena Leader Sylva', team: [
+        { slug: 'anoleaf', level: 9 }, { slug: 'budaye', level: 9 }, { slug: 'chloragon', level: 10 },
+      ], prizeMoney: 300, flag: 'sylva_defeated', badge: 'Bramble Badge',
+      preBattle: ["I am Sylva, Leader of the Ashveld Hall.", "Let's see if your team has truly grown!"],
+      postWin: ["Impressive. Take this Bramble Badge as proof of your victory."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'ashveld', tx: 11, ty: 26 }],
+};
+MAPS.gym_crysthaven = {
+  tiledKey: 'gym_bravion', tiledSrc: 'interior', name: 'Crysthaven Hall',
+  npcs: [{ id: 'leader_pyra', x: 10, y: 5, sprite: 'leader_pyra', facing: 'down', trainer: {
+      name: 'Arena Leader Pyra', team: [
+        { slug: 'embra', level: 16 }, { slug: 'agnidon', level: 17 }, { slug: 'cardiling', level: 16 },
+      ], prizeMoney: 600, flag: 'pyra_defeated', badge: 'Cinder Badge',
+      preBattle: ["I'm Pyra. My creatures burn brighter than any rival's.", "Show me your fire!"],
+      postWin: ["You've got real heat. Take the Cinder Badge."],
+    } }],
+  extraWarps: [{ x: 10, y: 19, w: 1, h: 1, to: 'crysthaven', tx: 34, ty: 18 }],
+};
+
 (function patchBrokenWarps() {
   // Each town has one warp into a "pokemon_center_*" building interior, but
   // those interior maps were never included in this build (ASSET_LIBRARY.md:
@@ -474,7 +580,12 @@ MAPS.summitplateau = {
   // build, everywhere, rather than special-casing the three known ones -
   // the door tile is left walkable (same as this project's other purely
   // decorative doors) but no longer tries to warp anywhere.
-  const targetExists = (key) => !!MAPS[key] && (!MAPS[key].tiledKey || !!TILED.maps[MAPS[key].tiledKey]);
+  const targetExists = (key) => {
+    const m = MAPS[key];
+    if (!m) return false;
+    if (!m.tiledKey) return true;
+    return !!(m.tiledSrc === 'interior' ? INTERIOR_TILED : TILED).maps[m.tiledKey];
+  };
   for (const name in TILED.maps) {
     const td = TILED.maps[name];
     if (td.warps) td.warps = td.warps.filter(w => targetExists(w.to));
@@ -588,7 +699,7 @@ function currentMap() { return MAPS[state.map]; }
 
 function tileSolidAt(map, x, y) {
   if (map.tiledKey) {
-    const td = TILED.maps[map.tiledKey];
+    const td = tiledSourceFor(map).data;
     if (x < 0 || y < 0 || x >= td.w || y >= td.h) return true;
     if (td.collide[y * td.w + x]) return true;
     for (const n of (map.npcs || [])) { if (n.x === x && n.y === y) return true; }
@@ -624,7 +735,7 @@ function tryMove(dx, dy, dir) {
 function onArrive() {
   const map = currentMap();
   if (map.tiledKey) {
-    const td = TILED.maps[map.tiledKey];
+    const td = tiledSourceFor(map).data;
     const allWarps = (td.warps || []).concat(map.extraWarps || []);
     const hit = allWarps.find(w => state.x >= w.x && state.x < w.x + w.w && state.y >= w.y && state.y < w.y + w.h);
     if (hit) {
@@ -635,9 +746,9 @@ function onArrive() {
       }
       const targetKey = hit.to;
       const targetMap = MAPS[targetKey];
-      const targetTd = TILED.maps[targetKey];
+      const targetTd = targetMap.tiledKey ? tiledSourceFor(targetMap).data : null;
       let tx = hit.tx, ty = hit.ty;
-      if (tx === undefined && targetTd && targetTd.spawns[hit.spawn]) {
+      if (tx === undefined && targetTd && targetTd.spawns && targetTd.spawns[hit.spawn]) {
         tx = targetTd.spawns[hit.spawn].x; ty = targetTd.spawns[hit.spawn].y;
       }
       state.map = targetKey; state.x = tx; state.y = ty;
@@ -773,11 +884,22 @@ function drawChar(spriteKey, facing, frame, dx, dy, scale) {
   ctx.drawImage(im, f.sx, f.sy, f.sw, f.sh, dx, dy - (h - TILE), w, h);
 }
 
-function drawAtlasTile(slot, dx, dy) {
-  if (!slot || !ATLAS_IMG || !ATLAS_IMG.complete) return;
+function drawAtlasTileFrom(img, cols, srcTile, slot, dx, dy) {
+  if (!slot || !img || !img.complete) return;
   const idx = slot - 1;
-  const sx = (idx % ATLAS_COLS) * SRC_TILE, sy = Math.floor(idx / ATLAS_COLS) * SRC_TILE;
-  ctx.drawImage(ATLAS_IMG, sx, sy, SRC_TILE, SRC_TILE, dx, dy, TILE, TILE);
+  const sx = (idx % cols) * srcTile, sy = Math.floor(idx / cols) * srcTile;
+  ctx.drawImage(img, sx, sy, srcTile, srcTile, dx, dy, TILE, TILE);
+}
+function drawAtlasTile(slot, dx, dy) {
+  drawAtlasTileFrom(ATLAS_IMG, ATLAS_COLS, SRC_TILE, slot, dx, dy);
+}
+// Resolves a map's raw tile-grid data plus which atlas/columns/native-tile-size to draw
+// it with - outdoor maps use TILED (32px tuxmon-sample atlas), building interiors use
+// INTERIOR_TILED (16px core_indoor_* atlas, a separate source-art family).
+function tiledSourceFor(map) {
+  return map.tiledSrc === 'interior'
+    ? { data: INTERIOR_TILED.maps[map.tiledKey], img: INTERIOR_ATLAS_IMG, cols: INTERIOR_ATLAS_COLS, srcTile: INTERIOR_SRC_TILE }
+    : { data: TILED.maps[map.tiledKey], img: ATLAS_IMG, cols: ATLAS_COLS, srcTile: SRC_TILE };
 }
 
 function renderOverworld() {
@@ -838,8 +960,10 @@ function cameraPixelPos(camX, camY, mapW, mapH) {
 }
 
 function renderTiledOverworld(map) {
-  const td = TILED.maps[map.tiledKey];
-  ctx.fillStyle = '#87ceeb';
+  const src = tiledSourceFor(map);
+  const td = src.data;
+  const draw = (slot, dx, dy) => drawAtlasTileFrom(src.img, src.cols, src.srcTile, slot, dx, dy);
+  ctx.fillStyle = map.tiledSrc === 'interior' ? '#1c1c22' : '#87ceeb';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const camX = state.px !== undefined ? state.px : state.x;
@@ -858,8 +982,8 @@ function renderTiledOverworld(map) {
       if (tx < 0 || ty < 0 || tx >= td.w || ty >= td.h) continue;
       const dx = tx * TILE - cam.x, dy = ty * TILE - cam.y;
       const i = ty * td.w + tx;
-      drawAtlasTile(td.below[i], dx, dy);
-      drawAtlasTile(td.world[i], dx, dy);
+      draw(td.below[i], dx, dy);
+      draw(td.world[i], dx, dy);
       if (td.grass && td.grass[i]) { ctx.fillStyle = 'rgba(20,60,20,0.18)'; ctx.fillRect(dx, dy, TILE, TILE); }
     }
   }
@@ -884,7 +1008,7 @@ function renderTiledOverworld(map) {
       const tx = originCol + rx, ty = originRow + ry;
       if (tx < 0 || ty < 0 || tx >= td.w || ty >= td.h) continue;
       const dx = tx * TILE - cam.x, dy = ty * TILE - cam.y;
-      drawAtlasTile(td.above[ty * td.w + tx], dx, dy);
+      draw(td.above[ty * td.w + tx], dx, dy);
     }
   }
 }
