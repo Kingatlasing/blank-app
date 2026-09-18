@@ -71,7 +71,10 @@
   .hpfilltrack { position:absolute; left:30%; top:16.7%; width:63.3%; height:66.6%; overflow:hidden; }
   .hpfilltrack .hpfill { height:100%; }
   #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:flex; flex-direction:column-reverse; }
-  #battleFooter { position:absolute; bottom:98px; left:10px; right:10px; display:flex; flex-direction:column; gap:8px; }
+  /* bottom:10px (not the old 98px, which left #app's own black background showing
+     as a dead bar under the menu - there's no party bar to leave room for once a
+     battle is on screen, so the footer can sit right at the bottom edge). */
+  #battleFooter { position:absolute; bottom:10px; left:10px; right:10px; display:flex; flex-direction:column; gap:6px; }
   /* Classic "What will X do?" prompt line above the action grid - hidden (display:none)
      while a submenu (Fight/Bag/Creatures) is open, same as the real games only show it
      on the root action menu. */
@@ -83,30 +86,39 @@
      too, matching the dark buttons already used elsewhere in this UI; the
      move-info panel keeps its own cream background instead (no "fill"), so
      the border wraps it without recoloring it - same dark-border/light-panel
-     contrast as the real PP box it's echoing. */
+     contrast as the real PP box it's echoing. border-image-width is kept small
+     (5px) so the 9-slice's corners read as a slim rounded outline instead of a
+     thick blocky frame. */
   #battlePrompt, #battleMenu button {
-    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 10px;
-    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 5px;
+    border-image-repeat: stretch; border-style: solid; border-width: 5px; image-rendering: pixelated;
   }
   .moveinfo {
-    border-image-source: var(--menu-border); border-image-slice: 6; border-image-width: 10px;
-    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+    border-image-source: var(--menu-border); border-image-slice: 6; border-image-width: 5px;
+    border-image-repeat: stretch; border-style: solid; border-width: 5px; image-rendering: pixelated;
   }
-  #battlePrompt { color:#fff; padding:10px 14px; font-size:15px; display:none; }
-  #battleMenu { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  #battleMenu button { padding:12px; font-size:15px; color:#fff; cursor:pointer; }
+  #battlePrompt { color:#fff; padding:8px 12px; font-size:14px; display:none; }
+  #battleMenu { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #battleMenu button { padding:8px; font-size:14px; color:#fff; cursor:pointer; }
   /* Fight submenu: classic 2x2 move grid + a side info panel (type/power/accuracy/
      recharge - real Tuxemon move data, not a fabricated PP number) that updates on
      hover, echoing the move-grid+PP-box layout of the reference screens. */
-  .fightpanel { grid-column: 1 / -1; display:flex; gap:8px; }
-  .movegrid { flex:2; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .fightpanel { grid-column: 1 / -1; display:flex; gap:6px; }
+  .movegrid { flex:2; display:grid; grid-template-columns:1fr 1fr; gap:6px; }
   .movegrid button {
-    padding:10px; font-size:14px; color:#fff; cursor:pointer; text-align:left;
-    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 10px;
-    border-image-repeat: stretch; border-style: solid; border-width: 10px; image-rendering: pixelated;
+    padding:8px; font-size:13px; color:#fff; cursor:pointer; text-align:left;
+    border-image-source: var(--menu-border); border-image-slice: 6 fill; border-image-width: 5px;
+    border-image-repeat: stretch; border-style: solid; border-width: 5px; image-rendering: pixelated;
   }
-  .moveinfo { flex:1; background:#eee3c6; color:#2a2016; padding:10px 12px; font-size:12px; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  .moveinfo { flex:1; background:#eee3c6; color:#2a2016; padding:8px 10px; font-size:12px; display:flex; flex-direction:column; justify-content:center; gap:3px; }
   .backbtn { grid-column: 1 / -1; }
+  /* Bag/Creatures item lists: a single stacked column (not the 2-col grid the
+     main action menu uses), since these lists can hold any number of items -
+     a 2-col grid would leave a dangling empty cell (showing #app's black
+     background through it) whenever the count is odd. Buttons inside still
+     pick up the #battleMenu button rule above (border-image etc.) since
+     that selector matches any descendant button. */
+  .listmenu { grid-column: 1 / -1; display:flex; flex-direction:column; gap:6px; }
   #battleTrainerName { position:absolute; top:8px; left:0; right:0; text-align:center; }
   .trainername { color:#fff; background:rgba(10,15,30,0.85); padding:4px 10px; border-radius:6px; font-size:13px; display:inline-block; }
 
@@ -1719,7 +1731,7 @@ function renderBattleMain() {
     <button onclick="openBagInBattle()">Bag</button>
     <button onclick="openPartyInBattle()">Creatures</button>
     <button onclick="battleRun()" ${battle.kind==='trainer'?'disabled':''}>${battle.kind==='trainer'?'Run':'Run'}</button>
-    ${battle.kind==='wild' && !battle.isFixed ? '<button onclick="battleThrowBall()">Throw Ball</button>' : ''}
+    ${battle.kind==='wild' && !battle.isFixed ? '<button style="grid-column:1 / -1" onclick="battleThrowBall()">Throw Ball</button>' : ''}
   `;
   renderBattleScene();
 }
@@ -1888,7 +1900,9 @@ function openBagInBattle() {
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
   const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion' && state.inventory[s] > 0);
-  menu.innerHTML = (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = `<div class="listmenu">` +
+    (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') +
+    `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function useItemInBattle(slug) {
   const pm = currentPlayerMon();
@@ -1901,7 +1915,9 @@ function useItemInBattle(slug) {
 function openPartyInBattle() {
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
-  menu.innerHTML = state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = `<div class="listmenu">` +
+    state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') +
+    `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function switchPlayerMon(i) {
   battle.playerIdx = i;

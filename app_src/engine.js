@@ -1527,7 +1527,7 @@ function renderBattleMain() {
     <button onclick="openBagInBattle()">Bag</button>
     <button onclick="openPartyInBattle()">Creatures</button>
     <button onclick="battleRun()" ${battle.kind==='trainer'?'disabled':''}>${battle.kind==='trainer'?'Run':'Run'}</button>
-    ${battle.kind==='wild' && !battle.isFixed ? '<button onclick="battleThrowBall()">Throw Ball</button>' : ''}
+    ${battle.kind==='wild' && !battle.isFixed ? '<button style="grid-column:1 / -1" onclick="battleThrowBall()">Throw Ball</button>' : ''}
   `;
   renderBattleScene();
 }
@@ -1696,7 +1696,9 @@ function openBagInBattle() {
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
   const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion' && state.inventory[s] > 0);
-  menu.innerHTML = (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = `<div class="listmenu">` +
+    (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') +
+    `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function useItemInBattle(slug) {
   const pm = currentPlayerMon();
@@ -1709,7 +1711,9 @@ function useItemInBattle(slug) {
 function openPartyInBattle() {
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
-  menu.innerHTML = state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = `<div class="listmenu">` +
+    state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') +
+    `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function switchPlayerMon(i) {
   battle.playerIdx = i;
