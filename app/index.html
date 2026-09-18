@@ -1580,18 +1580,18 @@ function renderBattleScene() {
   // Opponent trainer (trainer battles only) - stands behind/above their own
   // monster, same convention as their name banner already shown up top.
   if (battle.trainerSprite) {
-    drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.80, canvas.height * 0.16, 3);
+    drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.78, canvas.height * 0.14, 4);
   }
   if (enemy) {
     const im = IMG.monsters[enemy.slug];
-    if (im && im.complete) ctx.drawImage(im, canvas.width * 0.62, canvas.height * 0.14, 64 * 2.4, 44 * 2.4);
+    if (im && im.complete) ctx.drawImage(im, canvas.width * 0.58, canvas.height * 0.16, 64 * 3.3, 44 * 3.3);
   }
   // Player's own trainer, back view ('up' facing = back row in the sprite sheet).
   const playerSprite = state.playerSprite || 'player_boy';
-  drawChar(playerSprite, 'up', 0, canvas.width * 0.03, canvas.height * 0.58, 3.2);
+  drawChar(playerSprite, 'up', 0, canvas.width * 0.02, canvas.height * 0.55, 4.3);
   if (pm) {
     const im = IMG.monsters[pm.slug];
-    if (im && im.complete) ctx.drawImage(im, canvas.width * 0.08, canvas.height * 0.42, 64 * 2.8, 44 * 2.8);
+    if (im && im.complete) ctx.drawImage(im, canvas.width * 0.05, canvas.height * 0.38, 64 * 3.8, 44 * 3.8);
   }
 }
 (function hookBattleRender() {
