@@ -22,8 +22,10 @@ ROOT = Path(__file__).parent
 TEMPLATE_PATH = ROOT / "app" / "index.html"
 
 
-@st.cache_data
 def load_html() -> str:
+    # Deliberately uncached: this file changes frequently during development,
+    # and st.cache_data would keep serving a stale build from an old process
+    # even after a new version is pushed. Reading one HTML file is cheap.
     return TEMPLATE_PATH.read_text(encoding="utf-8")
 
 
