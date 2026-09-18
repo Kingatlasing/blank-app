@@ -1798,11 +1798,20 @@ function appendBattleLog(lines) {
 // grabbed/stuck's real power reduction for matching move ranges, diehard
 // clamps a fatal hit to 1 HP once, and a successful hit rolls the move's
 // real inflict chance and checks the defender's reflect statuses.
+// atkStat/defStat scale into the hundreds by high level while move.power is
+// a small 0.4-3.0 multiplier straight from the real Tuxemon data - without
+// a dampening constant here, atkStat*power alone lands in the same order of
+// magnitude as max HP, so even a same-level neutral matchup was a 1-3 hit
+// KO and a strong/super-effective move could one-shot regardless of level.
+// DAMAGE_DIVISOR brings that down to a normal turn-based pace (roughly a
+// 5-hit KO for a median-power move, neutral matchup) without changing the
+// relative balance between moves/types, which are still driven by real data.
+const DAMAGE_DIVISOR = 3.5;
 function dealDamage(atkMon, defMon, move, msgs) {
   const atkStat = move.range === 'ranged' ? getEffectiveStat(atkMon, 'ranged') : getEffectiveStat(atkMon, 'atk');
   const defStat = getEffectiveStat(defMon, 'def');
   const weaken = moveRangeWeaken(atkMon, move);
-  const base = Math.max(1, atkStat * move.power * weaken - defStat * 0.5);
+  const base = Math.max(1, atkStat * move.power * weaken - defStat * 0.5) / DAMAGE_DIVISOR;
   const mult = typeEffectiveness(move.type, MONSTERS[defMon.slug].types);
   let dmg = Math.max(1, Math.floor(base * mult * (0.85 + Math.random() * 0.3)));
   // retaliate (real: accumulates damage taken, adds it to the holder's next
