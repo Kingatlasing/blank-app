@@ -1853,8 +1853,14 @@ function startTrainerBattle(trainerDef, trainerSprite) {
   for (const m of battle.enemyTeam) markDexSeen(m.slug);
   playCry(battle.enemyTeam[0].slug);
   state.screen = 'battle';
-  if (trainerDef.preBattle) pushDialogue(trainerDef.preBattle);
+  // openBattleUI() unconditionally hides #dialogueBox as part of its own
+  // cleanup (clearing any stale dialogue left over from before this call) -
+  // pushDialogue() has to run AFTER that, not before, or its fresh preBattle
+  // text gets hidden the instant it's shown, leaving nothing for the player
+  // to click and dialogueQueue/state.screen stuck out of sync with the
+  // battle that's already running underneath.
   openBattleUI();
+  if (trainerDef.preBattle) pushDialogue(trainerDef.preBattle);
 }
 function currentEnemy() { return battle.enemyTeam[battle.enemyIdx]; }
 function currentPlayerMon() { return state.party[battle.playerIdx]; }
@@ -2138,7 +2144,12 @@ function finishBattle(playerWon) {
       pushDialogue(lines);
       if (t.story === 'gameWon') showVictory();
     } else if (battle.isFixed) {
-      const caught = currentEnemy();
+      // Not currentEnemy() - resolveBattleTurn() already incremented
+      // battle.enemyIdx past this (always single-member) enemyTeam's only
+      // valid index before calling finishBattle(true), so currentEnemy()
+      // is undefined here and .slug throws. enemyTeam[0] is always right
+      // for a wild/fixed encounter (there's only ever one).
+      const caught = battle.enemyTeam[0];
       state.flags.lostPetDone = true;
       markDexCaught(caught.slug);
       if (state.party.length < 6) state.party.push(caught); else state.boxParty.push(caught);
