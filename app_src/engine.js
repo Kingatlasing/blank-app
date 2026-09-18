@@ -40,6 +40,20 @@ function loadAllImages(cb) {
 // so a tree pokes up right in the middle of what should read as one
 // continuous roofline. Find every such gap, on every map, and clear the
 // tree there (falls back to plain grass) so no roof ever looks broken.
+(function patchMissingRoofs() {
+  // Searched every row of every map for a building (a wide run of non-tree
+  // "World" wall/window tiles) whose topmost row has no roof-cap in the
+  // Above layer and isn't itself continuing an existing wall above it -
+  // i.e. a building with no roof at all, bottom-to-top. Found exactly one:
+  // this 9-wide tower in town whose roof-cap was simply never placed in
+  // the source map. Rather than inventing new art, this overlay is a real
+  // crop of the SAME building's own roof from elsewhere in the same source
+  // tileset (identical width, identical style) - see roofcap_tower asset.
+  TILED.maps.town.overlays = [
+    { x: 18, y: 0, w: 9, h: 2, img: 'roofcap_tower' },
+  ];
+})();
+
 (function patchTreesInRoofGaps() {
   const TREE_SLOTS = new Set([12, 13, 16, 17]);
   const MAX_GAP = 3;
@@ -823,6 +837,10 @@ function renderTiledOverworld(map) {
       drawAtlasTile(td.world[i], dx, dy);
       if (td.grass && td.grass[i]) { ctx.fillStyle = 'rgba(20,60,20,0.18)'; ctx.fillRect(dx, dy, TILE, TILE); }
     }
+  }
+  for (const o of (td.overlays || [])) {
+    const dx = o.x * TILE - cam.x, dy = o.y * TILE - cam.y;
+    drawBuildingImg(o.img, dx, dy, o.w * TILE, o.h * TILE);
   }
 
   const drawables = [];
