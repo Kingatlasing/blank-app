@@ -34,6 +34,37 @@ function loadAllImages(cb) {
 }
 
 /* ---------------------------- Map data patch ---------------------------- */
+// Some buildings in the source maps sit close enough together that a
+// border/ornamental tree lands in the narrow gap between their roof-cap
+// (Above Player layer) runs on the same row, with no roof covering it -
+// so a tree pokes up right in the middle of what should read as one
+// continuous roofline. Find every such gap, on every map, and clear the
+// tree there (falls back to plain grass) so no roof ever looks broken.
+(function patchTreesInRoofGaps() {
+  const TREE_SLOTS = new Set([12, 13, 16, 17]);
+  const MAX_GAP = 3;
+  for (const name in TILED.maps) {
+    const td = TILED.maps[name];
+    const w = td.w, h = td.h;
+    for (let y = 0; y < h; y++) {
+      let runs = [], curStart = null;
+      for (let x = 0; x <= w; x++) {
+        const has = x < w && td.above[y * w + x] > 0;
+        if (has && curStart === null) curStart = x;
+        if (!has && curStart !== null) { runs.push([curStart, x - 1]); curStart = null; }
+      }
+      for (let i = 0; i < runs.length - 1; i++) {
+        const gapStart = runs[i][1] + 1, gapEnd = runs[i + 1][0] - 1;
+        if (gapEnd - gapStart + 1 > MAX_GAP) continue;
+        for (let x = gapStart; x <= gapEnd; x++) {
+          const i = y * w + x;
+          if (TREE_SLOTS.has(td.world[i])) { td.world[i] = 0; td.collide[i] = false; }
+        }
+      }
+    }
+  }
+})();
+
 // The source maps leave a walkable gap directly at the base of some border
 // trees (e.g. narrow alleys between buildings). Standing there is never
 // actually broken - the player sprite still draws correctly in front of the
