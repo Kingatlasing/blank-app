@@ -213,6 +213,28 @@ range icons show in the Fight submenu's move-info panel. `menu/tuxemon.png`
 specific branded character, not generic UI, unlike everything else in that
 folder.
 
+## 11. Status effects and bond (`STATUS_DEFS` in `engine.js`, `ASSET_B64.statusicons` / `.bondicons`)
+
+Source: `Tuxemon/Tuxemon`, `mods/tuxemon/db/status/*.yaml` for the 29 real
+battle conditions this project's move pool actually triggers, cross-checked
+against that project's own Python effect classes
+(`tuxemon/core/effects/*.py`) for the exact formulas (e.g. burn/poison deal
+`maxHP/8` per turn, confused has a real 50% chance, diehard clamps a fatal
+hit to 1 HP) rather than guessed numbers. Which of the 207 techniques
+inflict which status, on whom, and at what chance is real data too - each
+technique's own `effects: [{type:'give', parameters:[status, target]}]` and
+`potency` field, merged into `TECHNIQUES[x].inflicts`/`.potency` at data-
+build time (117 of 207 techniques actually do this). A few of the more
+elaborate reactive effects (`retaliate`'s damage accumulation, `charging`'s
+two-turn windup) are simplified to a single clear mechanic in
+`engine.js` rather than porting their full multi-phase state machine -
+called out in the code comments where that happens. Icons:
+`gfx/ui/icons/status/*.png` (shown on any battle HP card / party entry with
+an active status) and `gfx/ui/icons/bond/bond1-4.png` (a simple 0-4
+friendship tier gained by winning battles together, giving a small +3%/tier
+stat bonus - Tuxemon's own bond mechanic is deeper than this, simplified
+to one clean number here).
+
 ## What's NOT here (by design)
 
 No real Pokémon assets, sprites, or species data anywhere — verified both

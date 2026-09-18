@@ -23,7 +23,10 @@ the same self-contained-single-file style as this repo's previous games.
 - **The Bike** — faster overworld movement, awarded by the first Hall you
   clear; **Fast Travel** to any Monster Center you've visited
 - **Turn-based battles** — type effectiveness, capture mechanics, leveling,
-  evolution, trainer battles, with both trainers' sprites and creatures shown
+  evolution, trainer battles, with both trainers' sprites and creatures
+  shown, plus 29 real battle status effects (burn, poison, confusion,
+  sleep, stat buffs/debuffs, counters, and more) and a friendship "bond"
+  system that grants a small stat bonus the more battles you win together
 - **Story & side quests** — a main quest through 8 Arena Leaders and the
   "Enforcers" crime syndicate, plus a lost-pet quest and a hidden-item hunt
 - **A mini-game** — Berry Toss, a timing reflex game

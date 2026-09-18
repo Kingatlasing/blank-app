@@ -74,6 +74,15 @@ from that project, not drawn for this one; that menu folder's own mascot
 icon (`tuxemon.png`) was left out since it's Tuxemon's specific branded
 character rather than generic UI.
 
+Battle status effects (burn, poison, confusion, flinching, sleep, and 24
+more) are Tuxemon's own real battle conditions - their trigger chances,
+stat multipliers, and damage/heal formulas come from that project's own
+`mods/tuxemon/db/status/*.yaml` and Python effect code, and which move
+inflicts which status comes from each real technique's own data, not
+invented pairings. A friendship "bond" mechanic (0-4 tiers, small stat
+bonus) uses that project's real `bond1.png`-`bond4.png` icons, simplified
+from Tuxemon's own deeper bond system to one clean number.
+
 ## Guardian Monsters Artwork
 https://github.com/limbusdev/guardian_monsters_artwork
 

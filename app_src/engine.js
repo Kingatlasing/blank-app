@@ -196,6 +196,198 @@ function typeBadge(type, cls) {
   return `<span class="${cls || 'typebadge'}" style="background:${TYPE_COLORS[type]||'#888'}">${icon}${type}</span>`;
 }
 
+/* ============================ STATUS EFFECTS ============================
+   Real Tuxemon battle conditions (mods/tuxemon/db/status/*.yaml, cross-
+   referenced against that project's own Python effect implementations in
+   tuxemon/core/effects/*.py for the exact formulas) - not invented. Which
+   move inflicts which status, and at what chance, comes from each real
+   technique's own `effects: [{type:'give', parameters:[status, target]}]`
+   entry (merged into TECHNIQUES[x].inflicts/.potency at data-build time).
+   Stat names below are already translated from Tuxemon's (melee/ranged/
+   armour/dodge/speed) to this project's own derived-stat keys (atk/ranged/
+   def/eva/spd). A few of the more elaborate reactive effects (retaliate's
+   damage accumulation, charging's two-turn windup) are simplified to a
+   single clear mechanic rather than fully porting their multi-phase state
+   machine - noted inline where that happens. */
+const STATUS_DEFS = {
+  exhausted:  { category:'negative', statMods:{atk:0.5, ranged:0.5} },
+  focused:    { category:'positive', statMods:{eva:1.5} },
+  enraged:    { category:'positive', statMods:{atk:2, ranged:0.5} },
+  hardshell:  { category:'positive', statMods:{def:1.5} },
+  slow:       { category:'negative', statMods:{spd:0.5} },
+  blinded:    { category:'negative', statMods:{spd:0.5, eva:0.5} },
+  sniping:    { category:'positive', statMods:{atk:0.5, ranged:2} },
+  softened:   { category:'negative', statMods:{def:0.5, spd:0.5} },
+  chargedup:  { category:'positive', statMods:{def:2, eva:2, atk:2, ranged:2, spd:2}, oneTurn:true },
+  burn:       { category:'negative', dot:8 },            // damage = maxHP/8 per turn (real: burnt.py)
+  poison:     { category:'negative', dot:8 },             // damage = maxHP/8 per turn (real: poisoned.py)
+  harpooned:  { category:'negative', switchDamage:8 },     // damage = maxHP/8 on switching out (real: harpooned.py)
+  lifeleech:  { category:'negative', drain:16 },           // maxHP/16 drained to the opponent each turn (real: lifeleech.py)
+  festering:  { category:'negative', dot:8 },              // real engine has no numeric tick; kept as a flat DoT here for gameplay value
+  elementalshield: { category:'positive', reflect:16, ranges:['ranged','special'] },
+  feedback:   { category:'positive', reflect:8, ranges:['ranged','special'] },
+  prickly:    { category:'positive', reflect:8, ranges:['melee','touch'] },
+  grabbed:    { category:'negative', weaken:2, ranges:['ranged','reach'] },
+  stuck:      { category:'negative', weaken:2, ranges:['melee','touch'] },
+  confused:   { category:'negative', confuseChance:0.5 },
+  flinching:  { category:'negative', flinchChance:0.5, oneShot:true },
+  noddingoff: { category:'negative', sleepChance:0.5, maxTurns:5 },
+  wild:       { category:'negative', wildChance:0.25, wildDivisor:8 },
+  lockdown:   { category:'negative', blocksBag:true },
+  diehard:    { category:'positive', surviveAt1:true, oneShot:true },
+  recover:    { category:'positive', hot:16 },
+  charging:   { category:'positive', chargeBoost:1.5, oneTurn:true },
+  revenge:    { category:'positive', oneShotReflect:true, oneShot:true },
+  retaliate:  { category:'positive', accumulate:true },
+};
+
+function statusIconHtml(slug) {
+  if (!ASSET_B64.statusicons[slug]) return '';
+  return `<img src="data:image/png;base64,${ASSET_B64.statusicons[slug]}" style="width:14px;height:14px;image-rendering:pixelated;vertical-align:middle" title="${slug}">`;
+}
+function monsterStatusIcons(mon) {
+  if (!mon.status) return '';
+  const s = [mon.status.negative, mon.status.positive].filter(Boolean).map(x => statusIconHtml(x.slug)).join(' ');
+  return s ? `<span style="margin-left:4px">${s}</span>` : '';
+}
+// Applies a status, honoring the real "replaced" convention (a new status
+// overwrites whatever else was in the same positive/negative slot).
+function applyStatus(mon, slug, msgs) {
+  const def = STATUS_DEFS[slug];
+  if (!def || mon.currentHP <= 0) return;
+  mon.status[def.category] = { slug, turns: 0 };
+  if (msgs) msgs.push(monsterDisplayName(mon) + (def.category === 'positive' ? ' is charged up with ' : ' is afflicted with ') + slug + '!');
+}
+function clearStatusSlot(mon, category) { if (mon.status) mon.status[category] = null; }
+// Real derived stat with any active status stat_modifiers (and bond bonus)
+// applied multiplicatively - used everywhere combat math reads a stat.
+function getEffectiveStat(mon, key) {
+  let v = mon.derived[key];
+  for (const cat of ['negative', 'positive']) {
+    const st = mon.status && mon.status[cat];
+    const def = st && STATUS_DEFS[st.slug];
+    if (def && def.statMods && def.statMods[key] != null) v *= def.statMods[key];
+  }
+  if (mon.bond) v *= 1 + mon.bond * 0.03;
+  return v;
+}
+function moveRangeWeaken(mon, move) {
+  for (const cat of ['negative', 'positive']) {
+    const st = mon.status && mon.status[cat];
+    const def = st && STATUS_DEFS[st.slug];
+    if (def && def.weaken && def.ranges && def.ranges.includes(move.range)) return 1 / def.weaken;
+  }
+  return 1;
+}
+// After a hit lands, roll the move's real inflict chance (potency) and
+// apply to whichever side its real `target` says (own_monster/enemy_monster).
+function rollInflictStatuses(move, attackerMon, defenderMon, msgs) {
+  if (!move.inflicts) return;
+  const chance = move.potency != null ? move.potency : 1;
+  for (const inf of move.inflicts) {
+    if (Math.random() > chance) continue;
+    const target = inf.target === 'own_monster' ? attackerMon : defenderMon;
+    applyStatus(target, inf.status, msgs);
+  }
+}
+// Reflect/counter statuses (elementalshield/feedback/prickly): when the
+// status holder is hit by a move in its real trigger ranges, the attacker
+// takes maxHP/divisor damage back.
+function reflectStatusCheck(defenderMon, attackerMon, move, msgs) {
+  for (const cat of ['negative', 'positive']) {
+    const st = defenderMon.status && defenderMon.status[cat];
+    const def = st && STATUS_DEFS[st.slug];
+    if (def && def.reflect && def.ranges && def.ranges.includes(move.range)) {
+      const dmg = Math.max(1, Math.floor(attackerMon.derived.hp / def.reflect));
+      attackerMon.currentHP = Math.max(0, attackerMon.currentHP - dmg);
+      msgs.push(monsterDisplayName(attackerMon) + ' was hurt by ' + monsterDisplayName(defenderMon) + "'s " + st.slug + '!');
+    }
+  }
+}
+// Runs before a monster's chosen move executes - flinching/confused/sleep/
+// wild can skip or replace it entirely. Returns true if the normal move
+// should be skipped (a replacement message/effect has already been pushed).
+function preMoveStatusCheck(mon, msgs) {
+  const neg = mon.status && mon.status.negative;
+  if (!neg) return false;
+  const def = STATUS_DEFS[neg.slug];
+  if (!def) return false;
+  if (def.flinchChance && Math.random() < def.flinchChance) {
+    msgs.push(monsterDisplayName(mon) + ' flinched and couldn\'t move!');
+    clearStatusSlot(mon, 'negative');
+    return true;
+  }
+  if (def.sleepChance) {
+    neg.turns = (neg.turns || 0) + 1;
+    if (neg.turns >= def.maxTurns || Math.random() < def.sleepChance) {
+      msgs.push(monsterDisplayName(mon) + ' woke up!');
+      clearStatusSlot(mon, 'negative');
+      return false;
+    }
+    msgs.push(monsterDisplayName(mon) + ' is nodding off and can\'t move!');
+    return true;
+  }
+  if (def.wildChance && Math.random() < def.wildChance) {
+    const dmg = Math.max(1, Math.floor(mon.derived.hp / def.wildDivisor));
+    mon.currentHP = Math.max(0, mon.currentHP - dmg);
+    msgs.push(monsterDisplayName(mon) + ' is too wild to listen and hurts itself!');
+    return true;
+  }
+  if (def.confuseChance && Math.random() < def.confuseChance) {
+    const alts = getActiveMoves(mon);
+    if (alts.length > 1) {
+      msgs.push(monsterDisplayName(mon) + ' is confused and used a random move instead!');
+      mon._confusedMove = alts[Math.floor(Math.random() * alts.length)];
+    }
+  }
+  return false;
+}
+// End-of-turn DoT/HoT ticking (burn/poison/recover/lifeleech/festering),
+// real maxHP/divisor formula from burnt.py/poisoned.py/recover.py.
+function tickStatusEffects(mon, otherMon, msgs) {
+  if (mon.currentHP <= 0 || !mon.status) return;
+  for (const cat of ['negative', 'positive']) {
+    const st = mon.status[cat];
+    const def = st && STATUS_DEFS[st.slug];
+    if (!def) continue;
+    if (def.dot) {
+      const dmg = Math.max(1, Math.floor(mon.derived.hp / def.dot));
+      mon.currentHP = Math.max(0, mon.currentHP - dmg);
+      msgs.push(monsterDisplayName(mon) + ' is hurt by ' + st.slug + '!');
+    }
+    if (def.hot) {
+      const heal = Math.max(1, Math.floor(mon.derived.hp / def.hot));
+      const before = mon.currentHP;
+      mon.currentHP = Math.min(mon.derived.hp, mon.currentHP + heal);
+      if (mon.currentHP > before) msgs.push(monsterDisplayName(mon) + ' recovered a little HP!');
+      if (mon.currentHP >= mon.derived.hp) clearStatusSlot(mon, cat);
+    }
+    if (def.drain && otherMon && otherMon.currentHP > 0) {
+      const dmg = Math.max(1, Math.floor(mon.derived.hp / def.drain));
+      mon.currentHP = Math.max(0, mon.currentHP - dmg);
+      otherMon.currentHP = Math.min(otherMon.derived.hp, otherMon.currentHP + dmg);
+      msgs.push(monsterDisplayName(mon) + "'s HP is being leeched!");
+    }
+    if (def.oneTurn) {
+      // Survives the tick right after it was applied (so it's actually
+      // active for the next move's damage calc) and clears on the one after.
+      if (st.turns >= 1) clearStatusSlot(mon, cat);
+      else st.turns = (st.turns || 0) + 1;
+    }
+  }
+}
+// harpooned's real trigger (harpooned.py): damage on switching out, not a
+// per-turn tick.
+function applySwitchOutDamage(mon, msgs) {
+  const neg = mon.status && mon.status.negative;
+  const def = neg && STATUS_DEFS[neg.slug];
+  if (def && def.switchDamage) {
+    const dmg = Math.max(1, Math.floor(mon.derived.hp / def.switchDamage));
+    mon.currentHP = Math.max(0, mon.currentHP - dmg);
+    msgs.push(monsterDisplayName(mon) + ' was hurt pulling free of the harpoon!');
+  }
+}
+
 /* ---------------------------- Custom (non-Tuxemon) narrative items ---------------------------- */
 ITEMS_DB.bridge_pass = { slug: 'bridge_pass', name: 'Bridge Pass', description: 'Proof you cleared the Enforcer Outpost. Lets you cross into the Summit.', category: 'key', cost: 0 };
 
@@ -230,7 +422,11 @@ function createMonsterInstance(slug, level, opts) {
     currentHP: derived.hp,
     derived,
     nickname: opts.nickname || null,
-    status: null,
+    // status.negative/.positive: real Tuxemon battle conditions (see
+    // STATUS_DEFS); bond: 0-4 friendship tier (real bond1-4.png icons),
+    // gained by winning battles together, grants a small stat bonus.
+    status: { negative: null, positive: null },
+    bond: opts.bond || 0,
     id: 'm' + Math.random().toString(36).slice(2, 10)
   };
   return inst;
@@ -1531,7 +1727,7 @@ function renderBattleScene() {
 function battleHpBar(m, side) {
   const pct = Math.max(0, Math.floor(m.currentHP / m.derived.hp * 100));
   const typeBadges = MONSTERS[m.slug].types.map(t => typeBadge(t)).join('');
-  return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbarframe"><div class="hpfilltrack"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
+  return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}${monsterStatusIcons(m)}<div class="hpbarframe"><div class="hpfilltrack"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
 }
 
 function setBattlePrompt(text) {
@@ -1597,6 +1793,49 @@ function appendBattleLog(lines) {
   log.style.display = 'flex';
 }
 
+// Real formula (base * typeMult * variance), plus: getEffectiveStat folds in
+// active status stat_modifiers and bond bonus, moveRangeWeaken folds in
+// grabbed/stuck's real power reduction for matching move ranges, diehard
+// clamps a fatal hit to 1 HP once, and a successful hit rolls the move's
+// real inflict chance and checks the defender's reflect statuses.
+function dealDamage(atkMon, defMon, move, msgs) {
+  const atkStat = move.range === 'ranged' ? getEffectiveStat(atkMon, 'ranged') : getEffectiveStat(atkMon, 'atk');
+  const defStat = getEffectiveStat(defMon, 'def');
+  const weaken = moveRangeWeaken(atkMon, move);
+  const base = Math.max(1, atkStat * move.power * weaken - defStat * 0.5);
+  const mult = typeEffectiveness(move.type, MONSTERS[defMon.slug].types);
+  let dmg = Math.max(1, Math.floor(base * mult * (0.85 + Math.random() * 0.3)));
+  // retaliate (real: accumulates damage taken, adds it to the holder's next
+  // hit) - simplified to a single-turn accumulator rather than porting its
+  // multi-phase state machine.
+  const retaliating = atkMon.status && atkMon.status.positive && atkMon.status.positive.slug === 'retaliate';
+  if (retaliating && atkMon._retaliateAccum) {
+    dmg += atkMon._retaliateAccum;
+    atkMon._retaliateAccum = 0;
+    msgs.push(monsterDisplayName(atkMon) + ' retaliates for the damage it took!');
+  }
+  const diehard = defMon.status && defMon.status.positive && defMon.status.positive.slug === 'diehard';
+  if (diehard && dmg >= defMon.currentHP) {
+    dmg = defMon.currentHP - 1;
+    clearStatusSlot(defMon, 'positive');
+    msgs.push(monsterDisplayName(defMon) + ' held on with sheer determination!');
+  }
+  defMon.currentHP = Math.max(0, defMon.currentHP - Math.max(0, dmg));
+  msgs.push(monsterDisplayName(atkMon) + ' used ' + move.name + '!' + (mult > 1 ? ' It\'s super effective!' : mult < 1 && mult > 0 ? ' It\'s not very effective...' : ''));
+  if (defMon.status && defMon.status.positive && defMon.status.positive.slug === 'retaliate') {
+    defMon._retaliateAccum = (defMon._retaliateAccum || 0) + dmg;
+  }
+  // revenge (real: attacker takes the same damage back, holder heals it,
+  // one-shot).
+  if (defMon.status && defMon.status.positive && defMon.status.positive.slug === 'revenge') {
+    atkMon.currentHP = Math.max(0, atkMon.currentHP - dmg);
+    defMon.currentHP = Math.min(defMon.derived.hp, defMon.currentHP + dmg);
+    clearStatusSlot(defMon, 'positive');
+    msgs.push(monsterDisplayName(defMon) + ' got its revenge!');
+  }
+  reflectStatusCheck(defMon, atkMon, move, msgs);
+  rollInflictStatuses(move, atkMon, defMon, msgs);
+}
 function playerUseMove(i) {
   if (battle.turnLock) return;
   battle.turnLock = true;
@@ -1604,25 +1843,26 @@ function playerUseMove(i) {
   const moves = getActiveMoves(pm);
   const mv = moves[i];
   const enemy = currentEnemy();
-  const order = pm.derived.spd >= enemy.derived.spd ? ['player', 'enemy'] : ['enemy', 'player'];
+  const order = getEffectiveStat(pm, 'spd') >= getEffectiveStat(enemy, 'spd') ? ['player', 'enemy'] : ['enemy', 'player'];
   let msgs = [];
-  function doAttack(attacker, defender, atkMon, defMon, isPlayer) {
-    if (atkMon.currentHP <= 0) return;
-    const move = isPlayer ? mv : pickEnemyMove(defender);
+  function doAttack(atkMon, defMon, isPlayer) {
+    if (atkMon.currentHP <= 0 || defMon.currentHP <= 0) return;
+    let move = isPlayer ? mv : pickEnemyMove(defMon);
+    if (preMoveStatusCheck(atkMon, msgs)) {
+      if (atkMon._confusedMove) { move = atkMon._confusedMove; delete atkMon._confusedMove; }
+      else return;
+    }
     const hit = Math.random() <= move.accuracy;
     if (!hit) { msgs.push(monsterDisplayName(atkMon) + "'s " + move.name + ' missed!'); return; }
-    const atkStat = move.range === 'ranged' ? atkMon.derived.ranged : atkMon.derived.atk;
-    const base = Math.max(1, atkStat * move.power - defMon.derived.def * 0.5);
-    const mult = typeEffectiveness(move.type, MONSTERS[defMon.slug].types);
-    const dmg = Math.max(1, Math.floor(base * mult * (0.85 + Math.random() * 0.3)));
-    defMon.currentHP = Math.max(0, defMon.currentHP - dmg);
-    msgs.push(monsterDisplayName(atkMon) + ' used ' + move.name + '!' + (mult > 1 ? ' It\'s super effective!' : mult < 1 && mult > 0 ? ' It\'s not very effective...' : ''));
+    dealDamage(atkMon, defMon, move, msgs);
   }
   for (const who of order) {
-    if (who === 'player') doAttack(pm, enemy, pm, enemy, true);
-    else doAttack(enemy, pm, enemy, pm, false);
+    if (who === 'player') doAttack(pm, enemy, true);
+    else doAttack(enemy, pm, false);
     if (currentEnemy().currentHP <= 0 || currentPlayerMon().currentHP <= 0) break;
   }
+  if (enemy.currentHP > 0) tickStatusEffects(enemy, pm, msgs);
+  if (pm.currentHP > 0) tickStatusEffects(pm, enemy, msgs);
   appendBattleLog(msgs);
   setTimeout(() => resolveBattleTurn(), 700);
 }
@@ -1659,6 +1899,12 @@ function resolveBattleTurn() {
 
 function finishBattle(playerWon) {
   const t = battle.trainer;
+  // Statuses don't carry between battles; a won fight strengthens the bond
+  // (real bond1-4.png tiers) of whichever party members were still standing.
+  for (const m of state.party) {
+    m.status = { negative: null, positive: null };
+    if (playerWon && m.currentHP > 0) m.bond = Math.min(4, (m.bond || 0) + 1);
+  }
   if (playerWon) {
     if (t) {
       state.money += t.prizeMoney || 0;
@@ -1715,20 +1961,26 @@ function battleThrowBall() {
 }
 function resolveEnemyOnlyTurn() {
   const enemy = currentEnemy(); const pm = currentPlayerMon();
-  const move = pickEnemyMove(enemy);
-  const hit = Math.random() <= move.accuracy;
-  if (hit) {
-    const atkStat = move.range === 'ranged' ? enemy.derived.ranged : enemy.derived.atk;
-    const base = Math.max(1, atkStat * move.power - pm.derived.def * 0.5);
-    const mult = typeEffectiveness(move.type, MONSTERS[pm.slug].types);
-    const dmg = Math.max(1, Math.floor(base * mult * (0.85 + Math.random() * 0.3)));
-    pm.currentHP = Math.max(0, pm.currentHP - dmg);
-    appendBattleLog([monsterDisplayName(enemy) + ' used ' + move.name + '!']);
+  const msgs = [];
+  if (enemy.currentHP > 0 && pm.currentHP > 0) {
+    let move = pickEnemyMove(enemy);
+    if (!preMoveStatusCheck(enemy, msgs)) {
+      if (enemy._confusedMove) { move = enemy._confusedMove; delete enemy._confusedMove; }
+      const hit = Math.random() <= move.accuracy;
+      if (!hit) msgs.push(monsterDisplayName(enemy) + "'s " + move.name + ' missed!');
+      else dealDamage(enemy, pm, move, msgs);
+    }
   }
+  if (enemy.currentHP > 0) tickStatusEffects(enemy, pm, msgs);
+  if (pm.currentHP > 0) tickStatusEffects(pm, enemy, msgs);
+  appendBattleLog(msgs);
   resolveBattleTurn();
 }
 
 function openBagInBattle() {
+  const pm = currentPlayerMon();
+  const locked = pm.status && pm.status.negative && pm.status.negative.slug === 'lockdown';
+  if (locked) { appendBattleLog([monsterDisplayName(pm) + " can't use items - it's in lockdown!"]); return; }
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
   const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion' && state.inventory[s] > 0);
@@ -1752,8 +2004,12 @@ function openPartyInBattle() {
     `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function switchPlayerMon(i) {
+  const outgoing = currentPlayerMon();
+  const msgs = [];
+  applySwitchOutDamage(outgoing, msgs);
   battle.playerIdx = i;
-  appendBattleLog(['Go, ' + monsterDisplayName(state.party[i]) + '!']);
+  msgs.push('Go, ' + monsterDisplayName(state.party[i]) + '!');
+  appendBattleLog(msgs);
   setTimeout(() => resolveEnemyOnlyTurn(), 500);
 }
 function handleBattleKey() {}
@@ -1814,11 +2070,17 @@ function renderMenu() {
     <button onclick="closeMenu()">${menuIcon('close')}Close</button>
   </div>`;
 }
+// Real Tuxemon bond1-4.png tiers (gfx/ui/icons/bond/) - shown next to a
+// party member once it's fought alongside the player (bond 0 shows nothing).
+function bondIconHtml(mon) {
+  if (!mon.bond) return '';
+  return ` <img src="data:image/png;base64,${ASSET_B64.bondicons['bond' + mon.bond]}" style="width:12px;image-rendering:pixelated;vertical-align:middle" title="Bond ${mon.bond}/4">`;
+}
 function renderPartyMenu() {
   const el = document.getElementById('menuOverlay');
   el.innerHTML = `<div class="panel"><h2>Your Creatures</h2>` + state.party.map(m => {
     const moves = getActiveMoves(m).map(mv => mv.name).join(', ');
-    return `<div class="battlecard"><img src="data:image/png;base64,${ASSET_B64.monsters[m.slug]}" style="image-rendering:pixelated;width:64px"><br><b>${monsterDisplayName(m)}</b> Lv${m.level} (${MONSTERS[m.slug].types.join('/')})<br>HP ${m.currentHP}/${m.derived.hp} | EXP ${m.exp}/${expToNext(m.level)}<br>Moves: ${moves}</div>`;
+    return `<div class="battlecard"><img src="data:image/png;base64,${ASSET_B64.monsters[m.slug]}" style="image-rendering:pixelated;width:64px"><br><b>${monsterDisplayName(m)}</b> Lv${m.level} (${MONSTERS[m.slug].types.join('/')})${bondIconHtml(m)}${monsterStatusIcons(m)}<br>HP ${m.currentHP}/${m.derived.hp} | EXP ${m.exp}/${expToNext(m.level)}<br>Moves: ${moves}</div>`;
   }).join('') + `<button onclick="renderMenu()">Back</button></div>`;
 }
 function renderBagMenu() {
