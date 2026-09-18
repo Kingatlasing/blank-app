@@ -38,7 +38,11 @@
   #choiceBox { position:absolute; left:20px; right:20px; bottom:170px; display:none; flex-direction:column; gap:6px; z-index:31; }
   #choiceBox button { padding:10px; font-size:15px; background:#2f8fd6; color:#fff; border:none; border-radius:6px; cursor:pointer; }
 
-  #battleUI { position:absolute; inset:0; display:none; background:linear-gradient(#cfe8c9,#8fbf7a); z-index:15; }
+  /* No background here on purpose: the battle scene (sky/ground gradient +
+     the player's and enemy's monster/trainer sprites) is drawn onto the
+     canvas underneath by renderBattleScene(); an opaque background here
+     would hide it completely behind this overlay's own HP cards/menu. */
+  #battleUI { position:absolute; inset:0; display:none; z-index:15; }
   #battleTop { position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; gap:10px; }
   .battlecard { background:rgba(10,15,30,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; min-width:180px; }
   .typebadge, .movetype { display:inline-block; font-size:9px; padding:1px 5px; border-radius:8px; margin-left:4px; color:#fff; text-transform:uppercase; }

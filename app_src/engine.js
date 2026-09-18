@@ -277,8 +277,12 @@ const state = {
   badges: [],
   stepCounter: 0,
   encounterCooldown: 0,
-  camera: { x: 0, y: 0 }
+  camera: { x: 0, y: 0 },
+  dex: {} // slug -> 'seen' | 'caught', for the Bestiary screen
 };
+
+function markDexSeen(slug) { if (!state.dex[slug]) state.dex[slug] = 'seen'; }
+function markDexCaught(slug) { state.dex[slug] = 'caught'; }
 
 function addItem(slug, n) { state.inventory[slug] = (state.inventory[slug] || 0) + n; }
 function removeItem(slug, n) {
@@ -603,6 +607,7 @@ function professorDialogue() {
       onChoose: (i) => {
         const slug = STARTERS[i];
         state.party.push(createMonsterInstance(slug, 5));
+        markDexCaught(slug);
         state.flags.starterChosen = true;
         pushDialogue([MONSTERS[slug].name + ' joined your team!', "Go show the world what you two can do!"]);
       }
@@ -658,7 +663,12 @@ function showNextDialogueLine() {
   const txt = document.getElementById('dialogueText');
   if (dialogueQueue.length === 0) {
     box.style.display = 'none';
-    if (state.screen === 'dialogue' && !currentChoice) state.screen = 'overworld';
+    // A trainer's preBattle text runs through this same dialogue queue while
+    // battle is already set up underneath (see startTrainerBattle) - once
+    // dismissed, go back to the battle screen instead of the overworld, or
+    // every state.screen==='battle' check elsewhere (HUD, movement input,
+    // NPC interact, the render loop) would think the fight had ended.
+    if (state.screen === 'dialogue' && !currentChoice) state.screen = battle ? 'battle' : 'overworld';
     return;
   }
   box.style.display = 'block';
@@ -670,7 +680,7 @@ function advanceDialogue() {
 
 function handleNpcInteract(npc) {
   if (npc.trainer && !state.flags[npc.trainer.flag]) {
-    startTrainerBattle(npc.trainer);
+    startTrainerBattle(npc.trainer, npc.sprite);
     return;
   }
   if (npc.wildFixed && !state.flags.lostPetDone) {
@@ -684,7 +694,7 @@ function handleNpcInteract(npc) {
   if (npc.minigame) { openMinigame(); return; }
   let result = npc.dialogue ? npc.dialogue() : null;
   if (!result) return;
-  if (result.trainerNow) { startTrainerBattle(result.trainerNow); return; }
+  if (result.trainerNow) { startTrainerBattle(result.trainerNow, npc.sprite); return; }
   if (result.choice) {
     pushDialogue(result.lines);
     currentChoice = result;
@@ -1033,7 +1043,14 @@ function updateMovementAnim() {
 function gameLoop() {
   pollMovementInput();
   updateMovementAnim();
-  if (state.screen === 'overworld' || state.screen === 'dialogue') renderOverworld();
+  // A trainer's preBattle dialogue runs through the same pushDialogue() as
+  // ordinary overworld dialogue, which sets state.screen to 'dialogue' - so
+  // checking state.screen alone here would redraw the overworld map (and,
+  // once dismissed, state.screen goes to 'overworld' too) right over the
+  // already-drawn battle scene/sprites while the battle is still up. `battle`
+  // is the authoritative "a fight is in progress" flag regardless of which
+  // screen value dialogue plumbing leaves behind, so gate on it too.
+  if (!battle && (state.screen === 'overworld' || state.screen === 'dialogue')) renderOverworld();
   updateHud();
   requestAnimationFrame(gameLoop);
 }
@@ -1059,17 +1076,19 @@ function startWildBattle(slug, level, isFixed) {
     playerIdx: state.party.findIndex(m => m.currentHP > 0),
     log: [], turnLock: false,
   };
+  markDexSeen(slug);
   state.screen = 'battle';
   openBattleUI();
 }
-function startTrainerBattle(trainerDef) {
+function startTrainerBattle(trainerDef, trainerSprite) {
   battle = {
-    kind: 'trainer', trainer: trainerDef,
+    kind: 'trainer', trainer: trainerDef, trainerSprite: trainerSprite || null,
     enemyTeam: trainerDef.team.map(t => createMonsterInstance(t.slug, t.level)),
     enemyIdx: 0,
     playerIdx: state.party.findIndex(m => m.currentHP > 0),
     log: [], turnLock: false,
   };
+  for (const m of battle.enemyTeam) markDexSeen(m.slug);
   state.screen = 'battle';
   if (trainerDef.preBattle) pushDialogue(trainerDef.preBattle);
   openBattleUI();
@@ -1096,10 +1115,18 @@ function renderBattleScene() {
   ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
   const enemy = currentEnemy();
   const pm = currentPlayerMon();
+  // Opponent trainer (trainer battles only) - stands behind/above their own
+  // monster, same convention as their name banner already shown up top.
+  if (battle.trainerSprite) {
+    drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.80, canvas.height * 0.16, 3);
+  }
   if (enemy) {
     const im = IMG.monsters[enemy.slug];
     if (im && im.complete) ctx.drawImage(im, canvas.width * 0.62, canvas.height * 0.14, 64 * 2.4, 44 * 2.4);
   }
+  // Player's own trainer, back view ('up' facing = back row in the sprite sheet).
+  const playerSprite = state.playerSprite || 'player_boy';
+  drawChar(playerSprite, 'up', 0, canvas.width * 0.03, canvas.height * 0.58, 3.2);
   if (pm) {
     const im = IMG.monsters[pm.slug];
     if (im && im.complete) ctx.drawImage(im, canvas.width * 0.08, canvas.height * 0.42, 64 * 2.8, 44 * 2.8);
@@ -1219,6 +1246,7 @@ function finishBattle(playerWon) {
     } else if (battle.isFixed) {
       const caught = currentEnemy();
       state.flags.lostPetDone = true;
+      markDexCaught(caught.slug);
       if (state.party.length < 6) state.party.push(caught); else state.boxParty.push(caught);
       closeBattleUI();
       pushDialogue(['You gently coaxed ' + monsterDisplayName(caught) + ' to safety!', 'It joined your team!']);
@@ -1248,6 +1276,7 @@ function battleThrowBall() {
   appendBattleLog(['You threw a ' + ITEMS_DB[ballSlug].name + '!']);
   if (Math.random() < chance) {
     appendBattleLog(['Gotcha! ' + monsterDisplayName(enemy) + ' was caught!']);
+    markDexCaught(enemy.slug);
     if (state.party.length < 6) state.party.push(enemy); else state.boxParty.push(enemy);
     setTimeout(() => { closeBattleUI(); }, 900);
   } else {
@@ -1338,6 +1367,7 @@ function renderMenu() {
     <button onclick="renderPartyMenu()">Creatures</button>
     <button onclick="renderBagMenu()">Bag</button>
     <button onclick="renderBadgesMenu()">Badges</button>
+    <button onclick="renderBestiaryMenu()">Bestiary</button>
     <button onclick="saveGame()">Save Game</button>
     <button onclick="closeMenu()">Close</button>
   </div>`;
@@ -1358,6 +1388,32 @@ function renderBagMenu() {
 function renderBadgesMenu() {
   const el = document.getElementById('menuOverlay');
   el.innerHTML = `<div class="panel"><h2>Badges (${state.badges.length})</h2>` + state.badges.map(b => `<div>${b}</div>`).join('') + `<button onclick="renderMenu()">Back</button></div>`;
+}
+function dexStatus(slug) {
+  if (state.dex[slug] === 'caught') return 'caught';
+  if (state.party.some(m => m.slug === slug) || state.boxParty.some(m => m.slug === slug)) return 'caught';
+  if (state.dex[slug] === 'seen') return 'seen';
+  return 'unseen';
+}
+function renderBestiaryMenu() {
+  const el = document.getElementById('menuOverlay');
+  const slugs = Object.keys(MONSTERS);
+  const caughtCount = slugs.filter(s => dexStatus(s) === 'caught').length;
+  const cards = slugs.map(slug => {
+    const status = dexStatus(slug);
+    const mon = MONSTERS[slug];
+    if (status === 'unseen') {
+      return `<div class="battlecard" style="text-align:center;opacity:0.5"><div style="width:64px;height:44px;margin:0 auto;background:#333;border-radius:4px"></div><b>???</b></div>`;
+    }
+    const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
+    const img = `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:64px;${status==='seen'?'filter:grayscale(1) brightness(0.6)':''}">`;
+    return `<div class="battlecard" style="text-align:center">${img}<br><b>${mon.name}</b><br>${types}${status==='caught' ? '<div style="color:#7fd87f;font-size:11px;margin-top:2px">&#10003; Caught</div>' : '<div style="color:#9fb4d8;font-size:11px;margin-top:2px">Seen</div>'}</div>`;
+  }).join('');
+  el.innerHTML = `<div class="panel" style="max-width:640px">
+    <h2>Bestiary (${caughtCount}/${slugs.length} caught)</h2>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:6px;max-height:420px;overflow-y:auto">${cards}</div>
+    <button onclick="renderMenu()">Back</button>
+  </div>`;
 }
 
 /* ============================ SAVE / LOAD ============================ */
