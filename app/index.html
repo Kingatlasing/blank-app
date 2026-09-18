@@ -2009,6 +2009,18 @@ function dexStatus(slug) {
   if (state.dex[slug] === 'seen') return 'seen';
   return 'unseen';
 }
+// A true silhouette (solid-color shape, no interior detail) derived from a
+// monster's own real sprite via CSS mask-image - the sprite's own alpha
+// channel becomes the outline, so the shape is genuine artwork, just not
+// colored in yet. Used for "seen but not caught" everywhere in the Bestiary,
+// matching the classic Pokedex convention (seen = grey silhouette, caught =
+// full color).
+function silhouetteImg(slug, widthPx) {
+  const src = `url(data:image/png;base64,${ASSET_B64.monsters[slug]})`;
+  return `<div style="width:${widthPx}px;height:${Math.round(widthPx*44/64)}px;margin:0 auto;background:#6b7280;image-rendering:pixelated;
+    -webkit-mask-image:${src};-webkit-mask-size:contain;-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;
+    mask-image:${src};mask-size:contain;mask-repeat:no-repeat;mask-position:center;"></div>`;
+}
 function renderBestiaryMenu() {
   const el = document.getElementById('menuOverlay');
   const slugs = Object.keys(MONSTERS);
@@ -2020,7 +2032,9 @@ function renderBestiaryMenu() {
       return `<div class="battlecard" style="text-align:center;opacity:0.5"><div style="width:64px;height:44px;margin:0 auto;background:#333;border-radius:4px"></div><b>???</b></div>`;
     }
     const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
-    const img = `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:64px;${status==='seen'?'filter:grayscale(1) brightness(0.6)':''}">`;
+    const img = status === 'seen'
+      ? silhouetteImg(slug, 64)
+      : `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:64px">`;
     return `<div class="battlecard" style="text-align:center;cursor:pointer" onclick="renderDexDetail('${slug}')">${img}<br><b>${mon.name}</b><br>${types}${status==='caught' ? '<div style="color:#7fd87f;font-size:11px;margin-top:2px">&#10003; Caught</div>' : '<div style="color:#9fb4d8;font-size:11px;margin-top:2px">Seen</div>'}</div>`;
   }).join('');
   el.innerHTML = `<div class="panel" style="max-width:640px">
@@ -2042,7 +2056,9 @@ function renderDexDetail(slug) {
   const caught = status === 'caught';
   const types = mon.types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
   const classification = mon.species ? mon.species.split('_').map(w => w[0].toUpperCase() + w.slice(1)).join(' ') : '???';
-  const img = `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:120px;${caught?'':'filter:grayscale(1) brightness(0.6)'}">`;
+  const img = caught
+    ? `<img src="data:image/png;base64,${ASSET_B64.monsters[slug]}" style="image-rendering:pixelated;width:120px">`
+    : silhouetteImg(slug, 120);
   const statBars = Object.keys(STAT_LABELS).map(k => {
     const v = mon.stats[k] || 0;
     const pct = Math.min(100, v / 14 * 100);
@@ -2056,8 +2072,10 @@ function renderDexDetail(slug) {
     const evoMon = MONSTERS[e.to];
     if (!evoMon) return '';
     const evoStatus = dexStatus(e.to);
-    const evoImg = evoStatus !== 'unseen'
-      ? `<img src="data:image/png;base64,${ASSET_B64.monsters[e.to]}" style="image-rendering:pixelated;width:48px;${evoStatus==='caught'?'':'filter:grayscale(1) brightness(0.6)'}">`
+    const evoImg = evoStatus === 'caught'
+      ? `<img src="data:image/png;base64,${ASSET_B64.monsters[e.to]}" style="image-rendering:pixelated;width:48px">`
+      : evoStatus === 'seen'
+      ? silhouetteImg(e.to, 48)
       : `<div style="width:48px;height:33px;background:#333;border-radius:4px"></div>`;
     const evoName = evoStatus !== 'unseen' ? evoMon.name : '???';
     return `<div style="text-align:center;cursor:pointer" onclick="renderDexDetail('${e.to}')">${evoImg}<br><span style="font-size:10px">Lv${e.at_level != null ? e.at_level : e.level}&#8594;${evoName}</span></div>`;
