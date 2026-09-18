@@ -47,19 +47,22 @@
      sprite top-right), player's own card lower-right (beside their own sprite,
      which stands lower-left) - not both cards stacked together at the very top. */
   #battleTop { position:absolute; top:14px; left:14px; }
-  /* top:280 (not the card's more "natural" ~300+) and the shorter card height
-     below are both deliberately tight - the only vertical gap on the right side
-     of the battle canvas sits between the enemy's sprite/platform and the
-     bottom menu footer, so the card has to fit inside that gap rather than the
-     other way around. */
-  #battlePlayerHp { position:absolute; top:280px; right:14px; }
-  .battlecard { color:#2a2016; padding:6px 16px 4px; font-size:12px; box-sizing:border-box;
+  /* top:264 and the taller card height below are both deliberately tight - the
+     only vertical gap on the right side of the battle canvas sits between the
+     enemy's sprite/platform and the bottom menu footer, so the card has to fit
+     inside that gap rather than the other way around. */
+  #battlePlayerHp { position:absolute; top:260px; right:14px; }
+  .battlecard { color:#2a2016; font-size:12px; box-sizing:border-box;
     background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated; }
-  /* Heights match each real frame PNG's own aspect ratio (100x29 / 104x37) at this
-     width, so the pixel art isn't stretched out of proportion; text is allowed to
-     spill past the bottom edge if it needs more room rather than clipping. */
-  .battlecard.opponent { background-image:var(--hp-frame-opponent); width:260px; height:75px; }
-  .battlecard.player { background-image:var(--hp-frame-player); width:280px; height:76px; padding-top:6px; }
+  /* Each real frame PNG (100x29 / 104x37) is a card drawn smaller than its own
+     canvas, with a drop-shadow bevel filling the rest - e.g. the player frame's
+     actual cream rectangle only spans x:8.6%-94.2%, y:21.6%-75.7% of the image.
+     Padding below is that inset (as a fraction of this box's own size, not the
+     source pixels), so text stays on the cream card instead of spilling onto
+     the shadow around it. Heights are picked so that inset still leaves enough
+     vertical room for the name/type line + HP bar + HP text. */
+  .battlecard.opponent { background-image:var(--hp-frame-opponent); width:260px; height:80px; padding:6px 23px 20px 5px; }
+  .battlecard.player { background-image:var(--hp-frame-player); width:280px; height:98px; padding:22px 17px 24px 25px; }
   .typebadge, .movetype { display:inline-block; font-size:9px; padding:1px 5px; border-radius:8px; margin-left:4px; color:#fff; text-transform:uppercase; }
   .hptext { font-size:11px; opacity:0.8; }
   /* Real Tuxemon HP-bar frame (mods/tuxemon/gfx/ui/monster/hp_bar.png) in place of a
