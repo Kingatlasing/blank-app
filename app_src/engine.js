@@ -458,6 +458,31 @@ MAPS.summitplateau = {
   encounterTable: [],
 };
 
+(function patchBrokenWarps() {
+  // Each town has one warp into a "pokemon_center_*" building interior, but
+  // those interior maps were never included in this build (ASSET_LIBRARY.md:
+  // they're unfinished placeholders in the source repo - grass + tree-corner
+  // tiles, not a real room). Walking onto that doorway tile therefore sent
+  // the player to a map that doesn't exist in MAPS/TILED at all, which threw
+  // (`Cannot read properties of undefined (reading 'tiledKey')`) and froze
+  // the game on whatever frame was last drawn - looking exactly like the
+  // player had walked straight into/through the building, since nothing
+  // ever rendered again to show otherwise. Found by walking a real keyboard
+  // path onto each of the three affected doors (town, ashveld, crysthaven)
+  // and watching it crash the same way every time.
+  // Fix: drop any warp whose destination map isn't actually part of this
+  // build, everywhere, rather than special-casing the three known ones -
+  // the door tile is left walkable (same as this project's other purely
+  // decorative doors) but no longer tries to warp anywhere.
+  const targetExists = (key) => !!MAPS[key] && (!MAPS[key].tiledKey || !!TILED.maps[MAPS[key].tiledKey]);
+  for (const name in TILED.maps) {
+    const td = TILED.maps[name];
+    if (td.warps) td.warps = td.warps.filter(w => targetExists(w.to));
+    const map = MAPS[name];
+    if (map && map.extraWarps) map.extraWarps = map.extraWarps.filter(w => targetExists(w.to));
+  }
+})();
+
 /* ---------------------------- NPC dialogue functions ---------------------------- */
 function professorDialogue() {
   if (!state.flags.starterChosen) {
