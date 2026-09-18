@@ -1469,12 +1469,25 @@ function renderBattleScene() {
   if (battle.trainerSprite) {
     drawChar(battle.trainerSprite, 'down', 0, canvas.width * 0.78, canvas.height * 0.14, 4);
   }
+  // Ground platform under each creature's feet, the oval convention from the
+  // classic games - drawn before the creature so its feet overlap the front
+  // edge naturally. Real open-source art (Guardian Monsters Artwork by Georg
+  // Eckert/lucidtanooki, CC BY-4.0), not drawn/invented for this project.
+  const platform = IMG.battleui.platform_oval;
+  if (platform && platform.complete && enemy) {
+    const pw = 64 * 3.3 * 1.55, ph = pw * 0.29;
+    ctx.drawImage(platform, canvas.width * 0.58 + 64 * 3.3 * 0.5 - pw / 2, canvas.height * 0.16 + 44 * 3.3 * 0.86, pw, ph);
+  }
   if (enemy) {
     const im = IMG.monsters[enemy.slug];
     if (im && im.complete) ctx.drawImage(im, canvas.width * 0.58, canvas.height * 0.16, 64 * 3.3, 44 * 3.3);
   }
   // Player's own trainer, back view ('up' facing = back row in the sprite sheet).
   const playerSprite = state.playerSprite || 'player_boy';
+  if (platform && platform.complete && pm) {
+    const pw = 64 * 3.8 * 1.35, ph = pw * 0.29;
+    ctx.drawImage(platform, canvas.width * 0.05 + 64 * 3.8 * 0.5 - pw / 2, canvas.height * 0.38 + 44 * 3.8 * 0.74, pw, ph);
+  }
   drawChar(playerSprite, 'up', 0, canvas.width * 0.02, canvas.height * 0.55, 4.3);
   if (pm) {
     const im = IMG.monsters[pm.slug];
@@ -1491,6 +1504,12 @@ function battleHpBar(m, side) {
   return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
 }
 
+function setBattlePrompt(text) {
+  const el = document.getElementById('battlePrompt');
+  if (text) { el.style.display = 'block'; el.textContent = text; }
+  else { el.style.display = 'none'; el.textContent = ''; }
+}
+
 function renderBattleMain() {
   const enemy = currentEnemy(); const pm = currentPlayerMon();
   // Opponent's card top-left, player's own lower-right beside their own sprite -
@@ -1498,6 +1517,7 @@ function renderBattleMain() {
   document.getElementById('battleTrainerName').innerHTML = battle.trainer ? `<div class="trainername">${battle.trainer.name}</div>` : '';
   document.getElementById('battleTop').innerHTML = battleHpBar(enemy, 'opponent');
   document.getElementById('battlePlayerHp').innerHTML = battleHpBar(pm, 'player');
+  setBattlePrompt('What will ' + monsterDisplayName(pm) + ' do?');
   const menu = document.getElementById('battleMenu');
   menu.innerHTML = `
     <button onclick="battleShowMoves()">Fight</button>
@@ -1510,11 +1530,28 @@ function renderBattleMain() {
 }
 
 function battleShowMoves() {
+  setBattlePrompt('');
   const pm = currentPlayerMon();
   const moves = getActiveMoves(pm);
+  battle.currentMoves = moves;
   const menu = document.getElementById('battleMenu');
-  menu.innerHTML = moves.map((mv, i) => `<button onclick="playerUseMove(${i})">${mv.name} <span class="movetype" style="background:${TYPE_COLORS[mv.type]||'#888'}">${mv.type}</span></button>`).join('') +
-    `<button onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = `<div class="fightpanel">
+    <div class="movegrid">
+      ${moves.map((mv, i) => `<button onmouseover="showMoveInfo(${i})" onfocus="showMoveInfo(${i})" onclick="playerUseMove(${i})">${mv.name} <span class="movetype" style="background:${TYPE_COLORS[mv.type]||'#888'}">${mv.type}</span></button>`).join('')}
+    </div>
+    <div class="moveinfo" id="moveInfoPanel"></div>
+  </div>
+  <button class="backbtn" onclick="renderBattleMain()">Back</button>`;
+  showMoveInfo(0);
+}
+function showMoveInfo(i) {
+  const mv = battle.currentMoves[i];
+  const panel = document.getElementById('moveInfoPanel');
+  if (!mv || !panel) return;
+  panel.innerHTML = `<span class="movetype" style="background:${TYPE_COLORS[mv.type]||'#888'}">${mv.type}</span>
+    <div class="hptext" style="margin-top:6px">Power ${mv.power}</div>
+    <div class="hptext">Accuracy ${Math.round(mv.accuracy * 100)}%</div>
+    <div class="hptext">Recharge ${mv.recharge}</div>`;
 }
 
 function appendBattleLog(lines) {
@@ -1653,9 +1690,10 @@ function resolveEnemyOnlyTurn() {
 }
 
 function openBagInBattle() {
+  setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
-  const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion');
-  menu.innerHTML = usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') + `<button onclick="renderBattleMain()">Back</button>`;
+  const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion' && state.inventory[s] > 0);
+  menu.innerHTML = (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function useItemInBattle(slug) {
   const pm = currentPlayerMon();
@@ -1666,8 +1704,9 @@ function useItemInBattle(slug) {
   setTimeout(() => resolveEnemyOnlyTurn(), 500);
 }
 function openPartyInBattle() {
+  setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
-  menu.innerHTML = state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') + `<button onclick="renderBattleMain()">Back</button>`;
+  menu.innerHTML = state.party.map((m, i) => `<button ${m.currentHP<=0?'disabled':''} onclick="switchPlayerMon(${i})">${monsterDisplayName(m)} (${m.currentHP}/${m.derived.hp})</button>`).join('') + `<button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function switchPlayerMon(i) {
   battle.playerIdx = i;

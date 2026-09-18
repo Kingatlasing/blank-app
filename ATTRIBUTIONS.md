@@ -56,6 +56,20 @@ backgrounds/boxes used before - picked by context (a Hall battle gets the
 real stadium art, everything else gets the real forest/grass art), not drawn
 or invented for this project.
 
+## Guardian Monsters Artwork
+https://github.com/limbusdev/guardian_monsters_artwork
+
+- License: CC BY-4.0 ("Includes Guardian Monsters Artwork by Georg Eckert /
+  lucidtanooki")
+
+Used for one element only: the oval ground platform each creature stands on
+in battle (`backdrops/battle/grass.png`, cropped down to just its glowing
+oval ring and made transparent around it). Neither Tuxemon nor the
+PokeMMO-clone repo has an equivalent asset, and this platform shape isn't
+drawn/invented for this project - it's a real, licensed graphic from
+another open-source monster-battler, cropped (not redrawn) from its source
+file.
+
 ## PokeMMO-Online-Realtime-Multiplayer-Game
 https://github.com/aaron5670/PokeMMO-Online-Realtime-Multiplayer-Game
 

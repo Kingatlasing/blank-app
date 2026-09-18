@@ -145,6 +145,18 @@ none in the source data, so none was added - Fast Travel covers healing
 there instead. Valorhold/Thornwood/Umbrastar are real but sparse
 (forest/open-field) connector cities with no gym.
 
+## 8. Battle platform (`ASSET_B64.battleui.platform_oval`)
+
+Source: `limbusdev/guardian_monsters_artwork` (CC BY-4.0), `backdrops/battle/
+grass.png`. That file's own oval "arena glow" ground shape was cropped out
+(chroma-keyed against its flat ground color) into a standalone transparent
+PNG, since neither Tuxemon nor the PokeMMO-clone repo has an equivalent -
+the classic games' battle screens always show each creature standing on an
+oval platform, which the real Tuxemon battle backgrounds (section on battle
+UI in `ATTRIBUTIONS.md`) don't include. Drawn by `renderBattleScene()` under
+both combatants, sized/positioned separately for the (smaller, further-back)
+opponent and the (larger, closer) player creature.
+
 ## What's NOT here (by design)
 
 No real Pokémon assets, sprites, or species data anywhere — verified both

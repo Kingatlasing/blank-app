@@ -58,8 +58,21 @@
   .typebadge, .movetype { display:inline-block; font-size:9px; padding:1px 5px; border-radius:8px; margin-left:4px; color:#fff; text-transform:uppercase; }
   .hptext { font-size:11px; opacity:0.8; }
   #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:flex; flex-direction:column-reverse; }
-  #battleMenu { position:absolute; bottom:98px; left:10px; right:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  #battleFooter { position:absolute; bottom:98px; left:10px; right:10px; display:flex; flex-direction:column; gap:8px; }
+  /* Classic "What will X do?" prompt line above the action grid - hidden (display:none)
+     while a submenu (Fight/Bag/Creatures) is open, same as the real games only show it
+     on the root action menu. */
+  #battlePrompt { background:rgba(10,15,30,0.75); color:#fff; padding:10px 14px; border-radius:8px; font-size:15px; display:none; }
+  #battleMenu { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   #battleMenu button { padding:12px; font-size:15px; background:#1b2440; color:#fff; border:2px solid #4a5a8a; border-radius:6px; cursor:pointer; }
+  /* Fight submenu: classic 2x2 move grid + a side info panel (type/power/accuracy/
+     recharge - real Tuxemon move data, not a fabricated PP number) that updates on
+     hover, echoing the move-grid+PP-box layout of the reference screens. */
+  .fightpanel { grid-column: 1 / -1; display:flex; gap:8px; }
+  .movegrid { flex:2; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .movegrid button { padding:10px; font-size:14px; background:#1b2440; color:#fff; border:2px solid #4a5a8a; border-radius:6px; cursor:pointer; text-align:left; }
+  .moveinfo { flex:1; background:#eee3c6; color:#2a2016; border:2px solid #4a5a8a; border-radius:6px; padding:10px 12px; font-size:12px; display:flex; flex-direction:column; justify-content:center; gap:3px; }
+  .backbtn { grid-column: 1 / -1; }
   #battleTrainerName { position:absolute; top:8px; left:0; right:0; text-align:center; }
   .trainername { color:#fff; background:rgba(10,15,30,0.85); padding:4px 10px; border-radius:6px; font-size:13px; display:inline-block; }
 
@@ -108,7 +121,10 @@
     <div id="battleTop"></div>
     <div id="battlePlayerHp"></div>
     <div id="battleLog"></div>
-    <div id="battleMenu"></div>
+    <div id="battleFooter">
+      <div id="battlePrompt"></div>
+      <div id="battleMenu"></div>
+    </div>
   </div>
 
   <div id="menuOverlay"></div>
