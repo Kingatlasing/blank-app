@@ -48,6 +48,14 @@ original, since Tuxemon's own NPC database
 (`mods/tuxemon/db/npc/classic_gym_people.yaml`) defines no teams for any of
 them.
 
+The battle screen itself (background art and each combatant's name/level/HP
+card frame) also uses Tuxemon's own real battle UI assets from
+`mods/tuxemon/gfx/ui/combat/` (`grass_background.png`, `stadium_background.png`,
+`hp_player_nohp.png`, `hp_opponent_nohp.png`) in place of the flat CSS
+backgrounds/boxes used before - picked by context (a Hall battle gets the
+real stadium art, everything else gets the real forest/grass art), not drawn
+or invented for this project.
+
 ## PokeMMO-Online-Realtime-Multiplayer-Game
 https://github.com/aaron5670/PokeMMO-Online-Realtime-Multiplayer-Game
 

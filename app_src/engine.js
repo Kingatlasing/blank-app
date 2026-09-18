@@ -8,7 +8,7 @@
 ============================================================================ */
 
 /* ---------------------------- Image loading ---------------------------- */
-const IMG = { monsters: {}, items: {}, tiles: {}, chars: {}, elements: {}, buildings: {} };
+const IMG = { monsters: {}, items: {}, tiles: {}, chars: {}, elements: {}, buildings: {}, battleui: {} };
 let ATLAS_IMG = null;
 const ATLAS_COLS = TILED.atlasCols;
 // Building interiors (Pokemon Center, Mart, Lab, player's house, Gyms) use a second,
@@ -27,7 +27,7 @@ const CLASSIC_ATLAS_COLS = CLASSIC_TILED.atlasCols;
 const CLASSIC_SRC_TILE = 16;
 let imagesLoaded = 0, imagesTotal = 0;
 function loadAllImages(cb) {
-  const cats = ['monsters', 'items', 'tiles', 'chars', 'elements', 'buildings'];
+  const cats = ['monsters', 'items', 'tiles', 'chars', 'elements', 'buildings', 'battleui'];
   for (const cat of cats) {
     for (const key in ASSET_B64[cat]) imagesTotal++;
   }
@@ -1441,11 +1441,27 @@ function closeBattleUI() {
   battle = null;
 }
 
+// Real Tuxemon battle background art (mods/tuxemon/gfx/ui/combat/*_background.png) -
+// picks a scene that matches where the fight is actually happening instead of a
+// flat CSS gradient. Gym battles (any map whose tiledKey starts with "gym_") get
+// the stadium art; everything else (wild encounters, route trainers) gets grass.
+function battleBackgroundKey() {
+  const map = MAPS[state.map];
+  if (map && map.tiledKey && map.tiledKey.indexOf('gym_') === 0) return 'bg_stadium';
+  return 'bg_grass';
+}
 function renderBattleScene() {
-  ctx.fillStyle = '#cfe8c9';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#8fbf7a';
-  ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+  const bg = IMG.battleui[battleBackgroundKey()];
+  if (bg && bg.complete) {
+    const dw = canvas.width, dh = bg.naturalHeight * (canvas.width / bg.naturalWidth);
+    ctx.drawImage(bg, 0, 0, bg.naturalWidth, bg.naturalHeight, 0, 0, dw, dh);
+    if (dh < canvas.height) { ctx.fillStyle = '#8fbf7a'; ctx.fillRect(0, dh, canvas.width, canvas.height - dh); }
+  } else {
+    ctx.fillStyle = '#cfe8c9';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#8fbf7a';
+    ctx.fillRect(0, canvas.height * 0.55, canvas.width, canvas.height * 0.45);
+  }
   const enemy = currentEnemy();
   const pm = currentPlayerMon();
   // Opponent trainer (trainer battles only) - stands behind/above their own
@@ -1469,16 +1485,19 @@ function renderBattleScene() {
   const origLoop = gameLoop;
 })();
 
-function battleHpBar(m) {
+function battleHpBar(m, side) {
   const pct = Math.max(0, Math.floor(m.currentHP / m.derived.hp * 100));
   const typeBadges = MONSTERS[m.slug].types.map(t => `<span class="typebadge" style="background:${TYPE_COLORS[t]||'#888'}">${t}</span>`).join('');
-  return `<div class="battlecard"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
+  return `<div class="battlecard ${side}"><b>${monsterDisplayName(m)}</b> Lv${m.level} ${typeBadges}<div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div><div class="hptext">${m.currentHP}/${m.derived.hp} HP</div></div>`;
 }
 
 function renderBattleMain() {
   const enemy = currentEnemy(); const pm = currentPlayerMon();
-  const top = document.getElementById('battleTop');
-  top.innerHTML = (battle.trainer ? `<div class="trainername">${battle.trainer.name}</div>` : '') + battleHpBar(enemy) + battleHpBar(pm);
+  // Opponent's card top-left, player's own lower-right beside their own sprite -
+  // the classic layout, not both crammed together at the very top.
+  document.getElementById('battleTrainerName').innerHTML = battle.trainer ? `<div class="trainername">${battle.trainer.name}</div>` : '';
+  document.getElementById('battleTop').innerHTML = battleHpBar(enemy, 'opponent');
+  document.getElementById('battlePlayerHp').innerHTML = battleHpBar(pm, 'player');
   const menu = document.getElementById('battleMenu');
   menu.innerHTML = `
     <button onclick="battleShowMoves()">Fight</button>
@@ -1855,5 +1874,9 @@ window.addEventListener('load', () => {
   loadAllImages(() => {
     document.getElementById('loadingScreen').style.display = 'none';
     document.getElementById('titleScreen').style.display = 'flex';
+    // Real Tuxemon HP-card frame art (mods/tuxemon/gfx/ui/combat/hp_*_nohp.png) -
+    // set as CSS vars here since the base64 data isn't known until ASSET_B64 loads.
+    document.documentElement.style.setProperty('--hp-frame-player', "url(data:image/png;base64," + ASSET_B64.battleui.hp_player_frame + ")");
+    document.documentElement.style.setProperty('--hp-frame-opponent', "url(data:image/png;base64," + ASSET_B64.battleui.hp_opponent_frame + ")");
   });
 });

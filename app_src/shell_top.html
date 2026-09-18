@@ -43,14 +43,25 @@
      canvas underneath by renderBattleScene(); an opaque background here
      would hide it completely behind this overlay's own HP cards/menu. */
   #battleUI { position:absolute; inset:0; display:none; z-index:15; }
-  #battleTop { position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; gap:10px; }
-  .battlecard { background:rgba(10,15,30,0.85); color:#fff; padding:8px 12px; border-radius:8px; font-size:13px; min-width:180px; }
+  /* Layout matches the classic convention: opponent's card top-left (with their
+     sprite top-right), player's own card lower-right (beside their own sprite,
+     which stands lower-left) - not both cards stacked together at the very top. */
+  #battleTop { position:absolute; top:14px; left:14px; }
+  #battlePlayerHp { position:absolute; top:300px; right:14px; }
+  .battlecard { color:#2a2016; padding:8px 16px 6px; font-size:12px; box-sizing:border-box;
+    background-size:100% 100%; background-repeat:no-repeat; image-rendering:pixelated; }
+  /* Heights match each real frame PNG's own aspect ratio (100x29 / 104x37) at this
+     width, so the pixel art isn't stretched out of proportion; text is allowed to
+     spill past the bottom edge if it needs more room rather than clipping. */
+  .battlecard.opponent { background-image:var(--hp-frame-opponent); width:260px; height:75px; }
+  .battlecard.player { background-image:var(--hp-frame-player); width:280px; height:100px; padding-top:10px; }
   .typebadge, .movetype { display:inline-block; font-size:9px; padding:1px 5px; border-radius:8px; margin-left:4px; color:#fff; text-transform:uppercase; }
-  .hptext { font-size:11px; opacity:0.85; }
+  .hptext { font-size:11px; opacity:0.8; }
   #battleLog { position:absolute; top:110px; left:10px; right:10px; height:120px; overflow-y:auto; background:rgba(10,15,30,0.6); color:#fff; font-size:13px; padding:8px; border-radius:8px; display:flex; flex-direction:column-reverse; }
   #battleMenu { position:absolute; bottom:98px; left:10px; right:10px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   #battleMenu button { padding:12px; font-size:15px; background:#1b2440; color:#fff; border:2px solid #4a5a8a; border-radius:6px; cursor:pointer; }
-  .trainername { color:#fff; background:rgba(10,15,30,0.85); padding:4px 10px; border-radius:6px; font-size:13px; position:absolute; top:-4px; left:50%; transform:translateX(-50%); }
+  #battleTrainerName { position:absolute; top:8px; left:0; right:0; text-align:center; }
+  .trainername { color:#fff; background:rgba(10,15,30,0.85); padding:4px 10px; border-radius:6px; font-size:13px; display:inline-block; }
 
   #menuOverlay, #shopOverlay, #minigameOverlay { position:absolute; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,0.55); z-index:40; }
   .panel { background:#151b2e; border:3px solid #4a5a8a; border-radius:10px; padding:20px 26px; max-height:80%; overflow-y:auto; min-width:320px; }
@@ -93,7 +104,9 @@
   <div id="choiceBox"></div>
 
   <div id="battleUI">
+    <div id="battleTrainerName"></div>
     <div id="battleTop"></div>
+    <div id="battlePlayerHp"></div>
     <div id="battleLog"></div>
     <div id="battleMenu"></div>
   </div>
