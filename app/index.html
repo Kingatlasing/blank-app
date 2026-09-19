@@ -6728,6 +6728,7 @@ const PRESETS = [
   {
     id: 'great-pyramid', name: "Great Pyramid of Khufu (Giza)", shape: 'pyramid',
     real: { height: 146.6, baseX: 230.4, baseZ: 230.4 }, interiorMode: 'pyramidChambers',
+    defaultScaleNum: 1, defaultScaleDen: 2,
     blocks: { exterior: 'quartz_block', interior: 'stone', accent: 'gold_block' },
     desc: 'Original casing height ~146.6m, base ~230.4m/side. Interior models the King\'s &amp; Queen\'s Chambers, Grand Gallery, and ascending/descending passages, proportioned from published Giza figures.',
     notes: [
@@ -6739,6 +6740,7 @@ const PRESETS = [
   {
     id: 'khafre', name: "Pyramid of Khafre (Giza)", shape: 'pyramid',
     real: { height: 136.4, baseX: 215.25, baseZ: 215.25 }, interiorMode: 'pyramidChambers',
+    defaultScaleNum: 1, defaultScaleDen: 2,
     blocks: { exterior: 'smooth_sandstone', interior: 'stone', accent: 'gold_block' },
     desc: 'Second-largest Giza pyramid, height ~136.4m, base ~215.25m/side.',
     notes: ['Interior chambers are approximated using the Great Pyramid\'s proportions scaled to Khafre\'s own size — Khafre\'s real internal layout differs in detail.'],
@@ -6746,6 +6748,7 @@ const PRESETS = [
   {
     id: 'menkaure', name: "Pyramid of Menkaure (Giza)", shape: 'pyramid',
     real: { height: 65, baseX: 102.2, baseZ: 102.2 }, interiorMode: 'pyramidChambers',
+    defaultScaleNum: 1, defaultScaleDen: 2,
     blocks: { exterior: 'andesite', interior: 'stone', accent: 'gold_block' },
     desc: 'Smallest of the three main Giza pyramids, height ~65m, base ~102.2m/side.',
     notes: ['Interior chambers are approximated using the Great Pyramid\'s proportions scaled to Menkaure\'s own size.'],
@@ -6760,6 +6763,7 @@ const PRESETS = [
   {
     id: 'big-ben', name: "Big Ben (Elizabeth Tower)", shape: 'tower',
     real: { height: 96, baseX: 12, baseZ: 12 }, params: { roofFrac: 0.18 }, interiorMode: 'floors', floorHeightMeters: 6,
+    defaultScaleNum: 1, defaultScaleDen: 1,
     blocks: { exterior: 'sandstone', interior: 'stone', accent: 'gold_block' },
     desc: 'Clock tower of the Palace of Westminster, height to the roof ~96m, ~12m square footprint. Now includes a real gold-toned clock face on all 4 sides near the top of the shaft.',
     notes: [
@@ -6845,6 +6849,7 @@ const PRESETS = [
   {
     id: 'windmill', name: "Traditional Windmill", shape: 'tower',
     real: { height: 20, baseX: 8, baseZ: 8 }, params: { roofFrac: 0.35 }, interiorMode: 'floors', floorHeightMeters: 3,
+    defaultScaleNum: 1, defaultScaleDen: 1,
     blocks: { exterior: 'spruce_planks', interior: 'oak_planks', accent: 'white_concrete' },
     desc: 'Generic Dutch/European-style windmill, height ~20m, base ~8m.',
     notes: ['Sails/blades are not modeled — attach them to one face using fences or trapdoors.'],
@@ -6852,6 +6857,7 @@ const PRESETS = [
   {
     id: 'lighthouse', name: "Lighthouse", shape: 'cone',
     real: { height: 40, baseX: 10, baseZ: 10 }, interiorMode: 'floors', floorHeightMeters: 5,
+    defaultScaleNum: 1, defaultScaleDen: 1,
     blocks: { exterior: 'white_concrete', interior: 'stone', accent: 'red_concrete' },
     desc: 'Generic tapering lighthouse, height ~40m, base diameter ~10m.',
     notes: ['Add alternating stripe bands manually using the accent block for the classic red/white look.'],
@@ -6859,6 +6865,7 @@ const PRESETS = [
   {
     id: 'castle-keep', name: "Medieval Castle Keep", shape: 'box',
     real: { height: 25, baseX: 15, baseZ: 15 }, interiorMode: 'floors', floorHeightMeters: 4,
+    defaultScaleNum: 1, defaultScaleDen: 1,
     blocks: { exterior: 'stone_bricks', interior: 'stone', accent: 'mossy_stone_bricks' },
     desc: 'Generic square keep, height ~25m, ~15m square footprint.',
     notes: ['Crenellations, arrow slits, and a surrounding curtain wall are not modeled.'],
@@ -6866,6 +6873,7 @@ const PRESETS = [
   {
     id: 'village-house', name: "Village House", shape: 'tower',
     real: { height: 6, baseX: 8, baseZ: 6 }, params: { roofFrac: 0.4 }, interiorMode: 'floors', floorHeightMeters: 3,
+    defaultScaleNum: 1, defaultScaleDen: 1,
     blocks: { exterior: 'oak_planks', interior: 'oak_planks', accent: 'stone_bricks' },
     desc: 'Small single-story cottage, height ~6m, ~8m x 6m footprint. A good quick first test of the generator.',
     notes: [],
