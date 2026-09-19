@@ -253,9 +253,9 @@
             <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
             <div class="checkbox-row">
               <input type="checkbox" id="ai-web-search" />
-              <label for="ai-web-search">Let it search the web for real reference facts (dimensions, shape, color) before building</label>
+              <label for="ai-web-search">Let it search the web for real reference facts, and look at a real reference photo (Wikimedia Commons), before building</label>
             </div>
-            <div class="hint">Does NOT download any 3D file — it can only look up real-world facts as text to write more accurate geometry from. Off by default since it costs extra and isn't needed for a made-up/abstract design.</div>
+            <div class="hint">Looks up real-world facts as text AND fetches one real, appropriately-licensed reference photo for the AI to actually look at when one matches — never downloads any 3D file or mesh. Off by default since it costs extra, adds latency, and isn't needed for a made-up/abstract design. Local/self-hosted models don't get this (see the model note above) — and even on Anthropic, the photo only helps a genuinely vision-capable model; a code-focused model like qwen2.5-coder has no way to see it either way.</div>
           </div>
           <div id="ai-local-fields" style="display:none;">
             <label for="ai-base-url">API base URL</label>
@@ -296,7 +296,7 @@
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="scale-fieldset">
         <legend>Scale</legend>
         <div class="radio-row">
           <label><input type="radio" name="scalemode" value="ratio" checked /> Ratio</label>
@@ -405,7 +405,7 @@
         </div>
       </fieldset>
 
-      <fieldset>
+      <fieldset id="blocks-fieldset">
         <legend>Blocks</legend>
         <label for="mat-exterior">Exterior / skin block</label>
         <select id="mat-exterior"></select>
@@ -414,6 +414,7 @@
         <label for="mat-accent">Accent block (floors, sarcophagus, trim)</label>
         <select id="mat-accent"></select>
       </fieldset>
+      <div class="hint" id="ai-blocks-scale-hint" style="display:none;">Scale and blocks are chosen automatically by the AI from its own answer above — no need to set them yourself. Generate a design to see/change what it picked.</div>
 
       <div class="hint" id="volume-readout"></div>
       <button class="primary" id="generate-btn">Generate model</button>
@@ -4415,7 +4416,9 @@ WORKED EXAMPLE of combining parts (a real technique from this app's own hand-bui
 
 Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.`;
   if (canWebSearch) {
-    prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
+    prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.
+
+A real reference PHOTO (fetched automatically from Wikimedia Commons when one matching the description was found) may also be attached directly to the user's message below. If one is attached, actually look at it: identify its real distinct parts, their proportions relative to each other, and the actual colors/materials shown, and make solid()/materialCode match what's genuinely in the photo rather than a generic guess. Still write your own original code by hand from what you observe — never output the photo itself, describe it back verbatim, or treat its absence as a problem (plenty of prompts won't have one; use your own knowledge exactly as instructed above when that happens).`;
   }
   if (aiCurrentCode) {
     prompt += `\n\nCURRENT SHAPE CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}`;
@@ -4542,6 +4545,58 @@ async function callLocalForShape(model, messages, baseUrl, apiKey, signal) {
 
 let aiActiveController = null; // lets the Cancel button abort an in-flight request
 
+// Best-effort real reference PHOTO lookup via Wikimedia Commons' own public
+// search + media API — chosen specifically because it's CORS-friendly for a
+// plain unauthenticated browser fetch (verified live: the search endpoint
+// allows cross-origin requests via its own documented ?origin=* parameter,
+// and upload.wikimedia.org itself sends Access-Control-Allow-Origin: * on a
+// bare GET), unlike arbitrary third-party 3D-model or image sites. This
+// downloads one already-licensed 2D photo (never a 3D file/mesh) and
+// base64-encodes it for use as real vision input to a multimodal model —
+// the same spirit as the Anthropic web_search toggle it's gated behind, but
+// letting the model actually SEE a reference instead of only reading facts
+// about it. Every failure mode (no results, blocked fetch, unsupported
+// image type, oversized file) resolves to returning null rather than
+// throwing, since this is a nice-to-have on top of the text description,
+// never something that should block a generation from proceeding.
+async function fetchWikimediaReferenceImage(query, signal) {
+  try {
+    const searchUrl = 'https://commons.wikimedia.org/w/api.php?action=query&generator=search&gsrsearch=' +
+      encodeURIComponent(query) + '&gsrnamespace=6&gsrlimit=1&prop=imageinfo&iiprop=url&iiurlwidth=768&format=json&origin=*';
+    const searchResp = await fetch(searchUrl, { signal });
+    if (!searchResp.ok) return null;
+    const searchData = await searchResp.json();
+    const pages = searchData.query && searchData.query.pages;
+    if (!pages) return null;
+    const page = Object.values(pages)[0];
+    const info = page && page.imageinfo && page.imageinfo[0];
+    const imageUrl = info && (info.thumburl || info.url);
+    if (!imageUrl) return null;
+    // This fetch MUST stay a bare call with no added headers — a custom
+    // header (even a harmless one) triggers a CORS preflight that
+    // upload.wikimedia.org does not allow, unlike the simple-GET case.
+    const imgResp = await fetch(imageUrl, { signal });
+    if (!imgResp.ok) return null;
+    // The metadata's own "mime" field describes the ORIGINAL file (which
+    // can be an SVG or TIFF Claude's vision input doesn't accept) — the
+    // THUMBNAIL actually fetched above is always re-rendered to a plain
+    // raster format, so read its real type off the response itself instead.
+    const mediaType = (imgResp.headers.get('content-type') || '').split(';')[0].trim();
+    if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mediaType)) return null;
+    const buf = await imgResp.arrayBuffer();
+    if (buf.byteLength > 5_000_000) return null;
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return { mediaType, base64: btoa(binary) };
+  } catch (e) {
+    return null;
+  }
+}
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
   const local = isAiProviderLocal();
@@ -4559,12 +4614,32 @@ async function callAiGenerate() {
 
   const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
   const useWebSearch = !local && el('ai-web-search').checked;
-  const messages = aiConversation.concat([{ role: 'user', content: promptText }]);
   // No automatic timeout, by request — a slow local model or a long
   // multi-search Anthropic turn can legitimately take minutes. The only
   // way this ends early is the user's own Cancel button below.
   const controller = new AbortController();
   aiActiveController = controller;
+  // Opt-in real reference PHOTO lookup — same toggle as the text web
+  // search, Anthropic only. Wikimedia Commons is CORS-friendly for a plain
+  // unauthenticated fetch (search via ?origin=*, and upload.wikimedia.org
+  // itself sends Access-Control-Allow-Origin: * on a bare GET with no
+  // added headers), so a real photo can be fetched client-side and handed
+  // to the model as actual vision input, not just a text description of
+  // what to look for — directly addressing "look at reference images" for
+  // a real-world subject like the Parthenon, on top of the text lookup.
+  let referenceImage = null;
+  if (useWebSearch) {
+    status.textContent = 'Looking up a real reference photo on Wikimedia Commons...';
+    referenceImage = await fetchWikimediaReferenceImage(promptText, controller.signal);
+    status.textContent = (aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...') + ' This has no fixed timeout — a local model can genuinely take several minutes. Click Cancel to give up.';
+  }
+  const userContent = referenceImage
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: referenceImage.mediaType, data: referenceImage.base64 } },
+        { type: 'text', text: promptText },
+      ]
+    : promptText;
+  const messages = aiConversation.concat([{ role: 'user', content: userContent }]);
   try {
     let rawText = local
       ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal)
@@ -4578,6 +4653,28 @@ async function callAiGenerate() {
     }
     const result = JSON.parse(resultText);
 
+    // Compute the real-world size + auto-scale FIRST (pure math, no DOM
+    // writes yet) so the sanity check below can validate solid() at the
+    // SAME dimensions it will actually run at, not an arbitrary fixed size.
+    // A shape with thin proportional detail (e.g. a column radius computed
+    // as a fraction of dims.sx — the exact technique this app's own prompt
+    // now encourages) can be genuinely non-empty at its real target size
+    // (60-100+ blocks) while rounding away to nothing at a small fixed test
+    // size, which was producing false "completely empty shape" rejections
+    // of otherwise-working code. Same lesson as this app's own scan-preset
+    // native-resolution fix: validate at the real target resolution, not a
+    // coarser stand-in.
+    const realHeight = Number.isFinite(result.realHeightMeters) && result.realHeightMeters > 0 ? result.realHeightMeters : 10;
+    const realBaseX = Number.isFinite(result.realBaseXMeters) && result.realBaseXMeters > 0 ? result.realBaseXMeters : 10;
+    const realBaseZ = Number.isFinite(result.realBaseZMeters) && result.realBaseZMeters > 0 ? result.realBaseZMeters : 10;
+    const maxRealDim = Math.max(realHeight, realBaseX, realBaseZ, 0.1);
+    let targetLong = maxRealDim < 5 ? 40 : maxRealDim < 30 ? 60 : 100;
+    let outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
+    while (outDims.sx * outDims.sy * outDims.sz > 2_000_000 && targetLong > 20) {
+      targetLong -= 10;
+      outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
+    }
+
     // Compile and sanity-check BEFORE touching any existing working design,
     // so a bad response never destroys prior good progress (per the "keep
     // the original unless cleared" requirement).
@@ -4587,7 +4684,7 @@ async function callAiGenerate() {
     } catch (e) {
       throw new Error('The AI\'s code did not compile: ' + e.message);
     }
-    const testDims = { sx: 20, sy: 20, sz: 20 };
+    const testDims = outDims;
     let solidCount = 0, threw = null;
     for (let i = 0; i < 400 && !threw; i++) {
       const tx = Math.floor(Math.random() * testDims.sx), ty = Math.floor(Math.random() * testDims.sy), tz = Math.floor(Math.random() * testDims.sz);
@@ -4622,9 +4719,6 @@ async function callAiGenerate() {
     aiCurrentMeta = result;
     aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
-    const realHeight = Number.isFinite(result.realHeightMeters) && result.realHeightMeters > 0 ? result.realHeightMeters : 10;
-    const realBaseX = Number.isFinite(result.realBaseXMeters) && result.realBaseXMeters > 0 ? result.realBaseXMeters : 10;
-    const realBaseZ = Number.isFinite(result.realBaseZMeters) && result.realBaseZMeters > 0 ? result.realBaseZMeters : 10;
     el('ai-height').value = realHeight;
     el('ai-basex').value = realBaseX;
     el('ai-basez').value = realBaseZ;
@@ -4638,13 +4732,6 @@ async function callAiGenerate() {
     // scale to read as more than a few blocks; a huge one (a landmark)
     // needs a LOWER one to stay a reasonable size — so the target block
     // count for the longest real dimension scales with how big it is.
-    const maxRealDim = Math.max(realHeight, realBaseX, realBaseZ, 0.1);
-    let targetLong = maxRealDim < 5 ? 40 : maxRealDim < 30 ? 60 : 100;
-    let outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
-    while (outDims.sx * outDims.sy * outDims.sz > 2_000_000 && targetLong > 20) {
-      targetLong -= 10;
-      outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
-    }
     const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
     ratioRadio.checked = true;
     ratioRadio.dispatchEvent(new Event('change'));
@@ -8847,6 +8934,13 @@ document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('c
   el('custom-controls').style.display = mode === 'custom' ? 'block' : 'none';
   el('import-controls').style.display = mode === 'import' ? 'block' : 'none';
   el('ai-controls').style.display = mode === 'ai' ? 'block' : 'none';
+  // AI mode decides scale and block/color choices itself from its own
+  // answer (see callAiGenerate) — showing manual controls the AI is
+  // supposed to own would contradict "I should not need to input
+  // anything" beyond a description, so hide them here specifically.
+  el('scale-fieldset').style.display = mode === 'ai' ? 'none' : '';
+  el('blocks-fieldset').style.display = mode === 'ai' ? 'none' : '';
+  el('ai-blocks-scale-hint').style.display = mode === 'ai' ? 'block' : 'none';
   if (mode === 'preset') applyPresetDefaults();
   else if (mode === 'custom') { renderCustomExtra(); baselineScale = currentScale(); updateScaleQuickpickActive(); updateVolumeReadout(); }
   else if (mode === 'import') { el('generate-btn').disabled = !importedScanGridData; updateInteriorAvailability(); baselineScale = currentScale(); updateScaleQuickpickActive(); updateVolumeReadout(); }

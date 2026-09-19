@@ -391,3 +391,87 @@ ask — it just wasn't judged likely to fix THIS specific reported
 symptom, so it wasn't built speculatively. If image grounding is asked
 for again after the prompt fix above still isn't good enough, that's the
 shape a real version of it should take.
+
+### Real reference-photo lookup, and a "completely empty shape" validation bug
+
+The user asked again for image-based reference (three times total across
+this feature's life) and reported a NEW, worse failure: "The AI's code
+produced a completely empty shape" outright, on a local qwen2.5-coder
+Ollama setup. Two separate things were done.
+
+**1. Built the real reference-photo lookup** the note above scoped as
+the legitimate next step, rather than declining a fourth time: a new
+`fetchWikimediaReferenceImage(query, signal)` function, gated behind the
+same `#ai-web-search` checkbox (Anthropic only). CORS feasibility was
+verified live via `WebSearch` (not assumed) before building:
+`commons.wikimedia.org/w/api.php` allows unauthenticated cross-origin
+requests via its own documented `origin=*` parameter, and
+`upload.wikimedia.org` itself sends `Access-Control-Allow-Origin: *` on
+a bare GET with no added headers (a custom header, even an innocuous
+one, would trigger a preflight that endpoint doesn't allow — confirmed
+this matters, so the image fetch stays a plain `fetch(url)` with nothing
+added). The function searches Commons for one matching image, fetches
+its thumbnail, reads the ACTUAL media type off the response's own
+`content-type` header rather than the search metadata's `mime` field
+(the thumbnail is always re-rendered to a plain raster format even when
+the original file is an SVG/TIFF vision input can't accept), rejects
+anything not `image/jpeg|png|gif|webp` or over 5MB, and base64-encodes
+it via `arrayBuffer()` + `Uint8Array` + chunked `btoa()` (no `FileReader`
+dependency, so this also runs cleanly in the jsdom test harness). On any
+failure at any step it returns `null` and generation proceeds exactly as
+before with plain text — this is a best-effort enhancement layered on
+the existing text-only path, never a new way to fail. When a photo IS
+found, `callAiGenerate()` builds the outgoing user message as an
+Anthropic content array (`[{type:'image',...}, {type:'text',...}]`)
+instead of a plain string, and `buildAiSystemPrompt()` gained a
+paragraph telling the model to actually examine an attached photo's real
+parts/proportions/colors when present. Still Anthropic-only, and still
+genuinely useless for the user's own current model (qwen2.5-coder is a
+text-only coding model with no vision input at all, whatever provider
+it's served through) — the UI hint next to the checkbox now says so
+directly, rather than let it look like a no-op with no explanation.
+
+**2. Found and fixed the actual cause of the new "completely empty
+shape" failures.** The sanity-check that runs the AI's `solid()` before
+accepting it was sampling 400 random cells in a FIXED `{sx:20,sy:20,
+sz:20}` test cube, regardless of the real dimensions the shape would
+actually be generated at. This directly collided with the previous
+session's own worked-example fix: encouraging thin, dims-proportional
+detail (a column radius computed as `dims.sx * 0.035`, for instance)
+means a shape that's genuinely substantial at its real target size
+(60-100+ blocks, computed from the AI's own `realHeightMeters`/etc.) can
+round away to near-nothing at a fixed 20-block test cube, making 400
+random samples land on solid cells rarely or never — a false rejection
+of otherwise-correct code, not a real bug in it. This is the exact same
+lesson already written up above under "Voxelizing a real 3D-scanned
+model": validate/render at the real target resolution, not an arbitrary
+coarser stand-in. Fixed by moving the real-size + auto-scale computation
+(previously done AFTER validation, purely to fill in the height/width/
+depth fields and scale ratio) to BEFORE the compile-and-validate step,
+and using those actual computed dims as the test cube instead of the
+fixed 20-cube. Verified directly with a shape solid only in the outer
+few cells along x (empty at a 20-cube, substantial at the real ~80-block
+target the mocked `realHeightMeters`/etc. drive) now generating
+successfully, while a shape that is GENUINELY always-false is still
+correctly rejected at whatever its own real target size is.
+
+**Also**, per the user's explicit "I should not need to input anything
+beyond a description" requirement: the Scale and Blocks fieldsets (scale
+ratio, exterior/interior/accent block pickers) are now hidden entirely
+in AI mode — the AI already decides all of this from its own answer
+(`callAiGenerate` auto-fills them under the hood exactly as before),
+showing manual controls for values the AI is supposed to own just
+invited confusion about whether input was still expected there. A hint
+line in their place says as much and that Generate will fill them in.
+The full block palette was already being sent to the model in every
+system prompt (`MATERIALS.map(m => m.id)`, ~320 real block ids) — that
+part of the ask was already true before this round, not a new change.
+
+Also worth restating for later reference: the app already asks every
+provider for a single structured JSON object back (`{summary, code,
+materialCode, realHeightMeters, ...}` — see `AI_SHAPE_JSON_SCHEMA`) and
+always has; there's no separate "make a json file for this app" step
+missing here, no exported/saved `.json` file at all, and no way for a
+plain-text or coding-only model to opt into a capability (like vision)
+its own weights don't have — those are model-capability limits, not gaps
+in what this app asks for or how it's wired.
