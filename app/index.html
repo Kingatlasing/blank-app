@@ -287,7 +287,16 @@
               <input type="checkbox" id="ai-local-photo" />
               <label for="ai-local-photo">Look up a real reference photo (Wikimedia Commons) and send it to this model</label>
             </div>
-            <div class="hint">This app does the looking-up itself (a plain fetch to Wikimedia Commons, same as the Anthropic option above) and hands the photo to whatever model is loaded here — it does NOT rely on the model or server having its own web browsing, and plain Ollama has none built in regardless of what a separate chat UI you may also use (like Open WebUI) layers on top of it. Left OFF by default here specifically (unlike the Anthropic checkbox, which defaults on): most local/coding models, including a default Ollama pull like <code>qwen2.5-coder</code> or <code>llama3.1</code>, are text-only with no image input at all, and some servers error on an image in the request rather than just ignoring it — turn this on only once you know the model you've actually loaded can see (e.g. <code>llava</code>, <code>qwen2-vl</code>, a multimodal <code>gemma3</code> tag, <code>minicpm-v</code>). Every local model still gets researched from its own general training knowledge either way — see the system prompt — this checkbox only adds an actual photo on top of that for a model that can use one. There's no equivalent to Anthropic's text web-search tool here: no generic local server exposes one this app could call the same way.</div>
+            <div class="hint">This app does the looking-up itself (a plain fetch to Wikimedia Commons, same as the Anthropic option above) and hands the photo to whatever model is loaded here — it does NOT rely on the model or server having its own web browsing, and plain Ollama has none built in regardless of what a separate chat UI you may also use (like Open WebUI) layers on top of it. Left OFF by default here specifically (unlike the Anthropic checkbox, which defaults on): most local/coding models, including a default Ollama pull like <code>qwen2.5-coder</code> or <code>llama3.1</code>, are text-only with no image input at all, and some servers error on an image in the request rather than just ignoring it — turn this on only once you know the model you've actually loaded can see (e.g. <code>llava</code>, <code>qwen2-vl</code>, a multimodal <code>gemma3</code> tag, <code>minicpm-v</code>). Every local model still gets researched from its own general training knowledge either way — see the system prompt — this checkbox only adds an actual photo on top of that for a model that can use one.</div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="ai-local-websearch" />
+              <label for="ai-local-websearch">Let it search the web for real reference facts (via Ollama's own hosted web search API)</label>
+            </div>
+            <div id="ollama-search-key-row" style="display:none;">
+              <label for="ollama-search-key">Ollama Cloud API key (for web search only — a separate credential from any key above)</label>
+              <input type="password" id="ollama-search-key" placeholder="paste your ollama.com account API key" autocomplete="off" spellcheck="false" />
+            </div>
+            <div class="hint">This calls Ollama's own real, separately-hosted search service (<span style="user-select:all">ollama.com/api/web_search</span>) — a genuine server your model can request text facts from mid-generation, needing its own free Ollama account/API key (different from the base URL/key above, which talk to whatever server is actually running your model). This is NOT the same thing as a model "browsing the internet" on its own: this app still has to notice the request and make the call itself, same as the Anthropic checkbox does for Claude. It returns text search results only — snippets and links — never a downloadable 3D file of any kind, the same ceiling the Anthropic option has. Works with a tool-calling-capable model on Ollama specifically; other OpenAI-compatible servers (LM Studio, vLLM, etc.) can still use this if the loaded model supports tool calls, since the search call itself always goes straight to ollama.com regardless of where the model is actually running.</div>
           </div>
           <label for="ai-model">Model</label>
           <input type="text" id="ai-model" value="claude-opus-5" />
@@ -4484,6 +4493,7 @@ async function callLocalAiGenerate3D() {
  * ==================================================================== */
 const AI_API_KEY_STORAGE_KEY = 'mc3d_ai_api_key';
 const AI_LOCAL_URL_STORAGE_KEY = 'mc3d_ai_local_url';
+const OLLAMA_SEARCH_KEY_STORAGE_KEY = 'mc3d_ollama_search_key';
 function isAiProviderLocal() { return document.querySelector('input[name=ai-provider]:checked').value === 'local'; }
 let aiConversation = [];      // raw Anthropic message history, replayed on every call
 let aiCurrentCode = null;     // last successfully compiled shape function SOURCE (body text)
@@ -4678,6 +4688,31 @@ async function callAnthropicForShape(model, messages, apiKey, signal, useWebSear
   return text;
 }
 
+// Calls Ollama's own real, separately-hosted web search API
+// (https://ollama.com/api/web_search) — genuinely different from the
+// local server itself: this is a cloud service requiring its own free
+// Ollama account/API key, verified live via WebSearch before building
+// this (not guessed): POST with {query, max_results}, Authorization:
+// Bearer <key>, returns {results: [{title, url, content}, ...]}. This
+// call runs client-side, from THIS app — Ollama's local server has no
+// way to reach out to the internet on its own, so a tool-calling model
+// only ever REQUESTS a search; something has to actually perform it and
+// hand the results back, which is what this function and the loop in
+// callLocalForShape below do. Returns text snippets only — same as
+// Anthropic's own web_search tool, this can never return or download an
+// actual 3D file.
+async function callOllamaWebSearch(query, apiKey, signal) {
+  const resp = await fetch('https://ollama.com/api/web_search', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer ' + apiKey },
+    signal,
+    body: JSON.stringify({ query, max_results: 5 }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error((data && data.error) || `Ollama web search returned HTTP ${resp.status} — check your Ollama Cloud API key.`);
+  return data;
+}
+
 // Calls a local/self-hosted server through the OpenAI-compatible
 // /chat/completions surface that Ollama, LM Studio, llama.cpp's own
 // server, vLLM, text-generation-webui, and koboldcpp all implement as
@@ -4687,13 +4722,72 @@ async function callAnthropicForShape(model, messages, apiKey, signal, useWebSear
 // for it (harmless if ignored) AND spells the exact required shape out in
 // the system prompt as a fallback, then tolerantly extracts the first
 // {...} block from the response instead of assuming it's pure JSON.
-async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPhoto) {
+//
+// When useOllamaSearch is on, this instead runs a real OpenAI-style
+// tool-calling round trip: declares a web_search function tool, and if
+// the model asks to call it, THIS function executes callOllamaWebSearch
+// above and feeds the results back as a 'tool' message before asking
+// again — up to 3 rounds (same ceiling as the Anthropic web_search tool),
+// then one final call with no tools to force an answer either way.
+// response_format is dropped for this path, same reasoning as the
+// Anthropic side: combining a forced tool with a forced output schema
+// isn't a combination worth relying on unverified.
+async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPhoto, useOllamaSearch, ollamaSearchKey) {
   const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers['authorization'] = 'Bearer ' + apiKey;
+  const systemMsg = { role: 'system', content: buildAiSystemPrompt(useOllamaSearch, hasPhoto) + AI_JSON_ONLY_INSTRUCTION };
+
+  if (useOllamaSearch) {
+    const tools = [{
+      type: 'function',
+      function: {
+        name: 'web_search',
+        description: 'Search the web for real-world reference facts (dimensions, shape, color) about whatever is being built.',
+        parameters: { type: 'object', properties: { query: { type: 'string', description: 'The search query.' } }, required: ['query'] },
+      },
+    }];
+    let working = [systemMsg].concat(messages);
+    for (let round = 0; round < 3; round++) {
+      const resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working, tools }) });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error((data && data.error && (data.error.message || data.error)) || `HTTP ${resp.status}`);
+      const msg = data.choices && data.choices[0] && data.choices[0].message;
+      if (!msg) throw new Error('No response content from the local server.');
+      const toolCalls = msg.tool_calls;
+      if (!toolCalls || toolCalls.length === 0) {
+        if (!msg.content) throw new Error('No response content from the local server.');
+        return msg.content;
+      }
+      working = working.concat([msg]);
+      for (const call of toolCalls) {
+        let query = '';
+        try { query = JSON.parse(call.function.arguments).query || ''; } catch (e) { /* malformed args -- proceed with an empty query, the model sees the empty result and can retry */ }
+        let resultContent;
+        try {
+          resultContent = JSON.stringify(await callOllamaWebSearch(query, ollamaSearchKey, signal));
+        } catch (e) {
+          // A dead/invalid key or a network hiccup shouldn't crash the whole
+          // generation -- feed the error back so the model can fall back to
+          // its own knowledge instead, same as it does with search off.
+          resultContent = JSON.stringify({ error: e.message });
+        }
+        working = working.concat([{ role: 'tool', tool_call_id: call.id, content: resultContent }]);
+      }
+    }
+    // Ran out of rounds (a model that won't stop searching) -- force a
+    // final answer with no tools available so it has to respond in text.
+    const finalResp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working }) });
+    const finalData = await finalResp.json();
+    if (!finalResp.ok) throw new Error((finalData && finalData.error && (finalData.error.message || finalData.error)) || `HTTP ${finalResp.status}`);
+    const finalContent = finalData.choices && finalData.choices[0] && finalData.choices[0].message && finalData.choices[0].message.content;
+    if (!finalContent) throw new Error('No response content from the local server after tool calls.');
+    return finalContent;
+  }
+
   const body = {
     model,
-    messages: [{ role: 'system', content: buildAiSystemPrompt(false, hasPhoto) + AI_JSON_ONLY_INSTRUCTION }].concat(messages),
+    messages: [systemMsg].concat(messages),
     response_format: { type: 'json_schema', json_schema: { name: 'voxel_shape', schema: AI_SHAPE_JSON_SCHEMA, strict: true } },
   };
   let resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(body) });
@@ -4784,6 +4878,10 @@ async function callAiGenerate() {
   const status = el('ai-status');
   if (!local && !apiKey) { status.textContent = 'Paste your Anthropic API key above first.'; return; }
   if (!promptText) { status.textContent = 'Describe what to build first.'; return; }
+  if (local && el('ai-local-websearch').checked && !el('ollama-search-key').value.trim()) {
+    status.textContent = 'Paste your Ollama Cloud API key above first (needed for the web search checkbox — a separate credential from your local server key).';
+    return;
+  }
 
   aiRequestInFlight = true;
   el('ai-generate-btn').disabled = true;
@@ -4794,6 +4892,8 @@ async function callAiGenerate() {
   const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
   const useWebSearch = !local && el('ai-web-search').checked;
   const useLocalPhoto = local && el('ai-local-photo').checked;
+  const useOllamaSearch = local && el('ai-local-websearch').checked;
+  const ollamaSearchKey = el('ollama-search-key').value.trim();
   const wantPhoto = useWebSearch || useLocalPhoto;
   // No automatic timeout, by request — a slow local model or a long
   // multi-search Anthropic turn can legitimately take minutes. The only
@@ -4806,10 +4906,13 @@ async function callAiGenerate() {
   // ?origin=*, and upload.wikimedia.org itself sends
   // Access-Control-Allow-Origin: * on a bare GET with no added headers) --
   // the model being asked never needs its own browsing/search capability
-  // for this to work, local or cloud. Only the real Anthropic web_search
-  // TOOL declaration below (for looking up TEXT facts) is genuinely
-  // Anthropic-specific, since there's no equivalent generic tool a plain
-  // OpenAI-compatible local server can be handed the same way.
+  // for this to work, local or cloud. Text-fact web SEARCH is the one
+  // still genuinely provider-specific piece: Anthropic's own web_search
+  // tool for cloud, or Ollama's own separately-hosted web_search API
+  // (ollama.com/api/web_search, a real client-orchestrated tool-calling
+  // round trip -- see callLocalForShape/callOllamaWebSearch) for local --
+  // there's still no generic equivalent a plain OpenAI-compatible server
+  // that ISN'T Ollama exposes the same way.
   let referenceImage = null;
   if (wantPhoto) {
     status.textContent = 'Looking up a real reference photo on Wikimedia Commons...';
@@ -4833,7 +4936,7 @@ async function callAiGenerate() {
   const messages = aiConversation.concat([{ role: 'user', content: userContent }]);
   try {
     let rawText = local
-      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, !!referenceImage)
+      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, !!referenceImage, useOllamaSearch, ollamaSearchKey)
       : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch, !!referenceImage);
     let resultText = rawText.trim();
     if (local) {
@@ -9153,6 +9256,8 @@ document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('c
     if (saved) el('ai-api-key').value = saved;
     const savedUrl = localStorage.getItem(AI_LOCAL_URL_STORAGE_KEY);
     if (savedUrl) el('ai-base-url').value = savedUrl;
+    const savedSearchKey = localStorage.getItem(OLLAMA_SEARCH_KEY_STORAGE_KEY);
+    if (savedSearchKey) el('ollama-search-key').value = savedSearchKey;
   } catch (e) { /* localStorage can throw in a locked-down/private context — fields just stay at defaults */ }
 })();
 el('ai-api-key').addEventListener('input', () => {
@@ -9160,6 +9265,12 @@ el('ai-api-key').addEventListener('input', () => {
 });
 el('ai-base-url').addEventListener('input', () => {
   try { localStorage.setItem(AI_LOCAL_URL_STORAGE_KEY, el('ai-base-url').value); } catch (e) { /* best-effort only */ }
+});
+el('ollama-search-key').addEventListener('input', () => {
+  try { localStorage.setItem(OLLAMA_SEARCH_KEY_STORAGE_KEY, el('ollama-search-key').value); } catch (e) { /* best-effort only */ }
+});
+el('ai-local-websearch').addEventListener('change', () => {
+  el('ollama-search-key-row').style.display = el('ai-local-websearch').checked ? 'block' : 'none';
 });
 document.querySelectorAll('input[name=ai-provider]').forEach(r => r.addEventListener('change', () => {
   const local = isAiProviderLocal();

@@ -706,3 +706,84 @@ searches Wikimedia, fetches the matching photo, declares the real
 with zero manual setup. All prior AI-feature suites (96 checks total)
 and the full `dom-test.js` regression suite (34 checks) still pass
 unchanged.
+
+## A real Ollama-specific web search tool, and firmly declining "search for and download a 3D file" again
+
+The user asked again — now framed as "my local AI can already search the
+web, just tell it to go online first, download a 3D model if it finds
+one, and generate one from scratch as good as Meshy if it doesn't."
+Worth documenting precisely what was and wasn't done here, since this is
+the most detailed version of an ask this project has declined
+repeatedly, and it's worth being exact about which parts are real new
+capability vs. which parts remain genuinely impossible the way this app
+is built.
+
+**Verified, not assumed, before answering**: "my local AI can already
+search the web" is true because of `https://ollama.com/api/web_search`
+— a real, separately-hosted Ollama Cloud service requiring its own free
+account/API key, confirmed live via `WebSearch`. Critically, its own
+docs confirm this is a **client-orchestrated tool**, the same pattern as
+every other tool-calling setup: the model only emits a request to call
+`web_search`; something else (a wrapper app, a custom script — whatever
+gives the user's own setup its apparent browsing) has to actually make
+that HTTP call and hand results back. Ollama's bare server has no way to
+reach the internet on its own, and this app's own `callLocalForShape`
+had no such round-trip loop at all before this — it sent one request and
+read one response.
+
+**What WAS built**: a real one, not a token gesture. `callOllamaWebSearch
+(query, apiKey, signal)` calls that real endpoint (`{query, max_results:
+5}` → `{results: [{title, url, content}]}`, verified live). A new
+`#ai-local-websearch` checkbox (local-provider fields) plus a separate
+`#ollama-search-key` field (a distinct credential from the base-URL/key
+above it, since this always talks to ollama.com regardless of which
+server is actually running the model, persisted to its own
+localStorage key) drive a genuine OpenAI-style tool-calling loop now
+built into `callLocalForShape`: declares a `web_search` function tool,
+and if the model's response comes back with `tool_calls` instead of
+content, this app itself executes `callOllamaWebSearch` and feeds the
+result back as a `role:'tool'` message (matched by `tool_call_id`)
+before asking again — up to 3 rounds (same ceiling as the Anthropic
+tool), then one final tools-free call to force an answer if a model
+just won't stop searching. `response_format` is dropped for this path
+for the same "don't rely on an unverified tool+schema combination"
+reason already established for Anthropic's own web-search mode. A
+failed search (bad key, network error) is fed back to the model as an
+error string rather than throwing — the model can fall back to its own
+knowledge exactly as it does with search off, instead of the whole
+generation crashing over one bad lookup.
+
+**What was NOT built, again, and won't be**: actually finding and
+downloading a pre-made 3D file from the search results, or having the
+chat model "generate one from scratch as good as Meshy." Both remain
+real, not policy-squeamish, impossibilities given how this actually
+works:
+- Ollama's web search API returns TEXT — titles, URLs, short content
+  snippets — the same shape as Anthropic's own web_search tool. It
+  cannot search "3D model marketplaces" as a distinct category, and
+  even if a result linked to an actual mesh file, fetching that file
+  from this browser tab would hit the same wall this project has hit
+  every time this exact ask has come up: essentially no 3D-asset site
+  (Sketchfab, TurboSquid, CGTrader, Free3D, etc.) sets the CORS headers
+  needed to let an arbitrary third-party page fetch their files
+  directly — Wikimedia Commons remains the one confirmed exception,
+  and it hosts photos, not meshes.
+- "Generate correctly, like Meshy" is an architecture gap, not a
+  prompting one: Meshy/Tripo/Shap-E are 3D-native generative models;
+  a chat model, however good at search, is still only ever writing
+  `solid(x,y,z,dims)` JavaScript. No system-prompt wording changes what
+  kind of model is actually answering. The one genuine architecture
+  match already in this app to "generate correctly like Meshy" is the
+  LocalAI `/3d/generations` backend (see above) — a real non-chat
+  mesh-generation model — which is the honest answer whenever "an
+  actual generated mesh, not code" is really what's wanted.
+
+Verified via a new 15-check jsdom test: the key-row visibility toggle,
+a clean validation error with zero network calls when the checkbox is
+on but the key is empty, a full round trip (tool declared → app calls
+the real endpoint with the right Bearer auth and the model's own query
+→ result fed back with the matching `tool_call_id` → final design
+applied), and a failed search still completing generation via the
+model's own fallback rather than crashing. All prior AI-feature suites
+(96 checks) and the full `dom-test.js` regression suite (34 checks)
+still pass unchanged.
