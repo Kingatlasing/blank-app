@@ -2239,11 +2239,40 @@ function openBagInBattle() {
     `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
 }
 function useItemInBattle(slug) {
+  // Revive targets a fainted party member, not the active mon - the active
+  // slot is never fainted by the time the bag can be opened (a fainted mon
+  // is auto-switched out as soon as it faints, in resolveBattleTurn()).
+  if (slug === 'revive') { openRevivePicker(); return; }
   const pm = currentPlayerMon();
+  if (slug === 'cureall') {
+    pm.currentHP = pm.derived.hp;
+    pm.status = { negative: null, positive: null };
+    removeItem(slug, 1);
+    appendBattleLog(['Used ' + ITEMS_DB[slug].name + ' on ' + monsterDisplayName(pm) + '. Fully healed!']);
+    setTimeout(() => resolveEnemyOnlyTurn(), 500);
+    return;
+  }
   const heal = slug.includes('super') ? 100 : slug.includes('mega') ? 200 : slug.includes('imperial') ? 9999 : 50;
   pm.currentHP = Math.min(pm.derived.hp, pm.currentHP + heal);
   removeItem(slug, 1);
   appendBattleLog(['Used ' + ITEMS_DB[slug].name + ' on ' + monsterDisplayName(pm) + '.']);
+  setTimeout(() => resolveEnemyOnlyTurn(), 500);
+}
+function openRevivePicker() {
+  const fainted = state.party.map((m, i) => ({ m, i })).filter(x => x.m.currentHP <= 0);
+  setBattlePrompt('');
+  const menu = document.getElementById('battleMenu');
+  menu.innerHTML = `<div class="listmenu">` +
+    (fainted.length
+      ? fainted.map(x => `<button onclick="reviveMon(${x.i})">${monsterDisplayName(x.m)} (fainted)</button>`).join('')
+      : '<div class="hptext" style="padding:8px">No fainted monsters to revive.</div>') +
+    `</div><button class="backbtn" onclick="openBagInBattle()">Back</button>`;
+}
+function reviveMon(i) {
+  const m = state.party[i];
+  m.currentHP = Math.min(m.derived.hp, 20);
+  removeItem('revive', 1);
+  appendBattleLog([monsterDisplayName(m) + ' was revived!']);
   setTimeout(() => resolveEnemyOnlyTurn(), 500);
 }
 function openPartyInBattle() {
