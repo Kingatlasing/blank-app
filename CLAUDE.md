@@ -555,3 +555,93 @@ error, and Cancel aborting cleanly (including during the photo-lookup
 phase specifically, to catch the bug above). All prior AI-feature test
 suites (58 checks) and the full `dom-test.js` regression suite (34
 checks) still pass unchanged.
+
+## AI Generate: fill/hollow is now the AI's own call too, and photo lookup works for local models
+
+Two follow-ups from the same conversation as the LocalAI mesh feature
+above.
+
+**Fill/hollow.** The user's running "I should not need to input anything
+beyond a description" requirement (already applied to scale and blocks)
+had one gap left: the "Body" control (filled vs. hollow, and wall
+thickness when hollow) in the "Structure & interior" fieldset was still
+a manual, always-visible choice in AI mode. Closed the same way scale/
+blocks were: `AI_SHAPE_JSON_SCHEMA` gained `fillMode` ("filled"/"hollow")
+and `wallThickness` fields (both in `required`, matching the existing
+pattern for "required but has a sane default" fields), the system prompt
+gained a paragraph telling the model to weigh this exactly like a human
+builder would — hollow past roughly 40-50m on the longest side (a large
+build's own invisible interior stops being worth the block count),
+filled below that (a thin shell can look structurally wrong on something
+small) — and `callAiGenerate()` now sets `#fill-mode`/`#wall-thickness`
+from the AI's answer (falling back to filled/1 on an invalid value,
+never a stale leftover). The `#fill-mode`/`#wall-thickness` controls
+(wrapped in a new `#fill-mode-controls` div) are hidden in AI mode next
+to Scale and Blocks, with the existing `#ai-blocks-scale-hint` reworded
+to cover all three. `#interior-toggle` itself needed no change — it's
+already always disabled with an explanatory hint for AI-generated shapes
+via `currentInteriorMode()` returning `null` for `isAiMode()`, since
+there's no real modeled-interior concept for an arbitrary AI-authored
+`solid()`, same as Import mode.
+
+**Photo lookup now works for the local/self-hosted provider too**,
+prompted directly by the user pointing out their own local setup
+"already can search and browse the internet" and asking why the app's
+own reference-photo feature was Anthropic-only. Worth being precise
+about what's actually true here versus what changed: a plain Ollama (or
+any other raw OpenAI-compatible) server has NO built-in web browsing of
+its own — if a separate chat UI on top of one (Open WebUI, for instance)
+has ever appeared to browse, that's a capability that UI's own
+orchestration layer adds by calling a search API and feeding results
+back into the chat turn, not something inherent to the model or to
+hitting its plain `/chat/completions` endpoint the way this app does.
+BUT the actual reference-photo lookup this app already built
+(`fetchWikimediaReferenceImage`) was never gated on any provider-specific
+tool-calling capability in the first place — it's this app's OWN
+client-side code doing the fetch, then simply attaching the result as
+image content on the outgoing request. That part never needed Anthropic
+specifically; it was scoped there for the FIRST version only because the
+real Anthropic `web_search` TOOL (a genuinely Anthropic-specific
+server-side feature, for TEXT facts) rode along in the same checkbox.
+Split the two capabilities apart: a new `#ai-local-photo` checkbox (in
+`#ai-local-fields`) triggers the exact same `fetchWikimediaReferenceImage`
+call as the Anthropic checkbox, with its own honest hint explaining
+exactly the "this app does the searching, not the model" point above,
+and that it only helps a model that's actually vision-capable (llava,
+qwen2-vl, gemma3's multimodal variants, minicpm-v — not a text/code-only
+model like the user's own qwen2.5-coder, which has no image input at
+all regardless of provider). `buildAiSystemPrompt()` took a new `hasPhoto`
+parameter, independent from `canWebSearch` (previously the same flag
+controlled both the web-search-tool paragraph and the photo paragraph,
+which was never actually correct even for Anthropic, since photo and
+tool-use are logically separable), and `callLocalForShape`/
+`callAnthropicForShape` both now take `hasPhoto` explicitly.
+`callAiGenerate()` builds the outgoing image content in whichever wire
+shape the target provider actually needs — Anthropic's
+`{type:'image', source:{type:'base64',...}}` vs. the OpenAI-compatible
+`{type:'image_url', image_url:{url:'data:...;base64,...'}}}` — since the
+two are genuinely different formats, not a shared one. There is still no
+local equivalent of Anthropic's real web-search TOOL for text facts (no
+generic local server exposes an equivalent this app could declare the
+same way), so that half of the original checkbox stays Anthropic-only;
+only the photo half was ever provider-agnostic to begin with.
+
+Also worth restating for the record, since it came up directly: the
+scale/ratio the AI picks was ALREADY driven by the model's own suggested
+real-world bounding box (`realHeightMeters`/`realBaseXMeters`/
+`realBaseZMeters`, see "Auto-scale" above) — this round's system-prompt
+update made that mechanism explicit to the model itself (previous
+prompts never told the model this connection existed, they just asked
+for the three numbers) so it understands WHY those numbers matter
+before deciding fillMode based on the resulting scale.
+
+Verified via a new 14-check jsdom test: `#fill-mode-controls` visibility
+toggling with AI mode, `fillMode`/`wallThickness` from a mocked AI
+response landing correctly on `#fill-mode`/`#wall-thickness` (including
+an invalid-value fallback case), the local provider's outgoing request
+using `image_url` (not the Anthropic `image` shape) when
+`#ai-local-photo` is checked, the local system prompt actually including
+the photo paragraph in that case, and confirming Wikimedia is never
+queried at all for the local provider when the checkbox is off. All
+prior AI-feature suites (74 checks total) and the full `dom-test.js`
+regression suite (34 checks) still pass unchanged.

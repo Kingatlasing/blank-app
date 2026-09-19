@@ -275,7 +275,7 @@
               <input type="checkbox" id="ai-web-search" />
               <label for="ai-web-search">Let it search the web for real reference facts, and look at a real reference photo (Wikimedia Commons), before building</label>
             </div>
-            <div class="hint">Looks up real-world facts as text AND fetches one real, appropriately-licensed reference photo for the AI to actually look at when one matches — never downloads any 3D file or mesh. Off by default since it costs extra, adds latency, and isn't needed for a made-up/abstract design. Local/self-hosted models don't get this (see the model note above) — and even on Anthropic, the photo only helps a genuinely vision-capable model; a code-focused model like qwen2.5-coder has no way to see it either way.</div>
+            <div class="hint">Looks up real-world facts as text (a real server-side tool Anthropic runs for you) AND fetches one real, appropriately-licensed reference photo for the AI to actually look at when one matches — never downloads any 3D file or mesh. Off by default since it costs extra, adds latency, and isn't needed for a made-up/abstract design. The photo only helps a genuinely vision-capable model — a code-focused model has no way to see it either way, whatever provider it's served through.</div>
           </div>
           <div id="ai-local-fields" style="display:none;">
             <label for="ai-base-url">API base URL</label>
@@ -283,6 +283,11 @@
             <div class="hint">Works with anything speaking the OpenAI-compatible chat-completions format — that's most providers today, not just local ones. <b>Local/self-hosted:</b> Ollama (default shown, port 11434), LM Studio (usually port 1234), llama.cpp's own server, vLLM, text-generation-webui, koboldcpp — nothing leaves your machine, no key needed. <b>Cloud, with your own key from that provider:</b> OpenAI itself (<span style="user-select:all">https://api.openai.com/v1</span>), Groq, Together.ai, OpenRouter, DeepSeek, Mistral, xAI/Grok, Azure OpenAI, and others — just point the URL at that provider and paste your key from them below. (Anthropic is the one exception, since its API isn't OpenAI-format — use the "Anthropic (cloud)" option above for that.)</div>
             <label for="ai-local-key">API key (blank for most local servers; required for a cloud provider)</label>
             <input type="password" id="ai-local-key" placeholder="leave blank for local, or paste that provider's key" autocomplete="off" spellcheck="false" />
+            <div class="checkbox-row">
+              <input type="checkbox" id="ai-local-photo" />
+              <label for="ai-local-photo">Look up a real reference photo (Wikimedia Commons) and send it to this model</label>
+            </div>
+            <div class="hint">This app does the looking-up itself (a plain fetch to Wikimedia Commons, same as the Anthropic option above) and hands the photo to whatever model is loaded here — it does NOT rely on the model or server having its own web browsing, and plain Ollama has none built in regardless of what a separate chat UI you may also use (like Open WebUI) layers on top of it. This only genuinely helps if the loaded model can actually see images (e.g. llava, qwen2-vl, gemma3's multimodal variants, minicpm-v) — a text/code-only model (most coding-focused models, including qwen2.5-coder) has no image input at all and will just ignore it. There's no equivalent to Anthropic's text web-search tool here: no generic local server exposes one this app could call the same way.</div>
           </div>
           <label for="ai-model">Model</label>
           <input type="text" id="ai-model" value="claude-opus-5" />
@@ -405,14 +410,16 @@
 
       <fieldset>
         <legend>Structure &amp; interior</legend>
-        <label for="fill-mode">Body</label>
-        <select id="fill-mode">
-          <option value="filled">Filled (solid core + skin — accurate, heavier)</option>
-          <option value="hollow">Hollow (thin shell only — lighter, less accurate)</option>
-        </select>
-        <div id="wall-thickness-row" style="display:none;">
-          <label for="wall-thickness">Wall thickness (blocks)</label>
-          <input type="number" id="wall-thickness" value="1" min="1" step="1" />
+        <div id="fill-mode-controls">
+          <label for="fill-mode">Body</label>
+          <select id="fill-mode">
+            <option value="filled">Filled (solid core + skin — accurate, heavier)</option>
+            <option value="hollow">Hollow (thin shell only — lighter, less accurate)</option>
+          </select>
+          <div id="wall-thickness-row" style="display:none;">
+            <label for="wall-thickness">Wall thickness (blocks)</label>
+            <input type="number" id="wall-thickness" value="1" min="1" step="1" />
+          </div>
         </div>
         <div class="checkbox-row">
           <input type="checkbox" id="interior-toggle" />
@@ -434,7 +441,7 @@
         <label for="mat-accent">Accent block (floors, sarcophagus, trim)</label>
         <select id="mat-accent"></select>
       </fieldset>
-      <div class="hint" id="ai-blocks-scale-hint" style="display:none;">Scale and blocks are chosen automatically by the AI from its own answer above — no need to set them yourself. Generate a design to see/change what it picked.</div>
+      <div class="hint" id="ai-blocks-scale-hint" style="display:none;">Scale, blocks, and filled/hollow structure are all chosen automatically by the AI from its own answer above — no need to set them yourself. Generate a design to see/change what it picked.</div>
 
       <div class="hint" id="volume-readout"></div>
       <button class="primary" id="generate-btn">Generate model</button>
@@ -4499,8 +4506,10 @@ const AI_SHAPE_JSON_SCHEMA = {
     exteriorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the outer/skin material — used everywhere materialCode does not override it.' },
     interiorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the interior fill material — used everywhere materialCode does not override it.' },
     accentBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for a trim/accent material — used everywhere materialCode does not override it.' },
+    fillMode: { type: 'string', enum: ['filled', 'hollow'], description: '"filled" builds a solid core under the skin (accurate, but a large design becomes a huge number of blocks). "hollow" builds a thin shell only (much lighter, and the interior is invisible anyway on anything without a real modeled interior). Pick "hollow" for anything large (roughly taller/wider than ~40-50 real-world meters, e.g. a landmark or big building) where a solid core would be wasted and heavy; pick "filled" for small/medium things (a creature, a prop, a vehicle, a small building) where a thin shell could look flimsy or wrong.' },
+    wallThickness: { type: 'integer', description: 'Only meaningful when fillMode is "hollow": shell thickness in blocks. 1 for anything modest in size, 2-3 only for a genuinely massive design where a 1-block shell would look too thin at that scale. Ignored (but must still be a valid integer, e.g. 1) when fillMode is "filled".' },
   },
-  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock'],
+  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock', 'fillMode', 'wallThickness'],
   additionalProperties: false,
 };
 
@@ -4511,7 +4520,7 @@ const AI_SHAPE_JSON_SCHEMA = {
 // same request isn't a combination worth relying on unverified).
 const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
 
-function buildAiSystemPrompt(canWebSearch) {
+function buildAiSystemPrompt(canWebSearch, hasPhoto) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
   let prompt = `You are a geometry-code generator inside a Minecraft-style voxel model builder. You do NOT generate an image, a real 3D mesh, a .glb file, or any kind of downloadable file — the ONLY thing you produce is a short piece of JavaScript code that decides, cell by cell, which positions in a 3D grid are solid Minecraft blocks. That code is compiled and run by the app itself to build the actual model; you never see or return the model, only the code that generates it.
 
@@ -4529,7 +4538,9 @@ Rules for the code:
 
 ALLOWED BLOCK IDS for exteriorBlock/interiorBlock/accentBlock/materialCode (pick real, sensible ones for what's being built): ${blockIds}
 
-Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m).
+Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m). The app uses these numbers itself, automatically, to pick the actual block-count scale/ratio this renders at (a bigger real-world size gets a lower blocks-per-meter ratio so the total block count stays reasonable, a small one gets a higher ratio so it doesn't shrink to nothing) — you never need to and cannot set a scale/ratio directly, only these three real-world numbers.
+
+Also choose fillMode ("filled" or "hollow") and wallThickness: this app has no separate "let the AI decide automatically" toggle for solid-vs-hollow, so YOU are the one making this call every time, the same way a person building this manually would weigh it — a solid core is more accurate but becomes a very large number of blocks on anything big, while a hollow shell is far lighter but only worth it once something is actually large (its own invisible interior stops mattering more as it gets bigger). Prefer "hollow" once realHeightMeters/realBaseXMeters/realBaseZMeters put the longest side above roughly 40-50m; prefer "filled" for anything smaller, where a thin shell could look flimsy or structurally wrong (a creature, a vehicle, a small building, a prop). wallThickness only matters when hollow — 1 is right almost always; only go to 2-3 for something genuinely massive.
 
 PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.
 
@@ -4565,9 +4576,10 @@ WORKED EXAMPLE of combining parts (a real technique from this app's own hand-bui
 
 Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.`;
   if (canWebSearch) {
-    prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.
-
-A real reference PHOTO (fetched automatically from Wikimedia Commons when one matching the description was found) may also be attached directly to the user's message below. If one is attached, actually look at it: identify its real distinct parts, their proportions relative to each other, and the actual colors/materials shown, and make solid()/materialCode match what's genuinely in the photo rather than a generic guess. Still write your own original code by hand from what you observe — never output the photo itself, describe it back verbatim, or treat its absence as a problem (plenty of prompts won't have one; use your own knowledge exactly as instructed above when that happens).`;
+    prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
+  }
+  if (hasPhoto) {
+    prompt += `\n\nA real reference PHOTO (fetched automatically from Wikimedia Commons, a CORS-friendly appropriately-licensed source, when one matching the description was found — this app's own code does this lookup itself, it is not something you requested or searched for) is attached directly to the user's message below. Actually look at it: identify its real distinct parts, their proportions relative to each other, and the actual colors/materials shown, and make solid()/materialCode match what's genuinely in the photo rather than a generic guess. Still write your own original code by hand from what you observe — never output the photo itself or describe it back verbatim. If you are a text-only model with no real image understanding, you will not be able to make use of this — fall back to your own general knowledge exactly as instructed above instead of guessing at the image's contents.`;
   }
   if (aiCurrentCode) {
     prompt += `\n\nCURRENT SHAPE CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}`;
@@ -4620,11 +4632,11 @@ function el_ai_log_push(role, text) {
 // output schema in one request isn't a combination worth relying on
 // unverified, so the system prompt's own explicit JSON-only instruction
 // carries that job instead, same as the local/Ollama path already does.
-async function callAnthropicForShape(model, messages, apiKey, signal, useWebSearch) {
+async function callAnthropicForShape(model, messages, apiKey, signal, useWebSearch, hasPhoto) {
   const body = {
     model,
     max_tokens: 4096,
-    system: buildAiSystemPrompt(useWebSearch) + (useWebSearch ? AI_JSON_ONLY_INSTRUCTION : ''),
+    system: buildAiSystemPrompt(useWebSearch, hasPhoto) + (useWebSearch ? AI_JSON_ONLY_INSTRUCTION : ''),
     messages,
   };
   if (useWebSearch) {
@@ -4669,13 +4681,13 @@ async function callAnthropicForShape(model, messages, apiKey, signal, useWebSear
 // for it (harmless if ignored) AND spells the exact required shape out in
 // the system prompt as a fallback, then tolerantly extracts the first
 // {...} block from the response instead of assuming it's pure JSON.
-async function callLocalForShape(model, messages, baseUrl, apiKey, signal) {
+async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPhoto) {
   const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers['authorization'] = 'Bearer ' + apiKey;
   const body = {
     model,
-    messages: [{ role: 'system', content: buildAiSystemPrompt(false) + AI_JSON_ONLY_INSTRUCTION }].concat(messages),
+    messages: [{ role: 'system', content: buildAiSystemPrompt(false, hasPhoto) + AI_JSON_ONLY_INSTRUCTION }].concat(messages),
     response_format: { type: 'json_schema', json_schema: { name: 'voxel_shape', schema: AI_SHAPE_JSON_SCHEMA, strict: true } },
   };
   let resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(body) });
@@ -4775,36 +4787,48 @@ async function callAiGenerate() {
 
   const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
   const useWebSearch = !local && el('ai-web-search').checked;
+  const useLocalPhoto = local && el('ai-local-photo').checked;
+  const wantPhoto = useWebSearch || useLocalPhoto;
   // No automatic timeout, by request — a slow local model or a long
   // multi-search Anthropic turn can legitimately take minutes. The only
   // way this ends early is the user's own Cancel button below.
   const controller = new AbortController();
   aiActiveController = controller;
-  // Opt-in real reference PHOTO lookup — same toggle as the text web
-  // search, Anthropic only. Wikimedia Commons is CORS-friendly for a plain
-  // unauthenticated fetch (search via ?origin=*, and upload.wikimedia.org
-  // itself sends Access-Control-Allow-Origin: * on a bare GET with no
-  // added headers), so a real photo can be fetched client-side and handed
-  // to the model as actual vision input, not just a text description of
-  // what to look for — directly addressing "look at reference images" for
-  // a real-world subject like the Parthenon, on top of the text lookup.
+  // Opt-in real reference PHOTO lookup -- available for EITHER provider,
+  // since this app's own code does the actual looking-up itself (Wikimedia
+  // Commons is CORS-friendly for a plain unauthenticated fetch: search via
+  // ?origin=*, and upload.wikimedia.org itself sends
+  // Access-Control-Allow-Origin: * on a bare GET with no added headers) --
+  // the model being asked never needs its own browsing/search capability
+  // for this to work, local or cloud. Only the real Anthropic web_search
+  // TOOL declaration below (for looking up TEXT facts) is genuinely
+  // Anthropic-specific, since there's no equivalent generic tool a plain
+  // OpenAI-compatible local server can be handed the same way.
   let referenceImage = null;
-  if (useWebSearch) {
+  if (wantPhoto) {
     status.textContent = 'Looking up a real reference photo on Wikimedia Commons...';
     referenceImage = await fetchWikimediaReferenceImage(promptText, controller.signal);
     status.textContent = (aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...') + ' This has no fixed timeout — a local model can genuinely take several minutes. Click Cancel to give up.';
   }
+  // Anthropic and the OpenAI-compatible chat/completions surface use
+  // different wire shapes for an inline image, so which one gets built
+  // depends on the provider actually being called.
   const userContent = referenceImage
-    ? [
-        { type: 'image', source: { type: 'base64', media_type: referenceImage.mediaType, data: referenceImage.base64 } },
-        { type: 'text', text: promptText },
-      ]
+    ? (local
+        ? [
+            { type: 'image_url', image_url: { url: `data:${referenceImage.mediaType};base64,${referenceImage.base64}` } },
+            { type: 'text', text: promptText },
+          ]
+        : [
+            { type: 'image', source: { type: 'base64', media_type: referenceImage.mediaType, data: referenceImage.base64 } },
+            { type: 'text', text: promptText },
+          ])
     : promptText;
   const messages = aiConversation.concat([{ role: 'user', content: userContent }]);
   try {
     let rawText = local
-      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal)
-      : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch);
+      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, !!referenceImage)
+      : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch, !!referenceImage);
     let resultText = rawText.trim();
     if (local) {
       // Local models don't always honor "JSON only" — pull the first {...}
@@ -4907,6 +4931,15 @@ async function callAiGenerate() {
     el('mat-exterior').value = MATERIAL_INDEX[result.exteriorBlock] !== undefined ? result.exteriorBlock : 'stone';
     el('mat-interior').value = MATERIAL_INDEX[result.interiorBlock] !== undefined ? result.interiorBlock : 'stone';
     el('mat-accent').value = MATERIAL_INDEX[result.accentBlock] !== undefined ? result.accentBlock : 'gold_block';
+    // Filled/hollow + wall thickness are also the AI's own call now, same
+    // "the AI should decide, not leave a stale leftover value" principle
+    // as scale/blocks above -- fillMode controls are hidden in this mode
+    // entirely (see the mode-change handler), so this is the only thing
+    // setting them.
+    el('fill-mode').value = result.fillMode === 'hollow' ? 'hollow' : 'filled';
+    el('fill-mode').dispatchEvent(new Event('change'));
+    const wt = Math.round(Number(result.wallThickness));
+    el('wall-thickness').value = Number.isFinite(wt) && wt >= 1 ? wt : 1;
     if (!el('ai-name').value.trim()) el('ai-name').value = promptText.slice(0, 60);
 
     el_ai_log_push('assistant', result.summary || 'Done.');
@@ -9101,6 +9134,7 @@ document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('c
   // anything" beyond a description, so hide them here specifically.
   el('scale-fieldset').style.display = mode === 'ai' ? 'none' : '';
   el('blocks-fieldset').style.display = mode === 'ai' ? 'none' : '';
+  el('fill-mode-controls').style.display = mode === 'ai' ? 'none' : '';
   el('ai-blocks-scale-hint').style.display = mode === 'ai' ? 'block' : 'none';
   if (mode === 'preset') applyPresetDefaults();
   else if (mode === 'custom') { renderCustomExtra(); baselineScale = currentScale(); updateScaleQuickpickActive(); updateVolumeReadout(); }
