@@ -251,6 +251,11 @@
             <label for="ai-api-key">Anthropic API key</label>
             <input type="password" id="ai-api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
             <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
+            <div class="checkbox-row">
+              <input type="checkbox" id="ai-web-search" />
+              <label for="ai-web-search">Let it search the web for real reference facts (dimensions, shape, color) before building</label>
+            </div>
+            <div class="hint">Does NOT download any 3D file — it can only look up real-world facts as text to write more accurate geometry from. Off by default since it costs extra and isn't needed for a made-up/abstract design.</div>
           </div>
           <div id="ai-local-fields" style="display:none;">
             <label for="ai-base-url">API base URL</label>
@@ -4345,9 +4350,16 @@ const AI_SHAPE_JSON_SCHEMA = {
   additionalProperties: false,
 };
 
-function buildAiSystemPrompt() {
+// Shared belt-and-suspenders instruction appended whenever the response
+// can't be forced into shape by output_config.format (the local/Ollama
+// path always; the Anthropic path only when web search is also enabled,
+// since combining a forced tool call with a forced output schema in the
+// same request isn't a combination worth relying on unverified).
+const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
+
+function buildAiSystemPrompt(canWebSearch) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
-  let prompt = `You write JavaScript voxel-shape functions for a Minecraft-style voxel model builder.
+  let prompt = `You are a geometry-code generator inside a Minecraft-style voxel model builder. You do NOT generate an image, a real 3D mesh, a .glb file, or any kind of downloadable file — the ONLY thing you produce is a short piece of JavaScript code that decides, cell by cell, which positions in a 3D grid are solid Minecraft blocks. That code is compiled and run by the app itself to build the actual model; you never see or return the model, only the code that generates it.
 
 Your ENTIRE code output is the BODY of a function with this exact signature, called once per voxel cell over the whole bounding box:
 
@@ -4364,6 +4376,9 @@ Rules for the code:
 ALLOWED BLOCK IDS for exteriorBlock/interiorBlock/accentBlock (pick real, sensible ones for what's being built): ${blockIds}
 
 Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m).`;
+  if (canWebSearch) {
+    prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
+  }
   if (aiCurrentCode) {
     prompt += `\n\nCURRENT CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}\n\nIf the user's new message is a refinement/edit request, REVISE this existing function incrementally — keep its overall character and everything not asked to change. Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
   }
@@ -4379,10 +4394,30 @@ function el_ai_log_push(role, text) {
   log.scrollTop = log.scrollHeight;
 }
 
-// Calls Anthropic's real Messages API directly, using output_config.format
-// (json_schema) to force the {summary, code, ...} shape back in one shot —
-// see CLAUDE.md for why this is safe to do with plain fetch (no SDK).
-async function callAnthropicForShape(model, messages, apiKey, signal) {
+// Calls Anthropic's real Messages API directly. Normally uses
+// output_config.format (json_schema) to force the {summary, code, ...}
+// shape back in one shot — see CLAUDE.md for why this is safe to do with
+// plain fetch (no SDK). When useWebSearch is on, this instead declares
+// Anthropic's real server-side web_search tool (runs on Anthropic's own
+// infrastructure, no client-side loop needed — the result arrives as an
+// extra content block in this same response) so the model can look up
+// real-world reference facts before writing geometry; output_config.format
+// is dropped in that case since combining a forced tool with a forced
+// output schema in one request isn't a combination worth relying on
+// unverified, so the system prompt's own explicit JSON-only instruction
+// carries that job instead, same as the local/Ollama path already does.
+async function callAnthropicForShape(model, messages, apiKey, signal, useWebSearch) {
+  const body = {
+    model,
+    max_tokens: 4096,
+    system: buildAiSystemPrompt(useWebSearch) + (useWebSearch ? AI_JSON_ONLY_INSTRUCTION : ''),
+    messages,
+  };
+  if (useWebSearch) {
+    body.tools = [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }];
+  } else {
+    body.output_config = { format: { type: 'json_schema', schema: AI_SHAPE_JSON_SCHEMA } };
+  }
   const resp = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -4391,22 +4426,24 @@ async function callAnthropicForShape(model, messages, apiKey, signal) {
       'anthropic-version': '2023-06-01',
     },
     signal,
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system: buildAiSystemPrompt(),
-      messages,
-      output_config: { format: { type: 'json_schema', schema: AI_SHAPE_JSON_SCHEMA } },
-    }),
+    body: JSON.stringify(body),
   });
   const data = await resp.json();
   if (!resp.ok) throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
   if (data.stop_reason === 'refusal') {
     throw new Error('The AI declined this request' + (data.stop_details && data.stop_details.category ? ` (${data.stop_details.category})` : '') + '.');
   }
-  const textBlock = (data.content || []).find(b => b.type === 'text');
+  const textBlocks = (data.content || []).filter(b => b.type === 'text');
+  const textBlock = textBlocks[textBlocks.length - 1];
   if (!textBlock) throw new Error('No text response from the AI.');
-  return textBlock.text;
+  let text = textBlock.text.trim();
+  if (useWebSearch) {
+    // The model may still wrap the JSON in prose or a markdown fence
+    // despite the instruction — same tolerant extraction as the local path.
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) text = match[0];
+  }
+  return text;
 }
 
 // Calls a local/self-hosted server through the OpenAI-compatible
@@ -4420,12 +4457,11 @@ async function callAnthropicForShape(model, messages, apiKey, signal) {
 // {...} block from the response instead of assuming it's pure JSON.
 async function callLocalForShape(model, messages, baseUrl, apiKey, signal) {
   const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
-  const jsonInstruction = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
   const headers = { 'content-type': 'application/json' };
   if (apiKey) headers['authorization'] = 'Bearer ' + apiKey;
   const body = {
     model,
-    messages: [{ role: 'system', content: buildAiSystemPrompt() + jsonInstruction }].concat(messages),
+    messages: [{ role: 'system', content: buildAiSystemPrompt(false) + AI_JSON_ONLY_INSTRUCTION }].concat(messages),
     response_format: { type: 'json_schema', json_schema: { name: 'voxel_shape', schema: AI_SHAPE_JSON_SCHEMA, strict: true } },
   };
   let resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(body) });
@@ -4457,13 +4493,16 @@ async function callAiGenerate() {
   el_ai_log_push('user', promptText);
 
   const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
+  const useWebSearch = !local && el('ai-web-search').checked;
   const messages = aiConversation.concat([{ role: 'user', content: promptText }]);
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 90000);
+  // Web search adds real round-trip latency (one or more real searches
+  // before the model can finish writing code), so it gets a longer budget.
+  const timeoutId = setTimeout(() => controller.abort(), useWebSearch ? 150000 : 90000);
   try {
     let rawText = local
       ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal)
-      : await callAnthropicForShape(model, messages, apiKey, controller.signal);
+      : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch);
     clearTimeout(timeoutId);
     let resultText = rawText.trim();
     if (local) {
@@ -4513,7 +4552,7 @@ async function callAiGenerate() {
     el('ai-prompt').value = '';
     updateVolumeReadout();
   } catch (err) {
-    const msg = err.name === 'AbortError' ? 'Request timed out after 90s.' : err.message;
+    const msg = err.name === 'AbortError' ? `Request timed out after ${useWebSearch ? 150 : 90}s.` : err.message;
     el_ai_log_push('assistant', '⚠ ' + msg);
     status.textContent = '⚠ ' + msg + (aiCurrentFn ? ' (your previous design is unchanged)' : '');
   } finally {

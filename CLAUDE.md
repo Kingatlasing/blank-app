@@ -205,3 +205,67 @@ actually typed: the shared `#ai-model` field only auto-swaps between the
 two providers' own defaults (`claude-opus-5` / `llama3.1`) when it's
 still sitting at the OTHER provider's untouched default, checked before
 every switch.
+
+### Optional web search for real-world reference facts (Anthropic only)
+
+User confusion prompted this: after getting AI Generate working against
+local Ollama, the user asked for a way to make it "know it's being used
+to generate glb 3d models" and to let it "pull models from online if
+needed" — i.e. actually download an existing 3D file it finds, and/or
+output a real mesh/`.glb`. Both were explicitly declined, for reasons
+worth restating here since this exact ask (autonomous web
+search-and-download, sometimes phrased as "just get it from Google/a
+website") has come up and been declined multiple times across this
+project's history, for a mix of real technical and policy reasons that
+still both apply:
+
+- **Real mesh/`.glb` generation is not something a chat LLM does at all**
+  (local or Anthropic) — that needs a genuinely different model
+  architecture (text-to-3D, e.g. Meshy/Tripo/Shap-E), not a prompting
+  change to this feature. Out of scope here, same as USDZ import was
+  ruled out above for a different but analogous "this needs a
+  fundamentally different technology" reason.
+- **Actually downloading a found file cross-origin from a browser page
+  almost never works even given real internet access** (unlike this
+  coding session's own sandboxed network, which was a separate, earlier
+  problem) — most 3D-model sites don't set permissive CORS headers for
+  arbitrary third-party pages to fetch their files directly, so this
+  would silently fail on the user's own machine too, not just here.
+- **Automating unreviewed acquisition of third-party 3D content
+  reintroduces the exact copyright-review problem this project has
+  consistently held the line on** (see the many declined Hulkbuster
+  resubmission attempts elsewhere in this file's history) — a "search
+  and use whatever it finds" pipeline has no human review step at all,
+  which is a regression from every real-model preset here, all of which
+  went through explicit license/authorship verification before being
+  embedded.
+
+What WAS legitimately buildable and was built: an opt-in checkbox
+(`#ai-web-search`, Anthropic provider only — local/Ollama models don't
+get comparable first-class tool support here) that declares Anthropic's
+real server-side `web_search_20260209` tool on the request. This lets
+Claude look up real-world reference FACTS (approximate dimensions,
+shape, color) for whatever's described, the same spirit as the Bald
+Eagle preset's own real WebSearch-sourced dimensions — text grounding for
+geometry it still writes itself by hand, never a file. Off by default
+(costs extra, adds real latency, unnecessary for an abstract/invented
+design).
+
+Implementation note: `output_config.format` (structured JSON output) and
+a forced/declared tool in the same request is a combination this
+session's own `claude-api` skill reference didn't document either way,
+so rather than guess, web-search mode simply DROPS `output_config.format`
+and relies on the same explicit "respond with ONLY this JSON" system-
+prompt instruction (`AI_JSON_ONLY_INSTRUCTION`, shared with the local/
+Ollama path) plus the same tolerant `{...}` extraction already proven
+there — known-working over an unverified combination. `callAnthropicForShape`
+also now looks at the LAST text block in the response (not the first),
+since a web-search turn's response includes an earlier `web_search_tool_result`
+content block before the model's own final text answer.
+
+Also strengthened `buildAiSystemPrompt()`'s own opening line to explicitly
+state up front that the model produces code only, never an image, mesh,
+`.glb`, or any downloadable file — directly targeting the user-reported
+symptom of a local model (gemma4 via Ollama) not seeming to understand
+what it was being asked to do; this framing fix applies to every
+provider, not just the web-search path.
