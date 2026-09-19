@@ -1180,8 +1180,10 @@ function bridgeGuideDialogue() {
 /* ---------------------------- Dialogue box ---------------------------- */
 let dialogueQueue = [];
 let currentChoice = null;
-function pushDialogue(lines) {
+let dialogueDoneCallback = null;
+function pushDialogue(lines, onDone) {
   dialogueQueue = dialogueQueue.concat(lines);
+  if (onDone) dialogueDoneCallback = onDone;
   state.screen = 'dialogue';
   showNextDialogueLine();
 }
@@ -1196,6 +1198,7 @@ function showNextDialogueLine() {
     // every state.screen==='battle' check elsewhere (HUD, movement input,
     // NPC interact, the render loop) would think the fight had ended.
     if (state.screen === 'dialogue' && !currentChoice) state.screen = battle ? 'battle' : 'overworld';
+    if (dialogueDoneCallback) { const cb = dialogueDoneCallback; dialogueDoneCallback = null; cb(); }
     return;
   }
   box.style.display = 'block';
@@ -1949,8 +1952,7 @@ function finishBattle(playerWon) {
       const lines = (t.postWin || []).slice();
       if (t.prizeMoney) lines.push('You received ₡' + t.prizeMoney + '!');
       closeBattleUI();
-      pushDialogue(lines);
-      if (t.story === 'gameWon') showVictory();
+      pushDialogue(lines, t.story === 'gameWon' ? showVictory : null);
     } else if (battle.isFixed) {
       // Not currentEnemy() - resolveBattleTurn() already incremented
       // battle.enemyIdx past this (always single-member) enemyTeam's only
