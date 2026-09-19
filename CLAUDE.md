@@ -312,3 +312,39 @@ gives the user a real way out of a request that hangs forever (e.g. a
 truly dead connection) without silently capping every legitimate slow
 generation at some arbitrary number. The status line says as much while
 waiting, so a long wait doesn't read as the app being stuck.
+
+### Auto-scale, and leaning on the model's own real-world knowledge
+
+The user pointed out AI Generate still required manual input in one
+place that mattered: after a generate, the real height/width/depth
+fields got auto-filled from the AI's own answer, but the actual SCALE
+RATIO (`#scale-num`/`#scale-den`) was never touched — it silently kept
+whatever ratio was left over from a previous preset/custom shape/import.
+That's exactly the same bug class as the earlier Vader-Helmet-disappears
+fix and the building-presets-too-small-to-walk-into fix, just never
+closed for this newest mode. Fixed the same way those were: after a
+successful generate, auto-pick `scale-num`/`scale-den` so the longest
+real dimension maps to a target block count that scales with how big
+that dimension actually is (40 blocks under 5m, 60 under 30m, 100
+otherwise — a tiny prop needs a HIGHER relative scale to read as more
+than a few blocks; a huge landmark needs a LOWER one to stay a sane
+volume), backing the target down in a loop if that would exceed 2M cells
+(mirrors `handleImportedFile`'s own native-resolution backoff loop
+exactly). Verified directly: a mocked 0.3m "trinket" and a mocked 200m
+"tower" both come out at a real, visible block size instead of one
+disappearing to near-zero and the other ballooning unreasonably. Material
+fields also now fall back to sane defaults (`stone`/`stone`/`gold_block`)
+instead of silently keeping a stale leftover selection when the model
+returns an invalid block id — the AI should always be the one deciding
+blocks/colors here, per the user's explicit "I should not need to input
+anything" requirement, never a leftover value from whatever mode was
+active before.
+
+Also strengthened the system prompt for short/vague-but-real prompts
+("Greek Parthenon"): explicitly told the model to draw on its OWN
+general training knowledge of a real thing's proportions/shape/color
+when the description names one, even with web search off/unavailable
+(the only path local/Ollama models get at all) — a short prompt naming
+something real should still produce a recognizable result of that real
+thing, not a generic placeholder shape, and this doesn't depend on the
+Anthropic-only web-search toggle to work at all.

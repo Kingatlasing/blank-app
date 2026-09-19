@@ -4381,7 +4381,9 @@ ALLOWED BLOCK IDS for exteriorBlock/interiorBlock/accentBlock/materialCode (pick
 
 Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m).
 
-PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.`;
+PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.
+
+SHORT OR VAGUE DESCRIPTIONS STILL NEED A REAL, SPECIFIC RESULT. If the description names or clearly implies a specific real thing — a landmark ("Greek Parthenon"), an animal, a vehicle, a historical structure, a well-known character or object — draw on what you actually know about its real proportions, distinctive shape, and real typical color/material, and write geometry and pick blocks that reflect THAT real thing, not a generic placeholder box/tower. Use your own general knowledge for this even when you have no way to search the web for it. A short prompt is not a license to build something generic — "Greek Parthenon" should come out looking like a rectangular colonnaded temple with a row of columns and a triangular pediment roof, in a real stone-like block, not an arbitrary building. Only fall back to invented original geometry when the description is genuinely abstract/invented ("a spiky twisted tower", "a blob creature") rather than a real thing you have knowledge of.`;
   if (canWebSearch) {
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
@@ -4590,12 +4592,43 @@ async function callAiGenerate() {
     aiCurrentMeta = result;
     aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
-    if (Number.isFinite(result.realHeightMeters) && result.realHeightMeters > 0) el('ai-height').value = result.realHeightMeters;
-    if (Number.isFinite(result.realBaseXMeters) && result.realBaseXMeters > 0) el('ai-basex').value = result.realBaseXMeters;
-    if (Number.isFinite(result.realBaseZMeters) && result.realBaseZMeters > 0) el('ai-basez').value = result.realBaseZMeters;
-    if (MATERIAL_INDEX[result.exteriorBlock] !== undefined) el('mat-exterior').value = result.exteriorBlock;
-    if (MATERIAL_INDEX[result.interiorBlock] !== undefined) el('mat-interior').value = result.interiorBlock;
-    if (MATERIAL_INDEX[result.accentBlock] !== undefined) el('mat-accent').value = result.accentBlock;
+    const realHeight = Number.isFinite(result.realHeightMeters) && result.realHeightMeters > 0 ? result.realHeightMeters : 10;
+    const realBaseX = Number.isFinite(result.realBaseXMeters) && result.realBaseXMeters > 0 ? result.realBaseXMeters : 10;
+    const realBaseZ = Number.isFinite(result.realBaseZMeters) && result.realBaseZMeters > 0 ? result.realBaseZMeters : 10;
+    el('ai-height').value = realHeight;
+    el('ai-basex').value = realBaseX;
+    el('ai-basez').value = realBaseZ;
+    // Auto-pick a sensible scale too, the same "don't leave the user to
+    // guess a working ratio" principle already applied to every preset's
+    // own defaultScaleNum/Den and to handleImportedFile's native-resolution
+    // pick — otherwise this silently inherits whatever ratio was left over
+    // from a previous preset/custom shape, which is exactly the class of
+    // bug that made the Vader Helmet disappear earlier in this app's life.
+    // A tiny real object (a creature, a prop) needs a HIGHER relative
+    // scale to read as more than a few blocks; a huge one (a landmark)
+    // needs a LOWER one to stay a reasonable size — so the target block
+    // count for the longest real dimension scales with how big it is.
+    const maxRealDim = Math.max(realHeight, realBaseX, realBaseZ, 0.1);
+    let targetLong = maxRealDim < 5 ? 40 : maxRealDim < 30 ? 60 : 100;
+    let outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
+    while (outDims.sx * outDims.sy * outDims.sz > 2_000_000 && targetLong > 20) {
+      targetLong -= 10;
+      outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
+    }
+    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
+    ratioRadio.checked = true;
+    ratioRadio.dispatchEvent(new Event('change'));
+    el('scale-num').value = Number(targetLong.toFixed(4));
+    el('scale-den').value = Number(maxRealDim.toFixed(6));
+    baselineScale = currentScale();
+    updateScaleQuickpickActive();
+    // Fall back to sane defaults rather than silently leaving whatever
+    // materials happened to be selected from a previous mode if the model
+    // returns an id that isn't real — the AI should always be the one
+    // deciding blocks/colors here, never a stale leftover value.
+    el('mat-exterior').value = MATERIAL_INDEX[result.exteriorBlock] !== undefined ? result.exteriorBlock : 'stone';
+    el('mat-interior').value = MATERIAL_INDEX[result.interiorBlock] !== undefined ? result.interiorBlock : 'stone';
+    el('mat-accent').value = MATERIAL_INDEX[result.accentBlock] !== undefined ? result.accentBlock : 'gold_block';
     if (!el('ai-name').value.trim()) el('ai-name').value = promptText.slice(0, 60);
 
     el_ai_log_push('assistant', result.summary || 'Done.');
