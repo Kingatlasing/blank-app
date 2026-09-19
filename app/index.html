@@ -2023,6 +2023,16 @@ const DECOR_TYPES = {
   // cube textures/plain colour as a stand-in, same approach as rails
   // above, so the Farms & Automation presets can exist at all.
   hopper: { kind: 'hopper', tile: 'iron_block', interactive: false },
+  // A real storage chest — no unique chest texture exists in this app's
+  // extracted atlas (chests are a block-entity in real vanilla, not part
+  // of the basic block texture set that atlas was built from), so this
+  // reuses oak_planks as a believable wood stand-in, same "existing
+  // full-cube texture as a placeholder" approach already used for hopper/
+  // rails above. The real distinguishing shape (a body + a separate
+  // raised lid + a small latch) is what actually reads as "a chest"
+  // rather than a plain box, so that's built as real geometry below
+  // rather than a flat textured cube.
+  chest: { kind: 'chest', tile: 'oak_planks', interactive: false },
   cow: { kind: 'cow', interactive: false },
   pig: { kind: 'pig', interactive: false },
   sheep: { kind: 'sheep', interactive: false },
@@ -4559,8 +4569,27 @@ let aiCurrentMaterialCode = null; // last successfully compiled PER-CELL materia
 let aiCurrentFn = null;       // the compiled shape function itself, mirrored into aiGeneratedFn
 let aiGeneratedFn = null;     // read by SHAPES.aiGenerated (declared up top, before SHAPES) at generate time
 let aiGeneratedMaterialFn = null; // read by applyAiMaterialPaint at generate time, or null for the default ext/int/accent scheme
+let aiCurrentDecor = [];      // last successfully validated decor placements, re-embedded for follow-ups
+let aiGeneratedDecor = [];    // read by generateModel() at generate time to push real placeable objects
 let aiCurrentMeta = null;     // { summary, exteriorBlock, interiorBlock, accentBlock }
 let aiRequestInFlight = false;
+
+// The curated subset of this app's own real DECOR_TYPES that AI Generate
+// is allowed to place — real furniture/fixture objects, not the plain
+// per-cell blocks solid()/materialCode already cover. Deliberately
+// excludes every mob/animal type (their own wander/look AI is wired up
+// by specific hand-built interior-builder functions, not safe to trigger
+// generically from an arbitrary AI-chosen coordinate) and every
+// multi-entry contraption piece that only makes sense wired together
+// (rail, redstone_wire, redstone_torch, tripwire/tripwire_hook, hopper,
+// minecart) — a single orphaned rail segment or wire dot from a model
+// that doesn't understand real redstone wiring would read as a mistake,
+// not a feature. This is furnishing-a-building scope: doors, openings,
+// light, simple interactables, storage, and basic greenery.
+const AI_PLACEABLE_DECOR_TYPES = [
+  'door', 'trapdoor', 'window', 'ladder', 'bars', 'lever', 'button', 'pressure_plate',
+  'chair', 'torch', 'soul_torch', 'chest', 'flower', 'dandelion', 'grass_tuft', 'tree',
+];
 
 const AI_SHAPE_JSON_SCHEMA = {
   type: 'object',
@@ -4576,8 +4605,23 @@ const AI_SHAPE_JSON_SCHEMA = {
     accentBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for a trim/accent material — used everywhere materialCode does not override it.' },
     fillMode: { type: 'string', enum: ['filled', 'hollow'], description: '"filled" builds a solid core under the skin (accurate, but a large design becomes a huge number of blocks). "hollow" builds a thin shell only (much lighter, and the interior is invisible anyway on anything without a real modeled interior). Pick "hollow" for anything large (roughly taller/wider than ~40-50 real-world meters, e.g. a landmark or big building) where a solid core would be wasted and heavy; pick "filled" for small/medium things (a creature, a prop, a vehicle, a small building) where a thin shell could look flimsy or wrong.' },
     wallThickness: { type: 'integer', description: 'Only meaningful when fillMode is "hollow": shell thickness in blocks. 1 for anything modest in size, 2-3 only for a genuinely massive design where a 1-block shell would look too thin at that scale. Ignored (but must still be a valid integer, e.g. 1) when fillMode is "filled".' },
+    decor: {
+      type: 'array',
+      description: 'OPTIONAL real placeable objects (a door, a chest, a torch...) — leave as an empty array [] unless the design should include one or more. Each entry places ONE real object at ONE exact cell, distinct from solid()/materialCode which only ever choose plain block fill/color. Only place these at coordinates your own solid() already leaves as open air (e.g. floor space inside a room you carved) — placing one where solid() returns true buries it inside a solid block, invisible.',
+      items: {
+        type: 'object',
+        properties: {
+          type: { type: 'string', enum: AI_PLACEABLE_DECOR_TYPES, description: 'One of the allowed placeable object types.' },
+          x: { type: 'integer', description: 'X coordinate — same coordinate space as solid(x,y,z,dims).' },
+          y: { type: 'integer', description: 'Y coordinate (height) — same coordinate space as solid(x,y,z,dims).' },
+          z: { type: 'integer', description: 'Z coordinate — same coordinate space as solid(x,y,z,dims).' },
+        },
+        required: ['type', 'x', 'y', 'z'],
+        additionalProperties: false,
+      },
+    },
   },
-  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock', 'fillMode', 'wallThickness'],
+  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock', 'fillMode', 'wallThickness', 'decor'],
   additionalProperties: false,
 };
 
@@ -4586,7 +4630,7 @@ const AI_SHAPE_JSON_SCHEMA = {
 // path always; the Anthropic path only when web search is also enabled,
 // since combining a forced tool call with a forced output schema in the
 // same request isn't a combination worth relying on unverified).
-const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
+const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock, fillMode, wallThickness, decor (empty array [] if unused). No markdown, no code fences, no other text before or after it.';
 
 function buildAiSystemPrompt(canWebSearch, hasPhoto) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
@@ -4617,6 +4661,8 @@ Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-w
 Also choose fillMode ("filled" or "hollow") and wallThickness: this app has no separate "let the AI decide automatically" toggle for solid-vs-hollow, so YOU are the one making this call every time, the same way a person building this manually would weigh it — a solid core is more accurate but becomes a very large number of blocks on anything big, while a hollow shell is far lighter but only worth it once something is actually large (its own invisible interior stops mattering more as it gets bigger). Prefer "hollow" once realHeightMeters/realBaseXMeters/realBaseZMeters put the longest side above roughly 40-50m; prefer "filled" for anything smaller, where a thin shell could look flimsy or structurally wrong (a creature, a vehicle, a small building, a prop). wallThickness only matters when hollow — 1 is right almost always; only go to 2-3 for something genuinely massive.
 
 PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.
+
+PLACEABLE OBJECTS (the "decor" field): besides plain blocks, this app also has real placeable objects with their own real geometry — not just a colored cube. The ones you can place: ${AI_PLACEABLE_DECOR_TYPES.join(', ')}. Note "chair" is a single piece of seating furniture, NOT how to build an actual staircase — a real walkable staircase is still voxel geometry built directly in solid() (see the worked example above for the spiral/helical technique). If the description calls for one of the decor types above somewhere specific ("a chest in the corner", "a front door", "a torch by the entrance"), add an entry to the OPTIONAL decor array: {type, x, y, z} in the exact same coordinate space as solid(). Only place one at a cell your OWN solid() already leaves as open air (e.g. floor space inside a room you carved) — a decor object placed where solid() returns true is buried inside a solid block and invisible. Leave decor as an empty array entirely when nothing like this was actually asked for.
 
 SHORT OR VAGUE DESCRIPTIONS STILL NEED A REAL, SPECIFIC RESULT. If the description names or clearly implies a specific real thing — a landmark ("Greek Parthenon"), an animal, a vehicle, a historical structure, a well-known character or object — draw on what you actually know about its real proportions, distinctive shape, and real typical color/material, and write geometry and pick blocks that reflect THAT real thing, not a generic placeholder box/tower. Use your own general knowledge for this even when you have no way to search the web for it. A short prompt is not a license to build something generic — "Greek Parthenon" should come out looking like a rectangular colonnaded temple with a row of columns and a triangular pediment roof, in a real stone-like block, not an arbitrary building. Only fall back to invented original geometry when the description is genuinely abstract/invented ("a spiky twisted tower", "a blob creature") rather than a real thing you have knowledge of.
 
@@ -4697,7 +4743,10 @@ One real limitation to know about: this mode has no automatic Walk-mode spawn-at
     prompt += aiCurrentMaterialCode
       ? `\n\nCURRENT MATERIAL CODE (per-part block assignment already in effect):\n${aiCurrentMaterialCode}`
       : `\n\nThere is no material code yet — the model currently just uses one exterior/interior/accent block each.`;
-    prompt += `\n\nIf the user's new message is a refinement/edit request, REVISE the existing function(s) incrementally — keep their overall character and everything not asked to change. Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
+    prompt += aiCurrentDecor.length
+      ? `\n\nCURRENT DECOR (real placeable objects already in effect):\n${JSON.stringify(aiCurrentDecor)}`
+      : `\n\nThere are no placeable objects yet.`;
+    prompt += `\n\nIf the user's new message is a refinement/edit request, REVISE the existing function(s)/decor incrementally — keep their overall character and everything not asked to change (including carrying the current decor array forward unchanged unless the request specifically adds/removes/moves an object). Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
   }
   return prompt;
 }
@@ -5153,12 +5202,28 @@ async function callAiGenerate() {
       } catch (e) { /* material code is optional — silently skip a broken one rather than failing the whole design */ }
     }
 
+    // Optional real placeable objects (a chest, a door, a torch...) — same
+    // "never blocks the core shape, just skip anything invalid" discipline.
+    // Each entry is validated independently: a real allowed type, integer
+    // coordinates actually inside the model's own bounding box (testDims,
+    // the same real target size solid() was just validated against).
+    const rawDecor = Array.isArray(result.decor) ? result.decor : [];
+    const validDecor = rawDecor.filter(d =>
+      d && typeof d === 'object' &&
+      AI_PLACEABLE_DECOR_TYPES.includes(d.type) &&
+      Number.isInteger(d.x) && d.x >= 0 && d.x < testDims.sx &&
+      Number.isInteger(d.y) && d.y >= 0 && d.y < testDims.sy &&
+      Number.isInteger(d.z) && d.z >= 0 && d.z < testDims.sz
+    ).map(d => ({ type: d.type, x: d.x, y: d.y, z: d.z }));
+
     // Success — now it's safe to replace the active design.
     aiGeneratedFn = fn;
     aiGeneratedMaterialFn = materialFn;
+    aiGeneratedDecor = validDecor;
     aiCurrentFn = fn;
     aiCurrentCode = result.code;
     aiCurrentMaterialCode = materialCode;
+    aiCurrentDecor = validDecor;
     aiCurrentMeta = result;
     aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
@@ -9442,6 +9507,8 @@ el('ai-clear-btn').addEventListener('click', () => {
   aiCurrentFn = null;
   aiGeneratedFn = null;
   aiGeneratedMaterialFn = null;
+  aiCurrentDecor = [];
+  aiGeneratedDecor = [];
   aiCurrentMeta = null;
   el('ai-log').innerHTML = '';
   el('ai-prompt').value = '';
@@ -9772,6 +9839,22 @@ function generateModel() {
   }
   if (shapeType === 'aiGenerated' && aiGeneratedMaterialFn) {
     applyAiMaterialPaint(grid, dims);
+  }
+  // Real placeable objects (a chest, a door, a torch...) the AI asked for —
+  // pushed into the SAME decor array hand-built presets use, so they render,
+  // export as /fill setblock commands, and (for a door specifically) drive
+  // the existing Walk-mode entrance-spawn detection below exactly like a
+  // hand-built preset's own door would, with no extra plumbing needed.
+  // Re-bounds-checked here (not just at generate time in callAiGenerate)
+  // since the user can edit the real height/width/depth fields after the AI
+  // answers but before clicking "Generate model", changing dims out from
+  // under coordinates that were valid when the AI picked them.
+  if (shapeType === 'aiGenerated' && aiGeneratedDecor && aiGeneratedDecor.length) {
+    for (const d of aiGeneratedDecor) {
+      if (d.x >= 0 && d.x < dims.sx && d.y >= 0 && d.y < dims.sy && d.z >= 0 && d.z < dims.sz) {
+        decor.push({ type: d.type, x: d.x, y: d.y, z: d.z });
+      }
+    }
   }
 
   const label = isPresetMode() ? currentPreset().name
@@ -10458,6 +10541,23 @@ function hopperParts(tileKey) {
   basin.translate(0, 0.35, 0); // top flush with the cell's own top
   const spout = new THREE.BoxGeometry(0.3, 0.4, 0.3); remapUV(spout, tileKey);
   return [basin, spout]; // spout is already centered — meets the basin's underside
+}
+// A real chest: a squat main body (14x10x14px, real vanilla's own
+// footprint leaving a 1px margin on every side) plus a separate, slightly
+// narrower raised LID section on top and a small dark latch on the front
+// face — the lid/latch are what actually read as "a chest" rather than a
+// plain wood-textured box, so they're built as real geometry rather than
+// folded into one solid cube the way a plain block would be.
+function chestParts(tileKey) {
+  const bodyH = 10 * PX;
+  const body = new THREE.BoxGeometry(14 * PX, bodyH, 14 * PX); remapUV(body, tileKey);
+  body.translate(0, bodyH / 2, 0);
+  const lidH = 4 * PX;
+  const lid = new THREE.BoxGeometry(14 * PX, lidH, 14 * PX); remapUV(lid, tileKey);
+  lid.translate(0, bodyH + lidH / 2, 0);
+  const latch = new THREE.BoxGeometry(2 * PX, 4 * PX, 1 * PX);
+  latch.translate(0, bodyH - 1 * PX, 7 * PX); // centered on the front face, spanning the body/lid seam
+  return { body, lid, latch };
 }
 // A simple low-poly cow (no cow texture/model in this app at all) — body,
 // head, and 4 legs as plain coloured boxes, standing in for a real
@@ -13582,6 +13682,17 @@ function buildDecorMeshesForEntry(entry) {
     let parts = decorGeoCache.get(key);
     if (!parts) { parts = hopperParts(def.tile); decorGeoCache.set(key, parts); }
     for (const g of parts) objs.push(new THREE.Mesh(g, decorMaterial()));
+  } else if (def.kind === 'chest') {
+    const tile = entry.tile || def.tile;
+    const key = 'chest:' + tile;
+    let parts = decorGeoCache.get(key);
+    if (!parts) { parts = chestParts(tile); decorGeoCache.set(key, parts); }
+    const group = new THREE.Group();
+    group.add(new THREE.Mesh(parts.body, decorMaterial()));
+    group.add(new THREE.Mesh(parts.lid, decorMaterial()));
+    group.add(new THREE.Mesh(parts.latch, solidMaterial(0x2b2620)));
+    group.rotation.y = FACING_YAW[entry.facing || 'south'];
+    objs.push(group);
   } else if (def.kind === 'cow') {
     let parts = decorGeoCache.get('cow');
     if (!parts) { parts = cowParts(); decorGeoCache.set('cow', parts); }
@@ -24235,6 +24346,7 @@ function renderCommands(model) {
       else if (d.type === 'activator_rail') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:activator_rail[shape=${railShapeString(d)},powered=${!!(d.powered || d.on)}]`);
       else if (d.type === 'minecart') lines.push(`summon minecraft:minecart ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'hopper') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:hopper[facing=down]`);
+      else if (d.type === 'chest') lines.push(`setblock ~${d.x} ~${d.y} ~${d.z} minecraft:chest[facing=${d.facing || facing}]`);
       else if (d.type === 'cow') lines.push(`summon minecraft:cow ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'pig') lines.push(`summon minecraft:pig ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);
       else if (d.type === 'sheep') lines.push(`summon minecraft:sheep ~${d.x + 0.5} ~${d.y} ~${d.z + 0.5}`);

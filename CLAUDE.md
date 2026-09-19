@@ -957,3 +957,129 @@ one — end up attached to the final generate request alongside the
 original prompt text. All prior AI-feature suites (128 checks total,
 run unmodified) and the full `dom-test.js` regression suite (34 checks)
 still pass unchanged.
+
+## A real chest object, and AI Generate can now place real furnishings, not just voxel fill
+
+The user pushed on the same "does the local AI actually do everything by
+itself" architecture question one more time — insisting the HTTP calls a
+tool-calling loop makes should be made "by the ai not the modeler app."
+Same answer as every earlier round of this exact question, re-verified
+rather than just repeated: no LLM's weights can perform network I/O
+themselves, confirmed concretely this time via Ollama's own
+`OLLAMA_API_KEY` — that key is used by the CLIENT application (whatever
+orchestrates a tool-calling loop), never sent to the local `ollama serve`
+process itself, so even Ollama's own first-party tooling can't make "the
+local server" do this autonomously. This is a universal architectural
+fact, not a limitation specific to this app.
+
+Separately, the user clarified (after some crossed wires) that their real
+concern was license review, not architecture — asserting their local AI
+"is only searching the web not downloading models automatically" and
+that therefore some "license/verification pipeline" should be removed.
+Checked directly via `grep` rather than assumed: there is no runtime
+license-checking code anywhere in this app gating search/generate. The
+only license-related content at all is static attribution comments/README
+credits for the 5 hand-embedded real-model presets (Statue of Liberty,
+Vader Helmet, Golden Gate Bridge, Colosseum, Kip), required by their own
+CC-BY-4.0 terms — unrelated to and never in the AI pipeline's path. No
+code change was needed; there was nothing to remove.
+
+The user then asked the concrete, well-scoped question this session
+actually answers: can AI Generate build a two-floor building with a
+staircase AND a chest inside, and does the app already have a chest asset
+it can tell the AI about. Checked the second part directly via `grep`
+first rather than take the premise on faith: **no chest asset of any kind
+existed** — not a decor object, not even a plain reused block texture.
+More fundamentally, AI Generate had no mechanism at all to place any
+discrete furnishing object (a door, a torch, a chest) — its only two
+outputs were `solid()` (voxel fill) and `materialCode` (per-cell paint),
+never a placed-object list, even for object types (door, torch, ladder)
+that already existed elsewhere in the app for hand-built presets.
+
+**Part A: a real chest, added to the app's general decor system** (not
+AI-specific — any preset or the freeform builder can use it too).
+`DECOR_TYPES.chest` reuses `oak_planks` as a texture stand-in (no unique
+chest texture exists in this app's atlas — chests are a block-entity in
+real vanilla, not part of the basic block set that atlas was extracted
+from), but the real distinguishing SHAPE is built as genuine geometry via
+a new `chestParts(tileKey)`: a squat 14×10×14px main body (vanilla's own
+real footprint, a 1px margin on every side), a separate, slightly raised
+14×4×14px lid section on top, and a small dark 2×4×1px latch straddling
+the body/lid seam on the front face — three real parts, not one flat
+textured cube, which is what actually reads as "a chest" rather than a
+plain box. Wired into `buildDecorMeshesForEntry()` as a new dispatch
+branch (a `THREE.Group` of the three parts, oriented via the same
+`FACING_YAW` lookup every other facing-aware decor type already uses),
+and into the `/fill` export loop as `setblock ... minecraft:chest[facing=...]`,
+matching the pattern every other decor type's export line already
+follows.
+
+**Part B: AI Generate's JSON contract gained an optional `decor` array**,
+so the AI's response can now place real furnishing objects at exact
+coordinates, not just choose fill/paint. Added `AI_PLACEABLE_DECOR_TYPES`
+— a deliberately curated 16-entry subset of the app's full `DECOR_TYPES`:
+`door, trapdoor, window, ladder, bars, lever, button, pressure_plate,
+chair, torch, soul_torch, chest, flower, dandelion, grass_tuft, tree`.
+Two categories of the app's full decor set were deliberately excluded and
+documented as such directly in the constant's own comment: every
+mob/animal type (their wander/look-at AI is wired up by specific
+hand-built interior-builder functions for specific contexts, not verified
+safe to trigger generically from an arbitrary AI-chosen coordinate), and
+every multi-entry contraption piece that only makes sense wired together
+across several coordinated cells (rail, redstone_wire, redstone_torch,
+tripwire/tripwire_hook, hopper, minecart) — a lone AI-placed rail segment
+or wire dot from a model with no understanding of real redstone wiring
+would read as a mistake, not a feature. This is furnishing-a-building
+scope: doors, openings, light, simple interactables, storage, and basic
+greenery.
+
+`AI_SHAPE_JSON_SCHEMA` gained a `decor` field (array of `{type, x, y, z}`,
+required-but-empty-array-is-valid, matching the existing pattern for
+"required but has a sane empty default" fields like `materialCode`) and
+`AI_JSON_ONLY_INSTRUCTION`/`buildAiSystemPrompt()` were updated to name
+it under a new "PLACEABLE OBJECTS" section, explicitly listing the 16
+allowed types, telling the model to only place one at a cell its OWN
+`solid()` already leaves as open air (never inside a solid cell, where
+it'd be invisible), and — a mistake I caught and fixed in my own first
+draft before running any test — explicitly clarifying that "chair" is a
+single piece of seating furniture, NOT how to build an actual staircase;
+a real walkable staircase is still voxel geometry built directly in
+`solid()` (the existing spiral/helical worked example), never a decor
+placement.
+
+`callAiGenerate()` validates each returned decor entry independently
+(never lets one bad entry block the others, or the core shape): a real
+allowed type, and integer x/y/z actually inside `testDims` — the same
+real target-size bounding box the existing "completely empty shape"
+sanity check already validates `solid()` against. Valid entries are
+tracked in new `aiCurrentDecor`/`aiGeneratedDecor` state (alongside the
+existing `aiCurrentCode`/`aiGeneratedFn` pair, reset together on Clear,
+re-embedded in the system prompt's "CURRENT DECOR" block for follow-ups
+exactly like current code/materials already are). `generateModel()` pushes
+`aiGeneratedDecor` into the SAME shared `decor` array every hand-built
+preset's own interior-builder already populates — deliberately not a
+parallel/separate mechanism — so an AI-placed object renders, exports via
+`/fill`, and gets one genuine bonus for free with zero extra plumbing:
+Walk-mode's existing `computeEntranceSpawn`/`decor.find(d => d.type ===
+'door')` entrance-spawn detection already scans the shared `decor` array,
+so an AI-placed `door` now gets a real spawn-at-the-doorway just like a
+hand-built preset's own door, not the old drop-from-above default.
+Coordinates are re-validated a second time here against the real `dims`
+in effect at generate time (not just the `testDims` checked earlier in
+`callAiGenerate()`), since the user can edit the real height/width/depth
+fields after the AI answers but before clicking "Generate model," which
+could shift the valid coordinate range out from under previously-valid
+AI-chosen coordinates.
+
+Verified via a new 11-check test (`chest` registered with real 3-part
+geometry via `buildDecorMeshesForEntry`; the system prompt's PLACEABLE
+OBJECTS section and its chair-is-not-a-staircase clarification; and,
+using the user's own exact scenario — a hut with a chest inside — an
+end-to-end mocked Anthropic response with 3 decor entries (1 valid chest,
+1 invalid type, 1 out-of-bounds) correctly filtering down to exactly the
+1 valid entry, which lands in `currentModel.decor` at the exact AI-chosen
+coordinates after clicking Generate, and is re-embedded correctly in a
+follow-up system prompt). All 13 prior AI-feature test suites (138 checks
+total) were re-run UNMODIFIED and still passed, and the full `dom-test.js`
+regression suite (34 checks) still passed — bringing the AI-feature total
+to 149 checks.
