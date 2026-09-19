@@ -272,10 +272,10 @@
             <input type="password" id="ai-api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
             <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
             <div class="checkbox-row">
-              <input type="checkbox" id="ai-web-search" />
+              <input type="checkbox" id="ai-web-search" checked />
               <label for="ai-web-search">Let it search the web for real reference facts, and look at a real reference photo (Wikimedia Commons), before building</label>
             </div>
-            <div class="hint">Looks up real-world facts as text (a real server-side tool Anthropic runs for you) AND fetches one real, appropriately-licensed reference photo for the AI to actually look at when one matches — never downloads any 3D file or mesh. Off by default since it costs extra, adds latency, and isn't needed for a made-up/abstract design. The photo only helps a genuinely vision-capable model — a code-focused model has no way to see it either way, whatever provider it's served through.</div>
+            <div class="hint">On by default: every request first looks up real-world facts as text (a real server-side tool Anthropic runs for you) AND fetches one real, appropriately-licensed reference photo for the AI to actually look at when one matches — never downloads any 3D file or mesh, only ever research to build FROM. Uncheck it for a faster/cheaper request on a purely invented/abstract design (nothing real to look up), or for a small follow-up tweak that doesn't need fresh research. The photo only helps a genuinely vision-capable model — a code-focused model has no way to see it either way, whatever provider it's served through.</div>
           </div>
           <div id="ai-local-fields" style="display:none;">
             <label for="ai-base-url">API base URL</label>
@@ -287,7 +287,7 @@
               <input type="checkbox" id="ai-local-photo" />
               <label for="ai-local-photo">Look up a real reference photo (Wikimedia Commons) and send it to this model</label>
             </div>
-            <div class="hint">This app does the looking-up itself (a plain fetch to Wikimedia Commons, same as the Anthropic option above) and hands the photo to whatever model is loaded here — it does NOT rely on the model or server having its own web browsing, and plain Ollama has none built in regardless of what a separate chat UI you may also use (like Open WebUI) layers on top of it. This only genuinely helps if the loaded model can actually see images (e.g. llava, qwen2-vl, gemma3's multimodal variants, minicpm-v) — a text/code-only model (most coding-focused models, including qwen2.5-coder) has no image input at all and will just ignore it. There's no equivalent to Anthropic's text web-search tool here: no generic local server exposes one this app could call the same way.</div>
+            <div class="hint">This app does the looking-up itself (a plain fetch to Wikimedia Commons, same as the Anthropic option above) and hands the photo to whatever model is loaded here — it does NOT rely on the model or server having its own web browsing, and plain Ollama has none built in regardless of what a separate chat UI you may also use (like Open WebUI) layers on top of it. Left OFF by default here specifically (unlike the Anthropic checkbox, which defaults on): most local/coding models, including a default Ollama pull like <code>qwen2.5-coder</code> or <code>llama3.1</code>, are text-only with no image input at all, and some servers error on an image in the request rather than just ignoring it — turn this on only once you know the model you've actually loaded can see (e.g. <code>llava</code>, <code>qwen2-vl</code>, a multimodal <code>gemma3</code> tag, <code>minicpm-v</code>). Every local model still gets researched from its own general training knowledge either way — see the system prompt — this checkbox only adds an actual photo on top of that for a model that can use one. There's no equivalent to Anthropic's text web-search tool here: no generic local server exposes one this app could call the same way.</div>
           </div>
           <label for="ai-model">Model</label>
           <input type="text" id="ai-model" value="claude-opus-5" />
@@ -4523,6 +4523,12 @@ const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON obje
 function buildAiSystemPrompt(canWebSearch, hasPhoto) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
   let prompt = `You are a geometry-code generator inside a Minecraft-style voxel model builder. You do NOT generate an image, a real 3D mesh, a .glb file, or any kind of downloadable file — the ONLY thing you produce is a short piece of JavaScript code that decides, cell by cell, which positions in a 3D grid are solid Minecraft blocks. That code is compiled and run by the app itself to build the actual model; you never see or return the model, only the code that generates it.
+
+Do this in two steps, every time, before answering:
+
+STEP 1 — RESEARCH. Figure out what the thing described actually looks like in real life before writing anything. Use, in whatever combination is actually available to you this turn: your own general training knowledge of the real thing named or implied (always available, always use it as a baseline); the web_search tool, if one is available to you this turn, to look up its real proportions/shape/color; and a reference photo, if one is attached to the user's message this turn, actually examined for its real shape/parts/color. Not every turn has search or a photo available — that is normal, not a failure; fall back to your own knowledge whenever they aren't.
+
+STEP 2 — BUILD. Turn what you now know into the ONE output form this app can actually use: the exact JSON object described below, whose "code" field is a solid(x,y,z,dims) function body. This is the only usable form — there is no separate step where you hand back an image, mesh, description, or plan; the JSON response IS the finished deliverable for this turn.
 
 Your ENTIRE code output is the BODY of a function with this exact signature, called once per voxel cell over the whole bounding box:
 

@@ -645,3 +645,64 @@ the photo paragraph in that case, and confirming Wikimedia is never
 queried at all for the local provider when the checkbox is off. All
 prior AI-feature suites (74 checks total) and the full `dom-test.js`
 regression suite (34 checks) still pass unchanged.
+
+## Research now happens by default, and the two-step flow is stated explicitly
+
+The user pushed back one more time on the same underlying point across
+several messages now: they wanted the app to actually tell whatever
+model it's talking to (their own words: "Ollama or whatever AI I'm
+using") that it needs to research the prompt FIRST and only then
+produce output in a form this modeler can actually use — not something
+they have to remember to opt into by finding and checking a box.
+
+Two real changes, not just wording:
+
+1. **`#ai-web-search` (Anthropic: text facts + reference photo) now
+   defaults to `checked`.** It was off by default in every earlier round
+   specifically to avoid surprise cost/latency on every single request —
+   that reasoning was sound, but conflicted directly with what the user
+   kept asking for. Resolved in the user's favor: research now happens
+   automatically for every Anthropic request unless they explicitly turn
+   it off (worth doing for a purely invented/abstract design, or a fast
+   text-only follow-up tweak that doesn't need fresh research) — the
+   hint text next to it now explains that tradeoff instead of just
+   stating a default.
+2. **`#ai-local-photo` (local provider) stays OFF by default, on
+   purpose, and this is NOT the same tradeoff as #1.** Attaching an
+   image to every request has a real chance of actively breaking
+   generation on a typical local setup: most local/coding models
+   (including a default Ollama pull like `qwen2.5-coder` or `llama3.1`)
+   are text-only, and some servers error on an unexpected image content
+   block rather than silently ignoring it — unlike Anthropic, where
+   every current Claude model is genuinely vision-capable, so turning it
+   on can never hurt there. Research from the model's own general
+   knowledge still always happens for local models regardless (see the
+   STEP 1/STEP 2 framing below) — this checkbox only adds an actual
+   photo on top, and should only be turned on once the user knows their
+   loaded model can actually see.
+
+**Also made the two-step sequence explicit in the system prompt itself**,
+directly matching how the user described wanting this to work: a new
+opening block states "STEP 1 — RESEARCH" (use general knowledge, always;
+the real web_search tool, when available this turn; an attached
+reference photo, when one exists this turn) followed by "STEP 2 — BUILD"
+(the JSON response — a `solid()` function body — IS the finished
+deliverable; there's no other output form for this app to receive).
+Previously this same behavior was described in scattered prose across
+several paragraphs (short-prompt guidance, the web-search paragraph, the
+photo paragraph) without ever stating outright that these two things
+happen as an ordered sequence every time — this makes that sequencing a
+literal instruction instead of something only implied by the rest of
+the prompt, which matters more for weaker/local models that follow
+explicit structure more reliably than implication.
+
+Verified via a new 11-check test confirming: both checkboxes' actual
+default states straight off the page (not just checking JS logic), the
+system prompt containing the STEP 1/STEP 2 language, and — the real
+point of this round — that a plain Anthropic AI Generate call with
+NOTHING touched beyond typing a prompt and clicking Generate already
+searches Wikimedia, fetches the matching photo, declares the real
+`web_search` tool, and attaches the photo to the outgoing request, all
+with zero manual setup. All prior AI-feature suites (96 checks total)
+and the full `dom-test.js` regression suite (34 checks) still pass
+unchanged.
