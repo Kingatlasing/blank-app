@@ -269,3 +269,46 @@ state up front that the model produces code only, never an image, mesh,
 symptom of a local model (gemma4 via Ollama) not seeming to understand
 what it was being asked to do; this framing fix applies to every
 provider, not just the web-search path.
+
+### Per-part block/color control, and no fixed request timeout
+
+Two more follow-ups from the same conversation:
+
+**Per-part materials.** `exteriorBlock`/`interiorBlock`/`accentBlock` are
+each ONE material for the whole model — no way to honor "red wool roof,
+oak plank walls, gold trim" from those three alone. Added an OPTIONAL 4th
+function the AI can write, `materialCode` (schema field, required-but-
+often-empty-string so strict/local JSON-schema modes don't choke on a
+genuinely optional key): a `material(x, y, z, dims)` function body, same
+coordinate space as `solid()`, called only on cells `solid()` already
+marked true, returning a block id string for that exact cell or `""` to
+leave the app's normal exterior/interior/accent choice there.
+`applyAiMaterialPaint(grid, dims)` runs this over the whole grid AFTER
+the base fill/hollow pass — the exact same "paint after the fact" pattern
+`applyBaldEagleDetail`/`applyBigBenDetail` already use for their own
+hand-written per-cell overrides, just driven by AI-authored code instead.
+Gated on `shapeType === 'aiGenerated' && aiGeneratedMaterialFn` in
+`generateModel()`, right alongside those two existing hooks. A broken or
+throwing materialCode is swallowed silently (never blocks the shape
+itself from being accepted, only the per-part painting is skipped) —
+distinct from `solid()` itself, which must not throw or the whole
+response is rejected before touching any working state, since losing the
+CORE shape to a bad follow-up is a much bigger regression than just
+missing some paint detail. The system prompt explicitly tells the model
+to leave this empty when per-part control wasn't actually requested,
+so a plain "build a tower" doesn't get color variation nobody asked for.
+`aiCurrentMaterialCode` is tracked alongside `aiCurrentCode` and
+re-embedded in the CURRENT-CODE context block for follow-up edits, and
+both reset together on Clear.
+
+**No fixed request timeout, by explicit request.** The AbortController-
+based 90s/150s timeouts are gone entirely — a slow local model (or a
+long multi-search Anthropic turn, now compounded by writing a SECOND
+function) can legitimately take minutes, and browser `fetch()` has no
+built-in timeout of its own to fight. In its place: a `Cancel` button
+(`#ai-cancel-btn`, disabled unless a request is actually in flight) that
+calls `.abort()` on the same `AbortController` the fetch already uses —
+gives the user a real way out of a request that hangs forever (e.g. a
+truly dead connection) without silently capping every legitimate slow
+generation at some arbitrary number. The status line says as much while
+waiting, so a long wait doesn't read as the app being stuck.

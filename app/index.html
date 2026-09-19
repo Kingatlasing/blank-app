@@ -274,6 +274,7 @@
           <textarea id="ai-prompt" rows="3" placeholder="e.g. &quot;a squat crooked wizard tower with a lopsided spire&quot; — then later &quot;add a balcony halfway up&quot; to revise the same design in place"></textarea>
           <div class="row">
             <button type="button" id="ai-generate-btn" class="primary">Generate / refine with AI</button>
+            <button type="button" id="ai-cancel-btn" disabled>Cancel</button>
             <button type="button" id="ai-clear-btn">Clear / start over</button>
           </div>
           <div class="hint" id="ai-status">No design yet — describe something above and click Generate.</div>
@@ -4328,9 +4329,11 @@ const AI_API_KEY_STORAGE_KEY = 'mc3d_ai_api_key';
 const AI_LOCAL_URL_STORAGE_KEY = 'mc3d_ai_local_url';
 function isAiProviderLocal() { return document.querySelector('input[name=ai-provider]:checked').value === 'local'; }
 let aiConversation = [];      // raw Anthropic message history, replayed on every call
-let aiCurrentCode = null;     // last successfully compiled function SOURCE (body text)
-let aiCurrentFn = null;       // the compiled function itself, mirrored into aiGeneratedFn
+let aiCurrentCode = null;     // last successfully compiled shape function SOURCE (body text)
+let aiCurrentMaterialCode = null; // last successfully compiled PER-CELL material function SOURCE, or null
+let aiCurrentFn = null;       // the compiled shape function itself, mirrored into aiGeneratedFn
 let aiGeneratedFn = null;     // read by SHAPES.aiGenerated (declared up top, before SHAPES) at generate time
+let aiGeneratedMaterialFn = null; // read by applyAiMaterialPaint at generate time, or null for the default ext/int/accent scheme
 let aiCurrentMeta = null;     // { summary, exteriorBlock, interiorBlock, accentBlock }
 let aiRequestInFlight = false;
 
@@ -4339,14 +4342,15 @@ const AI_SHAPE_JSON_SCHEMA = {
   properties: {
     summary: { type: 'string', description: 'One short sentence describing what you built or changed.' },
     code: { type: 'string', description: 'A JavaScript function BODY (no "function" wrapper, no name) implementing solid(x, y, z, dims). Must end with a return statement on every path.' },
+    materialCode: { type: 'string', description: 'OPTIONAL. Leave as an empty string "" unless the user asked for specific blocks/colors on specific parts (e.g. "red roof, oak walls, gold trim"). If they did, a JavaScript function BODY implementing material(x, y, z, dims): called only for cells solid() already returned true for, must return a block id STRING from ALLOWED BLOCK IDS for that exact cell, or an empty string to fall back to the default exterior/interior/accent blocks there.' },
     realHeightMeters: { type: 'number', description: 'Suggested real-world height in meters for this design.' },
     realBaseXMeters: { type: 'number', description: 'Suggested real-world width (X) in meters.' },
     realBaseZMeters: { type: 'number', description: 'Suggested real-world depth (Z) in meters.' },
-    exteriorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the outer/skin material.' },
-    interiorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the interior fill material.' },
-    accentBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for a trim/accent material.' },
+    exteriorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the outer/skin material — used everywhere materialCode does not override it.' },
+    interiorBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for the interior fill material — used everywhere materialCode does not override it.' },
+    accentBlock: { type: 'string', description: 'A block id from the ALLOWED BLOCK IDS list for a trim/accent material — used everywhere materialCode does not override it.' },
   },
-  required: ['summary', 'code', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock'],
+  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock'],
   additionalProperties: false,
 };
 
@@ -4355,7 +4359,7 @@ const AI_SHAPE_JSON_SCHEMA = {
 // path always; the Anthropic path only when web search is also enabled,
 // since combining a forced tool call with a forced output schema in the
 // same request isn't a combination worth relying on unverified).
-const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
+const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
 
 function buildAiSystemPrompt(canWebSearch) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
@@ -4373,16 +4377,42 @@ Rules for the code:
 - Every code path must return a boolean.
 - Write real, thoughtful geometry (ellipsoids, tapers, offsets, ratios of dims.sx/sy/sz) — not just a solid box — matching whatever the user actually described.
 
-ALLOWED BLOCK IDS for exteriorBlock/interiorBlock/accentBlock (pick real, sensible ones for what's being built): ${blockIds}
+ALLOWED BLOCK IDS for exteriorBlock/interiorBlock/accentBlock/materialCode (pick real, sensible ones for what's being built): ${blockIds}
 
-Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m).`;
+Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-world size in meters for what you built (e.g. a small house ~6-10m tall, a tower ~20-100m, a creature ~1-5m).
+
+PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.`;
   if (canWebSearch) {
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
   if (aiCurrentCode) {
-    prompt += `\n\nCURRENT CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}\n\nIf the user's new message is a refinement/edit request, REVISE this existing function incrementally — keep its overall character and everything not asked to change. Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
+    prompt += `\n\nCURRENT SHAPE CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}`;
+    prompt += aiCurrentMaterialCode
+      ? `\n\nCURRENT MATERIAL CODE (per-part block assignment already in effect):\n${aiCurrentMaterialCode}`
+      : `\n\nThere is no material code yet — the model currently just uses one exterior/interior/accent block each.`;
+    prompt += `\n\nIf the user's new message is a refinement/edit request, REVISE the existing function(s) incrementally — keep their overall character and everything not asked to change. Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
   }
   return prompt;
+}
+
+// Optional per-cell material override for AI-generated shapes — the same
+// "paint after the fact" pattern already used by applyBaldEagleDetail/
+// applyBigBenDetail above, just driven by an AI-authored function instead
+// of hand-written logic. Only runs when the AI actually wrote a non-empty
+// materialCode (most requests don't need per-part control, so this is
+// skipped entirely then, same cost as every other shape).
+function applyAiMaterialPaint(grid, dims) {
+  for (let y = 0; y < dims.sy; y++) {
+    for (let z = 0; z < dims.sz; z++) {
+      for (let x = 0; x < dims.sx; x++) {
+        const i = idx(x, y, z, dims);
+        if (grid[i] === 0) continue;
+        let matId;
+        try { matId = aiGeneratedMaterialFn(x, y, z, dims); } catch (e) { continue; }
+        if (matId && MATERIAL_INDEX[matId] !== undefined) grid[i] = MATERIAL_INDEX[matId] + 1;
+      }
+    }
+  }
 }
 
 function el_ai_log_push(role, text) {
@@ -4478,6 +4508,8 @@ async function callLocalForShape(model, messages, baseUrl, apiKey, signal) {
   return content;
 }
 
+let aiActiveController = null; // lets the Cancel button abort an in-flight request
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
   const local = isAiProviderLocal();
@@ -4489,21 +4521,22 @@ async function callAiGenerate() {
 
   aiRequestInFlight = true;
   el('ai-generate-btn').disabled = true;
-  status.textContent = aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...';
+  el('ai-cancel-btn').disabled = false;
+  status.textContent = (aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...') + ' This has no fixed timeout — a local model can genuinely take several minutes. Click Cancel to give up.';
   el_ai_log_push('user', promptText);
 
   const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
   const useWebSearch = !local && el('ai-web-search').checked;
   const messages = aiConversation.concat([{ role: 'user', content: promptText }]);
+  // No automatic timeout, by request — a slow local model or a long
+  // multi-search Anthropic turn can legitimately take minutes. The only
+  // way this ends early is the user's own Cancel button below.
   const controller = new AbortController();
-  // Web search adds real round-trip latency (one or more real searches
-  // before the model can finish writing code), so it gets a longer budget.
-  const timeoutId = setTimeout(() => controller.abort(), useWebSearch ? 150000 : 90000);
+  aiActiveController = controller;
   try {
     let rawText = local
       ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal)
       : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch);
-    clearTimeout(timeoutId);
     let resultText = rawText.trim();
     if (local) {
       // Local models don't always honor "JSON only" — pull the first {...}
@@ -4531,10 +4564,29 @@ async function callAiGenerate() {
     if (threw) throw new Error('The AI\'s code threw while running: ' + threw.message);
     if (solidCount === 0) throw new Error('The AI\'s code produced a completely empty shape — try rephrasing, or describe it in more detail.');
 
+    // Optional per-part material function — same compile-and-sanity-check
+    // discipline, but a bad/empty one just means "no per-part painting",
+    // never blocks the shape itself from being accepted.
+    let materialFn = null, materialCode = null;
+    const rawMaterialCode = typeof result.materialCode === 'string' ? result.materialCode.trim() : '';
+    if (rawMaterialCode) {
+      try {
+        const candidate = new Function('x', 'y', 'z', 'dims', rawMaterialCode);
+        let materialThrew = null;
+        for (let i = 0; i < 100 && !materialThrew; i++) {
+          const tx = Math.floor(Math.random() * testDims.sx), ty = Math.floor(Math.random() * testDims.sy), tz = Math.floor(Math.random() * testDims.sz);
+          try { candidate(tx, ty, tz, testDims); } catch (e) { materialThrew = e; }
+        }
+        if (!materialThrew) { materialFn = candidate; materialCode = rawMaterialCode; }
+      } catch (e) { /* material code is optional — silently skip a broken one rather than failing the whole design */ }
+    }
+
     // Success — now it's safe to replace the active design.
     aiGeneratedFn = fn;
+    aiGeneratedMaterialFn = materialFn;
     aiCurrentFn = fn;
     aiCurrentCode = result.code;
+    aiCurrentMaterialCode = materialCode;
     aiCurrentMeta = result;
     aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
@@ -4547,18 +4599,19 @@ async function callAiGenerate() {
     if (!el('ai-name').value.trim()) el('ai-name').value = promptText.slice(0, 60);
 
     el_ai_log_push('assistant', result.summary || 'Done.');
-    status.textContent = result.summary || 'Design ready — click Generate model.';
+    status.textContent = (result.summary || 'Design ready — click Generate model.') + (materialFn ? ' (using per-part block colors)' : '');
     el('generate-btn').disabled = false;
     el('ai-prompt').value = '';
     updateVolumeReadout();
   } catch (err) {
-    const msg = err.name === 'AbortError' ? `Request timed out after ${useWebSearch ? 150 : 90}s.` : err.message;
+    const msg = err.name === 'AbortError' ? 'Cancelled.' : err.message;
     el_ai_log_push('assistant', '⚠ ' + msg);
     status.textContent = '⚠ ' + msg + (aiCurrentFn ? ' (your previous design is unchanged)' : '');
   } finally {
-    clearTimeout(timeoutId);
+    aiActiveController = null;
     aiRequestInFlight = false;
     el('ai-generate-btn').disabled = false;
+    el('ai-cancel-btn').disabled = true;
   }
 }
 // A highly-detailed shape for the Leaning Tower of Pisa preset
@@ -8761,11 +8814,16 @@ document.querySelectorAll('input[name=ai-provider]').forEach(r => r.addEventList
   else if (!local && modelField.value.trim() === 'llama3.1') modelField.value = 'claude-opus-5';
 }));
 el('ai-generate-btn').addEventListener('click', callAiGenerate);
+el('ai-cancel-btn').addEventListener('click', () => {
+  if (aiActiveController) aiActiveController.abort();
+});
 el('ai-clear-btn').addEventListener('click', () => {
   aiConversation = [];
   aiCurrentCode = null;
+  aiCurrentMaterialCode = null;
   aiCurrentFn = null;
   aiGeneratedFn = null;
+  aiGeneratedMaterialFn = null;
   aiCurrentMeta = null;
   el('ai-log').innerHTML = '';
   el('ai-prompt').value = '';
@@ -9088,6 +9146,9 @@ function generateModel() {
   // which must NOT get clock faces painted on by mistake.
   if (isPresetMode() && currentPreset().id === 'big-ben') {
     applyBigBenDetail(grid, dims, matAcc);
+  }
+  if (shapeType === 'aiGenerated' && aiGeneratedMaterialFn) {
+    applyAiMaterialPaint(grid, dims);
   }
 
   const label = isPresetMode() ? currentPreset().name
