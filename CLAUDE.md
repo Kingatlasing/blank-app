@@ -97,3 +97,75 @@ to add automatic up-axis detection or scale calibration heuristics here;
 they'd be guessing at exactly the kind of thing this app's own hand-built
 presets needed real research or direct silhouette verification to get
 right.
+
+## Walk-mode spawn point defaults to a modeled entrance when one exists
+
+`generateModel()` computes `currentModel.spawnPoint` from whatever real
+entrance an interior mode actually carved — the pyramid interior's own
+returned passage-threshold coords (`buildPyramidInterior` now returns
+`{x,y,z,axis}` instead of nothing), or the first `door` decor entry for
+"floors"-mode buildings — via the shared `computeEntranceSpawn(dims,
+entry)` helper (near `dirFromYawPitch`/`yawPitchFromDir`). `setCameraMode`
+uses it for Walk/first-person instead of the old universal "drop the
+player from directly overhead at the horizontal center" default, which
+lands ON TOP of anything with a real roof or sloped exterior (a pyramid's
+own apex, a house's own roof ridge) rather than inside it — confirmed
+directly: the Great Pyramid's real Giza-style entrance sits partway up a
+smooth sloped face with no exterior ramp/stairs modeled to it at all, so
+a walking player could never reach it from the ground regardless of spawn
+point; spawning them already standing at the passage threshold (which
+`buildPyramidInterior` always carves to air) sidesteps that entirely.
+Any future interior mode that carves its own real entrance should return/
+push equivalent `{x,y,z,axis}` info so this keeps working automatically —
+shapes with no interior entrance at all keep falling back to the old
+drop-from-above default unchanged.
+
+## "AI Generate" mode (experimental, direct-from-browser Anthropic API calls)
+
+A 4th "What to build" mode alongside preset/custom/import: describe a
+shape in plain language (even vague) and Claude writes a real
+`solid(x, y, z, dims)` function — the exact same contract every
+hand-written shape in `SHAPES` already uses — which gets compiled with
+`new Function(...)` and run through the existing generation pipeline
+completely unchanged (same scale system, same fill/hollow modes, same
+material pickers). `SHAPES.aiGenerated` is a stable indirection to
+whatever `aiGeneratedFn` currently holds, so each Generate/refine call
+swaps the active shape without needing its own SHAPES entry per design.
+
+Calls `POST https://api.anthropic.com/v1/messages` directly from browser
+`fetch` with a key the user pastes in and this file never sees beyond
+passing it straight through as the `x-api-key` header — there is no
+backend here to keep it server-side, by this project's own single-HTML-
+file, no-build design. The key is persisted only to `localStorage`
+(`mc3d_ai_api_key`), with an explicit in-UI warning about what that
+means. Verified via WebFetch against the live Anthropic docs (not
+guessed) before building this: the TypeScript SDK's own `browser usage`
+docs confirm direct browser calls are an officially supported pattern
+(gated client-side by `dangerouslyAllowBrowser` in the SDK — irrelevant
+here since this is raw `fetch`, not the SDK) and the Structured Outputs
+docs confirm `output_config.format` with a `json_schema` works with plain
+`fetch`, no SDK required — used here to force back `{summary, code,
+realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock,
+interiorBlock, accentBlock}` in one shot instead of a tool-use round trip.
+
+"Keep the original design unless cleared/told to remake" (an explicit
+user requirement) is implemented two ways at once: the full running
+`aiConversation` message history is replayed on every call (so Claude
+sees its own prior JSON reply as context), AND the system prompt
+separately re-embeds the current code's literal source under a "CURRENT
+CODE" heading with an explicit instruction to revise it incrementally
+unless the user's new message clearly asks to start over/scratch it/
+remake it — belt-and-suspenders so this still works even if conversation
+replay is ever changed. A response is validated (compiles, doesn't throw,
+isn't a completely empty shape over a random sample) BEFORE it's allowed
+to replace `aiCurrentFn`/`aiCurrentCode`, so one bad follow-up can never
+destroy prior good progress — matching the same requirement.
+
+Model defaults to `claude-opus-5` (editable in the UI) per this session's
+`claude-api` skill's own explicit non-negotiable default. No sandboxing
+beyond what every other shape function here already gets (none) — running
+AI-authored JS in the user's own browser tab, from their own request,
+with their own key, is the same risk level as them hand-writing a Custom
+shape themselves, not a new untrusted-content boundary; don't add Web
+Worker isolation or similar for this without a concrete reason, since
+that'd be scope creep beyond what was asked.
