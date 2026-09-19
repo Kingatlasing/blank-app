@@ -225,6 +225,26 @@
             <input type="file" id="import-file" accept=".glb,model/gltf-binary" />
           </div>
           <div class="hint" id="import-status">No file loaded yet. Only .glb is supported — USDZ is not (Pixar's USD format has no simple spec to parse in-browser). Export or convert your model to .glb first.</div>
+
+          <div class="hint" style="text-align:center;">— or generate a mesh instead of uploading one —</div>
+          <div id="localai-controls">
+            <label for="localai-base-url">LocalAI server URL</label>
+            <input type="text" id="localai-base-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
+            <label for="localai-model">3D model name</label>
+            <input type="text" id="localai-model" value="trellis2-4b" placeholder="trellis2-4b" />
+            <div class="hint">Calls a real image-to-3D backend on a <a href="https://localai.io" target="_blank" rel="noopener">LocalAI</a> server you run yourself (its own <code>/3d/generations</code> endpoint, a C++ port of Microsoft's TRELLIS.2) to build an actual textured mesh from a photo, then feeds that mesh straight into the same voxelizer as a manually-uploaded .glb above — a real 3D file, not code. Image-to-3D only: it needs a PHOTO, not just a description, so use your own or look one up below. This is a separate, optional LocalAI backend most installs don't have downloaded by default — an HTTP error below almost always means it isn't installed on that server yet, not a bug here.</div>
+            <label for="localai-image-file">Reference photo (upload your own)</label>
+            <input type="file" id="localai-image-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <div class="hint">— or leave that empty and describe the real thing here to fetch one automatically from Wikimedia Commons instead:</div>
+            <label for="localai-image-query">Describe the real thing (used only to look up a photo)</label>
+            <input type="text" id="localai-image-query" placeholder="e.g. a red London telephone box" />
+            <div class="row">
+              <button type="button" id="localai-generate-btn">Generate mesh with LocalAI</button>
+              <button type="button" id="localai-cancel-btn" disabled>Cancel</button>
+            </div>
+            <div class="hint" id="localai-status">No mesh generated yet.</div>
+          </div>
+
           <div class="row">
             <div>
               <label for="import-height">Detected height (m)</label>
@@ -4230,61 +4250,82 @@ function isAiMode() { return document.querySelector('input[name=mode]:checked').
 
 async function handleImportedFile(file) {
   const status = el('import-status');
-  el('generate-btn').disabled = true;
-  importedScanGridData = null;
   if (!/\.glb$/i.test(file.name)) {
+    el('generate-btn').disabled = true;
+    importedScanGridData = null;
     status.textContent = 'Only .glb files are supported (got "' + file.name + '") — USDZ and .gltf-with-separate-files are not.';
     return;
   }
   status.textContent = 'Reading ' + file.name + '...';
   try {
     const buf = await file.arrayBuffer();
-    const { json, bin } = parseGLBContainer(buf);
-    if (!bin) throw new Error('This .glb has no embedded binary buffer — a .gltf split across separate files is not supported, only a single self-contained .glb.');
-    status.textContent = 'Reading mesh geometry...';
-    const { triangles, triCount } = extractGLBTriangles(json, bin);
-    if (triCount === 0) throw new Error('No triangle mesh geometry found in this file.');
-    const bbox = computeTriangleBBox(triangles);
-    const xext = bbox.xmax - bbox.xmin, yext = bbox.ymax - bbox.ymin, zext = bbox.zmax - bbox.zmin;
-    if (!(xext > 0) || !(yext > 0) || !(zext > 0)) throw new Error('This model has no volume along one axis — cannot voxelize.');
+    await processGLBArrayBuffer(buf, file.name.replace(/\.glb$/i, ''));
+  } catch (err) {
+    status.textContent = 'Error: ' + err.message;
+  }
+}
 
-    importedModelName = file.name.replace(/\.glb$/i, '');
-    el('import-name').value = importedModelName;
-    el('import-height').value = yext.toFixed(3);
-    el('import-basex').value = xext.toFixed(3);
-    el('import-basez').value = zext.toFixed(3);
-    updateVolumeReadout();
+// Shared core of "take raw .glb bytes and voxelize them into this app's
+// own grid format" -- used both by a manually-dropped/chosen file above
+// AND by a mesh a LocalAI server's own image-to-3D backend just generated
+// (see callLocalAiGenerate3D below). Everything from "we have an
+// ArrayBuffer of .glb bytes" onward is identical regardless of where
+// those bytes came from, so this is the exact same code either way, not
+// a parallel reimplementation. Returns a promise that resolves once
+// voxelization finishes (success OR failure -- the status line already
+// reports which; callers await this only to know when it's safe to
+// re-enable their own buttons).
+async function processGLBArrayBuffer(buf, displayName) {
+  const status = el('import-status');
+  el('generate-btn').disabled = true;
+  importedScanGridData = null;
+  const { json, bin } = parseGLBContainer(buf);
+  if (!bin) throw new Error('This .glb has no embedded binary buffer — a .gltf split across separate files is not supported, only a single self-contained .glb.');
+  status.textContent = 'Reading mesh geometry...';
+  const { triangles, triCount } = extractGLBTriangles(json, bin);
+  if (triCount === 0) throw new Error('No triangle mesh geometry found in this file.');
+  const bbox = computeTriangleBBox(triangles);
+  const xext = bbox.xmax - bbox.xmin, yext = bbox.ymax - bbox.ymin, zext = bbox.zmax - bbox.zmin;
+  if (!(xext > 0) || !(yext > 0) || !(zext > 0)) throw new Error('This model has no volume along one axis — cannot voxelize.');
 
-    // Native voxelization resolution: aim the longest axis around 220
-    // blocks (comparable to this app's own offline real-scan presets),
-    // backing off if that would exceed the volume cap.
-    const maxExt = Math.max(xext, yext, zext);
-    let targetLong = 220;
-    let step = maxExt / targetLong;
-    const PAD = 2;
-    let W = Math.round(xext / step) + 2 * PAD, H = Math.round(yext / step) + 2 * PAD, D = Math.round(zext / step) + 2 * PAD;
-    while (W * H * D > 5_000_000 && targetLong > 40) {
-      targetLong -= 20;
-      step = maxExt / targetLong;
-      W = Math.round(xext / step) + 2 * PAD; H = Math.round(yext / step) + 2 * PAD; D = Math.round(zext / step) + 2 * PAD;
-    }
-    const density = triCount > 300000 ? 1.5 : 2.5;
-    const ox = bbox.xmin - PAD * step, oy = bbox.ymin - PAD * step, oz = bbox.zmin - PAD * step;
+  importedModelName = displayName;
+  el('import-name').value = importedModelName;
+  el('import-height').value = yext.toFixed(3);
+  el('import-basex').value = xext.toFixed(3);
+  el('import-basez').value = zext.toFixed(3);
+  updateVolumeReadout();
 
-    // Default the scale slider so the FIRST generate already comes out
-    // near this native resolution (mirrors every preset's own
-    // defaultScaleNum/Den) instead of leaving whatever unrelated ratio
-    // the sidebar happened to have from a previous preset/custom shape.
-    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
-    ratioRadio.checked = true;
-    ratioRadio.dispatchEvent(new Event('change'));
-    el('scale-num').value = targetLong;
-    el('scale-den').value = Number(maxExt.toFixed(6));
-    baselineScale = currentScale();
-    updateScaleQuickpickActive();
-    updateVolumeReadout();
+  // Native voxelization resolution: aim the longest axis around 220
+  // blocks (comparable to this app's own offline real-scan presets),
+  // backing off if that would exceed the volume cap.
+  const maxExt = Math.max(xext, yext, zext);
+  let targetLong = 220;
+  let step = maxExt / targetLong;
+  const PAD = 2;
+  let W = Math.round(xext / step) + 2 * PAD, H = Math.round(yext / step) + 2 * PAD, D = Math.round(zext / step) + 2 * PAD;
+  while (W * H * D > 5_000_000 && targetLong > 40) {
+    targetLong -= 20;
+    step = maxExt / targetLong;
+    W = Math.round(xext / step) + 2 * PAD; H = Math.round(yext / step) + 2 * PAD; D = Math.round(zext / step) + 2 * PAD;
+  }
+  const density = triCount > 300000 ? 1.5 : 2.5;
+  const ox = bbox.xmin - PAD * step, oy = bbox.ymin - PAD * step, oz = bbox.zmin - PAD * step;
 
-    status.textContent = `Voxelizing ${triCount.toLocaleString()} triangles into a ${W}x${H}x${D} grid...`;
+  // Default the scale slider so the FIRST generate already comes out
+  // near this native resolution (mirrors every preset's own
+  // defaultScaleNum/Den) instead of leaving whatever unrelated ratio
+  // the sidebar happened to have from a previous preset/custom shape.
+  const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
+  ratioRadio.checked = true;
+  ratioRadio.dispatchEvent(new Event('change'));
+  el('scale-num').value = targetLong;
+  el('scale-den').value = Number(maxExt.toFixed(6));
+  baselineScale = currentScale();
+  updateScaleQuickpickActive();
+  updateVolumeReadout();
+
+  status.textContent = `Voxelizing ${triCount.toLocaleString()} triangles into a ${W}x${H}x${D} grid...`;
+  return new Promise((resolve) => {
     const worker = new Worker(getImportVoxelizeWorkerURL());
     worker.onmessage = (e) => {
       const msg = e.data;
@@ -4297,15 +4338,123 @@ async function handleImportedFile(file) {
         status.textContent = `Ready — ${msg.solidCount.toLocaleString()} solid voxels in a ${msg.W}x${msg.H}x${msg.D} native grid. Click "Generate model" (or drop a different file to replace it).`;
         if (isImportMode()) el('generate-btn').disabled = false;
         worker.terminate();
+        resolve();
       } else if (msg.type === 'error') {
         status.textContent = 'Voxelization error: ' + msg.message;
         worker.terminate();
+        resolve();
       }
     };
-    worker.onerror = (err) => { status.textContent = 'Worker error: ' + err.message; };
+    worker.onerror = (err) => { status.textContent = 'Worker error: ' + err.message; resolve(); };
     worker.postMessage({ triangles, W, H, D, step, ox, oy, oz, density }, [triangles.buffer]);
+  });
+}
+
+/* =========================================================================
+ * LOCALAI IMAGE-TO-3D — a REAL non-chat mesh-generation backend, unlike
+ * every AI path elsewhere in this app (which only ever writes solid()/
+ * material() CODE). LocalAI (https://localai.io), a self-hosted,
+ * OpenAI-API-compatible inference server, separately exposes its own
+ * `/3d/generations` endpoint powered by a C++/GGML port of Microsoft's
+ * TRELLIS.2 (the `trellis2cpp` backend) that reconstructs an actual
+ * textured .glb mesh from a single photo. This is genuinely different
+ * from the text-to-code AI Generate mode below: it takes a PHOTO, not a
+ * description, and produces a real mesh, not code -- so once we have
+ * that mesh's raw bytes, it's fed straight into the exact same
+ * processGLBArrayBuffer() voxelizer already used for a manually-uploaded
+ * .glb file above, rather than building a second, parallel pipeline.
+ * Verified real (not guessed) via WebSearch before building this, since
+ * this sandbox's own network egress blocks fetching localai.io directly
+ * for a live doc read -- so response-shape parsing below is deliberately
+ * tolerant of more than one plausible shape rather than assuming the
+ * exact wire format sight-unseen.
+ * ========================================================================= */
+
+// Calls LocalAI's own image-to-3D backend directly (NOT the OpenAI-
+// compatible chat/completions surface callLocalForShape uses below --
+// this is a different, non-chat endpoint on the same kind of server).
+// Image-conditioned only: there is no text-prompt path for this endpoint,
+// per LocalAI's own docs.
+async function callLocalAiGenerations(baseUrl, model, imageBase64, signal) {
+  const resp = await fetch(baseUrl + '/3d/generations', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    signal,
+    body: JSON.stringify({ model, image: imageBase64, response_format: 'b64_json' }),
+  });
+  if (!resp.ok) {
+    let detail = '';
+    try { const errData = await resp.json(); detail = (errData && errData.error && errData.error.message) || ''; } catch (e) { /* body wasn't JSON */ }
+    throw new Error(`LocalAI returned HTTP ${resp.status}${detail ? ': ' + detail : ''} — is the 3D-generation backend (trellis2cpp / model "${model}") actually installed and downloaded on that server? This is a separate, optional backend most LocalAI installs don't have by default.`);
+  }
+  const contentType = (resp.headers.get('content-type') || '').split(';')[0].trim();
+  if (contentType === 'model/gltf-binary' || contentType === 'application/octet-stream') {
+    return await resp.arrayBuffer();
+  }
+  const data = await resp.json();
+  const entry = (Array.isArray(data.data) && data.data[0]) || data;
+  const inlineB64 = entry.b64_json || entry.base64 || entry.data;
+  if (typeof inlineB64 === 'string' && inlineB64.length > 0) {
+    return base64ToArrayBuffer(inlineB64);
+  }
+  const url = entry.url || data.url;
+  if (typeof url === 'string' && url) {
+    const fileUrl = /^https?:\/\//i.test(url) ? url : baseUrl + (url.startsWith('/') ? url : '/' + url);
+    const fileResp = await fetch(fileUrl, { signal });
+    if (!fileResp.ok) throw new Error(`Could not fetch the generated mesh from ${fileUrl} (HTTP ${fileResp.status}).`);
+    return await fileResp.arrayBuffer();
+  }
+  throw new Error('LocalAI response did not contain a recognizable mesh (no binary body, inline base64, or url field) — the server may be running a different version of this API than expected.');
+}
+
+let localAiActiveController = null;
+
+async function callLocalAiGenerate3D() {
+  const status = el('localai-status');
+  const baseUrl = (el('localai-base-url').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+  const model = el('localai-model').value.trim() || 'trellis2-4b';
+  const fileInput = el('localai-image-file');
+  const query = el('localai-image-query').value.trim();
+  el('localai-generate-btn').disabled = true;
+  el('localai-cancel-btn').disabled = false;
+  const controller = new AbortController();
+  localAiActiveController = controller;
+  try {
+    let base64;
+    if (fileInput.files && fileInput.files[0]) {
+      status.textContent = 'Reading your uploaded photo...';
+      const buf = await fileInput.files[0].arrayBuffer();
+      base64 = arrayBufferToBase64(buf);
+    } else if (query) {
+      status.textContent = 'Looking up a reference photo on Wikimedia Commons...';
+      const ref = await fetchWikimediaReferenceImage(query, controller.signal);
+      // fetchWikimediaReferenceImage swallows every failure (including a
+      // cancel) into a plain null, since its other caller treats it as a
+      // best-effort enhancement -- check for an actual cancel here first
+      // so it still reports as "Cancelled." instead of a misleading
+      // "no photo found".
+      if (controller.signal.aborted) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
+      if (!ref) throw new Error('No usable reference photo found for "' + query + '" — try uploading your own photo instead.');
+      base64 = ref.base64;
+    } else {
+      throw new Error('Upload a photo, or describe the real thing so one can be looked up, first.');
+    }
+
+    status.textContent = `Generating a real 3D mesh with LocalAI (${model}) — image-to-3D generation can take a while, especially on CPU. Click Cancel to give up.`;
+    const meshBuf = await callLocalAiGenerations(baseUrl, model, base64, controller.signal);
+    status.textContent = 'Mesh received from LocalAI — voxelizing it now...';
+    await processGLBArrayBuffer(meshBuf, (query || 'localai-mesh').slice(0, 60));
+    // processGLBArrayBuffer reports the actual voxelization result on the
+    // shared #import-status line (same one a manually-dropped file uses)
+    // -- give this LocalAI-specific status line its own closing message
+    // too, so it doesn't look stuck on "voxelizing now" once that's done.
+    status.textContent = 'Done — see the result below, or click "Generate model".';
   } catch (err) {
-    status.textContent = 'Error: ' + err.message;
+    status.textContent = err.name === 'AbortError' ? 'Cancelled.' : 'Error: ' + err.message;
+  } finally {
+    localAiActiveController = null;
+    el('localai-generate-btn').disabled = false;
+    el('localai-cancel-btn').disabled = true;
   }
 }
 
@@ -4585,16 +4734,28 @@ async function fetchWikimediaReferenceImage(query, signal) {
     if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(mediaType)) return null;
     const buf = await imgResp.arrayBuffer();
     if (buf.byteLength > 5_000_000) return null;
-    const bytes = new Uint8Array(buf);
-    let binary = '';
-    const chunkSize = 0x8000;
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
-    }
-    return { mediaType, base64: btoa(binary) };
+    return { mediaType, base64: arrayBufferToBase64(buf) };
   } catch (e) {
     return null;
   }
+}
+
+// Shared byte<->base64 helpers (no FileReader dependency, so these also
+// run cleanly in the jsdom test harness, not just a real browser).
+function arrayBufferToBase64(buf) {
+  const bytes = new Uint8Array(buf);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+function base64ToArrayBuffer(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
 }
 
 async function callAiGenerate() {
@@ -9003,6 +9164,8 @@ el('import-file').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
   if (file) handleImportedFile(file);
 });
+el('localai-generate-btn').addEventListener('click', callLocalAiGenerate3D);
+el('localai-cancel-btn').addEventListener('click', () => { if (localAiActiveController) localAiActiveController.abort(); });
 document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListener('change', () => {
   const ratio = document.querySelector('input[name=scalemode]:checked').value === 'ratio';
   el('scale-ratio-controls').style.display = ratio ? 'flex' : 'block';
