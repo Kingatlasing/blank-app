@@ -226,8 +226,9 @@
           </div>
           <div class="hint" id="import-status">No file loaded yet. Only .glb is supported — USDZ is not (Pixar's USD format has no simple spec to parse in-browser). Export or convert your model to .glb first.</div>
 
-          <div class="hint" style="text-align:center;">— or generate a mesh instead of uploading one —</div>
-          <div id="localai-controls">
+          <fieldset id="localai-controls">
+            <legend>A second, separate AI modeler (Meshy-style): generate a real mesh instead of uploading one</legend>
+            <div class="hint">This is a genuinely different AI pipeline from "AI Generate" above — that one is a chat model writing voxel-generating CODE; this one hands a photo to a real, dedicated image-to-3D backend that outputs an actual textured mesh, the same category of thing as Meshy/Tripo. The two can't be merged into one, since a chat model and a 3D-generative model are different kinds of model entirely — but they end up feeding the exact same voxelizer either way.</div>
             <label for="localai-base-url">LocalAI server URL</label>
             <input type="text" id="localai-base-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
             <label for="localai-model">3D model name</label>
@@ -238,12 +239,23 @@
             <div class="hint">— or leave that empty and describe the real thing here to fetch one automatically from Wikimedia Commons instead:</div>
             <label for="localai-image-query">Describe the real thing (used only to look up a photo)</label>
             <input type="text" id="localai-image-query" placeholder="e.g. a red London telephone box" />
+            <div class="checkbox-row">
+              <input type="checkbox" id="localai-refine-search" />
+              <label for="localai-refine-search">Let a local chat model turn that description into a search phrase first</label>
+            </div>
+            <div id="localai-refine-fields" style="display:none;">
+              <label for="localai-refine-base-url">Chat model API base URL</label>
+              <input type="text" id="localai-refine-base-url" value="http://localhost:11434/v1" placeholder="http://localhost:11434/v1" />
+              <label for="localai-refine-model">Chat model name</label>
+              <input type="text" id="localai-refine-model" value="llama3.1" placeholder="llama3.1" />
+            </div>
+            <div class="hint">Off by default: with it off, your typed description is searched on Wikimedia Commons literally, word for word, which already works fine for a specific, named thing. Turn this on to have a local chat model (Ollama, LM Studio, or anything else OpenAI-compatible — same kind of server as AI Generate's own local provider, can be the exact same one) turn a vaguer description into a sharper search phrase first — e.g. "that old British phone box" → "red K2 telephone box London". This app still performs the actual Wikimedia search itself either way; the chat model only chooses the WORDS to search for. If this call fails for any reason (server down, bad model name), your original typed description is used as-is rather than blocking generation.</div>
             <div class="row">
               <button type="button" id="localai-generate-btn">Generate mesh with LocalAI</button>
               <button type="button" id="localai-cancel-btn" disabled>Cancel</button>
             </div>
             <div class="hint" id="localai-status">No mesh generated yet.</div>
-          </div>
+          </fieldset>
 
           <div class="row">
             <div>
@@ -4425,6 +4437,44 @@ async function callLocalAiGenerations(baseUrl, model, imageBase64, signal) {
 
 let localAiActiveController = null;
 
+// Optional: have a local CHAT model turn a vague typed description into a
+// sharper Wikimedia search phrase before this app searches for a photo --
+// the "let local AI do the searching" the user actually asked for, applied
+// to the one place in this pipeline where a literal keyword match can miss
+// (a vague description) rather than a specific one (a named real thing,
+// which the literal search already handles fine). This app still performs
+// the real HTTP search itself either way (see fetchWikimediaReferenceImage)
+// -- the chat model only picks the words, same "client executes, model only
+// requests" shape as every other tool-use path in this file. Never throws:
+// any failure here (bad URL, no such model, timeout) just means the
+// original typed description is used as-is, since this is a best-effort
+// refinement layered on top of an already-working default, not a new way
+// for generation to fail.
+async function refineSearchQueryWithLocalAI(description, baseUrl, model, signal) {
+  try {
+    const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      signal,
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: 'You turn a short description of a real-world object or place into ONE short, specific search phrase (5-10 words) likely to find a real reference PHOTO of it on Wikimedia Commons. Respond with ONLY the search phrase itself -- no punctuation around it, no explanation, no quotes.' },
+          { role: 'user', content: description },
+        ],
+      }),
+    });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    const refined = typeof content === 'string' ? content.trim().replace(/^["']|["']$/g, '') : '';
+    return refined || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 async function callLocalAiGenerate3D() {
   const status = el('localai-status');
   const baseUrl = (el('localai-base-url').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
@@ -4442,15 +4492,23 @@ async function callLocalAiGenerate3D() {
       const buf = await fileInput.files[0].arrayBuffer();
       base64 = arrayBufferToBase64(buf);
     } else if (query) {
-      status.textContent = 'Looking up a reference photo on Wikimedia Commons...';
-      const ref = await fetchWikimediaReferenceImage(query, controller.signal);
+      let searchQuery = query;
+      if (el('localai-refine-search').checked) {
+        status.textContent = 'Asking your local chat model for a better search phrase...';
+        const refineBaseUrl = el('localai-refine-base-url').value.trim() || 'http://localhost:11434/v1';
+        const refineModel = el('localai-refine-model').value.trim() || 'llama3.1';
+        const refined = await refineSearchQueryWithLocalAI(query, refineBaseUrl, refineModel, controller.signal);
+        if (refined) searchQuery = refined;
+      }
+      status.textContent = 'Looking up a reference photo on Wikimedia Commons' + (searchQuery !== query ? ` (searching "${searchQuery}")` : '') + '...';
+      const ref = await fetchWikimediaReferenceImage(searchQuery, controller.signal);
       // fetchWikimediaReferenceImage swallows every failure (including a
       // cancel) into a plain null, since its other caller treats it as a
       // best-effort enhancement -- check for an actual cancel here first
       // so it still reports as "Cancelled." instead of a misleading
       // "no photo found".
       if (controller.signal.aborted) throw Object.assign(new Error('Cancelled'), { name: 'AbortError' });
-      if (!ref) throw new Error('No usable reference photo found for "' + query + '" — try uploading your own photo instead.');
+      if (!ref) throw new Error('No usable reference photo found for "' + searchQuery + '" — try uploading your own photo instead.');
       base64 = ref.base64;
     } else {
       throw new Error('Upload a photo, or describe the real thing so one can be looked up, first.');
@@ -9354,6 +9412,9 @@ el('import-file').addEventListener('change', (e) => {
 });
 el('localai-generate-btn').addEventListener('click', callLocalAiGenerate3D);
 el('localai-cancel-btn').addEventListener('click', () => { if (localAiActiveController) localAiActiveController.abort(); });
+el('localai-refine-search').addEventListener('change', () => {
+  el('localai-refine-fields').style.display = el('localai-refine-search').checked ? 'block' : 'none';
+});
 document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListener('change', () => {
   const ratio = document.querySelector('input[name=scalemode]:checked').value === 'ratio';
   el('scale-ratio-controls').style.display = ratio ? 'flex' : 'block';

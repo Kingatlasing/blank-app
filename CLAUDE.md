@@ -836,3 +836,61 @@ mixed solid/air shape, and the door cell it claims to carve is actually
 air when the code runs, not just described that way in a comment. All
 prior AI-feature suites (111 checks) and the full `dom-test.js`
 regression suite (34 checks) still pass unchanged.
+
+## "Add a second AI modeler like Meshy" — it already existed; made that undeniable, and closed the one real gap
+
+The user asked for "a second ai modeler that works like meshy... still
+using local ai to do all searching... a new backend that's separate but
+can work together... to make a compiled 3d model." The honest answer:
+that second, Meshy-style pipeline already existed (the LocalAI
+`/3d/generations` backend documented above) — it just wasn't obviously
+legible AS a second, separate AI modeler, tucked under Import mode's
+drop zone with a plain one-line "— or generate a mesh instead of
+uploading one —" divider. Two things were done rather than declaring
+this done and moving on.
+
+**1. Made it read as what it actually is.** The panel is now its own
+`<fieldset>` with an explicit legend — "A second, separate AI modeler
+(Meshy-style): generate a real mesh instead of uploading one" — and an
+opening hint stating outright that this is a genuinely different
+pipeline from AI Generate (a real 3D-generative backend producing an
+actual mesh, vs. a chat model writing voxel code) and why the two can't
+just be merged into one (different kinds of model entirely) even though
+they both end up feeding the same voxelizer.
+
+**2. Built the one part that was genuinely new: "local AI does the
+searching."** Before this, the Wikimedia photo lookup here used the
+user's typed description as a literal keyword search — fine for a
+specific named thing, weaker for a vague one ("that old British phone
+box" won't match as well as "red K2 telephone box London"). Added
+`refineSearchQueryWithLocalAI(description, baseUrl, model, signal)` and
+an opt-in `#localai-refine-search` checkbox (off by default, since the
+literal search already works for a specific description) with its own
+base-URL/model fields (can be pointed at the exact same local server as
+AI Generate's own local provider, or a different one) — when on, this
+app itself sends the raw description to that chat model asking ONLY for
+a sharper search phrase, then uses whatever comes back (or the original
+description, on ANY failure — bad URL, no such model, timeout — since
+this is a best-effort refinement layered onto an already-working
+default, never a new way for generation to fail) as the actual
+Wikimedia query. Same "the model only picks the words, this app
+performs the real HTTP call" shape as every other tool-use path in this
+file (Anthropic's web_search, Ollama's own web_search API above) — no
+new exception to that pattern.
+
+What still hasn't changed, because the reasons haven't: this remains
+image-to-3D only (LocalAI's backend has no text-to-3D path), and the
+"local AI" in "local AI does the searching" refers to it choosing
+search WORDS, never to it browsing or downloading a 3D file on its own
+— those remain the same real technical walls documented above (search
+APIs return text, not files; almost no 3D-asset site's CORS policy
+allows a third-party page to fetch files directly).
+
+Verified via a new 9-check test: the refine-fields visibility toggle,
+confirming the REFINED phrase (not the raw typed description) is what
+actually gets searched on Wikimedia when the checkbox is on, a failed
+refine call falling back to the raw description without blocking
+generation, and confirming zero chat-completion calls happen at all
+when the checkbox is left off. All prior AI-feature suites (119 checks)
+and the full `dom-test.js` regression suite (34 checks) still pass
+unchanged.
