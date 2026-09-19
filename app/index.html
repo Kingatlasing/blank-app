@@ -245,7 +245,7 @@
         <div id="ai-controls" style="display:none;">
           <div class="radio-row">
             <label><input type="radio" name="ai-provider" value="anthropic" checked /> Anthropic (cloud)</label>
-            <label><input type="radio" name="ai-provider" value="local" /> Local / self-hosted</label>
+            <label><input type="radio" name="ai-provider" value="local" /> Local / other provider (OpenAI-compatible)</label>
           </div>
           <div id="ai-anthropic-fields">
             <label for="ai-api-key">Anthropic API key</label>
@@ -253,11 +253,11 @@
             <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
           </div>
           <div id="ai-local-fields" style="display:none;">
-            <label for="ai-base-url">Local server base URL</label>
+            <label for="ai-base-url">API base URL</label>
             <input type="text" id="ai-base-url" value="http://localhost:11434/v1" placeholder="http://localhost:11434/v1" />
-            <div class="hint">Works with any OpenAI-compatible local/self-hosted server: Ollama (default shown, port 11434), LM Studio (usually port 1234), llama.cpp's own server, vLLM, text-generation-webui, koboldcpp, and others. Change the URL/port to match whatever you're actually running. Nothing leaves your machine — this request never goes to Anthropic or anywhere else.</div>
-            <label for="ai-local-key">API key (usually blank for local)</label>
-            <input type="password" id="ai-local-key" placeholder="leave blank unless your server requires one" autocomplete="off" spellcheck="false" />
+            <div class="hint">Works with anything speaking the OpenAI-compatible chat-completions format — that's most providers today, not just local ones. <b>Local/self-hosted:</b> Ollama (default shown, port 11434), LM Studio (usually port 1234), llama.cpp's own server, vLLM, text-generation-webui, koboldcpp — nothing leaves your machine, no key needed. <b>Cloud, with your own key from that provider:</b> OpenAI itself (<span style="user-select:all">https://api.openai.com/v1</span>), Groq, Together.ai, OpenRouter, DeepSeek, Mistral, xAI/Grok, Azure OpenAI, and others — just point the URL at that provider and paste your key from them below. (Anthropic is the one exception, since its API isn't OpenAI-format — use the "Anthropic (cloud)" option above for that.)</div>
+            <label for="ai-local-key">API key (blank for most local servers; required for a cloud provider)</label>
+            <input type="password" id="ai-local-key" placeholder="leave blank for local, or paste that provider's key" autocomplete="off" spellcheck="false" />
           </div>
           <label for="ai-model">Model</label>
           <input type="text" id="ai-model" value="claude-opus-5" />
