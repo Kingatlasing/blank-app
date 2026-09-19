@@ -266,7 +266,7 @@ content block before the model's own final text answer.
 Also strengthened `buildAiSystemPrompt()`'s own opening line to explicitly
 state up front that the model produces code only, never an image, mesh,
 `.glb`, or any downloadable file — directly targeting the user-reported
-symptom of a local model (gemma4 via Ollama) not seeming to understand
+symptom of a local model (qwen2.5-coder via Ollama) not seeming to understand
 what it was being asked to do; this framing fix applies to every
 provider, not just the web-search path.
 
