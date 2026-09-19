@@ -2023,16 +2023,22 @@ const DECOR_TYPES = {
   // cube textures/plain colour as a stand-in, same approach as rails
   // above, so the Farms & Automation presets can exist at all.
   hopper: { kind: 'hopper', tile: 'iron_block', interactive: false },
-  // A real storage chest — no unique chest texture exists in this app's
-  // extracted atlas (chests are a block-entity in real vanilla, not part
-  // of the basic block texture set that atlas was built from), so this
-  // reuses oak_planks as a believable wood stand-in, same "existing
-  // full-cube texture as a placeholder" approach already used for hopper/
-  // rails above. The real distinguishing shape (a body + a separate
-  // raised lid + a small latch) is what actually reads as "a chest"
-  // rather than a plain box, so that's built as real geometry below
-  // rather than a flat textured cube.
-  chest: { kind: 'chest', tile: 'oak_planks', interactive: false },
+  // A real storage chest — no chest.png-atlas texture exists in this app's
+  // extracted atlas at all (chests are a block-entity in real vanilla,
+  // rendered from their own distinct non-square multi-region texture sheet
+  // — front/back/left/right/top/underside each their own region per
+  // Minecraft's own real chest.png-atlas layout — not a plain repeating
+  // square block-face texture the way every other entry in this app's
+  // atlas is, so it structurally doesn't fit that atlas's one-square-tile-
+  // per-key system). Reproduced with real solid colors instead of a
+  // texture: CHEST_WOOD_COLOR/CHEST_TRIM_COLOR below are chosen to match
+  // real vanilla's own actual colors (a distinct orange-brown wood, NOT
+  // oak-plank brown — confirmed via WebSearch; see chestParts()'s own
+  // comment for sourcing). The real distinguishing shape (a body + a
+  // separate raised lid + 4 corner trim posts + a latch) is what actually
+  // reads as "a chest" rather than a plain box, so that's built as real
+  // geometry below rather than a flat colored cube.
+  chest: { kind: 'chest', interactive: false },
   cow: { kind: 'cow', interactive: false },
   pig: { kind: 'pig', interactive: false },
   sheep: { kind: 'sheep', interactive: false },
@@ -10544,20 +10550,43 @@ function hopperParts(tileKey) {
 }
 // A real chest: a squat main body (14x10x14px, real vanilla's own
 // footprint leaving a 1px margin on every side) plus a separate, slightly
-// narrower raised LID section on top and a small dark latch on the front
-// face — the lid/latch are what actually read as "a chest" rather than a
-// plain wood-textured box, so they're built as real geometry rather than
-// folded into one solid cube the way a plain block would be.
-function chestParts(tileKey) {
+// narrower raised LID section on top, 4 dark corner/edge trim posts, and a
+// small dark latch centered on the front face at the lid/body seam — this
+// app has no chest.png-atlas texture to sample (see DECOR_TYPES.chest's own
+// comment for why), so the real distinguishing look is reproduced with real
+// colors instead of a texture: a chest's wood is its own distinct legacy
+// orange-brown, NOT the same hue as oak planks (confirmed via WebSearch
+// against Minecraft's own feedback-site threads on "Wooden Variants for
+// Chests and Barrels," which describe the vanilla chest color as "an odd
+// orange-brown that doesn't match any of the other wood/wood-derived
+// blocks in the game" — the two are visibly distinct colors in real
+// vanilla, so reusing oak_planks was a wrong stand-in, not just a
+// placeholder), and the corner/edge trim + latch are dark iron-gray, never
+// gold (corroborated indirectly but solidly: the Trapped Chest variant is
+// documented as needing to tint its own latch RED specifically to stand
+// out from a normal chest, which only makes sense if a normal chest's own
+// latch/trim is a neutral dark tone to begin with).
+const CHEST_WOOD_COLOR = 0xa5672d;
+const CHEST_TRIM_COLOR = 0x33302b;
+function chestParts() {
   const bodyH = 10 * PX;
-  const body = new THREE.BoxGeometry(14 * PX, bodyH, 14 * PX); remapUV(body, tileKey);
+  const body = new THREE.BoxGeometry(14 * PX, bodyH, 14 * PX);
   body.translate(0, bodyH / 2, 0);
   const lidH = 4 * PX;
-  const lid = new THREE.BoxGeometry(14 * PX, lidH, 14 * PX); remapUV(lid, tileKey);
+  const lid = new THREE.BoxGeometry(14 * PX, lidH, 14 * PX);
   lid.translate(0, bodyH + lidH / 2, 0);
   const latch = new THREE.BoxGeometry(2 * PX, 4 * PX, 1 * PX);
   latch.translate(0, bodyH - 1 * PX, 7 * PX); // centered on the front face, spanning the body/lid seam
-  return { body, lid, latch };
+  // 4 vertical corner posts spanning the body's full real height — the
+  // metal edge banding every real chest reference image shows at each
+  // corner, distinct from the flat wood faces between them.
+  const postH = bodyH + lidH;
+  const posts = [[-6.5, -6.5], [6.5, -6.5], [-6.5, 6.5], [6.5, 6.5]].map(([x, z]) => {
+    const post = new THREE.BoxGeometry(1.5 * PX, postH, 1.5 * PX);
+    post.translate(x * PX, postH / 2, z * PX);
+    return post;
+  });
+  return { body, lid, latch, posts };
 }
 // A simple low-poly cow (no cow texture/model in this app at all) — body,
 // head, and 4 legs as plain coloured boxes, standing in for a real
@@ -13683,14 +13712,15 @@ function buildDecorMeshesForEntry(entry) {
     if (!parts) { parts = hopperParts(def.tile); decorGeoCache.set(key, parts); }
     for (const g of parts) objs.push(new THREE.Mesh(g, decorMaterial()));
   } else if (def.kind === 'chest') {
-    const tile = entry.tile || def.tile;
-    const key = 'chest:' + tile;
-    let parts = decorGeoCache.get(key);
-    if (!parts) { parts = chestParts(tile); decorGeoCache.set(key, parts); }
+    let parts = decorGeoCache.get('chest');
+    if (!parts) { parts = chestParts(); decorGeoCache.set('chest', parts); }
     const group = new THREE.Group();
-    group.add(new THREE.Mesh(parts.body, decorMaterial()));
-    group.add(new THREE.Mesh(parts.lid, decorMaterial()));
-    group.add(new THREE.Mesh(parts.latch, solidMaterial(0x2b2620)));
+    const woodMat = solidMaterial(CHEST_WOOD_COLOR);
+    const trimMat = solidMaterial(CHEST_TRIM_COLOR);
+    group.add(new THREE.Mesh(parts.body, woodMat));
+    group.add(new THREE.Mesh(parts.lid, woodMat));
+    group.add(new THREE.Mesh(parts.latch, trimMat));
+    for (const post of parts.posts) group.add(new THREE.Mesh(post, trimMat));
     group.rotation.y = FACING_YAW[entry.facing || 'south'];
     objs.push(group);
   } else if (def.kind === 'cow') {

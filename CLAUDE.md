@@ -1083,3 +1083,50 @@ follow-up system prompt). All 13 prior AI-feature test suites (138 checks
 total) were re-run UNMODIFIED and still passed, and the full `dom-test.js`
 regression suite (34 checks) still passed — bringing the AI-feature total
 to 149 checks.
+
+### Follow-up: the chest's own color was wrong, not just placeholder-flavored
+
+The user pushed back hard on "no chest asset exists," pointing out chest
+is a real, official Minecraft block/texture and this app should already
+have it. That pushback surfaced a real distinction worth being precise
+about, since both things are true at once: the *reason* chest isn't in
+this app's atlas is real and structural (confirmed by grepping the whole
+`ATLAS_UV` key list — every one of its ~320 entries is a plain square
+block-face texture; real vanilla chests are a block-entity rendered from
+their own non-square `chest.png-atlas` sheet with distinct front/back/
+left/right/top/underside regions, which doesn't fit this atlas's
+one-square-tile-per-key system at all) — but reusing `oak_planks` as the
+color stand-in was a real, avoidable inaccuracy on top of that, not just
+an inherent limitation. Checked via `WebSearch` (not assumed) rather than
+just asserted a fix: Minecraft's own feedback-site threads on "Wooden
+Variants for Chests and Barrels" explicitly describe vanilla's own chest
+color as "an odd orange-brown that doesn't match any of the other wood/
+wood-derived blocks in the game" — i.e., a chest is NOT oak-plank colored
+in real vanilla, confirming the placeholder was a wrong stand-in, not
+just an approximate one. Separately corroborated (indirectly but
+solidly): the Trapped Chest variant's own wiki page documents it tinting
+its own latch RED specifically to visually distinguish itself from a
+normal chest — which only makes sense if a normal chest's latch/trim is
+some neutral dark tone to begin with, not gold.
+
+Fixed by dropping the oak_planks tile reuse entirely and reproducing the
+real distinguishing COLORS directly: `CHEST_WOOD_COLOR = 0xa5672d` (a
+saturated orange-brown, distinctly warmer/more orange than oak planks)
+for the body/lid, `CHEST_TRIM_COLOR = 0x33302b` (dark iron-gray, not
+gold) for the latch and 4 new vertical corner trim posts spanning the
+body+lid height — matching every real reference image's own visible
+corner/edge banding, which the original single-latch-only version didn't
+have at all. `chestParts()` no longer takes a `tileKey`/calls `remapUV`
+since there's no atlas tile to sample anymore; `DECOR_TYPES.chest` lost
+its now-inaccurate `tile: 'oak_planks'` field entirely (confirmed via
+grep that `tile` is only read by kind-specific render branches, never a
+required schema field — `cow`/`pig`/`sheep` and other non-textured decor
+kinds already have no `tile` field at all, so this isn't a new pattern).
+
+Verified by updating the existing chest test in place: the chest group
+now has 7 children (body, lid, latch, 4 posts) instead of 3, and a new
+assertion reads the body mesh's actual material color and confirms it's
+the real `0xa5672d`, not oak-plank brown — re-run and passing (12/12,
+the one prior assertion count moved by +1 for the new color check). The
+full `dom-test.js` regression suite (34 checks) was also re-run and
+still passes unchanged.
