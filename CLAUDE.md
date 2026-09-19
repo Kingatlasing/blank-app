@@ -787,3 +787,52 @@ applied), and a failed search still completing generation via the
 model's own fallback rather than crashing. All prior AI-feature suites
 (96 checks) and the full `dom-test.js` regression suite (34 checks)
 still pass unchanged.
+
+## Second worked example: multi-floor interiors with real door openings + a spiral staircase
+
+The user asked a concrete, well-scoped question: how to get "a red house
+with two floors and a spiral/helix staircase inside" out of AI Generate
+mode. Worth being precise about which of this app's two AI pipelines
+even applies here, since it's easy to conflate them: the LocalAI
+image-to-3D backend (above) is photo-conditioned only — an invented
+design with no real-world photo has nothing for it to reconstruct from,
+so it's not a candidate here at all. AI Generate's text-to-code pipeline
+is the only one that can produce this, since it's pure procedural
+geometry, not reconstruction.
+
+The gap: the existing "DO NOT DEFAULT TO A PLAIN BOX" worked example
+(temple: platform + ring of columns + roof) teaches solid EXTERIOR
+architecture with repeated positional elements, but a walkable, hollow,
+MULTI-FLOOR interior with a real door and a real staircase is a
+genuinely different technique class the prompt never taught: this app
+has no decor/door-placement system for AI-generated shapes at all (that
+machinery only exists for hand-built presets) — a door or a staircase
+here has to be actual carved AIR inside `solid()` itself, not a
+separate object.
+
+Added a SECOND worked example, right after the first, teaching exactly
+that: a hollow multi-floor shell (outer walls + floor slabs by height
+band) with a real door opening carved via an explicit `return false`
+INSIDE the wall rule (checked before the wall's own `return true` —
+never a hole left by omission), plus a helical staircase technique:
+divide height into a fixed step count, compute each step's rotation
+angle as a function of its position in that sequence, and mark a small
+solid platform at the resulting rotating (x,z) position — the same
+"position as a function of a loop variable" idea as the column ring,
+just driven by height/step-index instead of a fixed loop count. Also
+honestly tells the MODEL ITSELF (not just documented for the user) that
+Walk-mode has no automatic spawn-at-the-door for AI-generated shapes the
+way some hand-built presets get via `computeEntranceSpawn` — the
+geometry can be entirely correct and still drop the player on the roof
+by default, and that's a property of the app's camera system the
+model's own code can't fix.
+
+Verified more rigorously than a text-only worked example usually needs:
+extracted BOTH worked-example `solid()` function bodies straight out of
+the actual system prompt string and ran them for real (`new Function`
+over a 20×20×20 test grid), confirming the second example doesn't just
+read plausibly — it genuinely compiles, produces a real non-trivial
+mixed solid/air shape, and the door cell it claims to carve is actually
+air when the code runs, not just described that way in a comment. All
+prior AI-feature suites (111 checks) and the full `dom-test.js`
+regression suite (34 checks) still pass unchanged.

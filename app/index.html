@@ -4590,7 +4590,44 @@ WORKED EXAMPLE of combining parts (a real technique from this app's own hand-bui
     return Math.abs(x - cx) <= halfWidth;
   }
 
-Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.`;
+Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.
+
+SECOND WORKED EXAMPLE, for a genuinely different case: a WALKABLE MULTI-FLOOR INTERIOR with real door openings and a spiral/helical staircase — the same request pattern as "a two-story house with a spiral staircase inside." This app has no separate decor/door-placement system for AI-generated shapes (that only exists for hand-built presets) — a real door or a real usable staircase here has to be genuine carved-out AIR in solid() itself, not a texture or a separate object:
+
+  function solid(x, y, z, dims) {
+    var cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+    var wallThick = 1;
+    var floorSpacing = dims.sy / 2; // 2 floors, evenly split
+    var onOuterWall = x < wallThick || x >= dims.sx - wallThick || z < wallThick || z >= dims.sz - wallThick;
+    var onFloorSlab = (y % floorSpacing) < wallThick && y > 0;
+    if (onOuterWall || onFloorSlab) {
+      // Carve a REAL opening through the wall for a front door -- this has
+      // to return false (air) here, not be left as a separate shape, or
+      // it's just a solid box with no way in.
+      var doorHalfWidth = 1.5, doorHeight = 4;
+      var isFrontDoor = z < wallThick && Math.abs(x - cx) <= doorHalfWidth && y < doorHeight;
+      if (isFrontDoor) return false;
+      return true;
+    }
+    // A helical staircase: at each height, work out which "step" that slice
+    // belongs to, turn a fixed angle further per step around a central
+    // column, and mark a small platform solid there -- as y climbs, the
+    // angle keeps advancing, so the solid platforms trace a real spiral.
+    var stepsPerFloor = 12;
+    var totalSteps = stepsPerFloor * 2;
+    var stepIndex = Math.floor((y / dims.sy) * totalSteps);
+    var angle = stepIndex * (Math.PI * 2 / stepsPerFloor);
+    var stairRadius = Math.min(dims.sx, dims.sz) * 0.25;
+    var stepX = cx + Math.cos(angle) * stairRadius;
+    var stepZ = cz + Math.sin(angle) * stairRadius;
+    var dx = x - stepX, dz = z - stepZ;
+    if (dx * dx + dz * dz <= 2 * 2) return true;
+    return false; // everywhere else inside the shell stays open, walkable air
+  }
+
+The technique that matters here: a real opening is written as an explicit "return false" carved INTO a wall/floor rule, checked before the wall's own "return true" — never a hole left by omission. And a spiral shape in general comes from making an angle a function of height/step index and placing something solid at the resulting rotating position, the exact same "position as a function of a loop variable" idea as the ring of columns above, just varying by height instead of by a fixed loop count. Adapt the numbers (floor count, radius, door size/position) to whatever's actually described — these exact values are only here to show the technique.
+
+One real limitation to know about: this mode has no automatic Walk-mode spawn-at-the-door the way some hand-built presets get (see computeEntranceSpawn) — a design like this is real, solid, correctly-shaped geometry, but Walk mode will still drop the player from above by default rather than at the door you carved. That's a property of this app's camera system, not something your code can fix from inside solid().`;
   if (canWebSearch) {
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
