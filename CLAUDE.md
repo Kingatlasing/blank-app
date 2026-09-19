@@ -169,3 +169,39 @@ with their own key, is the same risk level as them hand-writing a Custom
 shape themselves, not a new untrusted-content boundary; don't add Web
 Worker isolation or similar for this without a concrete reason, since
 that'd be scope creep beyond what was asked.
+
+### Local/self-hosted provider option
+
+Added a second provider (radio choice alongside "Anthropic (cloud)"):
+"Local / self-hosted", targeting the OpenAI-compatible `/chat/completions`
+surface that Ollama, LM Studio, llama.cpp's own server, vLLM,
+text-generation-webui, and koboldcpp all implement as their standard
+interop layer — one `callLocalForShape()` code path covers all of them,
+same as `callAnthropicForShape()` covers Anthropic. Base URL defaults to
+Ollama's own local address (`http://localhost:11434/v1`, the single most
+common local runner) but is a plain editable text field for any other
+port/server. No API key is required by default (most local servers don't
+check one) but an optional key field exists and is sent as
+`Authorization: Bearer <key>` when non-empty, for anyone proxying a local
+endpoint that does check one.
+
+Structured JSON-schema output (`response_format: {type:'json_schema',...}`)
+isn't universally supported the way Anthropic's own `output_config.format`
+is, so `callLocalForShape` both requests it (harmless if the server
+ignores the field) AND falls back to retrying once without it on an HTTP
+error, relying purely on an explicit "respond with ONLY this JSON shape"
+instruction appended to the system prompt either way. Parsing is
+tolerant on this path (extracts the first `{...}` block via regex rather
+than assuming the whole response is pure JSON) since local models,
+especially smaller ones, don't always follow "JSON only" as reliably as
+Claude does — this is a real, expected difference in output quality/
+reliability across local models, not a bug to paper over further; a
+model that can't follow the contract at all will still surface a clear
+compile/empty-shape error rather than silently doing nothing, via the
+same validate-before-replacing logic used for both providers.
+
+The provider-switch UI is careful never to clobber a value the user
+actually typed: the shared `#ai-model` field only auto-swaps between the
+two providers' own defaults (`claude-opus-5` / `llama3.1`) when it's
+still sitting at the OTHER provider's untouched default, checked before
+every switch.

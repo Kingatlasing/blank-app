@@ -243,11 +243,25 @@
         </div>
 
         <div id="ai-controls" style="display:none;">
-          <label for="ai-api-key">Anthropic API key</label>
-          <input type="password" id="ai-api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
-          <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
+          <div class="radio-row">
+            <label><input type="radio" name="ai-provider" value="anthropic" checked /> Anthropic (cloud)</label>
+            <label><input type="radio" name="ai-provider" value="local" /> Local / self-hosted</label>
+          </div>
+          <div id="ai-anthropic-fields">
+            <label for="ai-api-key">Anthropic API key</label>
+            <input type="password" id="ai-api-key" placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+            <div class="hint">Saved only in this browser's own local storage and sent directly from your browser straight to Anthropic's API on every request — never to any other server, and never seen by this app's own code beyond that. It's still a real secret credential: don't paste it in on a shared or public computer, and don't share this saved page/profile with anyone else. Get one at <span style="user-select:all">console.anthropic.com</span>.</div>
+          </div>
+          <div id="ai-local-fields" style="display:none;">
+            <label for="ai-base-url">Local server base URL</label>
+            <input type="text" id="ai-base-url" value="http://localhost:11434/v1" placeholder="http://localhost:11434/v1" />
+            <div class="hint">Works with any OpenAI-compatible local/self-hosted server: Ollama (default shown, port 11434), LM Studio (usually port 1234), llama.cpp's own server, vLLM, text-generation-webui, koboldcpp, and others. Change the URL/port to match whatever you're actually running. Nothing leaves your machine — this request never goes to Anthropic or anywhere else.</div>
+            <label for="ai-local-key">API key (usually blank for local)</label>
+            <input type="password" id="ai-local-key" placeholder="leave blank unless your server requires one" autocomplete="off" spellcheck="false" />
+          </div>
           <label for="ai-model">Model</label>
           <input type="text" id="ai-model" value="claude-opus-5" />
+          <div class="hint" id="ai-model-hint">For Anthropic: a model ID like claude-opus-5. For local: whatever model name your server has loaded/pulled (e.g. llama3.1, qwen2.5-coder, deepseek-coder-v2, mistral) — check your server's own model list if unsure.</div>
           <label for="ai-name">Name (for your reference)</label>
           <input type="text" id="ai-name" placeholder="e.g. my dream house, a spaceship, a dragon..." />
           <div id="ai-log"></div>
@@ -4306,6 +4320,8 @@ async function handleImportedFile(file) {
  * this project's own single-HTML-file, no-build design (see CLAUDE.md).
  * ==================================================================== */
 const AI_API_KEY_STORAGE_KEY = 'mc3d_ai_api_key';
+const AI_LOCAL_URL_STORAGE_KEY = 'mc3d_ai_local_url';
+function isAiProviderLocal() { return document.querySelector('input[name=ai-provider]:checked').value === 'local'; }
 let aiConversation = [];      // raw Anthropic message history, replayed on every call
 let aiCurrentCode = null;     // last successfully compiled function SOURCE (body text)
 let aiCurrentFn = null;       // the compiled function itself, mirrored into aiGeneratedFn
@@ -4363,12 +4379,76 @@ function el_ai_log_push(role, text) {
   log.scrollTop = log.scrollHeight;
 }
 
+// Calls Anthropic's real Messages API directly, using output_config.format
+// (json_schema) to force the {summary, code, ...} shape back in one shot —
+// see CLAUDE.md for why this is safe to do with plain fetch (no SDK).
+async function callAnthropicForShape(model, messages, apiKey, signal) {
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    signal,
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: buildAiSystemPrompt(),
+      messages,
+      output_config: { format: { type: 'json_schema', schema: AI_SHAPE_JSON_SCHEMA } },
+    }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
+  if (data.stop_reason === 'refusal') {
+    throw new Error('The AI declined this request' + (data.stop_details && data.stop_details.category ? ` (${data.stop_details.category})` : '') + '.');
+  }
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if (!textBlock) throw new Error('No text response from the AI.');
+  return textBlock.text;
+}
+
+// Calls a local/self-hosted server through the OpenAI-compatible
+// /chat/completions surface that Ollama, LM Studio, llama.cpp's own
+// server, vLLM, text-generation-webui, and koboldcpp all implement as
+// their standard interop layer — one code path covers all of them.
+// Structured JSON-schema output isn't universally supported by every such
+// server/model the way it is on Anthropic's own API, so this both asks
+// for it (harmless if ignored) AND spells the exact required shape out in
+// the system prompt as a fallback, then tolerantly extracts the first
+// {...} block from the response instead of assuming it's pure JSON.
+async function callLocalForShape(model, messages, baseUrl, apiKey, signal) {
+  const url = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+  const jsonInstruction = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock. No markdown, no code fences, no other text before or after it.';
+  const headers = { 'content-type': 'application/json' };
+  if (apiKey) headers['authorization'] = 'Bearer ' + apiKey;
+  const body = {
+    model,
+    messages: [{ role: 'system', content: buildAiSystemPrompt() + jsonInstruction }].concat(messages),
+    response_format: { type: 'json_schema', json_schema: { name: 'voxel_shape', schema: AI_SHAPE_JSON_SCHEMA, strict: true } },
+  };
+  let resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(body) });
+  if (!resp.ok) {
+    // Not every local server accepts response_format — retry once without
+    // it before giving up, relying purely on the system-prompt instruction.
+    const bodyNoFormat = { model, messages: body.messages };
+    resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(bodyNoFormat) });
+  }
+  const data = await resp.json();
+  if (!resp.ok) throw new Error((data && data.error && (data.error.message || data.error)) || `HTTP ${resp.status}`);
+  const content = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+  if (!content) throw new Error('No response content from the local server.');
+  return content;
+}
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
-  const apiKey = el('ai-api-key').value.trim();
+  const local = isAiProviderLocal();
+  const apiKey = local ? el('ai-local-key').value.trim() : el('ai-api-key').value.trim();
   const promptText = el('ai-prompt').value.trim();
   const status = el('ai-status');
-  if (!apiKey) { status.textContent = 'Paste your Anthropic API key above first.'; return; }
+  if (!local && !apiKey) { status.textContent = 'Paste your Anthropic API key above first.'; return; }
   if (!promptText) { status.textContent = 'Describe what to build first.'; return; }
 
   aiRequestInFlight = true;
@@ -4376,38 +4456,23 @@ async function callAiGenerate() {
   status.textContent = aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...';
   el_ai_log_push('user', promptText);
 
-  const model = el('ai-model').value.trim() || 'claude-opus-5';
+  const model = el('ai-model').value.trim() || (local ? 'llama3.1' : 'claude-opus-5');
   const messages = aiConversation.concat([{ role: 'user', content: promptText }]);
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 90000);
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        max_tokens: 4096,
-        system: buildAiSystemPrompt(),
-        messages,
-        output_config: { format: { type: 'json_schema', schema: AI_SHAPE_JSON_SCHEMA } },
-      }),
-    });
+    let rawText = local
+      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal)
+      : await callAnthropicForShape(model, messages, apiKey, controller.signal);
     clearTimeout(timeoutId);
-    const data = await resp.json();
-    if (!resp.ok) {
-      throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
+    let resultText = rawText.trim();
+    if (local) {
+      // Local models don't always honor "JSON only" — pull the first {...}
+      // block out in case of leading/trailing prose or a markdown fence.
+      const match = resultText.match(/\{[\s\S]*\}/);
+      if (match) resultText = match[0];
     }
-    if (data.stop_reason === 'refusal') {
-      throw new Error('The AI declined this request' + (data.stop_details && data.stop_details.category ? ` (${data.stop_details.category})` : '') + '.');
-    }
-    const textBlock = (data.content || []).find(b => b.type === 'text');
-    if (!textBlock) throw new Error('No text response from the AI.');
-    const result = JSON.parse(textBlock.text);
+    const result = JSON.parse(resultText);
 
     // Compile and sanity-check BEFORE touching any existing working design,
     // so a bad response never destroys prior good progress (per the "keep
@@ -4432,7 +4497,7 @@ async function callAiGenerate() {
     aiCurrentFn = fn;
     aiCurrentCode = result.code;
     aiCurrentMeta = result;
-    aiConversation = messages.concat([{ role: 'assistant', content: textBlock.text }]);
+    aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
     if (Number.isFinite(result.realHeightMeters) && result.realHeightMeters > 0) el('ai-height').value = result.realHeightMeters;
     if (Number.isFinite(result.realBaseXMeters) && result.realBaseXMeters > 0) el('ai-basex').value = result.realBaseXMeters;
@@ -8636,11 +8701,26 @@ document.querySelectorAll('input[name=mode]').forEach(r => r.addEventListener('c
   try {
     const saved = localStorage.getItem(AI_API_KEY_STORAGE_KEY);
     if (saved) el('ai-api-key').value = saved;
-  } catch (e) { /* localStorage can throw in a locked-down/private context — key field just stays empty */ }
+    const savedUrl = localStorage.getItem(AI_LOCAL_URL_STORAGE_KEY);
+    if (savedUrl) el('ai-base-url').value = savedUrl;
+  } catch (e) { /* localStorage can throw in a locked-down/private context — fields just stay at defaults */ }
 })();
 el('ai-api-key').addEventListener('input', () => {
   try { localStorage.setItem(AI_API_KEY_STORAGE_KEY, el('ai-api-key').value); } catch (e) { /* best-effort only */ }
 });
+el('ai-base-url').addEventListener('input', () => {
+  try { localStorage.setItem(AI_LOCAL_URL_STORAGE_KEY, el('ai-base-url').value); } catch (e) { /* best-effort only */ }
+});
+document.querySelectorAll('input[name=ai-provider]').forEach(r => r.addEventListener('change', () => {
+  const local = isAiProviderLocal();
+  el('ai-anthropic-fields').style.display = local ? 'none' : 'block';
+  el('ai-local-fields').style.display = local ? 'block' : 'none';
+  // Only swap the model field's own value when it's still sitting at the
+  // OTHER provider's default — never clobber something the user actually typed.
+  const modelField = el('ai-model');
+  if (local && modelField.value.trim() === 'claude-opus-5') modelField.value = 'llama3.1';
+  else if (!local && modelField.value.trim() === 'llama3.1') modelField.value = 'claude-opus-5';
+}));
 el('ai-generate-btn').addEventListener('click', callAiGenerate);
 el('ai-clear-btn').addEventListener('click', () => {
   aiConversation = [];
