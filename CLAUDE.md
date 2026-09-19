@@ -348,3 +348,46 @@ when the description names one, even with web search off/unavailable
 something real should still produce a recognizable result of that real
 thing, not a generic placeholder shape, and this doesn't depend on the
 Anthropic-only web-search toggle to work at all.
+
+### "Greek Parthenon just generates a big square" — a code-gen gap, not an image gap
+
+Follow-up complaint from the same conversation. The user's own proposed
+fix was "let it look at reference images online for inspiration" —
+explicitly declined as the fix here (though not for the same reasons as
+the earlier "download a 3D file" asks; see below), because it doesn't
+actually address the mechanism of the failure: `solid(x,y,z,dims)` still
+has to become exact per-cell math regardless of whether the input was a
+text description or a photo, and translating a PICTURE into that math is
+arguably a HARDER task for current models than translating a good text
+description — a photo doesn't make the code-writing step easier. A
+"big square" result is the classic symptom of a model taking the easy
+way out: one bounding-box test instead of several combined shape tests
+for the thing's actual distinct parts (a temple's platform + colonnade +
+pediment; an animal's body + head + legs + tail).
+
+Fixed by giving the model an explicit worked example to pattern-match
+against, adapted directly from this app's own real hand-built presets
+(the ring-of-columns technique already used for the Pisa Tower's own
+loggia and the Taj Mahal's own corner minarets — see `pisaSolid`/
+`tajMahalSolid` above): a literal ~20-line `solid()` example in the
+system prompt showing 3 parts (a base platform, a ring of individual
+columns via a fixed-count loop over an angle, a tapering roof) layered
+by height with plain if/return, explicitly labeled as a PATTERN to adapt
+rather than numbers to copy. Paired with a direct "DO NOT DEFAULT TO A
+PLAIN BOX" instruction naming the failure mode itself and asking the
+model to mentally list 2-4 defining parts before writing code. Few-shot
+worked examples are one of the most effective levers for lifting a
+weaker/local model's structured-output quality — cheaper to try than
+building new infrastructure, and more likely to actually address the
+reported symptom's real mechanism.
+
+Note for later: unlike the earlier "download a 3D file" asks, fetching a
+real 2D reference PHOTO from a CORS-friendly, appropriately-licensed
+source (Wikimedia Commons has a genuine public API designed for this,
+unlike arbitrary 3D-model sites) and passing it to a vision-capable
+model (Anthropic's own vision input, or a multimodal local model) is
+technically a different and more feasible proposition than that earlier
+ask — it just wasn't judged likely to fix THIS specific reported
+symptom, so it wasn't built speculatively. If image grounding is asked
+for again after the prompt fix above still isn't good enough, that's the
+shape a real version of it should take.

@@ -4383,7 +4383,37 @@ Also suggest realHeightMeters/realBaseXMeters/realBaseZMeters: a sensible real-w
 
 PER-PART BLOCKS/COLORS: exteriorBlock/interiorBlock/accentBlock are only ONE color/material each for the whole model. If the user names specific blocks or colors for specific PARTS ("red wool roof, oak plank walls, gold trim around the windows", "make the wings blue and the body white") — write the OPTIONAL materialCode field too: a function body for material(x, y, z, dims), same coordinate space as solid(), called only on cells solid() already marked true, returning a block id string for that specific cell (e.g. based on its height fraction y/dims.sy, or its position relative to a part of the shape you can identify from the same math solid() uses) or an empty string to leave that cell as the default exterior/interior/accent block. Leave materialCode as an empty string entirely when the user didn't ask for per-part control — don't invent color variation nobody asked for.
 
-SHORT OR VAGUE DESCRIPTIONS STILL NEED A REAL, SPECIFIC RESULT. If the description names or clearly implies a specific real thing — a landmark ("Greek Parthenon"), an animal, a vehicle, a historical structure, a well-known character or object — draw on what you actually know about its real proportions, distinctive shape, and real typical color/material, and write geometry and pick blocks that reflect THAT real thing, not a generic placeholder box/tower. Use your own general knowledge for this even when you have no way to search the web for it. A short prompt is not a license to build something generic — "Greek Parthenon" should come out looking like a rectangular colonnaded temple with a row of columns and a triangular pediment roof, in a real stone-like block, not an arbitrary building. Only fall back to invented original geometry when the description is genuinely abstract/invented ("a spiky twisted tower", "a blob creature") rather than a real thing you have knowledge of.`;
+SHORT OR VAGUE DESCRIPTIONS STILL NEED A REAL, SPECIFIC RESULT. If the description names or clearly implies a specific real thing — a landmark ("Greek Parthenon"), an animal, a vehicle, a historical structure, a well-known character or object — draw on what you actually know about its real proportions, distinctive shape, and real typical color/material, and write geometry and pick blocks that reflect THAT real thing, not a generic placeholder box/tower. Use your own general knowledge for this even when you have no way to search the web for it. A short prompt is not a license to build something generic — "Greek Parthenon" should come out looking like a rectangular colonnaded temple with a row of columns and a triangular pediment roof, in a real stone-like block, not an arbitrary building. Only fall back to invented original geometry when the description is genuinely abstract/invented ("a spiky twisted tower", "a blob creature") rather than a real thing you have knowledge of.
+
+DO NOT DEFAULT TO A PLAIN BOX. This is the single most common mistake: writing one bounding-box test (\`Math.abs(x-cx)<=w && Math.abs(z-cz)<=d\`) and calling it done. A real thing almost always has multiple visually-DEFINING parts, not one. Before writing code, mentally list the 2-4 parts that make THIS thing recognizable (for a classical temple: a raised platform, a ring of individual columns around the outside — NOT a solid wall, and a sloped pediment roof; for an animal: a body, a head, legs, a tail; for a bridge: towers, a deck, cables). Then write solid() as several combined shape tests (OR'd or layered by height), one per part, matching that mental list — not a single test for the whole thing.
+
+WORKED EXAMPLE of combining parts (a real technique from this app's own hand-built presets, adapted here to show the PATTERN — write your own geometry for whatever's actually described, don't reuse these exact numbers unless they genuinely fit):
+
+  function solid(x, y, z, dims) {
+    var cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
+    var t = y / dims.sy;
+    // Part 1: a raised base platform (the stylobate), the bottom slice only.
+    if (t < 0.08) return true;
+    // Part 2: a ring of separate round columns around the perimeter, NOT a
+    // solid wall — a fixed count of columns spaced evenly around the edge.
+    if (t < 0.75) {
+      var colCount = 14, colR = Math.max(1, dims.sx * 0.035);
+      for (var i = 0; i < colCount; i++) {
+        var frac = i / colCount;
+        var px = cx + Math.cos(frac * Math.PI * 2) * dims.sx * 0.42;
+        var pz = cz + Math.sin(frac * Math.PI * 2) * dims.sz * 0.42;
+        var dx = x - px, dz = z - pz;
+        if (dx * dx + dz * dz <= colR * colR) return true;
+      }
+      return false;
+    }
+    // Part 3: a sloped pediment roof tapering to a ridge near the top.
+    var roofT = (t - 0.75) / 0.25;
+    var halfWidth = dims.sx * 0.48 * (1 - roofT);
+    return Math.abs(x - cx) <= halfWidth;
+  }
+
+Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.`;
   if (canWebSearch) {
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
