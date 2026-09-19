@@ -4690,7 +4690,7 @@ One real limitation to know about: this mode has no automatic Walk-mode spawn-at
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
   if (hasPhoto) {
-    prompt += `\n\nA real reference PHOTO (fetched automatically from Wikimedia Commons, a CORS-friendly appropriately-licensed source, when one matching the description was found — this app's own code does this lookup itself, it is not something you requested or searched for) is attached directly to the user's message below. Actually look at it: identify its real distinct parts, their proportions relative to each other, and the actual colors/materials shown, and make solid()/materialCode match what's genuinely in the photo rather than a generic guess. Still write your own original code by hand from what you observe — never output the photo itself or describe it back verbatim. If you are a text-only model with no real image understanding, you will not be able to make use of this — fall back to your own general knowledge exactly as instructed above instead of guessing at the image's contents.`;
+    prompt += `\n\nOne or more real reference PHOTOS (fetched automatically from Wikimedia Commons, a CORS-friendly appropriately-licensed source — this app's own code does this lookup itself, it is not something you requested or searched for) are attached directly to the user's message below. When the description is one single well-documented real thing, there is usually just one photo of that whole thing. When the description COMBINES real parts that don't exist combined in real life (e.g. "a house with a spiral staircase inside"), there may instead be a SEPARATE photo for each real, well-documented PART — one of a house exterior, a different one of a spiral staircase interior — since no real photo shows that exact invented combination but each real piece does. Either way: actually look at every photo attached, identify each one's real distinct parts/proportions/colors/materials, and combine what you learn from all of them into ONE coherent solid()/materialCode design matching what's genuinely shown rather than a generic guess — figure out from the original description which photo (if more than one) corresponds to which part of what you're building. Still write your own original code by hand from what you observe — never output a photo itself or describe one back verbatim. If you are a text-only model with no real image understanding, you will not be able to make use of this — fall back to your own general knowledge exactly as instructed above instead of guessing at any image's contents.`;
   }
   if (aiCurrentCode) {
     prompt += `\n\nCURRENT SHAPE CODE (this is what's already generated and showing to the user):\n${aiCurrentCode}`;
@@ -4965,6 +4965,59 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
+// A whole invented combination ("a red two-story house with a spiral
+// staircase inside") usually has no single real photo -- but its distinct
+// real, well-documented PARTS almost always do (a two-story house
+// exterior, a spiral staircase). This asks the SAME model already being
+// used to name up to 3 such parts worth finding a separate reference
+// photo for, so research can ground each real component individually
+// instead of one query for the whole made-up thing turning up nothing
+// useful. This app still performs every actual search itself (see
+// fetchWikimediaReferenceImage) -- the model only proposes the search
+// phrases, the same "model requests, app executes" shape as every other
+// tool-use path in this file. Any failure at all here (bad response,
+// unparseable, network error, timeout, an aborted Cancel) falls back to
+// a single concept -- the original whole prompt text, i.e. exactly the
+// old one-photo behavior -- so this can only ever add value, never
+// newly break a generation that used to work.
+async function askModelForReferenceConcepts(local, promptText, opts, signal) {
+  const fallback = [promptText];
+  try {
+    const sys = 'Given a short description of something to build, output a JSON array of 1 to 3 short search phrases (3-6 words each) for DISTINCT REAL-WORLD VISUAL COMPONENTS worth finding a reference PHOTO of separately -- for example "a red two-story house with a spiral staircase inside" might become ["red two-story house exterior", "spiral staircase interior"], since no single real photo shows that whole invented combination but each real part does. If the whole description already names one single well-documented real thing (e.g. "Eiffel Tower"), return an array with just that one phrase. Respond with ONLY the JSON array, nothing else -- no markdown, no explanation.';
+    let text;
+    if (local) {
+      const resp = await fetch(opts.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal,
+        body: JSON.stringify({ model: opts.model, messages: [{ role: 'system', content: sys }, { role: 'user', content: promptText }] }),
+      });
+      if (!resp.ok) return fallback;
+      const data = await resp.json();
+      text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    } else {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': opts.apiKey, 'anthropic-version': '2023-06-01' },
+        signal,
+        body: JSON.stringify({ model: opts.model, max_tokens: 256, system: sys, messages: [{ role: 'user', content: promptText }] }),
+      });
+      if (!resp.ok) return fallback;
+      const data = await resp.json();
+      const textBlocks = (data.content || []).filter(b => b.type === 'text');
+      text = textBlocks.length ? textBlocks[textBlocks.length - 1].text : null;
+    }
+    if (typeof text !== 'string') return fallback;
+    const match = text.match(/\[[\s\S]*\]/);
+    if (!match) return fallback;
+    const parsed = JSON.parse(match[0]);
+    const concepts = Array.isArray(parsed) ? parsed.filter(c => typeof c === 'string' && c.trim()).slice(0, 3) : [];
+    return concepts.length ? concepts : fallback;
+  } catch (e) {
+    return fallback;
+  }
+}
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
   const local = isAiProviderLocal();
@@ -5008,31 +5061,32 @@ async function callAiGenerate() {
   // round trip -- see callLocalForShape/callOllamaWebSearch) for local --
   // there's still no generic equivalent a plain OpenAI-compatible server
   // that ISN'T Ollama exposes the same way.
-  let referenceImage = null;
+  let referenceImages = [];
   if (wantPhoto) {
-    status.textContent = 'Looking up a real reference photo on Wikimedia Commons...';
-    referenceImage = await fetchWikimediaReferenceImage(promptText, controller.signal);
+    const localBaseUrl = el('ai-base-url').value.trim() || 'http://localhost:11434/v1';
+    status.textContent = 'Researching distinct real-world parts worth a reference photo...';
+    const concepts = await askModelForReferenceConcepts(local, promptText, local ? { baseUrl: localBaseUrl, model } : { apiKey, model }, controller.signal);
+    status.textContent = `Looking up real reference photo${concepts.length > 1 ? 's' : ''} on Wikimedia Commons${concepts.length > 1 ? ' (' + concepts.length + ' parts)' : ''}...`;
+    const fetched = await Promise.all(concepts.map(c => fetchWikimediaReferenceImage(c, controller.signal)));
+    referenceImages = fetched.filter(Boolean);
     status.textContent = (aiCurrentCode ? 'Asking the AI to revise the current design...' : 'Asking the AI to generate a design...') + ' This has no fixed timeout — a local model can genuinely take several minutes. Click Cancel to give up.';
   }
   // Anthropic and the OpenAI-compatible chat/completions surface use
   // different wire shapes for an inline image, so which one gets built
-  // depends on the provider actually being called.
-  const userContent = referenceImage
-    ? (local
-        ? [
-            { type: 'image_url', image_url: { url: `data:${referenceImage.mediaType};base64,${referenceImage.base64}` } },
-            { type: 'text', text: promptText },
-          ]
-        : [
-            { type: 'image', source: { type: 'base64', media_type: referenceImage.mediaType, data: referenceImage.base64 } },
-            { type: 'text', text: promptText },
-          ])
-    : promptText;
+  // depends on the provider actually being called. Zero, one, or several
+  // images can be attached (see askModelForReferenceConcepts above) --
+  // e.g. a real photo of a house exterior AND a separate real photo of a
+  // spiral staircase, for a described combination that has no single real
+  // photo of its own.
+  const imageBlocks = referenceImages.map(img => local
+    ? { type: 'image_url', image_url: { url: `data:${img.mediaType};base64,${img.base64}` } }
+    : { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.base64 } });
+  const userContent = imageBlocks.length ? imageBlocks.concat([{ type: 'text', text: promptText }]) : promptText;
   const messages = aiConversation.concat([{ role: 'user', content: userContent }]);
   try {
     let rawText = local
-      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, !!referenceImage, useOllamaSearch, ollamaSearchKey)
-      : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch, !!referenceImage);
+      ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, imageBlocks.length > 0, useOllamaSearch, ollamaSearchKey)
+      : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch, imageBlocks.length > 0);
     let resultText = rawText.trim();
     if (local) {
       // Local models don't always honor "JSON only" — pull the first {...}

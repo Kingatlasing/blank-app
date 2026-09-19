@@ -894,3 +894,66 @@ generation, and confirming zero chat-completion calls happen at all
 when the checkbox is left off. All prior AI-feature suites (119 checks)
 and the full `dom-test.js` regression suite (34 checks) still pass
 unchanged.
+
+## Multi-concept research: separate reference photos for an invented combination's real parts
+
+Direct follow-up to the spiral-staircase house example: the user pointed
+out, correctly, that even though "a red house with two floors and a
+spiral staircase inside" has no single real photo, each real, distinct
+PART of it does — a two-story house exterior, a spiral staircase — and
+asked for research to work at that level rather than one query for the
+whole invented combination (which was the existing behavior: a single
+`fetchWikimediaReferenceImage(promptText, ...)` call using the raw,
+whole prompt as the search string, which finds nothing useful for a
+made-up combination even though its ingredients are common).
+
+Added `askModelForReferenceConcepts(local, promptText, opts, signal)`:
+a lightweight, schema-free, tool-free completion call to the SAME model/
+provider already selected, asking it to output a JSON array of 1-3
+short search phrases for distinct real-world visual components worth a
+separate reference photo — explicitly instructed to collapse back to a
+single phrase (the whole description) when it already names one
+well-documented real thing, so a normal single-subject prompt like
+"Greek Parthenon" isn't needlessly split. `callAiGenerate()` now calls
+this whenever photo research is wanted (either provider), then runs
+`fetchWikimediaReferenceImage` once per returned concept in parallel via
+`Promise.all`, and attaches EVERY photo that was actually found (not
+just the first) to the outgoing message — Anthropic gets multiple
+`{type:'image',...}` blocks, local gets multiple `{type:'image_url',...}`
+entries, same per-provider shapes as the single-photo path already used.
+`buildAiSystemPrompt()`'s photo paragraph now explicitly describes the
+multi-photo case, telling the model each photo may correspond to a
+different real part of an invented combination and to reason out which
+photo maps to which part from the original description.
+
+Failure handling follows the same "can only add value, never break
+what worked before" discipline as everything else in this file:
+`askModelForReferenceConcepts` catches every possible failure (bad
+response, unparseable JSON, non-2xx, a cancelled request) and falls
+back to `[promptText]` — the exact old single-query behavior — so
+a generation that worked before this change still works identically if
+this new step fails for any reason. This was verified directly, not
+just asserted: every one of the 12 pre-existing test suites that
+exercise the photo-lookup paths was re-run completely UNMODIFIED after
+this change and all still passed, because their mocked chat-completion
+responses (shaped for the final generate schema, not a bare JSON array)
+naturally fail `askModelForReferenceConcepts`'s array-parsing check and
+fall back to the single-concept path exactly as before — proving the
+fallback is genuinely transparent, not just designed to be.
+
+One real cost worth being upfront about: this adds one more full
+model round-trip before every research-enabled generate call (which is
+now default-on for Anthropic) — a real latency/cost increase on top of
+an already-default-on feature. The Cancel button remains the way out of
+a request that's taking too long.
+
+Verified via a new 10-check test built around the user's own exact
+example ("a red two-story house with a spiral staircase inside"):
+confirms the decomposition call is plain (no tools/schema) and receives
+the real prompt text, that it genuinely drives two SEPARATE Wikimedia
+searches for two distinct real components rather than one search for
+the whole invented phrase, and that BOTH resulting photos — not just
+one — end up attached to the final generate request alongside the
+original prompt text. All prior AI-feature suites (128 checks total,
+run unmodified) and the full `dom-test.js` regression suite (34 checks)
+still pass unchanged.
