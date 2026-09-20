@@ -1451,3 +1451,111 @@ plain-text Generate click doesn't re-trigger photo mode. All 16 prior
 AI-feature test suites (160 checks total) were re-run UNMODIFIED and
 still passed, and the full `dom-test.js` regression suite (34 checks)
 still passed.
+
+## Truncated JSON responses, and a sparse-shape false-rejection bug (both real, both found live)
+
+The user hit two more real failures in quick succession while actually
+using the previous round's fixes: `⚠ Unexpected token 'w', ..."ickness":
+wallThickn"... is not valid JSON` (a response cut off mid-value), then,
+asking for a DNA double-helix design, `⚠ The AI's code produced a
+completely empty shape, even after asking it to fix the error once` —
+even after the self-repair round from the previous entry ran. Also
+repeated, correctly: "I thought I told you to let the AI automatically
+choose Real height/width/depth" — worth being precise that this was
+never actually contradicted; when the JSON itself never parses at all,
+there is no `result.realHeightMeters` to read in the first place, so the
+previous "apply dims unconditionally" fix has nothing to apply — this
+new truncation-handling work is what actually closes that gap for real.
+
+**Bug 1 — truncated JSON had no repair path at all.** The self-repair
+round built in the previous entry only triggers AFTER `JSON.parse`
+already succeeded (it repairs a broken `solid()` inside an otherwise
+valid JSON object). A response cut off mid-JSON throws during `JSON.parse`
+itself, before that mechanism ever engages — it fell straight into the
+outer catch and failed the whole turn immediately, matching exactly what
+the user saw. Root cause, not just the symptom: this app's request bodies
+to both providers never set an explicit output-length budget at all
+(Anthropic's own `max_tokens: 4096` was already present but hadn't kept
+pace with how much larger the required JSON schema has grown across this
+file's own history — materialCode, decor, interiorMode/floorHeightMeters
+all landed after 4096 was first chosen — and the local path set no
+`max_tokens` whatsoever). Verified live rather than assumed: Ollama's own
+OpenAI-compatible `/v1/chat/completions` endpoint does map `max_tokens`
+straight to its native `num_predict`, so setting it is a real, direct
+lever, not a no-op passthrough — bumped to `8192` on every request body to
+both providers (initial call, the code-repair round, and every branch of
+the Ollama tool-calling loop, including its own forced-final-answer call).
+Genuinely flagged as an incomplete fix, not oversold: a too-small
+CONTEXT window (`num_ctx`) on the server's own end is a separate,
+real possible cause of the same symptom that this app's request body has
+no per-request override for on Ollama's OpenAI-compatible endpoint
+specifically — the final error message (see below) names the real,
+actionable remedy for that (`OLLAMA_CONTEXT_LENGTH`, or a Modelfile's
+`PARAMETER num_ctx`) rather than implying `max_tokens` alone always fixes
+it.
+
+Also added a genuine self-repair path for THIS failure class specifically:
+`extractAndParseJson(text)` wraps the existing tolerant `{...}`-extraction
+logic and now catches the `JSON.parse` failure itself, returning a
+descriptive `{error}` instead of throwing. On that error, exactly ONE
+repair round runs — the same one-shot discipline as the existing
+code-compile repair, but asking for something different: not "fix this
+one field," since there's no valid partial object to point at, but
+"resend the SAME design as one complete, valid JSON object, written out
+in full from the very beginning." `callAnthropicForShape` also now checks
+`data.stop_reason === 'max_tokens'` explicitly and throws a precise,
+named error for that case rather than letting it surface only as a vague
+downstream JSON parse failure — a real, detectable signal Anthropic's own
+response already carries that was previously being discarded. The two
+repair mechanisms (JSON-parse and code-compile) now correctly CHAIN: a
+`finalMessages` variable (declared once, no longer redeclared) is
+threaded through so a code-compile repair building on top of an already
+-JSON-repaired response continues that same message history rather than
+starting the repair conversation over from the original attempt — bounded
+worst case is 3 total calls (original, JSON-repair, code-repair), still
+never an open-ended loop.
+
+**Bug 2 — a real, independent false-rejection bug in the empty-shape
+check itself**, triggered by the user's own DNA-helix request: the sanity
+check that decides whether `solid()` "produced a completely empty shape"
+sampled only **400 RANDOM cells** out of the real target volume, which
+can be a couple million cells for a large design. A genuinely correct,
+thin/sparse shape — exactly what a DNA double helix is: two narrow
+strands plus periodic rungs, easily well under 1% of a large bounding
+box's volume — has a real, non-trivial chance of landing on air for
+every single one of 400 random samples purely by chance, wrongly
+rejecting perfectly correct code as empty. This is the same lesson
+already learned the hard way and written up under "Voxelizing a real
+3D-scanned model" above (validate at the real target resolution, not an
+arbitrary coarser/weaker stand-in) — sampling density, not just
+resolution, turned out to be the same class of problem. Fixed by
+replacing the 400-random-sample loop with a full, deterministic scan over
+EVERY cell in the real target volume: `solid()` is guaranteed cheap per
+cell by the system prompt's own "no unbounded loops" rule, and `testDims`
+is already capped to at most 2,000,000 cells by the existing backoff loop
+— confirmed directly via a real timed test run that a full scan over a
+real target volume this size completes in a small fraction of a second,
+so there was no real performance reason to ever have gambled on random
+coverage when the exact, zero-false-negative answer is this cheap to
+compute outright. A genuinely, always-empty shape (`return false`) is
+still correctly rejected — the fix removes false negatives without
+making the check toothless.
+
+Verified via two new test files. `ai-json-repair-test.js` (10 checks):
+`max_tokens: 8192` is actually present on the outgoing Anthropic request;
+a response truncated exactly like the user's own reported case (mid-value
+inside `"wallThickness"`) triggers one JSON self-repair call and the
+complete second response is what's accepted; truncation on BOTH attempts
+still costs only 2 calls and produces a final error naming both that the
+repair was already tried and the real `OLLAMA_CONTEXT_LENGTH`/`num_ctx`
+remedy; and the two repair mechanisms genuinely chain (a truncated
+response repaired into valid-JSON-but-broken-code correctly triggers a
+SECOND, code-level repair round on top, 3 calls total, final code
+accepted). `ai-sparse-shape-validation-test.js` (4 checks): a genuinely
+sparse single-line "shape" at a real target volume large enough that the
+old random-sample check would have wrongly rejected it roughly 3 times
+out of 4 (computed directly from the real density here) is now correctly
+accepted every time, while a truly always-false shape is still correctly
+rejected. All 17 prior AI-feature test suites (182 checks total) were
+re-run UNMODIFIED and still passed, and the full `dom-test.js` regression
+suite (34 checks) still passed — 196 AI-feature checks in total.

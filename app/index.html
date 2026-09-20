@@ -4835,7 +4835,13 @@ function el_ai_log_push(role, text) {
 async function callAnthropicForShape(model, messages, apiKey, signal, useWebSearch, hasPhoto) {
   const body = {
     model,
-    max_tokens: 4096,
+    // Bumped from an earlier 4096: the schema this asks for has grown
+    // substantially over this app's own life (materialCode, decor,
+    // interiorMode/floorHeightMeters all landed after 4096 was first
+    // chosen), and a real reported truncated-JSON failure (a response
+    // cut off mid-value) confirmed this needed real headroom, not just a
+    // theoretical one.
+    max_tokens: 8192,
     system: buildAiSystemPrompt(useWebSearch, hasPhoto) + (useWebSearch ? AI_JSON_ONLY_INSTRUCTION : ''),
     messages,
   };
@@ -4858,6 +4864,13 @@ async function callAnthropicForShape(model, messages, apiKey, signal, useWebSear
   if (!resp.ok) throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
   if (data.stop_reason === 'refusal') {
     throw new Error('The AI declined this request' + (data.stop_details && data.stop_details.category ? ` (${data.stop_details.category})` : '') + '.');
+  }
+  // A precise, detectable signal of truncation (distinct from a vague JSON
+  // parse error downstream) -- surfaced as its own clear message so the
+  // self-repair round in callAiGenerate() gets an accurate diagnosis to
+  // hand back to the model, rather than a generic "Unexpected token".
+  if (data.stop_reason === 'max_tokens') {
+    throw new Error('The AI\'s response was cut off after hitting the token limit before it finished writing the JSON.');
   }
   const textBlocks = (data.content || []).filter(b => b.type === 'text');
   const textBlock = textBlocks[textBlocks.length - 1];
@@ -4933,7 +4946,7 @@ async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPh
     }];
     let working = [systemMsg].concat(messages);
     for (let round = 0; round < 3; round++) {
-      const resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working, tools }) });
+      const resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working, tools, max_tokens: 8192 }) });
       const data = await resp.json();
       if (!resp.ok) throw new Error((data && data.error && (data.error.message || data.error)) || `HTTP ${resp.status}`);
       const msg = data.choices && data.choices[0] && data.choices[0].message;
@@ -4961,7 +4974,7 @@ async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPh
     }
     // Ran out of rounds (a model that won't stop searching) -- force a
     // final answer with no tools available so it has to respond in text.
-    const finalResp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working }) });
+    const finalResp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify({ model, messages: working, max_tokens: 8192 }) });
     const finalData = await finalResp.json();
     if (!finalResp.ok) throw new Error((finalData && finalData.error && (finalData.error.message || finalData.error)) || `HTTP ${finalResp.status}`);
     const finalContent = finalData.choices && finalData.choices[0] && finalData.choices[0].message && finalData.choices[0].message.content;
@@ -4973,12 +4986,22 @@ async function callLocalForShape(model, messages, baseUrl, apiKey, signal, hasPh
     model,
     messages: [systemMsg].concat(messages),
     response_format: { type: 'json_schema', json_schema: { name: 'voxel_shape', schema: AI_SHAPE_JSON_SCHEMA, strict: true } },
+    // Real reported failure: a local model's response got cut off mid-value
+    // ("wallThickn...") on the default token budget most local servers use.
+    // Ollama's own OpenAI-compatible endpoint maps max_tokens straight to
+    // its native num_predict (verified live), so this is a real, direct
+    // lever here, not a no-op passthrough field. This can't fix a too-small
+    // CONTEXT window on the server's own end (num_ctx — a separate limit
+    // this endpoint has no per-request override for on Ollama specifically),
+    // which is the other real, honest possibility for the same symptom —
+    // see the system prompt size note in this app's own project notes.
+    max_tokens: 8192,
   };
   let resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(body) });
   if (!resp.ok) {
     // Not every local server accepts response_format — retry once without
     // it before giving up, relying purely on the system-prompt instruction.
-    const bodyNoFormat = { model, messages: body.messages };
+    const bodyNoFormat = { model, messages: body.messages, max_tokens: 8192 };
     resp = await fetch(url, { method: 'POST', headers, signal, body: JSON.stringify(bodyNoFormat) });
   }
   const data = await resp.json();
@@ -5229,14 +5252,54 @@ async function callAiGenerate() {
     let rawText = local
       ? await callLocalForShape(model, messages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, imageBlocks.length > 0, useOllamaSearch, ollamaSearchKey)
       : await callAnthropicForShape(model, messages, apiKey, controller.signal, useWebSearch, imageBlocks.length > 0);
-    let resultText = rawText.trim();
-    if (local) {
-      // Local models don't always honor "JSON only" — pull the first {...}
-      // block out in case of leading/trailing prose or a markdown fence.
-      const match = resultText.match(/\{[\s\S]*\}/);
-      if (match) resultText = match[0];
+
+    // Local models don't always honor "JSON only" — pull the first {...}
+    // block out in case of leading/trailing prose or a markdown fence —
+    // then attempt the actual parse, reporting WHY it failed rather than
+    // just that it did, since "invalid JSON" alone doesn't tell a
+    // self-repair round (below) or the user what actually went wrong.
+    function extractAndParseJson(text) {
+      let t = text.trim();
+      if (local) {
+        const match = t.match(/\{[\s\S]*\}/);
+        if (match) t = match[0];
+      }
+      try {
+        return { result: JSON.parse(t) };
+      } catch (e) {
+        return { error: 'returned invalid/incomplete JSON (' + e.message + ') — most likely its response was cut off before it finished writing the JSON' };
+      }
     }
-    let result = JSON.parse(resultText);
+
+    let finalMessages = messages;
+    let parsed = extractAndParseJson(rawText);
+    if (parsed.error) {
+      // ONE self-repair round, same discipline as the solid()-compile
+      // repair further below: a truncated/malformed JSON response (a
+      // real, reported failure — a local model's answer cut off mid-value
+      // once the schema this app asks for grew large enough) gets exactly
+      // one chance to be resent whole, rather than failing the turn
+      // outright. Distinct from the code-repair round below because the
+      // failure happens BEFORE there's any parsed `result` object to read
+      // a specific broken field from — the only sane ask here is "send
+      // the entire thing again, complete."
+      status.textContent = `The AI's response ${parsed.error} — asking it to resend the complete JSON...`;
+      const jsonRepairMessages = messages.concat([
+        { role: 'assistant', content: rawText },
+        { role: 'user', content: `Your last response ${parsed.error}. Resend the SAME design as one complete, valid JSON object, written out in full from the very beginning — do not continue or append to the previous response.` },
+      ]);
+      const jsonRepairRawText = local
+        ? await callLocalForShape(model, jsonRepairMessages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, imageBlocks.length > 0, useOllamaSearch, ollamaSearchKey)
+        : await callAnthropicForShape(model, jsonRepairMessages, apiKey, controller.signal, useWebSearch, imageBlocks.length > 0);
+      const jsonRepairParsed = extractAndParseJson(jsonRepairRawText);
+      if (jsonRepairParsed.error) {
+        throw new Error(`The AI's response ${jsonRepairParsed.error}, even after asking it to resend the complete JSON once. A local model hitting this repeatedly may need a larger context window/output limit set on its own server (e.g. Ollama's OLLAMA_CONTEXT_LENGTH, or a Modelfile's "PARAMETER num_ctx").`);
+      }
+      parsed = jsonRepairParsed;
+      rawText = jsonRepairRawText;
+      finalMessages = jsonRepairMessages;
+    }
+    let result = parsed.result;
 
     // Compute the real-world size + auto-scale FIRST (pure math, no DOM
     // writes yet) so the sanity check below can validate solid() at the
@@ -5293,10 +5356,26 @@ async function callAiGenerate() {
       } catch (e) {
         return { error: 'did not compile: ' + e.message };
       }
+      // A full, deterministic scan over the REAL target volume -- not a
+      // random sample. Real, reported false rejection: a genuinely thin,
+      // sparse design (a DNA double helix's own two narrow strands can be
+      // well under 1% of a large bounding box's volume) can land on air
+      // for all 400 random samples purely by chance, rejecting perfectly
+      // correct code as "completely empty." solid() is guaranteed cheap
+      // per cell by the system prompt's own "no unbounded loops" rule, and
+      // testDims is already capped to at most 2,000,000 cells by the
+      // backoff loop above, so scanning every cell here is both provably
+      // correct (zero chance of missing a real solid cell, unlike
+      // sampling) and still fast — no reason to gamble on random coverage
+      // when the exact answer is this cheap to compute directly.
       let solidCount = 0, threw = null;
-      for (let i = 0; i < 400 && !threw; i++) {
-        const tx = Math.floor(Math.random() * testDims.sx), ty = Math.floor(Math.random() * testDims.sy), tz = Math.floor(Math.random() * testDims.sz);
-        try { if (candidateFn(tx, ty, tz, testDims)) solidCount++; } catch (e) { threw = e; }
+      scan:
+      for (let x = 0; x < testDims.sx; x++) {
+        for (let y = 0; y < testDims.sy; y++) {
+          for (let z = 0; z < testDims.sz; z++) {
+            try { if (candidateFn(x, y, z, testDims)) solidCount++; } catch (e) { threw = e; break scan; }
+          }
+        }
       }
       if (threw) return { error: 'threw while running: ' + threw.message };
       if (solidCount === 0) return { error: 'produced a completely empty shape' };
@@ -5304,7 +5383,6 @@ async function callAiGenerate() {
     }
 
     let attempt = tryCompileAndValidate(result.code);
-    let finalMessages = messages;
     if (attempt.error) {
       // ONE self-repair round, for either provider: a genuinely broken
       // solid() (an unbalanced paren, a stray token — a real, expected
@@ -5313,31 +5391,26 @@ async function callAiGenerate() {
       // and give it one real chance to fix its own code, the same "feed
       // the error back and let the model recover" pattern already used
       // for a failed Ollama web-search lookup and the local JSON-schema
-      // HTTP retry elsewhere in this function.
+      // HTTP retry elsewhere in this function. Chains from finalMessages
+      // (not the original `messages`), so this still works correctly on
+      // top of a JSON-parse repair round that may have already run above.
       status.textContent = `The AI's code ${attempt.error} — asking it to fix it...`;
-      const repairMessages = messages.concat([
+      const repairMessages = finalMessages.concat([
         { role: 'assistant', content: rawText },
         { role: 'user', content: `Your last response's "code" field ${attempt.error}. Return the SAME design as a corrected JSON object — fix ONLY the error in solid(), keep everything else (shape intent, materials, decor, interiorMode) the same.` },
       ]);
       const repairRawText = local
         ? await callLocalForShape(model, repairMessages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, imageBlocks.length > 0, useOllamaSearch, ollamaSearchKey)
         : await callAnthropicForShape(model, repairMessages, apiKey, controller.signal, useWebSearch, imageBlocks.length > 0);
-      let repairResultText = repairRawText.trim();
-      if (local) {
-        const m = repairResultText.match(/\{[\s\S]*\}/);
-        if (m) repairResultText = m[0];
+      const repairParsed = extractAndParseJson(repairRawText);
+      if (repairParsed.error) {
+        throw new Error(`The AI's code ${attempt.error}, and the self-repair attempt ${repairParsed.error}.`);
       }
-      let repairResult;
-      try {
-        repairResult = JSON.parse(repairResultText);
-      } catch (e) {
-        throw new Error(`The AI's code ${attempt.error}, and the self-repair attempt didn't return valid JSON either.`);
-      }
-      const repairAttempt = tryCompileAndValidate(repairResult.code);
+      const repairAttempt = tryCompileAndValidate(repairParsed.result.code);
       if (repairAttempt.error) {
         throw new Error(`The AI's code ${repairAttempt.error}, even after asking it to fix the error once.`);
       }
-      result = repairResult;
+      result = repairParsed.result;
       rawText = repairRawText;
       attempt = repairAttempt;
       finalMessages = repairMessages;
