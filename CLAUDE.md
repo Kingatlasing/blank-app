@@ -1227,3 +1227,52 @@ MODE: "floors"`; and Clear resets all 4 new state variables back to
 their defaults. All 14 prior AI-feature test suites (150 checks total)
 were re-run UNMODIFIED and still passed, and the full `dom-test.js`
 regression suite (34 checks) still passed.
+
+## Strafe direction was backwards in Walk/third-person mode (real sign bug, not a design choice)
+
+The user reported that A/D strafing in Walk (first-person) and third-person
+mode didn't move relative to the camera/player's own facing direction the
+way it should. Traced this to `updateFreeCamera(dt)` — the single shared
+movement function behind free-fly, Walk, AND third-person alike (so any fix
+here applies to all three at once) — which computed:
+
+```js
+const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize().negate();
+```
+
+Verified the actual math independently rather than guessing which sign was
+"probably" right: `dirFromYawPitch(0, 0)` returns `(0, 0, -1)` (this app's
+own convention: yaw 0 faces -Z, matching Three.js's standard camera-forward
+axis). For a viewer facing that direction with +Y up, the real right-hand
+side — the direction the D key is supposed to strafe toward — is `+X`,
+confirmed by the standard `right = cross(forward, up)` lookAt-basis formula
+(the same convention this app's own `dirFromYawPitch`/mouselook math is
+already built on, so this isn't introducing a new convention, just
+correcting an inconsistency with the one already in use). `cross(dir, up)`
+alone already evaluates to `(1, 0, 0)` — the correct answer — but the
+code's own trailing `.negate()` flipped it to `(-1, 0, 0)`, the LEFT side,
+and that inverted vector is exactly what `KeyD`/`KeyA` were both wired to
+(`mx += right.x` for D, `mx -= right.x` for A) two lines below. Net effect:
+D strafed left and A strafed right, backwards from the direction the
+camera/player model was actually facing, in every mode that shares this
+function (free-fly included, though the user only reported it in Walk/
+third-person).
+
+Fixed by simply dropping the erroneous `.negate()`. `right` is used
+NOWHERE else in the file (confirmed via grep) except the two `KeyD`/`KeyA`
+lines immediately below its declaration, so this was a fully isolated,
+one-line fix with no other call site to reconcile.
+
+Verified via a new 4-check jsdom test rather than trusting the hand-derived
+math alone: generates a real flat platform, sets `flyState.yaw`/`pitch`
+directly, and confirms `KeyD`/`KeyA` move the player toward the
+mathematically-correct side of two DIFFERENT facing directions (yaw 0,
+facing -Z, and yaw -90°, facing +X — the second case exists specifically
+to rule out the fix only working by coincidence at yaw 0), plus one more
+check confirming third-person mode — the mode named in the report —
+shares the exact same corrected behavior. The full `dom-test.js` regression
+suite (34 checks) was re-run and still passes unchanged, confirming this
+one-line fix didn't disturb anything else (collision, gravity, pressure
+plates, and every other consumer of `updateFreeCamera`'s own movement
+math all still behave identically aside from the corrected strafe
+direction).

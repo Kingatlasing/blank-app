@@ -23914,7 +23914,7 @@ function updateFreeCamera(dt) {
   const t = three;
   const dir = dirFromYawPitch(flyState.yaw, flyState.pitch);
   const forward = new THREE.Vector3(dir.x, 0, dir.z).normalize();
-  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize().negate();
+  const right = new THREE.Vector3().crossVectors(dir, new THREE.Vector3(0, 1, 0)).normalize();
   const speed = (pressedKeys.has('ShiftLeft') || pressedKeys.has('ShiftRight')) ? 14 : 6;
   let mx = 0, mz = 0;
   if (pressedKeys.has('KeyW') || pressedKeys.has('ArrowUp')) { mx += forward.x; mz += forward.z; }
