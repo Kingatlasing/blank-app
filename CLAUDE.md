@@ -1351,3 +1351,103 @@ attempts still land in the DOM fields despite the shape being rejected.
 All 15 prior AI-feature test suites (150 checks total) were re-run
 UNMODIFIED and still passed, and the full `dom-test.js` regression suite
 (34 checks) still passed.
+
+## Photogrammetry declined; the "unified workflow" ask built instead
+
+The user escalated across several messages in one conversation: "the ai im
+using should be able to do all the work for the app," then specifically
+asked for real image-based 3D reconstruction, then for genuine multi-photo
+photogrammetry, then — after being told what that actually costs — "without
+having to download anything else," then "let my local ai download whats
+needed to generate models." Each of these got a real, researched answer
+rather than a reflexive yes or no, and it's worth recording precisely
+which parts turned out real and which didn't, since this is the most
+detailed version yet of an escalation pattern that recurs throughout this
+file's history.
+
+**Verified, not assumed, at each step:**
+- Real multi-photo photogrammetry (structure-from-motion + dense
+  reconstruction — COLMAP, Meshroom/AliceVision, OpenDroneMap/WebODM,
+  OpenSfM) is a genuinely different, much heavier technology than either
+  of this app's existing AI paths: it needs dozens of photos, real
+  processing time (minutes to hours, GPU recommended), and produces a raw
+  scan rather than clean geometry. Of the real open-source options, only
+  **WebODM** exposes a documented REST API (JWT auth via `/api/token-auth/`,
+  task creation via multipart `POST /api/projects/{id}/tasks/`, and —
+  confirmed directly — a `textured_model.glb` download asset, meaning a
+  WebODM-produced mesh would need zero format conversion to feed this
+  app's existing voxelizer) — the others are desktop GUI/CLI tools with no
+  API surface at all.
+- Checked specifically whether ANY fully client-side, no-server,
+  no-install photogrammetry pipeline exists (to see whether "without
+  downloading anything else" was reconcilable with real multi-photo
+  reconstruction): it doesn't, at any real quality — the actual
+  computational work is too heavy for a browser tab alone, confirmed
+  across independent sources describing every real web-based photogrammetry
+  system as relying on server/cloud compute, never pure client-side WASM.
+- The one real "no download" alternative — paid, hosted photogrammetry
+  cloud APIs (Kiri Engine, Reali3, Autodesk Reality Capture API, Beholder)
+  — was surfaced honestly, including its own real cost (money, an account,
+  and the user's photos leaving their machine to a third-party company),
+  rather than silently building against one un-vetted.
+- "Let my local AI download what's needed" was declined outright, and
+  explained as an architecture fact rather than a policy call: a browser
+  page cannot install software, run Docker, or execute anything on the
+  user's machine — that's the browser security sandbox every website
+  operates inside, not a missing feature of this app specifically. A local
+  chat model over an HTTP API has no shell access either, regardless of
+  what it's asked to do. The only way "the AI downloads what it needs"
+  could work at all is granting a model the ability to execute arbitrary
+  commands on the user's computer — a real security risk (arbitrary local
+  code execution driven by model output), correctly refused rather than
+  built.
+
+Given all of that, the user explicitly chose to drop photogrammetry
+entirely (`AskUserQuestion`: "neither — drop this") rather than accept
+either real cost (a self-hosted server, or a paid third-party API). No
+WebODM code was written as a result — the research above is preserved here
+for the future instead, in case this comes back around: if it does, WebODM
+is the one real candidate, and its own textured_model.glb asset is a
+direct, zero-conversion match for this app's existing `.glb` voxelizer.
+
+**What the user separately confirmed wanting, and what got built**: the
+"unified workflow" — one request that decides which real AI backend
+handles it, instead of the user manually switching between AI Generate's
+own panel and Import mode's separate LocalAI mesh panel. Implemented as a
+new optional photo upload (`#ai-photo-file`, plus its own
+`#ai-photo-localai-url`/`#ai-photo-localai-model` fields) added directly
+to the AI Generate panel. The routing rule is deliberately simple and
+deterministic — never an LLM-guessed decision that could be wrong: **no
+photo attached → the existing text-to-code chat-model path, unchanged;
+a photo attached → skip the chat model entirely and reconstruct a real
+mesh via LocalAI's own `/3d/generations`** (the exact same backend Import
+mode's own "second AI modeler" panel already calls — `callLocalAiGenerations`
+and `processGLBArrayBuffer` are reused directly, not reimplemented). New
+`callAiGenerateFromPhoto(file)` is checked for at the very top of
+`callAiGenerate()`, before any of the text-path's own validation (an
+Anthropic API key, a non-empty prompt) — a photo-only request needs
+neither, since LocalAI's mesh backend is a wholly separate server from
+whatever's serving the chat model. On success it also flips the "What to
+build" mode radio over to Import, since that's the pipeline a reconstructed
+mesh actually flows through (real-world dims, the Generate-model button,
+the Rotate tool all live there) — so the UI accurately reflects what
+happened instead of leaving "AI Generate" selected over an imported-scan
+shape underneath it. Import mode's own standalone LocalAI panel was left
+in place unchanged, for anyone who prefers explicit manual control over
+the "just attach whatever you have" experience.
+
+Verified via a new 8-check test using a synthetic tetrahedron `.glb`
+fixture (real volume on all 3 axes, unlike a flat single triangle, so the
+shell + flood-fill voxelizer has an actual interior — the same lesson
+already learned the hard way and written up under "Voxelizing a real
+3D-scanned model" above) and the same jsdom `Worker` stub already proven
+in `localai-3d-test.js`: attaching a photo calls the real
+`/3d/generations` endpoint and NEVER the chat-completion endpoint, even
+with no Anthropic API key present at all; the request carries the AI
+panel's own model field; the mode radio switches to Import on success;
+the reconstructed mesh genuinely reaches `importedScanGridData` through
+the real voxelizer; and the photo input is cleared afterward so a later
+plain-text Generate click doesn't re-trigger photo mode. All 16 prior
+AI-feature test suites (160 checks total) were re-run UNMODIFIED and
+still passed, and the full `dom-test.js` regression suite (34 checks)
+still passed.

@@ -316,6 +316,23 @@
           <label for="ai-name">Name (for your reference)</label>
           <input type="text" id="ai-name" placeholder="e.g. my dream house, a spaceship, a dragon..." />
           <div id="ai-log"></div>
+          <fieldset id="ai-photo-recon-controls">
+            <legend>Or reconstruct a real photo into an actual mesh, instead of describing it</legend>
+            <div class="hint">This ONE box now covers both of this app's AI paths — attach a photo here and Generate hands it straight to a real image-to-3D backend (LocalAI's own <code>/3d/generations</code>, the same "second AI modeler" from Import mode) instead of asking the chat model to write code, since that's a completely different, more accurate job for a real photo of a real object. Leave this empty and just type a description below for the normal chat-model code-gen path. You decide which by whether you attach a photo — the app picks the right backend for you either way, without needing to switch mode yourself.</div>
+            <label for="ai-photo-file">Photo to reconstruct (optional)</label>
+            <input type="file" id="ai-photo-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <div class="row">
+              <div>
+                <label for="ai-photo-localai-url">LocalAI server URL</label>
+                <input type="text" id="ai-photo-localai-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
+              </div>
+              <div>
+                <label for="ai-photo-localai-model">3D model name</label>
+                <input type="text" id="ai-photo-localai-model" value="trellis2-4b" placeholder="trellis2-4b" />
+              </div>
+            </div>
+            <div class="hint">Needs a <a href="https://localai.io" target="_blank" rel="noopener">LocalAI</a> server of your own with the <code>/3d/generations</code> backend downloaded — a separate, optional install from whatever's serving your chat model above. An HTTP error here almost always means that backend isn't installed on that server yet, not a bug. This is still image-to-3D from ONE photo only — real multi-photo reconstruction (photogrammetry) is a fundamentally heavier, separate technology this app doesn't do (see the project notes if you're curious why).</div>
+          </fieldset>
           <label for="ai-prompt">Describe what to build, or how to change what's already built</label>
           <textarea id="ai-prompt" rows="3" placeholder="e.g. &quot;a squat crooked wizard tower with a lopsided spire&quot; — then later &quot;add a balcony halfway up&quot; to revise the same design in place"></textarea>
           <div class="row">
@@ -5090,8 +5107,61 @@ async function askModelForReferenceConcepts(local, promptText, opts, signal) {
   }
 }
 
+// One request, one box, one decision: if a photo is attached in the AI
+// Generate panel, this reconstructs a REAL mesh via LocalAI's own real
+// image-to-3D backend (/3d/generations — the exact same "second AI
+// modeler" Import mode's own panel already calls) instead of asking a
+// chat model to write voxel code, since reconstructing an actual photo
+// of a real object is a completely different, more accurate job than
+// code-gen. This is the "unified workflow" entry point: the user no
+// longer has to manually switch to Import mode themselves to reach this
+// backend — attaching a photo here is itself the decision, and the app
+// routes it, exactly the deterministic (never LLM-guessed) rule this was
+// scoped to. It never needs the chat provider's own API key/base URL at
+// all, since LocalAI's mesh backend is a wholly separate server.
+async function callAiGenerateFromPhoto(file) {
+  const status = el('ai-status');
+  const baseUrl = (el('ai-photo-localai-url').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+  const model = el('ai-photo-localai-model').value.trim() || 'trellis2-4b';
+  aiRequestInFlight = true;
+  el('ai-generate-btn').disabled = true;
+  el('ai-cancel-btn').disabled = false;
+  status.textContent = `Reconstructing your photo into a real mesh with LocalAI (${model}) — image-to-3D can take a while, especially on CPU. Click Cancel to give up.`;
+  el_ai_log_push('user', '[uploaded photo: ' + file.name + ']');
+  const controller = new AbortController();
+  aiActiveController = controller;
+  try {
+    const buf = await file.arrayBuffer();
+    const base64 = arrayBufferToBase64(buf);
+    const meshBuf = await callLocalAiGenerations(baseUrl, model, base64, controller.signal);
+    status.textContent = 'Mesh received from LocalAI — voxelizing it now...';
+    await processGLBArrayBuffer(meshBuf, file.name.replace(/\.[^.]+$/, '').slice(0, 60) || 'reconstructed-photo');
+    // A reconstructed mesh flows through the exact same pipeline a
+    // manually-dropped .glb does, which lives under Import mode's own
+    // shapeType — switch the active "What to build" selection there so
+    // the rest of the UI (real-world dims, the Generate model button, the
+    // Rotate tool) reflects what actually happened, instead of silently
+    // leaving "AI Generate" selected over an imported-scan shape.
+    const importRadio = document.querySelector('input[name=mode][value=import]');
+    importRadio.checked = true;
+    importRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    el('ai-photo-file').value = '';
+  } catch (err) {
+    const msg = err.name === 'AbortError' ? 'Cancelled.' : err.message;
+    el_ai_log_push('assistant', '⚠ ' + msg);
+    status.textContent = '⚠ ' + msg;
+  } finally {
+    aiActiveController = null;
+    aiRequestInFlight = false;
+    el('ai-generate-btn').disabled = false;
+    el('ai-cancel-btn').disabled = true;
+  }
+}
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
+  const photoFile = el('ai-photo-file').files && el('ai-photo-file').files[0];
+  if (photoFile) { await callAiGenerateFromPhoto(photoFile); return; }
   const local = isAiProviderLocal();
   const apiKey = local ? el('ai-local-key').value.trim() : el('ai-api-key').value.trim();
   const promptText = el('ai-prompt').value.trim();
