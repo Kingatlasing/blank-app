@@ -5166,7 +5166,7 @@ async function callAiGenerate() {
       const match = resultText.match(/\{[\s\S]*\}/);
       if (match) resultText = match[0];
     }
-    const result = JSON.parse(resultText);
+    let result = JSON.parse(resultText);
 
     // Compute the real-world size + auto-scale FIRST (pure math, no DOM
     // writes yet) so the sanity check below can validate solid() at the
@@ -5190,23 +5190,89 @@ async function callAiGenerate() {
       outDims = scaledDims({ height: realHeight, baseX: realBaseX, baseZ: realBaseZ }, targetLong / maxRealDim);
     }
 
+    // Apply the AI's own real-world size judgment to the height/width/depth
+    // (and auto-scale ratio) fields UNCONDITIONALLY, before solid() is even
+    // compiled below — these three numbers are an independent judgment call
+    // the AI already made regardless of whether its geometry code itself is
+    // correct, so a broken solid() should never leave them stuck at a
+    // stale/manual value left over from a previous mode. If solid() goes on
+    // to fail validation below (even after the self-repair attempt), the
+    // SHAPE itself is still rejected and whatever design was already
+    // working keeps rendering (per the "never destroy prior good progress"
+    // rule) — only these size fields update regardless, ready for another
+    // attempt.
+    el('ai-height').value = realHeight;
+    el('ai-basex').value = realBaseX;
+    el('ai-basez').value = realBaseZ;
+    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
+    ratioRadio.checked = true;
+    ratioRadio.dispatchEvent(new Event('change'));
+    el('scale-num').value = Number(targetLong.toFixed(4));
+    el('scale-den').value = Number(maxRealDim.toFixed(6));
+    baselineScale = currentScale();
+    updateScaleQuickpickActive();
+
     // Compile and sanity-check BEFORE touching any existing working design,
     // so a bad response never destroys prior good progress (per the "keep
     // the original unless cleared" requirement).
-    let fn;
-    try {
-      fn = new Function('x', 'y', 'z', 'dims', result.code);
-    } catch (e) {
-      throw new Error('The AI\'s code did not compile: ' + e.message);
-    }
     const testDims = outDims;
-    let solidCount = 0, threw = null;
-    for (let i = 0; i < 400 && !threw; i++) {
-      const tx = Math.floor(Math.random() * testDims.sx), ty = Math.floor(Math.random() * testDims.sy), tz = Math.floor(Math.random() * testDims.sz);
-      try { if (fn(tx, ty, tz, testDims)) solidCount++; } catch (e) { threw = e; }
+    function tryCompileAndValidate(code) {
+      let candidateFn;
+      try {
+        candidateFn = new Function('x', 'y', 'z', 'dims', code);
+      } catch (e) {
+        return { error: 'did not compile: ' + e.message };
+      }
+      let solidCount = 0, threw = null;
+      for (let i = 0; i < 400 && !threw; i++) {
+        const tx = Math.floor(Math.random() * testDims.sx), ty = Math.floor(Math.random() * testDims.sy), tz = Math.floor(Math.random() * testDims.sz);
+        try { if (candidateFn(tx, ty, tz, testDims)) solidCount++; } catch (e) { threw = e; }
+      }
+      if (threw) return { error: 'threw while running: ' + threw.message };
+      if (solidCount === 0) return { error: 'produced a completely empty shape' };
+      return { fn: candidateFn };
     }
-    if (threw) throw new Error('The AI\'s code threw while running: ' + threw.message);
-    if (solidCount === 0) throw new Error('The AI\'s code produced a completely empty shape — try rephrasing, or describe it in more detail.');
+
+    let attempt = tryCompileAndValidate(result.code);
+    let finalMessages = messages;
+    if (attempt.error) {
+      // ONE self-repair round, for either provider: a genuinely broken
+      // solid() (an unbalanced paren, a stray token — a real, expected
+      // failure mode especially for a smaller/weaker local model) doesn't
+      // have to end the turn outright. Tell the model exactly what broke
+      // and give it one real chance to fix its own code, the same "feed
+      // the error back and let the model recover" pattern already used
+      // for a failed Ollama web-search lookup and the local JSON-schema
+      // HTTP retry elsewhere in this function.
+      status.textContent = `The AI's code ${attempt.error} — asking it to fix it...`;
+      const repairMessages = messages.concat([
+        { role: 'assistant', content: rawText },
+        { role: 'user', content: `Your last response's "code" field ${attempt.error}. Return the SAME design as a corrected JSON object — fix ONLY the error in solid(), keep everything else (shape intent, materials, decor, interiorMode) the same.` },
+      ]);
+      const repairRawText = local
+        ? await callLocalForShape(model, repairMessages, el('ai-base-url').value.trim() || 'http://localhost:11434/v1', apiKey, controller.signal, imageBlocks.length > 0, useOllamaSearch, ollamaSearchKey)
+        : await callAnthropicForShape(model, repairMessages, apiKey, controller.signal, useWebSearch, imageBlocks.length > 0);
+      let repairResultText = repairRawText.trim();
+      if (local) {
+        const m = repairResultText.match(/\{[\s\S]*\}/);
+        if (m) repairResultText = m[0];
+      }
+      let repairResult;
+      try {
+        repairResult = JSON.parse(repairResultText);
+      } catch (e) {
+        throw new Error(`The AI's code ${attempt.error}, and the self-repair attempt didn't return valid JSON either.`);
+      }
+      const repairAttempt = tryCompileAndValidate(repairResult.code);
+      if (repairAttempt.error) {
+        throw new Error(`The AI's code ${repairAttempt.error}, even after asking it to fix the error once.`);
+      }
+      result = repairResult;
+      rawText = repairRawText;
+      attempt = repairAttempt;
+      finalMessages = repairMessages;
+    }
+    const fn = attempt.fn;
 
     // Optional per-part material function — same compile-and-sanity-check
     // discipline, but a bad/empty one just means "no per-part painting",
@@ -5264,28 +5330,13 @@ async function callAiGenerate() {
     aiCurrentInteriorMode = validInteriorMode;
     aiCurrentFloorHeightMeters = validFloorHeight;
     aiCurrentMeta = result;
-    aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
+    // finalMessages is `messages` on a clean first attempt, or the repair
+    // round's own message list (including the failed attempt and the
+    // error-feedback turn) if a self-repair happened above — either way,
+    // this keeps aiConversation an accurate record of what actually
+    // happened, so a later follow-up's replayed history matches reality.
+    aiConversation = finalMessages.concat([{ role: 'assistant', content: rawText }]);
 
-    el('ai-height').value = realHeight;
-    el('ai-basex').value = realBaseX;
-    el('ai-basez').value = realBaseZ;
-    // Auto-pick a sensible scale too, the same "don't leave the user to
-    // guess a working ratio" principle already applied to every preset's
-    // own defaultScaleNum/Den and to handleImportedFile's native-resolution
-    // pick — otherwise this silently inherits whatever ratio was left over
-    // from a previous preset/custom shape, which is exactly the class of
-    // bug that made the Vader Helmet disappear earlier in this app's life.
-    // A tiny real object (a creature, a prop) needs a HIGHER relative
-    // scale to read as more than a few blocks; a huge one (a landmark)
-    // needs a LOWER one to stay a reasonable size — so the target block
-    // count for the longest real dimension scales with how big it is.
-    const ratioRadio = document.querySelector('input[name=scalemode][value=ratio]');
-    ratioRadio.checked = true;
-    ratioRadio.dispatchEvent(new Event('change'));
-    el('scale-num').value = Number(targetLong.toFixed(4));
-    el('scale-den').value = Number(maxRealDim.toFixed(6));
-    baselineScale = currentScale();
-    updateScaleQuickpickActive();
     // Fall back to sane defaults rather than silently leaving whatever
     // materials happened to be selected from a previous mode if the model
     // returns an id that isn't real — the AI should always be the one

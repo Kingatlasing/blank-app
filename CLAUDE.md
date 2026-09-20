@@ -1276,3 +1276,78 @@ one-line fix didn't disturb anything else (collision, gravity, pressure
 plates, and every other consumer of `updateFreeCamera`'s own movement
 math all still behave identically aside from the corrected strafe
 direction).
+
+## AI Generate: one self-repair round on broken code, and real-world size always applies
+
+The user hit `⚠ The AI's code did not compile: Unexpected token ')'` on
+qwen2.5-coder via local Ollama, and separately asked why the real height/
+width/depth fields aren't always coming from whatever local model they're
+using. Traced both to the same root structural issue in `callAiGenerate()`,
+not two separate bugs.
+
+**Why the compile error happens at all**: a real, expected local-model
+failure mode already documented elsewhere in this file — a smaller/weaker
+model (qwen2.5-coder here) sometimes hands back genuinely malformed JS (an
+unbalanced paren, a stray token) inside its own `code` field, something
+Anthropic's own structured-output schema can force the JSON's SHAPE to be
+correct but can never validate the JS string's own syntax. Previously this
+just threw immediately and discarded the entire response.
+
+**Why realHeightMeters/etc. weren't landing**: `el('ai-height').value =
+realHeight` (and the matching auto-scale-ratio pick) lived AFTER the
+compile-and-validate block, inside the same try that a compile error
+throws out of — so on any compile/runtime/empty-shape failure, none of it
+ever ran, and the height/width/depth fields silently kept whatever stale
+value was left over from a previous mode or attempt. This directly
+explains the second complaint: the AI DID pick real-world dimensions every
+time, they just never reached the DOM whenever the code itself broke.
+
+**Fix 1 — dims apply unconditionally.** Moved the `realHeight`/`realBaseX`/
+`realBaseZ` computation's DOM writes (height/width/depth fields, plus the
+auto-picked scale-num/den ratio) to run immediately after they're computed
+from the parsed JSON, before `solid()` is compiled or validated at all.
+These three numbers are an independent real-world-size judgment the model
+already made regardless of whether its geometry code is correct, so a
+broken `solid()` should never leave them stuck — the SHAPE itself is still
+correctly rejected on failure (the previous working design keeps
+rendering, per the standing "never destroy prior good progress" rule),
+only the size fields update unconditionally either way.
+
+**Fix 2 — one real self-repair round.** `tryCompileAndValidate(code)` is
+now a small reusable helper (compile, run the same 400-sample sanity
+check, return `{fn}` or `{error}`) called on the AI's first response; on
+any of the three existing failure kinds (doesn't compile, throws while
+running, produces a completely empty shape), instead of failing
+immediately, the app now makes exactly ONE follow-up model call —
+appending the broken assistant turn plus a new user turn stating precisely
+what broke — and re-validates that second response with the same helper.
+This mirrors the exact "feed the error back and let the model recover"
+pattern already established elsewhere in this file (a failed Ollama
+web-search lookup fed back as an error string; the local JSON-schema
+HTTP-retry-without-`response_format`) rather than introducing a new
+pattern. If the repair also fails, the (now second) error is thrown with
+an explicit "even after asking it to fix the error once" note so the
+user knows a retry was already attempted automatically. Bounded to
+exactly one repair round — never an open-ended retry loop — and applies
+to BOTH providers (this is a generic code-quality recovery, not a
+local-model-specific patch; Anthropic's own schema doesn't validate JS
+syntax either, so the same failure class, if rarer, can happen there too).
+`aiConversation` is rebuilt from whichever message list actually
+produced the accepted result (`finalMessages`, either the original
+`messages` or the repair round's own extended list) so a later follow-up's
+replayed history stays an accurate record of what really happened, repair
+round included.
+
+Verified via a new 10-check test: a deliberately broken first response
+(the user's own exact reported syntax error class — an extra unbalanced
+`)`) followed by a corrected second response results in exactly 2 model
+calls and the REPAIRED code/summary ending up active, with no error shown
+to the user; a design broken in BOTH the original and the repair attempt
+still costs only 2 calls total (no infinite loop), is still correctly
+rejected as a shape, and shows a message explicitly noting the repair was
+already tried; and — the second complaint's own direct test — real
+height/width/depth values from a response that ultimately fails on both
+attempts still land in the DOM fields despite the shape being rejected.
+All 15 prior AI-feature test suites (150 checks total) were re-run
+UNMODIFIED and still passed, and the full `dom-test.js` regression suite
+(34 checks) still passed.
