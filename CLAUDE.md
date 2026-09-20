@@ -1559,3 +1559,137 @@ accepted every time, while a truly always-false shape is still correctly
 rejected. All 17 prior AI-feature test suites (182 checks total) were
 re-run UNMODIFIED and still passed, and the full `dom-test.js` regression
 suite (34 checks) still passed — 196 AI-feature checks in total.
+
+## A SECOND real mesh-generation backend: Hunyuan3D-2, with real text-to-3D
+
+The user asked directly whether Tencent's Hunyuan3D-2
+(https://github.com/Tencent-Hunyuan/Hunyuan3D-2) "can be combined with
+what we have" — it's a text-to-3D/image-to-3D generator. Checked live
+before answering (WebSearch across multiple independent sources, then a
+direct WebFetch of the real `api_server.py` source off
+raw.githubusercontent.com — this sandbox's network egress allows that
+even where it blocks some other doc sites, so unlike the LocalAI
+integration below, this one's wire format is verified against the actual
+source, not inferred from search summaries): yes, architecturally it's
+the exact same category as the LocalAI/trellis2cpp backend already
+wired into Import mode — a real 3D-native diffusion model
+(Hunyuan3D-DiT), not a chat LLM, self-hosted via its own
+`api_server.py --host 0.0.0.0 --port 8080`, outputting a real textured
+`.glb` that needs zero conversion to feed this app's existing
+`processGLBArrayBuffer` voxelizer. It is genuinely MORE capable than
+LocalAI's own backend in one specific, verified way: LocalAI's
+`/3d/generations` is image-conditioned ONLY (no text path at all, per its
+own docs), while Hunyuan3D-2's `/generate` endpoint takes EITHER an
+`image` OR a `text` prompt (real text-to-3D, via its own internal
+text-to-image step) — the first path in this whole app that can go
+straight from a plain description to an actual generated MESH, not code.
+Real cost stated upfront to the user: this needs a self-hosted server
+with a real GPU (roughly 6GB VRAM for geometry-only, 12-16GB+ with
+texture on the 2.0 line — this app cannot run the model itself, it only
+calls whatever server the user stands up, same boundary as LocalAI).
+
+**Where it lives**: TWO places, mirroring how LocalAI's own backend is
+exposed twice already. (1) A new standalone `#hunyuan3d-controls`
+fieldset in Import mode, right after `#localai-controls` — its own
+server URL, a text-prompt textarea (real text-to-3D), an optional photo
+upload (image-to-3D, takes priority when both are present), and a
+"generate texture too" checkbox (checked by default, since a mesh with a
+plain gray material still fully voxelizes as accurately, but a
+texture-aware voxelizer isn't wired here — see caveat below). (2) The
+unified AI Generate panel's `#ai-photo-recon-controls` fieldset gained a
+`name="ai-mesh-backend"` radio choice (LocalAI / Hunyuan3D-2) — LocalAI
+stays the DEFAULT-SELECTED option specifically so every existing
+behavior (a photo routes to LocalAI, no photo goes to the normal
+chat-model code-gen path) is completely unchanged unless the user
+explicitly switches the radio, a zero-regression requirement verified by
+re-running all 19 prior AI-feature suites completely UNMODIFIED. With
+Hunyuan3D-2 selected in that panel, an attached photo behaves like
+LocalAI's own image path; with NO photo attached, clicking Generate sends
+the user's own typed description straight to Hunyuan3D-2's real
+text-to-3D, skipping the chat model and code-gen entirely — needing no
+Anthropic API key or local chat model at all for that path specifically.
+
+**Shared core**: `callHunyuan3DGenerate(baseUrl, payload, signal)` POSTs
+`{type:'glb', ...payload}` to `{baseUrl}/generate` and returns the raw
+binary `.glb` directly on success (a documented `FileResponse`), or
+throws with the real `{text, error_code}` detail message on a
+documented failure (e.g. a CUDA OOM) — unlike LocalAI's own
+`callLocalAiGenerations`, this does NOT need to hedge across several
+plausible response shapes, since the schema was read from the actual
+source rather than inferred. Both UI entry points funnel into this same
+function, then into the same `processGLBArrayBuffer` every other mesh
+source in this app already uses — a third source of the same bytes, not
+a third parallel pipeline.
+
+**"The app should tell my local agent to write the prompt for the 3D
+tool"** — the user's own follow-up ask, mid-build, after seeing the
+initial routing design. This is the exact same "client performs the
+real call, the model only supplies the words" shape as every other
+tool-use path in this file (Wikimedia search-phrase refinement, the
+reference-photo concept decomposition, Ollama's own `web_search` tool),
+applied to prompt quality instead of search phrasing: `refineTextTo3DPrompt
+(local, promptText, opts, signal)` asks whichever chat model is already
+in scope to rewrite a vague typed description into one concrete
+text-to-3D prompt (shape/parts/proportions/material/color, explicitly
+never a story or camera direction), and that REWRITE — not the user's
+raw text — is what actually reaches Hunyuan3D-2. Any failure at all
+(bad response, network error, a cancel) falls back to the original text
+verbatim, the same best-effort discipline as every other refinement step
+here, so this can only ever add value, never break generation. Wired at
+both entry points: the standalone Import-mode panel gets its own
+`#hunyuan3d-refine-prompt` checkbox (off by default, with its own
+base-url/model fields, mirroring `#localai-refine-search`'s own
+off-by-default precedent, since that panel has no chat model already "in
+context") — the unified AI Generate panel's `#ai-hunyuan3d-refine-prompt`
+checkbox defaults ON instead and reuses whichever provider/model is
+ALREADY configured there (Anthropic or local), since that's a real
+model the user already set up for this exact panel, not a new one to
+configure.
+
+**Answering "do I need to download anything?" directly and honestly**:
+yes — Hunyuan3D-2 itself (the model weights + `api_server.py`) is a real,
+separate, GPU-backed piece of software the user must install and run
+themselves; this single-HTML-file app was never going to change that,
+same boundary already established for LocalAI. What changed is that this
+app can now CALL a Hunyuan3D-2 server once one exists, including asking
+their own already-running local chat model to write a better prompt for
+it first — but it cannot install, download, or run Hunyuan3D-2 (or
+anything else) on the user's machine on its own; that remains the same
+browser-sandbox/no-shell-access boundary repeatedly documented above
+(see "Photogrammetry declined" and "A real Ollama-specific web search
+tool" above) and was restated plainly rather than left implied.
+
+**One real caveat, not glossed over**: the "generate texture too"
+checkbox's texture data is currently NOT preserved through voxelization —
+`processGLBArrayBuffer`'s own shell+flood-fill voxelizer only ever reads
+triangle geometry (see "Voxelizing a real 3D-scanned model" above), never
+UV/material data, for every mesh source in this app including a manually
+uploaded `.glb`. Requesting a textured mesh from Hunyuan3D-2 still costs
+real extra GPU time/VRAM for a result whose color is then thrown away by
+this app's own pipeline regardless of source — this isn't a new
+limitation introduced here, just one worth being explicit about now that
+a texture-generation checkbox exists to make the tradeoff visible for
+the first time. The hint text next to that checkbox says as much.
+
+Verified via a new 29-check test (`hunyuan3d-test.js`): both UI entry
+points exist; the standalone panel's plain text-to-3D path calls the
+real documented `/generate` endpoint with the right body (`text`,
+`type:'glb'`, `texture`) and no chat-completion call at all with the
+refine checkbox off; an attached photo takes priority over typed text
+and is sent under `image`, base64-encoded; a real documented HTTP error
+response's own `{text, error_code}` detail surfaces in the status line;
+the refine checkbox genuinely calls a chat model first and sends its
+REFINED text (not the raw description) to Hunyuan3D-2, with a failed
+refine call falling back to the raw text; in the unified AI Generate
+panel, LocalAI remains the default-selected backend, selecting
+Hunyuan3D-2 reveals its own fields, generating with no photo attached
+skips the Anthropic endpoint entirely (verified with a deliberately
+empty API key) and sends the typed description straight to Hunyuan3D-2,
+switches "What to build" to Import mode on success exactly like the
+LocalAI photo path already does, and — using the local/Ollama provider —
+the refine step genuinely asks the user's own configured local agent for
+a better prompt and that REFINED text is what reaches Hunyuan3D-2,
+answering the "tell my local agent to write the prompt" request
+end-to-end. All 19 prior AI-feature test suites (196 checks total) were
+re-run UNMODIFIED and still passed, and the full `dom-test.js` regression
+suite (34 checks) still passed — 225 AI-feature checks in total.

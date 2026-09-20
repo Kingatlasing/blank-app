@@ -257,6 +257,38 @@
             <div class="hint" id="localai-status">No mesh generated yet.</div>
           </fieldset>
 
+          <fieldset id="hunyuan3d-controls">
+            <legend>A third, separate AI modeler (Hunyuan3D-2): generate a mesh from TEXT, or a photo</legend>
+            <div class="hint">A different real 3D-generative backend from LocalAI above — <a href="https://github.com/Tencent-Hunyuan/Hunyuan3D-2" target="_blank" rel="noopener">Tencent's Hunyuan3D-2</a>, a diffusion model (Hunyuan3D-DiT) that sculpts real geometry, not a chat model. Genuinely more capable in one specific way: unlike LocalAI's own backend (photo only, no text path at all), Hunyuan3D-2 does real TEXT-to-3D too — describe something below with no photo needed at all, and it builds an actual mesh directly. A self-hosted server of your own, run via its own <code>api_server.py --host 0.0.0.0 --port 8080</code> — a separate install from LocalAI, and it needs a real GPU (roughly 6GB VRAM for geometry only, 12-16GB+ with texture — see its own repo for exact numbers per variant).</div>
+            <label for="hunyuan3d-base-url">Hunyuan3D-2 server URL</label>
+            <input type="text" id="hunyuan3d-base-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
+            <label for="hunyuan3d-text">Describe what to build (real text-to-3D — no photo needed)</label>
+            <textarea id="hunyuan3d-text" rows="2" placeholder="e.g. a red vintage sports car"></textarea>
+            <div class="checkbox-row">
+              <input type="checkbox" id="hunyuan3d-refine-prompt" />
+              <label for="hunyuan3d-refine-prompt">Let a local chat model turn that description into a proper 3D-generation prompt first</label>
+            </div>
+            <div id="hunyuan3d-refine-fields" style="display:none;">
+              <label for="hunyuan3d-refine-base-url">Chat model API base URL</label>
+              <input type="text" id="hunyuan3d-refine-base-url" value="http://localhost:11434/v1" placeholder="http://localhost:11434/v1" />
+              <label for="hunyuan3d-refine-model">Chat model name</label>
+              <input type="text" id="hunyuan3d-refine-model" value="llama3.1" placeholder="llama3.1" />
+            </div>
+            <div class="hint">Off by default: your typed description is sent to Hunyuan3D-2 as-is, which already works fine for a clear, specific description. Turn this on to have a local chat model (Ollama, LM Studio, or anything else OpenAI-compatible) expand it into a sharper prompt focused on shape/parts/material/color first — this app still performs the real Hunyuan3D-2 call itself either way; the chat model only chooses the WORDS. A failed refine call (server down, bad model name) falls back to your original text rather than blocking generation.</div>
+            <div class="hint">— or leave the description empty and attach a real photo instead (image-to-3D), which takes priority over the text above when both are present:</div>
+            <label for="hunyuan3d-image-file">Reference photo (optional)</label>
+            <input type="file" id="hunyuan3d-image-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <div class="checkbox-row">
+              <input type="checkbox" id="hunyuan3d-texture" checked />
+              <label for="hunyuan3d-texture">Generate texture too (needs much more VRAM/time — uncheck for geometry only)</label>
+            </div>
+            <div class="row">
+              <button type="button" id="hunyuan3d-generate-btn">Generate mesh with Hunyuan3D-2</button>
+              <button type="button" id="hunyuan3d-cancel-btn" disabled>Cancel</button>
+            </div>
+            <div class="hint" id="hunyuan3d-status">No mesh generated yet.</div>
+          </fieldset>
+
           <div class="row">
             <div>
               <label for="import-height">Detected height (m)</label>
@@ -317,21 +349,43 @@
           <input type="text" id="ai-name" placeholder="e.g. my dream house, a spaceship, a dragon..." />
           <div id="ai-log"></div>
           <fieldset id="ai-photo-recon-controls">
-            <legend>Or reconstruct a real photo into an actual mesh, instead of describing it</legend>
-            <div class="hint">This ONE box now covers both of this app's AI paths — attach a photo here and Generate hands it straight to a real image-to-3D backend (LocalAI's own <code>/3d/generations</code>, the same "second AI modeler" from Import mode) instead of asking the chat model to write code, since that's a completely different, more accurate job for a real photo of a real object. Leave this empty and just type a description below for the normal chat-model code-gen path. You decide which by whether you attach a photo — the app picks the right backend for you either way, without needing to switch mode yourself.</div>
-            <label for="ai-photo-file">Photo to reconstruct (optional)</label>
-            <input type="file" id="ai-photo-file" accept="image/png,image/jpeg,image/webp,image/gif" />
-            <div class="row">
-              <div>
-                <label for="ai-photo-localai-url">LocalAI server URL</label>
-                <input type="text" id="ai-photo-localai-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
-              </div>
-              <div>
-                <label for="ai-photo-localai-model">3D model name</label>
-                <input type="text" id="ai-photo-localai-model" value="trellis2-4b" placeholder="trellis2-4b" />
-              </div>
+            <legend>Or generate a real mesh instead of code — two real 3D-generative backends, not the chat model</legend>
+            <div class="hint">This ONE box now covers all THREE of this app's AI paths. Pick a backend below — LocalAI (needs a photo) or Hunyuan3D-2 (a photo, OR your typed description below with no photo at all — real text-to-3D). Either one hands the request straight to a real, dedicated 3D-generative model instead of asking the chat model to write code, since that's a completely different, more accurate job than code-gen for an actual real-world thing. Leave BOTH photo fields empty (and keep LocalAI selected, the default) for the normal chat-model code-gen path, unchanged from before. You decide which by what you attach/select — the app picks the right backend for you either way, without needing to switch mode yourself.</div>
+            <div class="radio-row">
+              <label><input type="radio" name="ai-mesh-backend" value="localai" checked /> LocalAI (photo → mesh only)</label>
+              <label><input type="radio" name="ai-mesh-backend" value="hunyuan3d" /> Hunyuan3D-2 (text → mesh, or photo → mesh)</label>
             </div>
-            <div class="hint">Needs a <a href="https://localai.io" target="_blank" rel="noopener">LocalAI</a> server of your own with the <code>/3d/generations</code> backend downloaded — a separate, optional install from whatever's serving your chat model above. An HTTP error here almost always means that backend isn't installed on that server yet, not a bug. This is still image-to-3D from ONE photo only — real multi-photo reconstruction (photogrammetry) is a fundamentally heavier, separate technology this app doesn't do (see the project notes if you're curious why).</div>
+            <div id="ai-mesh-localai-fields">
+              <label for="ai-photo-file">Photo to reconstruct (optional)</label>
+              <input type="file" id="ai-photo-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <div class="row">
+                <div>
+                  <label for="ai-photo-localai-url">LocalAI server URL</label>
+                  <input type="text" id="ai-photo-localai-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
+                </div>
+                <div>
+                  <label for="ai-photo-localai-model">3D model name</label>
+                  <input type="text" id="ai-photo-localai-model" value="trellis2-4b" placeholder="trellis2-4b" />
+                </div>
+              </div>
+              <div class="hint">Needs a <a href="https://localai.io" target="_blank" rel="noopener">LocalAI</a> server of your own with the <code>/3d/generations</code> backend downloaded — a separate, optional install from whatever's serving your chat model above. An HTTP error here almost always means that backend isn't installed on that server yet, not a bug. Image-to-3D from ONE photo only — no text path on this backend at all.</div>
+            </div>
+            <div id="ai-mesh-hunyuan3d-fields" style="display:none;">
+              <label for="ai-hunyuan3d-base-url">Hunyuan3D-2 server URL</label>
+              <input type="text" id="ai-hunyuan3d-base-url" value="http://localhost:8080" placeholder="http://localhost:8080" />
+              <label for="ai-hunyuan3d-image-file">Reference photo (optional — overrides your typed description below when present)</label>
+              <input type="file" id="ai-hunyuan3d-image-file" accept="image/png,image/jpeg,image/webp,image/gif" />
+              <div class="checkbox-row">
+                <input type="checkbox" id="ai-hunyuan3d-texture" checked />
+                <label for="ai-hunyuan3d-texture">Generate texture too (needs much more VRAM/time — uncheck for geometry only)</label>
+              </div>
+              <div class="checkbox-row">
+                <input type="checkbox" id="ai-hunyuan3d-refine-prompt" checked />
+                <label for="ai-hunyuan3d-refine-prompt">Have the chat model above turn this into a proper 3D-generation prompt first</label>
+              </div>
+              <div class="hint">On by default when using text (not a photo): before calling Hunyuan3D-2, this app first asks the SAME chat model/provider already configured above (your local Ollama model, or Anthropic) to rewrite your description into a prompt focused on shape/parts/material/color — exactly what you asked for ("the app tells my local agent to give me a text prompt"). That model only supplies the WORDS; this app still makes the actual Hunyuan3D-2 call itself. If that rewrite call fails for any reason, your original typed description is sent as-is rather than blocking generation. Uncheck this to always send your raw text unchanged.</div>
+              <div class="hint">Needs a self-hosted <a href="https://github.com/Tencent-Hunyuan/Hunyuan3D-2" target="_blank" rel="noopener">Hunyuan3D-2</a> server of your own (<code>api_server.py</code>) — a real GPU-backed 3D-diffusion model that YOU must install and run (see the hint at the top of this box for exactly what that involves); this app only calls it over HTTP, it can't run the model itself. With this backend selected and no photo attached, clicking Generate sends your (optionally refined) description DIRECTLY to Hunyuan3D-2's own real text-to-3D — it skips code-gen entirely, so no Anthropic API key is required for this option specifically (the chat model is only consulted for the optional prompt-refinement step above, and even that step is skippable).</div>
+            </div>
           </fieldset>
           <label for="ai-prompt">Describe what to build, or how to change what's already built</label>
           <textarea id="ai-prompt" rows="3" placeholder="e.g. &quot;a squat crooked wizard tower with a lopsided spire&quot; — then later &quot;add a balcony halfway up&quot; to revise the same design in place"></textarea>
@@ -4468,6 +4522,92 @@ async function callLocalAiGenerations(baseUrl, model, imageBase64, signal) {
   throw new Error('LocalAI response did not contain a recognizable mesh (no binary body, inline base64, or url field) — the server may be running a different version of this API than expected.');
 }
 
+/* =========================================================================
+ * HUNYUAN3D-2 — a SECOND real non-chat mesh-generation backend, alongside
+ * LocalAI above. Tencent's Hunyuan3D-2 (https://github.com/Tencent-Hunyuan/
+ * Hunyuan3D-2) is a real 3D-native diffusion model (Hunyuan3D-DiT sculpts
+ * geometry first, textures second) self-hosted via its own api_server.py.
+ * Genuinely more capable than LocalAI's own /3d/generations in one real,
+ * verified way: LocalAI's backend is image-conditioned ONLY (no text path
+ * at all, per its own docs, see above) -- Hunyuan3D-2's /generate endpoint
+ * accepts EITHER an `image` (base64) OR a `text` prompt (real text-to-3D,
+ * via its own internal text-to-image step), so this is the first path in
+ * this whole app that can go straight from a plain text description to an
+ * actual generated MESH, not code. Unlike the LocalAI integration above --
+ * whose exact wire format couldn't be confirmed by reading live docs
+ * directly, only inferred from search-result summaries -- this one WAS
+ * verified against the real api_server.py source itself (this sandbox's
+ * network egress allows fetching raw.githubusercontent.com even where it
+ * blocks some other doc sites), so the request/response shape below is
+ * taken as authoritative rather than hedged with multiple fallback shapes:
+ * POST /generate takes a JSON body ({image|text, texture, type:'glb', ...})
+ * and returns the raw binary .glb directly (a FileResponse) on success, or
+ * JSON {text: message, error_code} on failure. Feeds the exact same
+ * processGLBArrayBuffer() voxelizer as LocalAI and a manual upload -- a
+ * third source of the same kind of bytes, not a third parallel pipeline.
+ * ========================================================================= */
+
+async function callHunyuan3DGenerate(baseUrl, payload, signal) {
+  const resp = await fetch(baseUrl + '/generate', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    signal,
+    body: JSON.stringify(Object.assign({ type: 'glb' }, payload)),
+  });
+  if (!resp.ok) {
+    let detail = '';
+    try { const errData = await resp.json(); detail = errData && errData.text; } catch (e) { /* body wasn't JSON */ }
+    throw new Error(`Hunyuan3D-2 returned HTTP ${resp.status}${detail ? ': ' + detail : ''} — make sure api_server.py is actually running at that URL and its model weights finished downloading.`);
+  }
+  return await resp.arrayBuffer();
+}
+
+let hunyuan3dActiveController = null;
+
+async function callHunyuan3DGenerateStandalone() {
+  const status = el('hunyuan3d-status');
+  const baseUrl = (el('hunyuan3d-base-url').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+  const text = el('hunyuan3d-text').value.trim();
+  const fileInput = el('hunyuan3d-image-file');
+  const wantTexture = el('hunyuan3d-texture').checked;
+  el('hunyuan3d-generate-btn').disabled = true;
+  el('hunyuan3d-cancel-btn').disabled = false;
+  const controller = new AbortController();
+  hunyuan3dActiveController = controller;
+  try {
+    let payload, label;
+    if (fileInput.files && fileInput.files[0]) {
+      status.textContent = 'Reading your uploaded photo...';
+      const buf = await fileInput.files[0].arrayBuffer();
+      payload = { image: arrayBufferToBase64(buf), texture: wantTexture };
+      label = fileInput.files[0].name.replace(/\.[^.]+$/, '');
+    } else if (text) {
+      let finalText = text;
+      if (el('hunyuan3d-refine-prompt').checked) {
+        status.textContent = 'Asking your local chat model for a better 3D-generation prompt...';
+        const refineBaseUrl = el('hunyuan3d-refine-base-url').value.trim() || 'http://localhost:11434/v1';
+        const refineModel = el('hunyuan3d-refine-model').value.trim() || 'llama3.1';
+        finalText = await refineTextTo3DPrompt(true, text, { baseUrl: refineBaseUrl, model: refineModel }, controller.signal);
+      }
+      payload = { text: finalText, texture: wantTexture };
+      label = text;
+    } else {
+      throw new Error('Describe what to build, or attach a photo, first.');
+    }
+    status.textContent = `Generating a real 3D mesh with Hunyuan3D-2${wantTexture ? ' (with texture — can take a while, especially on limited VRAM)' : ''} — click Cancel to give up.`;
+    const meshBuf = await callHunyuan3DGenerate(baseUrl, payload, controller.signal);
+    status.textContent = 'Mesh received from Hunyuan3D-2 — voxelizing it now...';
+    await processGLBArrayBuffer(meshBuf, (label || 'hunyuan3d-mesh').slice(0, 60));
+    status.textContent = 'Done — see the result below, or click "Generate model".';
+  } catch (err) {
+    status.textContent = err.name === 'AbortError' ? 'Cancelled.' : 'Error: ' + err.message;
+  } finally {
+    hunyuan3dActiveController = null;
+    el('hunyuan3d-generate-btn').disabled = false;
+    el('hunyuan3d-cancel-btn').disabled = true;
+  }
+}
+
 let localAiActiveController = null;
 
 // Optional: have a local CHAT model turn a vague typed description into a
@@ -5130,6 +5270,52 @@ async function askModelForReferenceConcepts(local, promptText, opts, signal) {
   }
 }
 
+// Directly answers the request "the app should tell my local agent to
+// write the prompt for the 3D tool": the chat model/provider ALREADY
+// configured in this same panel (Anthropic or local) is asked to turn a
+// plain typed description into one concrete, well-formed TEXT-TO-3D
+// generation prompt -- focused on shape/parts/proportions/material/color,
+// never a story -- before it's ever sent to Hunyuan3D-2's own /generate.
+// Same "client performs the real HTTP call, the model only supplies the
+// words" shape as every other tool-use path in this file (Wikimedia
+// search-phrase refinement, the reference-photo concept decomposition
+// above, Ollama's own web_search tool). Any failure at all (bad response,
+// network error, an aborted Cancel) falls back to the user's own original
+// text verbatim -- a best-effort enhancement layered on an
+// already-working default, never a new way for generation to fail.
+async function refineTextTo3DPrompt(local, promptText, opts, signal) {
+  try {
+    const sys = 'You turn a short description of an object into ONE vivid, concrete text-to-3D generation prompt (1-3 sentences) for a real 3D-generative model. Describe its visual FORM: overall shape, distinct parts, proportions, materials, and color -- never a story, a use-case, or camera/lighting direction. Respond with ONLY the prompt text itself -- no preamble, no quotes, no markdown.';
+    let text;
+    if (local) {
+      const resp = await fetch(opts.baseUrl.replace(/\/+$/, '') + '/chat/completions', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        signal,
+        body: JSON.stringify({ model: opts.model, messages: [{ role: 'system', content: sys }, { role: 'user', content: promptText }] }),
+      });
+      if (!resp.ok) return promptText;
+      const data = await resp.json();
+      text = data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+    } else {
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-api-key': opts.apiKey, 'anthropic-version': '2023-06-01' },
+        signal,
+        body: JSON.stringify({ model: opts.model, max_tokens: 256, system: sys, messages: [{ role: 'user', content: promptText }] }),
+      });
+      if (!resp.ok) return promptText;
+      const data = await resp.json();
+      const textBlocks = (data.content || []).filter(b => b.type === 'text');
+      text = textBlocks.length ? textBlocks[textBlocks.length - 1].text : null;
+    }
+    const refined = typeof text === 'string' ? text.trim().replace(/^["']|["']$/g, '') : '';
+    return refined || promptText;
+  } catch (e) {
+    return promptText;
+  }
+}
+
 // One request, one box, one decision: if a photo is attached in the AI
 // Generate panel, this reconstructs a REAL mesh via LocalAI's own real
 // image-to-3D backend (/3d/generations — the exact same "second AI
@@ -5181,10 +5367,78 @@ async function callAiGenerateFromPhoto(file) {
   }
 }
 
+// Second real mesh-generation backend reachable from this SAME unified box
+// -- see the fieldset's own "ai-mesh-backend" radio choice just above.
+// Genuinely different from the LocalAI photo path above in one specific
+// way: with no photo attached, this sends the user's own typed
+// description straight to Hunyuan3D-2's real text-to-3D (optionally
+// refined first by the SAME chat model/provider already configured in
+// this panel -- see refineTextTo3DPrompt above), which needs neither an
+// Anthropic API key nor a local chat model at all when that refine step
+// is off. A photo, if attached here, takes priority and is sent as
+// image-to-3D instead, same "photo present -> image path" rule the
+// LocalAI branch above already follows.
+async function callAiGenerateFromHunyuan3D(imageFile, promptText) {
+  const status = el('ai-status');
+  const baseUrl = (el('ai-hunyuan3d-base-url').value.trim() || 'http://localhost:8080').replace(/\/+$/, '');
+  const wantTexture = el('ai-hunyuan3d-texture').checked;
+  aiRequestInFlight = true;
+  el('ai-generate-btn').disabled = true;
+  el('ai-cancel-btn').disabled = false;
+  const controller = new AbortController();
+  aiActiveController = controller;
+  try {
+    let payload, label;
+    if (imageFile) {
+      status.textContent = `Generating a real 3D mesh with Hunyuan3D-2 from your photo${wantTexture ? ' (with texture — this needs real GPU time)' : ''} — click Cancel to give up.`;
+      el_ai_log_push('user', '[uploaded photo: ' + imageFile.name + ']');
+      const buf = await imageFile.arrayBuffer();
+      payload = { image: arrayBufferToBase64(buf), texture: wantTexture };
+      label = imageFile.name.replace(/\.[^.]+$/, '');
+    } else {
+      let finalText = promptText;
+      if (el('ai-hunyuan3d-refine-prompt').checked) {
+        status.textContent = 'Asking the chat model above for a better 3D-generation prompt...';
+        const local = isAiProviderLocal();
+        const opts = local
+          ? { baseUrl: el('ai-base-url').value.trim() || 'http://localhost:11434/v1', model: el('ai-model').value.trim() || 'llama3.1' }
+          : { apiKey: el('ai-api-key').value.trim(), model: el('ai-model').value.trim() || 'claude-opus-5' };
+        finalText = await refineTextTo3DPrompt(local, promptText, opts, controller.signal);
+      }
+      status.textContent = `Generating a real 3D mesh with Hunyuan3D-2 from your description${wantTexture ? ' (with texture — this needs real GPU time)' : ''} — click Cancel to give up.`;
+      el_ai_log_push('user', promptText);
+      payload = { text: finalText, texture: wantTexture };
+      label = promptText;
+    }
+    const meshBuf = await callHunyuan3DGenerate(baseUrl, payload, controller.signal);
+    status.textContent = 'Mesh received from Hunyuan3D-2 — voxelizing it now...';
+    await processGLBArrayBuffer(meshBuf, (label || 'hunyuan3d-mesh').slice(0, 60));
+    const importRadio = document.querySelector('input[name=mode][value=import]');
+    importRadio.checked = true;
+    importRadio.dispatchEvent(new Event('change', { bubbles: true }));
+    el('ai-hunyuan3d-image-file').value = '';
+  } catch (err) {
+    const msg = err.name === 'AbortError' ? 'Cancelled.' : err.message;
+    el_ai_log_push('assistant', '⚠ ' + msg);
+    status.textContent = '⚠ ' + msg;
+  } finally {
+    aiActiveController = null;
+    aiRequestInFlight = false;
+    el('ai-generate-btn').disabled = false;
+    el('ai-cancel-btn').disabled = true;
+  }
+}
+
 async function callAiGenerate() {
   if (aiRequestInFlight) return;
+  const meshBackend = document.querySelector('input[name=ai-mesh-backend]:checked').value;
   const photoFile = el('ai-photo-file').files && el('ai-photo-file').files[0];
-  if (photoFile) { await callAiGenerateFromPhoto(photoFile); return; }
+  if (meshBackend === 'localai' && photoFile) { await callAiGenerateFromPhoto(photoFile); return; }
+  if (meshBackend === 'hunyuan3d') {
+    const hunyuanImageFile = el('ai-hunyuan3d-image-file').files && el('ai-hunyuan3d-image-file').files[0];
+    const hunyuanPromptText = el('ai-prompt').value.trim();
+    if (hunyuanImageFile || hunyuanPromptText) { await callAiGenerateFromHunyuan3D(hunyuanImageFile, hunyuanPromptText); return; }
+  }
   const local = isAiProviderLocal();
   const apiKey = local ? el('ai-local-key').value.trim() : el('ai-api-key').value.trim();
   const promptText = el('ai-prompt').value.trim();
@@ -9773,6 +10027,16 @@ el('localai-cancel-btn').addEventListener('click', () => { if (localAiActiveCont
 el('localai-refine-search').addEventListener('change', () => {
   el('localai-refine-fields').style.display = el('localai-refine-search').checked ? 'block' : 'none';
 });
+el('hunyuan3d-generate-btn').addEventListener('click', callHunyuan3DGenerateStandalone);
+el('hunyuan3d-cancel-btn').addEventListener('click', () => { if (hunyuan3dActiveController) hunyuan3dActiveController.abort(); });
+el('hunyuan3d-refine-prompt').addEventListener('change', () => {
+  el('hunyuan3d-refine-fields').style.display = el('hunyuan3d-refine-prompt').checked ? 'block' : 'none';
+});
+document.querySelectorAll('input[name=ai-mesh-backend]').forEach(r => r.addEventListener('change', () => {
+  const hunyuan = document.querySelector('input[name=ai-mesh-backend]:checked').value === 'hunyuan3d';
+  el('ai-mesh-localai-fields').style.display = hunyuan ? 'none' : 'block';
+  el('ai-mesh-hunyuan3d-fields').style.display = hunyuan ? 'block' : 'none';
+}));
 document.querySelectorAll('input[name=scalemode]').forEach(r => r.addEventListener('change', () => {
   const ratio = document.querySelector('input[name=scalemode]:checked').value === 'ratio';
   el('scale-ratio-controls').style.display = ratio ? 'flex' : 'block';
