@@ -4577,6 +4577,10 @@ let aiGeneratedFn = null;     // read by SHAPES.aiGenerated (declared up top, be
 let aiGeneratedMaterialFn = null; // read by applyAiMaterialPaint at generate time, or null for the default ext/int/accent scheme
 let aiCurrentDecor = [];      // last successfully validated decor placements, re-embedded for follow-ups
 let aiGeneratedDecor = [];    // read by generateModel() at generate time to push real placeable objects
+let aiCurrentInteriorMode = 'none';    // last successfully validated interiorMode ('none' or 'floors'), re-embedded for follow-ups
+let aiGeneratedInteriorMode = 'none';  // read by generateModel() at generate time to run buildFloorsInterior
+let aiCurrentFloorHeightMeters = 3;    // last successfully validated floorHeightMeters, re-embedded for follow-ups
+let aiGeneratedFloorHeightMeters = 3;  // read by generateModel() at generate time, converted to blocksPerFloor via the current scale
 let aiCurrentMeta = null;     // { summary, exteriorBlock, interiorBlock, accentBlock }
 let aiRequestInFlight = false;
 
@@ -4626,8 +4630,16 @@ const AI_SHAPE_JSON_SCHEMA = {
         additionalProperties: false,
       },
     },
+    interiorMode: {
+      type: 'string', enum: ['none', 'floors'],
+      description: 'Set to "floors" to have this app itself carve a REAL, reliable multi-floor interior into your exterior shape automatically — the exact same proven builder used by this app\'s own hand-built multi-story building presets: a hollow shell, real floor slabs every floorHeightMeters, one stairwell gap with a full-height ladder, a front door on the ground floor, windows at the middle of every floor, and a chair. This OVERWRITES anything your own solid() carved on the inside (it works from your solid()\'s outer silhouette only), so use it INSTEAD OF hand-carving a multi-floor interior yourself, not in addition to it. Pick "floors" for an ordinary walkable multi-story building where a standard interior is all that is needed. Pick "none" (the default) for anything that should not have this generic interior at all: a design with no real interior concept (a statue, a vehicle, a creature, a sculpture), a single-story build, or a design where you are hand-carving your OWN custom interior in solid() instead (e.g. the spiral-staircase worked example below) — "floors" would immediately overwrite that custom work.',
+    },
+    floorHeightMeters: {
+      type: 'number',
+      description: 'Only meaningful when interiorMode is "floors": real-world height of each floor in meters (a real ordinary room is roughly 3, a grander space more like 4-6). Ignored (but must still be a valid number, e.g. 3) when interiorMode is "none".',
+    },
   },
-  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock', 'fillMode', 'wallThickness', 'decor'],
+  required: ['summary', 'code', 'materialCode', 'realHeightMeters', 'realBaseXMeters', 'realBaseZMeters', 'exteriorBlock', 'interiorBlock', 'accentBlock', 'fillMode', 'wallThickness', 'decor', 'interiorMode', 'floorHeightMeters'],
   additionalProperties: false,
 };
 
@@ -4636,7 +4648,7 @@ const AI_SHAPE_JSON_SCHEMA = {
 // path always; the Anthropic path only when web search is also enabled,
 // since combining a forced tool call with a forced output schema in the
 // same request isn't a combination worth relying on unverified).
-const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock, fillMode, wallThickness, decor (empty array [] if unused). No markdown, no code fences, no other text before or after it.';
+const AI_JSON_ONLY_INSTRUCTION = '\n\nRespond with ONLY a single valid JSON object with exactly these keys: summary, code, materialCode (empty string "" if unused), realHeightMeters, realBaseXMeters, realBaseZMeters, exteriorBlock, interiorBlock, accentBlock, fillMode, wallThickness, decor (empty array [] if unused), interiorMode ("none" or "floors"), floorHeightMeters. No markdown, no code fences, no other text before or after it.';
 
 function buildAiSystemPrompt(canWebSearch, hasPhoto) {
   const blockIds = MATERIALS.map(m => m.id).join(', ');
@@ -4702,7 +4714,9 @@ WORKED EXAMPLE of combining parts (a real technique from this app's own hand-bui
 
 Notice this is THREE separate shape rules layered by height (t), combined with a normal if/return chain — not one formula. That's the pattern to follow for any real thing with distinct parts.
 
-SECOND WORKED EXAMPLE, for a genuinely different case: a WALKABLE MULTI-FLOOR INTERIOR with real door openings and a spiral/helical staircase — the same request pattern as "a two-story house with a spiral staircase inside." This app has no separate decor/door-placement system for AI-generated shapes (that only exists for hand-built presets) — a real door or a real usable staircase here has to be genuine carved-out AIR in solid() itself, not a texture or a separate object:
+BUILT-IN MULTI-FLOOR INTERIOR BUILDER (the interiorMode field): for an ORDINARY walkable multi-story building — "a two-story house," "a five-floor tower you can walk up inside" — you do NOT need to hand-carve floors/stairs/doors/windows into solid() yourself at all. Set interiorMode to "floors" (and floorHeightMeters to a sensible real room height) and this app itself carves a real, tested interior automatically from your solid()'s own outer silhouette: a hollow shell, real floor slabs every floorHeightMeters, one stairwell gap with a full-height ladder connecting every floor, a front door carved through the ground-floor wall (found automatically by scanning outward from the center, so it works even on a tapering shape like a dome or a stepped tower), windows at the middle of every floor, and a ground-floor chair — the exact same interior-building code this app's own hand-built multi-story presets use. This is simpler and more reliable than hand-writing the equivalent logic yourself (especially for a weaker/local model), and a placed door built this way automatically gets a real Walk-mode spawn-at-the-doorway too, unlike a hand-carved one (see the limitation noted below). Only your solid()'s OUTER shape matters when interiorMode is "floors" — whatever floors/rooms/stairs you carved inside it yourself are irrelevant and get overwritten, so don't bother hand-carving an interior at all when using this. Leave interiorMode as "none" (the default) for anything with no ordinary walkable-building interior at all (a statue, creature, vehicle, sculpture), a single-story build, or when you specifically need a CUSTOM interior this generic builder can't produce — most commonly a SPIRAL/HELICAL staircase instead of the builder's own straight ladder shaft, or multiple distinct named rooms — which is exactly what the next worked example below shows how to hand-carve instead.
+
+SECOND WORKED EXAMPLE, for that different, fully CUSTOM case: a WALKABLE MULTI-FLOOR INTERIOR with real door openings and a spiral/helical staircase specifically (use this instead of interiorMode:"floors" only when a plain straight ladder stairwell genuinely isn't what was asked for) — the same request pattern as "a two-story house with a spiral staircase inside." A real door or a real usable staircase built this way has to be genuine carved-out AIR in solid() itself, not a texture or a separate object (though you can still additionally place a decor door/chest/torch/etc. from the PLACEABLE OBJECTS list above at any cell you've carved to air here, same as anywhere else):
 
   function solid(x, y, z, dims) {
     var cx = (dims.sx - 1) / 2, cz = (dims.sz - 1) / 2;
@@ -4737,7 +4751,7 @@ SECOND WORKED EXAMPLE, for a genuinely different case: a WALKABLE MULTI-FLOOR IN
 
 The technique that matters here: a real opening is written as an explicit "return false" carved INTO a wall/floor rule, checked before the wall's own "return true" — never a hole left by omission. And a spiral shape in general comes from making an angle a function of height/step index and placing something solid at the resulting rotating position, the exact same "position as a function of a loop variable" idea as the ring of columns above, just varying by height instead of by a fixed loop count. Adapt the numbers (floor count, radius, door size/position) to whatever's actually described — these exact values are only here to show the technique.
 
-One real limitation to know about: this mode has no automatic Walk-mode spawn-at-the-door the way some hand-built presets get (see computeEntranceSpawn) — a design like this is real, solid, correctly-shaped geometry, but Walk mode will still drop the player from above by default rather than at the door you carved. That's a property of this app's camera system, not something your code can fix from inside solid().`;
+One real limitation to know about a HAND-CARVED door like this one (i.e. one carved directly in solid(), not built by interiorMode:"floors" and not placed via the decor array): it gets no automatic Walk-mode spawn-at-the-door the way some hand-built presets get (see computeEntranceSpawn) — a design like this is real, solid, correctly-shaped geometry, but Walk mode will still drop the player from above by default rather than at the door you carved. If a real spawn-at-the-door matters for this design, either use interiorMode:"floors" instead (its own door gets this automatically) or additionally place a {type:"door", x, y, z} decor entry at the exact cell you carved open — either one is enough to make Walk mode spawn there. That's a property of this app's camera system, not something your solid() code alone can fix.`;
   if (canWebSearch) {
     prompt += `\n\nYou have a web_search tool available. Use it when the user describes something with a real-world reference (a specific animal, vehicle, landmark, character, object) to look up its real approximate proportions, shape, and color before writing the geometry — this makes the shape more accurate, it does NOT change what you output. Search results are reference facts only; you still always write your own original solid(x,y,z,dims) code by hand, and you still never return an actual mesh/image/file of any kind, found online or otherwise.`;
   }
@@ -4752,7 +4766,10 @@ One real limitation to know about: this mode has no automatic Walk-mode spawn-at
     prompt += aiCurrentDecor.length
       ? `\n\nCURRENT DECOR (real placeable objects already in effect):\n${JSON.stringify(aiCurrentDecor)}`
       : `\n\nThere are no placeable objects yet.`;
-    prompt += `\n\nIf the user's new message is a refinement/edit request, REVISE the existing function(s)/decor incrementally — keep their overall character and everything not asked to change (including carrying the current decor array forward unchanged unless the request specifically adds/removes/moves an object). Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
+    prompt += aiCurrentInteriorMode === 'floors'
+      ? `\n\nCURRENT INTERIOR MODE: "floors" (floorHeightMeters ${aiCurrentFloorHeightMeters}) — this design currently has the automatic multi-floor interior builder turned on.`
+      : `\n\nCURRENT INTERIOR MODE: "none" — no automatic multi-floor interior is turned on for this design right now.`;
+    prompt += `\n\nIf the user's new message is a refinement/edit request, REVISE the existing function(s)/decor/interiorMode incrementally — keep their overall character and everything not asked to change (including carrying the current decor array and interiorMode forward unchanged unless the request specifically adds/removes/moves an object, or specifically asks to add/remove the multi-floor interior). Only produce a genuinely different design from scratch if the user's message explicitly asks you to start over, scratch it, remake it, or delete/clear the current design.`;
   }
   return prompt;
 }
@@ -5222,14 +5239,30 @@ async function callAiGenerate() {
       Number.isInteger(d.z) && d.z >= 0 && d.z < testDims.sz
     ).map(d => ({ type: d.type, x: d.x, y: d.y, z: d.z }));
 
+    // Optional built-in multi-floor interior — validated the same
+    // "never blocks the core shape, fall back to a sane default" way as
+    // fillMode/wallThickness already are: an invalid interiorMode falls
+    // back to 'none' rather than rejecting the whole response, and
+    // floorHeightMeters falls back to a real ordinary room height (3m)
+    // and is clamped to a sane range so a bad/huge number from a weaker
+    // model can't produce a degenerate (zero or absurdly tall) floor
+    // spacing once converted to blocksPerFloor at generate time.
+    const validInteriorMode = result.interiorMode === 'floors' ? 'floors' : 'none';
+    const rawFloorHeight = Number(result.floorHeightMeters);
+    const validFloorHeight = Number.isFinite(rawFloorHeight) ? Math.min(15, Math.max(2, rawFloorHeight)) : 3;
+
     // Success — now it's safe to replace the active design.
     aiGeneratedFn = fn;
     aiGeneratedMaterialFn = materialFn;
     aiGeneratedDecor = validDecor;
+    aiGeneratedInteriorMode = validInteriorMode;
+    aiGeneratedFloorHeightMeters = validFloorHeight;
     aiCurrentFn = fn;
     aiCurrentCode = result.code;
     aiCurrentMaterialCode = materialCode;
     aiCurrentDecor = validDecor;
+    aiCurrentInteriorMode = validInteriorMode;
+    aiCurrentFloorHeightMeters = validFloorHeight;
     aiCurrentMeta = result;
     aiConversation = messages.concat([{ role: 'assistant', content: rawText }]);
 
@@ -9515,6 +9548,10 @@ el('ai-clear-btn').addEventListener('click', () => {
   aiGeneratedMaterialFn = null;
   aiCurrentDecor = [];
   aiGeneratedDecor = [];
+  aiCurrentInteriorMode = 'none';
+  aiGeneratedInteriorMode = 'none';
+  aiCurrentFloorHeightMeters = 3;
+  aiGeneratedFloorHeightMeters = 3;
   aiCurrentMeta = null;
   el('ai-log').innerHTML = '';
   el('ai-prompt').value = '';
@@ -9843,6 +9880,27 @@ function generateModel() {
   if (isPresetMode() && currentPreset().id === 'big-ben') {
     applyBigBenDetail(grid, dims, matAcc);
   }
+  // The AI's own optional built-in multi-floor interior (interiorMode
+  // "floors") — the exact same buildFloorsInterior() every hand-built
+  // multi-story preset above uses, just driven by the AI's own solid()
+  // silhouette instead of a hand-written one. This REBUILDS the whole
+  // grid from that silhouette (a hollow shell + real floor slabs + a
+  // ladder stairwell + door + windows), discarding whatever the AI's own
+  // solid()/fillMode/wallThickness chose for the inside — the same way a
+  // hand-built preset's own "floors" interiorMode always overrides
+  // fillMode, since a real walkable interior is definitionally hollow.
+  // Must run BEFORE applyAiMaterialPaint below so a materialCode's own
+  // per-part painting (e.g. "gold trim around the windows") lands on the
+  // real final wall/floor/window cells this carves, not on cells that
+  // get carved to air afterward. buildFloorsInterior also pushes its own
+  // real door/ladder/chair/window decor entries into the shared `decor`
+  // array, so the existing entranceEntry/computeEntranceSpawn logic below
+  // picks up its door automatically — the same "free" bonus hand-built
+  // floors-mode presets already get, with no extra plumbing needed here.
+  if (shapeType === 'aiGenerated' && aiGeneratedInteriorMode === 'floors') {
+    const bpf = Math.max(2, Math.round(aiGeneratedFloorHeightMeters * scale));
+    buildFloorsInterior(grid, silhouette, dims, bpf, matExt, matAcc, decor);
+  }
   if (shapeType === 'aiGenerated' && aiGeneratedMaterialFn) {
     applyAiMaterialPaint(grid, dims);
   }
@@ -9869,7 +9927,7 @@ function generateModel() {
     : (el('custom-name').value.trim() || CUSTOM_SHAPE_LABELS[shapeType]);
   const notes = isPresetMode() ? (currentPreset().notes || [])
     : isImportMode() ? ['Voxelized live in your browser from a dropped .glb file — real-world scale and up-axis are assumed from the file itself (glTF spec: meters, Y-up), not independently verified, so double-check the height/width/depth fields and use the Rotate tool if it doesn\'t stand upright.']
-    : isAiMode() ? ['AI-generated shape (' + (el('ai-model').value.trim() || 'claude-opus-5') + ') — not a real-world reference, no modeled interior. Describe a change and generate again to revise it in place, or "Clear / start over" for a fresh design.']
+    : isAiMode() ? ['AI-generated shape (' + (el('ai-model').value.trim() || 'claude-opus-5') + ') — not a real-world reference.' + (aiGeneratedInteriorMode === 'floors' ? ' Includes the app\'s own automatic multi-floor interior (floor slabs, a ladder stairwell, a door, windows).' : ' No modeled interior unless the AI\'s own solid() code hand-carved one.') + ' Describe a change and generate again to revise it in place, or "Clear / start over" for a fresh design.']
     : [];
 
   // Walk/first-person mode used to always spawn by dropping the player from

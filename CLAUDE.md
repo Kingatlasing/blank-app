@@ -1130,3 +1130,100 @@ the real `0xa5672d`, not oak-plank brown — re-run and passing (12/12,
 the one prior assertion count moved by +1 for the new color check). The
 full `dom-test.js` regression suite (34 checks) was also re-run and
 still passes unchanged.
+
+## AI Generate gets the real interior-builder too, not just hand-carved solid()/decor
+
+The user asked directly: "can you add the interior builder and integrate it
+for the AI to design [with]." Up to this point, AI Generate's only path to
+a walkable multi-floor interior was entirely on the model's own shoulders —
+hand-write the floor slabs, stairwell, door, and windows all inside
+`solid()` itself (the existing spiral-staircase worked example), a
+genuinely harder task than describing the exterior shape, and one this
+project's own notes already flagged as a common failure point for a
+weaker/local model. Meanwhile this app already has a proven, reusable,
+non-preset-specific interior builder sitting right there: `buildFloorsInterior
+(grid, silhouette, dims, blocksPerFloor, exteriorMat, accentMat, decorOut)`
+— used by every hand-built multi-story building preset (village house,
+windmill, watchtower, lighthouse) — which works from nothing but an
+arbitrary silhouette (it scans outward from the center to find the real
+wall at any height, so it already handles a tapering shape like a dome or
+stepped tower correctly) and carves a real hollow shell + floor slabs +
+one ladder stairwell + a front door + windows + a chair, entirely
+independent of any specific building's own geometry. That genericity is
+exactly what made it safe to point at an AI-generated silhouette too,
+without writing a second, parallel interior-builder implementation.
+
+**What was built**: a new `interiorMode` field (enum `"none"`/`"floors"`)
+and `floorHeightMeters` field added to `AI_SHAPE_JSON_SCHEMA` (both
+required, matching the existing "required but has a sane default" pattern
+already used for `fillMode`/`wallThickness`/`materialCode`). When the AI
+sets `interiorMode: "floors"`, `generateModel()` calls
+`buildFloorsInterior(grid, silhouette, dims, bpf, matExt, matAcc, decor)`
+— `bpf` computed the exact same way a hand-built floors-mode preset
+computes it (`Math.round(floorHeightMeters * scale)`) — right before
+`applyAiMaterialPaint`, since `buildFloorsInterior` REBUILDS the entire
+grid from the silhouette (discarding whatever the AI's own `solid()`
+carved on the inside, and overriding whatever `fillMode`/`wallThickness`
+it chose, exactly like a hand-built preset's own "floors" interiorMode
+already does), so any `materialCode` per-part painting needs to land on
+the real final wall/floor/window cells this produces, not cells that get
+carved to air afterward. `buildFloorsInterior` pushes its own real
+door/ladder/chair/window entries into the SAME shared `decor` array the
+AI's own `decor` field (chest, torch, etc. — see the section above) also
+feeds, so both coexist automatically, and the existing `entranceEntry =
+interiorEntrance || decor.find(d => d.type === 'door')` Walk-mode
+spawn-detection logic picks up the builder's own door with zero new code
+— an AI-generated design placed at a real doorway automatically now,
+without a hand-carved door needing that separately.
+
+Validation follows the same "never blocks the core shape, fall back to a
+sane default" discipline as everything else in this pipeline: an
+`interiorMode` value other than `"floors"` silently falls back to
+`"none"` rather than rejecting the whole response, and `floorHeightMeters`
+falls back to a real ordinary room height (3m) when non-numeric and is
+clamped to [2, 15] when it's a real but absurd number — protecting
+`buildFloorsInterior`'s own `blocksPerFloor` computation from a
+degenerate (zero, or absurdly tall) floor spacing a weaker model might
+return. New `aiCurrentInteriorMode`/`aiGeneratedInteriorMode` and
+`aiCurrentFloorHeightMeters`/`aiGeneratedFloorHeightMeters` state pairs
+follow the exact same track-current/reset-on-Clear/re-embed-in-follow-up
+pattern already established for `aiCurrentDecor`/`aiGeneratedDecor`.
+
+The system prompt gained a new "BUILT-IN MULTI-FLOOR INTERIOR BUILDER"
+paragraph, placed right before the existing hand-carved multi-floor
+worked example, explicitly telling the model to PREFER `interiorMode:
+"floors"` for an ordinary walkable multi-story building (simpler, more
+reliable than hand-carving the equivalent by hand) and reserve the
+hand-carved `solid()` approach for when a genuinely custom interior is
+needed that the generic builder can't produce — most commonly a real
+SPIRAL/HELICAL staircase specifically, since the builder's own stairwell
+is a plain straight ladder shaft, or several distinct named rooms. The
+existing hand-carved worked example's own intro text was corrected at
+the same time: it previously claimed outright that "this app has no
+separate decor/door-placement system for AI-generated shapes," which
+was already stale from the chest/decor work documented in the section
+above — reworded to point at the decor array (for placing an extra
+object at an already-carved-open cell) and at `interiorMode:"floors"`
+(for when a plain interior would do) as the two real alternatives, and
+to note that a hand-carved door specifically does NOT get automatic
+Walk-mode entrance-spawn the way the builder's own door or a placed
+`door` decor entry both do — narrowing that limitation to exactly the
+case it still applies to, rather than describing it as a blanket
+property of AI Generate mode.
+
+Verified via a new 14-check jsdom test: the system prompt actually
+contains the new section and both new field names; an end-to-end mocked
+Anthropic response with `interiorMode: "floors"` genuinely produces a
+real carved door and a real ladder stairwell in the final rendered
+model's own `decor` array, that the AI's OWN separately-specified decor
+entry (a chest) survives alongside the builder's own decor rather than
+being overwritten, and that `currentModel.spawnPoint` ends up set purely
+from the builder's own door (proving the existing entrance-spawn logic
+picked it up with no new wiring); an invalid `interiorMode` string falls
+back to `"none"` without rejecting the design; an absurdly large and a
+non-numeric `floorHeightMeters` both fall back to sane values (15 and 3
+respectively); a follow-up prompt correctly re-embeds `CURRENT INTERIOR
+MODE: "floors"`; and Clear resets all 4 new state variables back to
+their defaults. All 14 prior AI-feature test suites (150 checks total)
+were re-run UNMODIFIED and still passed, and the full `dom-test.js`
+regression suite (34 checks) still passed.
