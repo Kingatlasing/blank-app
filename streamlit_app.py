@@ -41,9 +41,9 @@ def _cached_research(prompt: str):
 
 st.title("🧱 VoxelCraft")
 st.caption(
-    "Describe any object or building — VoxelCraft researches a real reference photo for it online "
-    "(Wikipedia, then Openverse), works out how to build it in 3D from that photo, and sculpts a "
-    "blocky Minecraft-style model. You can also supply your own reference image instead."
+    "Describe any object or building and get a blocky, Minecraft-style 3D voxel model, built from "
+    "VoxelCraft's own procedural shapes. Optionally, turn on online photo research (or supply your "
+    "own reference image) to steer the model from a real picture instead."
 )
 
 if "voxels" not in st.session_state:
@@ -57,7 +57,8 @@ with st.sidebar:
     mode = st.radio(
         "Source",
         ["Text prompt", "Reference image (+ optional prompt)"],
-        help="Text prompt researches a photo online for you. An image lets you supply your own instead.",
+        help="Text prompt builds from VoxelCraft's procedural shapes (with optional online photo "
+             "research). An image lets you supply your own reference photo instead.",
     )
 
     prompt = st.text_input(
@@ -73,12 +74,14 @@ with st.sidebar:
 
     if mode == "Text prompt":
         research_online = st.checkbox(
-            "🔎 Research online: find a photo + work out how to build it in 3D",
-            value=True,
-            help="Looks up a real photo of your subject (Wikipedia, then Openverse), reads what kind "
-                 "of object it is to decide whether to reconstruct it as a lathed 3D revolve (towers, "
-                 "bottles, trees, ...) or a relief sculpture (buildings, animals, vehicles, ...), then "
-                 "builds it. Falls back to VoxelCraft's built-in procedural shapes if nothing is found.",
+            "🔎 Optional: research a reference photo online",
+            value=False,
+            help="Off by default — generation uses VoxelCraft's own built-in procedural shapes. Turn "
+                 "this on to instead look up a real photo of your subject (Wikipedia, then Openverse), "
+                 "read what kind of object it is to decide whether to reconstruct it as a lathed 3D "
+                 "revolve (towers, bottles, trees, ...) or a relief sculpture (buildings, animals, "
+                 "vehicles, ...), and build from that. Falls back to the procedural shapes if nothing "
+                 "usable is found.",
         )
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
@@ -175,18 +178,18 @@ if voxels is None:
     st.markdown(
         """
 **Try prompts like:**
-- `the Eiffel Tower` *(→ researched, then lathed into a 3D revolve)*
-- `a lighthouse` *(→ 3D revolve)*
-- `a red barn` *(→ 3D relief)*
-- `a golden retriever` *(→ 3D relief)*
-- `a diamond sword` *(no great photo online → falls back to a built-in procedural shape)*
+- `a red house with a garden`
+- `a diamond sword`
+- `a golden castle`
+- `a snowy pine tree`
 - `a green dragon` *(falls back to an abstract sculpture — still unique per prompt!)*
 
-Each one is **researched online first**: VoxelCraft finds a real photo (Wikipedia, then Openverse),
-reads what kind of subject it is to decide *how* to build it in 3D (a lathed revolve for anything
-round about a vertical axis, a relief sculpture otherwise), then sculpts it. Turn the checkbox off in
-the sidebar to use only VoxelCraft's built-in procedural shapes, or switch to "Reference image" to
-supply — and steer the reconstruction of — your own photo instead.
+By default, prompts are built entirely from VoxelCraft's own procedural shape library — no internet
+required. Flip on **"🔎 Optional: research a reference photo online"** in the sidebar to instead have
+VoxelCraft look up a real photo (Wikipedia, then Openverse), work out how to build it in 3D from that
+photo (a lathed revolve for anything round about a vertical axis, like towers or bottles; a relief
+sculpture otherwise), and sculpt the model from it. Or switch to "Reference image" to supply — and
+steer the reconstruction of — your own photo directly.
         """
     )
 else:
@@ -252,10 +255,11 @@ else:
 
 st.divider()
 st.caption(
-    "Text prompts are researched online (Wikipedia, then Openverse — both free, keyless, openly-licensed "
-    "sources) for a real reference photo. The article text is read to pick a 3D reconstruction method "
-    "(a lathed revolve for axially-symmetric subjects, a relief sculpture otherwise), and the photo is "
-    "quantized to real Minecraft block colors and sculpted into voxels. If research is off, finds nothing, "
-    "or you're offline, VoxelCraft falls back to its built-in rule-based procedural shapes so generation "
-    "never fails outright. No paid AI API is used."
+    "By default, everything above runs locally with VoxelCraft's own rule-based procedural shapes — "
+    "no internet or AI API needed. Online photo research is entirely optional: when turned on, it looks "
+    "up a real reference photo (Wikipedia, then Openverse — both free, keyless, openly-licensed sources), "
+    "reads the article text to pick a 3D reconstruction method (a lathed revolve for axially-symmetric "
+    "subjects, a relief sculpture otherwise), and sculpts the photo into voxels quantized to real "
+    "Minecraft block colors. If it's off, finds nothing, or you're offline, VoxelCraft falls back to its "
+    "built-in procedural shapes so generation never fails outright."
 )
