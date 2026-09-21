@@ -159,7 +159,13 @@ def _extrude_from_grid(grid: Grid, mode: str, max_depth: int) -> list[Voxel]:
             else:
                 luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
                 depth = max(1, round(luminance * max_depth))
-                for z in range(depth):
+                # extrude symmetrically both forward AND backward from the
+                # photo plane, not just forward. A single-sided extrusion
+                # is a hollow shell with zero thickness from the back/side
+                # — a photo can't tell us what's actually back there, but
+                # mirroring gives a solid lens-like volume that reads as a
+                # real 3D object from every angle instead of a flat plaque.
+                for z in range(-depth, depth):
                     voxels.append((col_i, y, z, swatch.hex))
     return voxels
 
