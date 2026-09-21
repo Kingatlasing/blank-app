@@ -1,8 +1,8 @@
 # blank-app: a newcomer's guide to the voxel model generator
 
-Written 2026-09-21, describing this branch as of commit `e8a8b61`, and updated for
-the subject-matching rewrite that landed just after. Everything below was read from
-the repository and, where it says "verified", actually run.
+Written 2026-09-21, describing this branch as of commit `e8a8b61`, and updated since
+for the subject-matching rewrite and the generated reference library. Everything
+below was read from the repository and, where it says "verified", actually run.
 
 The guide flagged two areas as drift-prone and both have since changed. All subject
 matching now goes through `matching.py` (§3, §4b, §4c, §4d), because the old
@@ -377,13 +377,14 @@ before redistribution.
 - **`main` is not the generator.** Check out the branch.
 - **Branches cannot be merged together.** Each replaces the whole app. Picking one
   for `main` means dropping the others from it.
-- **`README.md` on the generator branch is out of date.** It documents `palette`,
-  `shapes`, `text_generator`, `image_generator`, `exporters`, and `viewer`, but not
-  `research.py`, `llm_builder.py`, `known_facts.py`, `local_library.py`, or
-  `transform.py` — roughly half the modules, including both optional pipelines.
-- **The bundled reference library was empty at `e8a8b61`**, making that code path
-  dead scaffolding rather than a bug. Check `library/manifest.json` before relying on
-  that still being true.
+- **`README.md` is still partly behind.** It now covers `research.py`,
+  `local_library.py` and `tools/ingest_library.py`, but not `llm_builder.py`,
+  `known_facts.py`, `matching.py` or `transform.py`, so the local-LLM pipeline and
+  the matching rules are undocumented there.
+- **The bundled reference library ships empty**, so that code path is a no-op until
+  someone runs `python tools/ingest_library.py` — it is unpopulated scaffolding, not
+  dead scaffolding, and the tooling to fill it exists. Check `library/manifest.json`
+  rather than assuming either way.
 - **No CI.** Nothing runs on push; verify locally with `python3 tests/accuracy_sweep.py`.
 - **Substring matching is the recurring bug in this codebase.** "cat" is inside
   "cathedral", "man" inside "mansion", "house" inside "lighthouse", "night" inside
