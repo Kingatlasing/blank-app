@@ -38,6 +38,7 @@ the real services.
 from __future__ import annotations
 
 import argparse
+import importlib
 import io
 import json
 import re
@@ -52,14 +53,37 @@ from PIL import Image
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
-from app.voxelcraft.known_facts import iter_known_entries  # noqa: E402
-from app.voxelcraft.research import (  # noqa: E402
-    BlueprintFacts,
-    _classify_build_method,
-    _quantity_in_meters,
-)
 
-LIBRARY_DIR = REPO_ROOT / "app" / "voxelcraft" / "library"
+def _locate_package() -> tuple[Path, str]:
+    """Find the voxelcraft package wherever it sits in the tree.
+
+    Not hard-coded to ``app/voxelcraft``: the app gets rearranged (a move
+    under ``pages/`` is in flight at time of writing), and a tool that
+    writes into a path that no longer exists fails in a confusing way —
+    it would happily create a second, empty library beside the real one.
+    """
+    for init in sorted(REPO_ROOT.glob("**/voxelcraft/__init__.py")):
+        if ".git" in init.parts:
+            continue
+        package_dir = init.parent
+        dotted = ".".join(package_dir.relative_to(REPO_ROOT).parts)
+        return package_dir, dotted
+    raise SystemExit(
+        f"could not find the voxelcraft package under {REPO_ROOT} — "
+        "run this from a checkout of the VoxelCraft branch."
+    )
+
+
+PACKAGE_DIR, _PACKAGE = _locate_package()
+
+known_facts = importlib.import_module(f"{_PACKAGE}.known_facts")
+research = importlib.import_module(f"{_PACKAGE}.research")
+iter_known_entries = known_facts.iter_known_entries
+BlueprintFacts = research.BlueprintFacts
+_classify_build_method = research._classify_build_method
+_quantity_in_meters = research._quantity_in_meters
+
+LIBRARY_DIR = PACKAGE_DIR / "library"
 IMAGES_DIR = LIBRARY_DIR / "images"
 MANIFEST_PATH = LIBRARY_DIR / "manifest.json"
 FACTS_PATH = LIBRARY_DIR / "facts.json"
