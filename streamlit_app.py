@@ -1,30 +1,36 @@
-from pathlib import Path
+"""Launcher for the two Minecraft modeling tools in this repo.
+
+Each tool is a page under `pages/`; Streamlit builds the sidebar nav itself.
+The tools share no code — see docs/newcomer-guide.md for the layout.
+"""
 
 import streamlit as st
-import streamlit.components.v1 as components
 
-st.set_page_config(page_title="Minecraft Scale Model Designer", page_icon="⛏️", layout="wide")
-
-# Streamlit adds default padding/whitespace around the page; strip it so the
-# embedded game fills the frame like a real full-screen web app.
-st.markdown(
-    """
-    <style>
-        .block-container {padding: 0 !important; max-width: 100% !important;}
-        header[data-testid="stHeader"] {display:none;}
-        iframe {border: none;}
-    </style>
-    """,
-    unsafe_allow_html=True,
+st.set_page_config(
+    page_title="Minecraft modeling tools", page_icon="🧱", layout="wide"
 )
 
-ROOT = Path(__file__).parent
-TEMPLATE_PATH = ROOT / "app" / "index.html"
+st.title("🧱 Minecraft modeling tools")
 
+st.markdown(
+    """
+Two separate tools live here. Pick one from the sidebar.
 
-@st.cache_data
-def load_html() -> str:
-    return TEMPLATE_PATH.read_text(encoding="utf-8")
+### 🧱 VoxelCraft
+Describe an object or a building in plain words and get a blocky, Minecraft-style
+voxel model back, built from procedural shapes. It can optionally research a real
+reference photo and real dimensions online, or hand the design off to a local LLM.
+Exports `.mcfunction`, JSON, and OBJ/MTL.
 
+### ⛏️ Scale Model Designer
+Build accurate, scaled block models of real landmarks — or anything you design
+yourself — in a three.js editor with ~320 real Minecraft blocks. Computes real
+measurements for a chosen scale ratio, models interiors, shows a layer-by-layer
+blueprint, and exports `/fill` commands.
 
-components.html(load_html(), height=900, scrolling=False)
+---
+
+VoxelCraft *generates* a model from a prompt; the Designer lets *you* build one to a
+real-world scale.
+"""
+)
