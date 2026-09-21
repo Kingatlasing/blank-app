@@ -150,6 +150,7 @@ if generate:
                 source_url = None
                 blueprint_caption = None
                 llm_code = None
+                degenerate_photo = False
 
                 if use_llm:
                     spinner_msg = (
@@ -174,20 +175,32 @@ if generate:
                         cached = _cached_research(prompt)
                     if cached is not None:
                         image, subject, source_label, source_url, build_method, reason, facts = cached
-                        voxels = image_generator.image_to_voxels(
+                        researched_voxels = image_generator.image_to_voxels(
                             image, resolution=img_resolution, mode=build_method,
                             remove_bg=True, target_ratio=facts.ratio,
                         )
-                        method_label = {"revolve": "a lathed 3D revolve", "relief": "a 3D relief sculpture"}[build_method]
-                        note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
-                        source_caption = f"Reference photo: {source_label}"
-                        if facts.summary():
-                            note += " Proportions corrected using real-world dimensions from Wikidata."
-                            blueprint_caption = f"Blueprint data (Wikidata): {facts.summary()}"
+                        # relief/flat color each voxel individually from the photo, so a
+                        # near-single-color result means the reconstruction went wrong
+                        # somewhere upstream (bad background removal, a decoding issue,
+                        # ...) rather than a faithful build — don't ship an unrecognizable
+                        # colored blob as "the answer". (revolve legitimately averages
+                        # colors per row, so a uniform result there can be correct.)
+                        degenerate_photo = build_method != "revolve" and image_generator.is_degenerate(researched_voxels)
+                        if not degenerate_photo:
+                            voxels = researched_voxels
+                            method_label = {"revolve": "a lathed 3D revolve", "relief": "a 3D relief sculpture"}[build_method]
+                            note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
+                            source_caption = f"Reference photo: {source_label}"
+                            if facts.summary():
+                                note += " Proportions corrected using real-world dimensions from Wikidata."
+                                blueprint_caption = f"Blueprint data (Wikidata): {facts.summary()}"
 
                 if voxels is None:
                     voxels, note = text_generator.generate_from_text(prompt)
-                    if research_online:
+                    if degenerate_photo:
+                        note = ("The researched photo didn't reconstruct well (came out nearly "
+                                 "one solid color), so ") + note[0].lower() + note[1:]
+                    elif research_online:
                         note = "No usable reference photo found online, so " + note[0].lower() + note[1:]
                     elif use_llm:
                         note = "Falling back to a procedural shape: " + note[0].lower() + note[1:]

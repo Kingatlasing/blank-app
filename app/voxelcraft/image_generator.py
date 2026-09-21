@@ -242,3 +242,25 @@ def image_to_voxels(
     if mode == "revolve":
         return _revolve_from_grid(grid, new_w)
     return _extrude_from_grid(grid, mode, max_depth)
+
+
+def is_degenerate(voxels: list[Voxel], dominant_threshold: float = 0.9, min_voxels: int = 20) -> bool:
+    """True if the reconstruction came out (almost) a single solid color —
+    a strong signal something went wrong upstream (background removal
+    barely trimmed anything and the photo's own average tone dominated, a
+    color-space decoding issue, a bad/placeholder image, ...) rather than
+    a faithful voxelization. Small models are exempted since a handful of
+    voxels being one color is normal, not a red flag.
+
+    This can't fix whatever the underlying cause was (there are several
+    plausible ones and no way to inspect the actual failing photo without
+    the fetch itself), but it stops an obviously-broken result — a
+    featureless colored blob instead of anything resembling the subject —
+    from ever being presented as the answer."""
+    if len(voxels) < min_voxels:
+        return False
+    counts: dict[str, int] = {}
+    for v in voxels:
+        counts[v[3]] = counts.get(v[3], 0) + 1
+    dominant = max(counts.values())
+    return (dominant / len(voxels)) >= dominant_threshold
