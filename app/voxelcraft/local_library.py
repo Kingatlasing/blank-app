@@ -18,12 +18,12 @@ Both files are written by the ingest tool, not by hand.
 from __future__ import annotations
 
 import json
-import re
 from functools import lru_cache
 from pathlib import Path
 
 from PIL import Image
 
+from .matching import phrase_in_text
 from .research import BlueprintFacts, ResearchResult, _classify_build_method
 
 _LIBRARY_DIR = Path(__file__).parent / "library"
@@ -50,34 +50,16 @@ def _facts_index() -> dict:
     return _load_json(_FACTS_PATH)
 
 
-def _alias_matches(alias: str, text: str) -> bool:
-    """True when `alias` occurs in `text` as a whole word/phrase.
-
-    Deliberately *not* a plain substring test in either direction. Checking
-    ``text in alias`` lets a short subject match inside a longer alias, which
-    is a false-positive machine: "cat" matches "cathedral" and "at" matches
-    "vatican city". Checking ``alias in text`` without word boundaries has
-    the same problem in reverse. So an entry matches only when its alias
-    appears as an actual word run, which still lets "the eiffel tower in
-    paris" hit the "eiffel tower" entry.
-
-    Boundaries are lookarounds rather than ``\b`` because an alias can end in
-    punctuation — ``\b`` never matches after the ")" in "bench (furniture)",
-    so that alias could never match itself.
-
-    NOTE: this duplicates the whole-word logic in ``research._word_matches``;
-    both should move to the shared matcher module when it lands.
-    """
-    return re.search(rf"(?<!\w){re.escape(alias)}(?!\w)", text) is not None
-
-
 def _match(index: dict, subject: str) -> dict | None:
     """Find `subject`'s entry: exact key first, then any recorded alias.
 
     Alias matching is what makes an ingested entry usable at all — without
     it, an entry would only ever match a prompt that happened to reduce to
-    its exact manifest key. Longest alias first, so a specific entry beats a
-    generic one that happens to be a prefix of it.
+    its exact manifest key. It goes through ``matching.phrase_in_text``:
+    a plain substring test resolves "cat" to "cathedral" and "at" to
+    "vatican city", and a manifest keyed by landmark name is exactly where
+    that bites. Longest alias first, so a specific entry beats a generic
+    one that happens to be contained in it.
     """
     text = subject.strip().lower()
     if not text:
@@ -85,10 +67,17 @@ def _match(index: dict, subject: str) -> dict | None:
     entry = index.get(text)
     if entry:
         return entry
+    # Same rule as known_facts.get_known_facts, so a prompt resolves to the
+    # same subject whether its facts come from the bundle or the curated
+    # table: alias-inside-subject always, subject-inside-alias only when the
+    # subject is at least two words. The two-word floor is what stops a bare
+    # "cat" matching an entry aliased "notre-dame cathedral".
+    subject_is_specific = len(text.split()) >= 2
     candidates = []
     for key, entry in index.items():
         for alias in (entry.get("aliases") or [key]):
-            if _alias_matches(alias.strip().lower(), text):
+            alias = alias.strip().lower()
+            if phrase_in_text(alias, text) or (subject_is_specific and phrase_in_text(text, alias)):
                 candidates.append((len(alias), entry))
     if not candidates:
         return None
@@ -141,6 +130,8 @@ def get_local_reference(subject: str) -> ResearchResult | None:
         diameter_m=entry.get("diameter_m"),
         floors=entry.get("floors"),
     )
+    if facts.summary():
+        facts.source = entry.get("facts_source", "the bundled reference library")
 
     return ResearchResult(
         image=image,

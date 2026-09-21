@@ -14,17 +14,20 @@ authoritative, continuously-updated source when reachable.
 
 from __future__ import annotations
 
+from .matching import phrase_in_text
 from .research import BlueprintFacts
 
 # (aliases, facts) — checked in order, first alias match wins. Aliases are
-# full phrases (never a single generic word like "tower" or "bridge") so a
-# random prompt containing that word can't accidentally match.
+# full phrases, or a single *distinctive* word ("eiffel", "parthenon"),
+# never a generic one like "tower" or "bridge", so a random prompt
+# containing that word can't accidentally match. See ``get_known_facts``
+# for how they are matched.
 _ENTRIES: list[tuple[list[str], BlueprintFacts]] = [
-    (["eiffel tower"], BlueprintFacts(height_m=330.0, width_m=125.0)),
+    (["eiffel tower", "eiffel"], BlueprintFacts(height_m=330.0, width_m=125.0)),
     (["statue of liberty", "lady liberty"], BlueprintFacts(height_m=93.0, width_m=19.0)),
     (["big ben", "elizabeth tower"], BlueprintFacts(height_m=96.0, width_m=12.0)),
     (["leaning tower of pisa", "tower of pisa"], BlueprintFacts(height_m=56.0, diameter_m=15.5)),
-    (["great pyramid of giza", "pyramid of giza", "pyramid of khufu"],
+    (["great pyramid of giza", "pyramid of giza", "pyramids of giza", "pyramid of khufu"],
      BlueprintFacts(height_m=138.5, width_m=230.3)),
     (["parthenon"], BlueprintFacts(height_m=13.7, width_m=30.9)),
     (["golden gate bridge"], BlueprintFacts(height_m=227.0)),
@@ -46,7 +49,7 @@ _ENTRIES: list[tuple[list[str], BlueprintFacts]] = [
     (["hagia sophia"], BlueprintFacts(height_m=55.6, diameter_m=31.7)),
     (["gateway arch"], BlueprintFacts(height_m=192.0, width_m=192.0)),
     (["tokyo tower"], BlueprintFacts(height_m=333.0)),
-    (["petronas towers", "petronas twin towers"], BlueprintFacts(height_m=452.0, floors=88)),
+    (["petronas towers", "petronas twin towers", "petronas"], BlueprintFacts(height_m=452.0, floors=88)),
     (["one world trade center", "freedom tower"], BlueprintFacts(height_m=541.3)),
     (["chrysler building"], BlueprintFacts(height_m=319.0, floors=77)),
     (["mount rushmore"], BlueprintFacts(height_m=18.0)),
@@ -55,16 +58,35 @@ _ENTRIES: list[tuple[list[str], BlueprintFacts]] = [
 
 
 def get_known_facts(subject: str) -> BlueprintFacts | None:
-    """Return hand-curated facts for `subject` if it matches one of the
-    entries above, else None. Matches either direction (alias-in-subject or
-    subject-in-alias) so both "the eiffel tower in paris" and "eiffel
-    tower" work, but never on a single generic word."""
+    """Return hand-curated facts for `subject` if it names one of the
+    entries above, else None.
+
+    Matching is on whole words in both directions:
+
+    - alias inside subject, so "the eiffel tower in paris" finds the
+      Eiffel Tower;
+    - subject inside alias, so a partial name like "notre-dame cathedral"
+      still finds "notre-dame de paris" — but only when the subject is at
+      least two words.
+
+    That two-word floor is the whole point of this function being more
+    than an ``in`` check. A bare "a cat" used to come back as Notre-Dame
+    (``"cat" in "notre-dame cathedral"``), "a house" as the Sydney Opera
+    House, and "a tower" as the Eiffel Tower, which then stretched those
+    models to a landmark's real-world proportions. A one-word subject now
+    has to be an alias in its own right (hence "eiffel" and "petronas"
+    appearing explicitly above).
+    """
     text = subject.strip().lower()
     if not text:
         return None
+    subject_is_specific = len(text.split()) >= 2
     for aliases, facts in _ENTRIES:
-        if any(alias in text or text in alias for alias in aliases):
-            return facts
+        for alias in aliases:
+            if phrase_in_text(alias, text):
+                return facts
+            if subject_is_specific and phrase_in_text(text, alias):
+                return facts
     return None
 
 

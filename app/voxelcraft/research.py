@@ -34,12 +34,12 @@ foreshortening/cropping the photo happened to have.
 from __future__ import annotations
 
 import io
-import re
 from dataclasses import dataclass, field
 
 import requests
 from PIL import Image
 
+from .matching import word_matches
 from .palette import COLOR_WORDS
 
 _TIMEOUT_S = 6
@@ -58,36 +58,47 @@ _UNIT_TO_METERS = {
 
 # Subjects that are (roughly) symmetric about a vertical axis, where
 # "spin the silhouette into a lathe" is a good reconstruction strategy.
-# NOTE: matched with an optional trailing "s" only (see _word_matches) —
-# never a bare common word like "well", which would trip on "as well as"
-# in virtually every article, and nothing that's a prefix of an unrelated
-# common word ("dome" is a prefix of "domesticated", "cup" of "cupboard").
+# NOTE: matched as whole words with an optional trailing "s" (see
+# ``matching.word_matches``) — never a bare common word like "well",
+# which would trip on "as well as" in virtually every article.
 _REVOLVE_KEYWORDS = [
     "tower", "spire", "column", "obelisk", "silo", "chimney", "lighthouse",
     "bottle", "vase", "dome", "statue", "monument", "trunk", "cylindrical",
     "rocket", "missile", "pillar", "urn", "wishing well", "fountain", "minaret",
     "vessel", "jar", "cup", "mug", "barrel", "cannon", "candle", "totem",
-    "planet", "globe", "sphere", "balloon", "steeple", "flask",
+    "planet", "globe", "sphere", "balloon", "steeple", "flask", "tree",
 ]
 
 # Multi-part structures checked *before* the revolve keywords above: a
 # temple described as having "columns" is still a whole rectangular
 # building, not a single round object, so these always win.
+# NOTE: deliberately excludes filler nouns that describe almost any
+# landmark without saying anything about its shape. "structure" alone
+# misclassified the Eiffel Tower ("the tallest structure in Paris") and a
+# silo ("a structure for storing bulk materials"); "complex" and
+# "compound" are both also common adjectives ("a complex lattice").
 _BUILDING_KEYWORDS = [
     "temple", "building", "house", "palace", "church", "cathedral", "stadium",
     "bridge", "mansion", "fortress", "castle", "school", "museum", "library",
     "mosque", "synagogue", "parliament", "capitol", "colonnade", "portico",
-    "peristyle", "complex", "compound", "structure", "hall",
+    "peristyle", "hall",
 ]
 
 
 @dataclass
 class BlueprintFacts:
-    """Real-world dimensions pulled from Wikidata, when available."""
+    """Real-world dimensions for a named subject, when we have any.
+
+    ``source`` names where the numbers actually came from, so the UI can
+    say so honestly: they may be live Wikidata, the hand-curated table in
+    ``known_facts.py`` (which is what answers when Wikidata is
+    unreachable), or both.
+    """
     height_m: float | None = None
     width_m: float | None = None
     diameter_m: float | None = None
     floors: int | None = None
+    source: str | None = None
 
     @property
     def ratio(self) -> float | None:
@@ -130,43 +141,71 @@ def extract_subject(prompt: str) -> str:
     """Strip filler words/clauses/colors from a prompt to get a search-able subject.
 
     "a red house with a garden and a fence" -> "house"
+
+    Color words are dropped because they describe the model's palette
+    rather than what to search for ("a blue dragon" should find a dragon,
+    not the blue sea slug of that name). Two exceptions keep the color
+    when it is part of a *name* rather than a description: the phrase
+    already names a landmark we have dimensions for ("the golden gate
+    bridge"), or the user capitalised it the way English capitalises
+    proper nouns ("the White House" keeps the "White", "a white house"
+    does not).
     """
-    text = prompt.strip().lower()
+    original = prompt.strip()
+    text = original.lower()
+    cut = len(original)
     for article in ("a ", "an ", "the "):
         if text.startswith(article):
             text = text[len(article):]
+            original = original[len(article):]
             break
     for sep in (" with ", " that ", " which ", " standing ", " sitting ",
                 " holding ", " wearing ", " and ", " in ", " on ", " near ", ","):
         idx = text.find(sep)
         if idx != -1:
             text = text[:idx]
-    color_words = set(COLOR_WORDS.keys())
+            cut = min(cut, idx)
+    original = original[:cut]
+
+    from .known_facts import get_known_facts
+    if get_known_facts(text):
+        return text
+
+    capitalized = {w.lower() for w in original.split() if w[:1].isupper()}
+    color_words = set(COLOR_WORDS.keys()) - capitalized
     words = [w for w in text.split() if w not in color_words]
     subject = " ".join(words).strip()
     return subject or text.strip() or prompt.strip()
 
 
-def _word_matches(keyword: str, text: str) -> bool:
-    """Whole-word match (keyword, optionally with a trailing 's') — NOT a
-    prefix match. `\\b{keyword}\\w*\\b` looks similar but is a real trap: it
-    matches any word that merely *starts with* the keyword, so "dome"
-    matched "domesticated" and "cup" matched "cupboard" in testing.
-    Multi-word keywords (e.g. "wishing well") are matched literally, with
-    no trailing 's'."""
-    if " " in keyword:
-        return re.search(re.escape(keyword), text) is not None
-    return re.search(rf"\b{re.escape(keyword)}s?\b", text) is not None
+def _cue_in(text: str) -> tuple[str, str] | None:
+    """First shape cue found in `text`, as (method, reason), or None.
+    Buildings are checked first: a temple described as having "columns" is
+    still a whole rectangular building, not a single round object."""
+    building_hit = next((k for k in _BUILDING_KEYWORDS if word_matches(k, text)), None)
+    if building_hit:
+        return "relief", f"'{building_hit}' suggests a multi-part building, not a single round object"
+    revolve_hit = next((k for k in _REVOLVE_KEYWORDS if word_matches(k, text)), None)
+    if revolve_hit:
+        return "revolve", f"'{revolve_hit}' suggests a shape that's round about a vertical axis"
+    return None
 
 
 def _classify_build_method(title: str, extract: str) -> tuple[str, str]:
-    text = f"{title} {extract}".lower()
-    building_hit = next((k for k in _BUILDING_KEYWORDS if _word_matches(k, text)), None)
-    if building_hit:
-        return "relief", f"'{building_hit}' suggests a multi-part building, not a single round object"
-    hit = next((k for k in _REVOLVE_KEYWORDS if _word_matches(k, text)), None)
-    if hit:
-        return "revolve", f"'{hit}' suggests a shape that's round about a vertical axis"
+    """Pick a reconstruction strategy from the article's title first, and
+    only then from its body text.
+
+    Title-first matters: the Leaning Tower of Pisa's intro mentions "Pisa
+    Cathedral" and a lighthouse's says "a tower, building, or other type
+    of physical structure", so scanning title and body as one blob let an
+    incidental noun in the body outvote the subject's own name.
+    """
+    cue = _cue_in(title.lower())
+    if cue:
+        return cue
+    cue = _cue_in(extract.lower())
+    if cue:
+        return cue
     return "relief", "no rotational-symmetry cue found, so treated as a flatter/profile shape"
 
 
@@ -275,6 +314,41 @@ def _fetch_wikidata_facts(title: str) -> BlueprintFacts:
     )
 
 
+CURATED_SOURCE = "VoxelCraft's curated landmark table"
+
+_FACT_FIELDS = ("height_m", "width_m", "diameter_m", "floors")
+
+
+def merge_facts(candidates: list[tuple[str, BlueprintFacts | None]]) -> BlueprintFacts:
+    """Merge candidate facts field by field, highest precedence first, and
+    record which sources actually contributed in ``source``.
+
+    Each source only fills fields the ones before it left empty, so a
+    result can legitimately be one source's height and another's floor
+    count. ``source`` therefore names every source that contributed
+    rather than one winner, because that is what the UI has to be able
+    to say truthfully. Sources that contributed nothing are not named,
+    and a result with no facts at all gets no source.
+    """
+    merged = BlueprintFacts()
+    contributors: list[str] = []
+    for label, facts in candidates:
+        if facts is None:
+            continue
+        contributed = False
+        for field_name in _FACT_FIELDS:
+            if getattr(merged, field_name) is None and getattr(facts, field_name) is not None:
+                setattr(merged, field_name, getattr(facts, field_name))
+                contributed = True
+        if contributed:
+            contributors.append(label)
+    if len(contributors) > 1:
+        merged.source = f"{', '.join(contributors[:-1])} and {contributors[-1]}"
+    elif contributors:
+        merged.source = contributors[0]
+    return merged
+
+
 def fetch_blueprint_facts(title: str) -> BlueprintFacts:
     """Real-world dimensions for a named subject, filled in from three
     sources in descending order of currency:
@@ -285,28 +359,16 @@ def fetch_blueprint_facts(title: str) -> BlueprintFacts:
        app still gets real numbers rather than none;
     3. ``known_facts.py`` — the hand-curated landmark table.
 
-    Each source only ever *fills in* fields the ones above it left empty;
-    a value from a higher source is never overridden.
+    Each source only fills fields the ones above it left empty, and
+    ``merge_facts`` records which of them actually contributed.
     """
     from .known_facts import get_known_facts
     from .local_library import get_cached_facts
-
-    sources = [
-        _fetch_wikidata_facts(title),
-        get_cached_facts(title),
-        get_known_facts(title),
-    ]
-    merged = BlueprintFacts()
-    for facts in sources:
-        if facts is None:
-            continue
-        merged = BlueprintFacts(
-            height_m=merged.height_m or facts.height_m,
-            width_m=merged.width_m or facts.width_m,
-            diameter_m=merged.diameter_m or facts.diameter_m,
-            floors=merged.floors or facts.floors,
-        )
-    return merged
+    return merge_facts([
+        ("Wikidata", _fetch_wikidata_facts(title)),
+        ("the ingested reference library", get_cached_facts(title)),
+        (CURATED_SOURCE, get_known_facts(title)),
+    ])
 
 
 def _search_wikipedia(query: str) -> ResearchResult | None:

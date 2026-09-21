@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 
 from . import shapes
+from .matching import word_matches
 from .palette import find_color_words
 
 Voxel = tuple[int, int, int, str]
@@ -41,7 +42,14 @@ def _wants_staircase(text: str) -> bool:
     return bool(re.search(r"(spiral|helix|helical|winding)\s*stair", text))
 
 
-# Ordered (specific-first) keyword -> builder table. Every builder takes the
+# Ordered (specific-first) keyword -> builder table. Keywords are matched
+# as whole words (``matching.word_matches``), never as substrings: "a
+# lighthouse" used to build a lighthouse *and* a house side by side, and
+# "a multi-story mansion" used to build a person, because "house" and
+# "man" are inside those words. Anything that should still match a longer
+# word therefore needs its own entry ("mansion", "snowman").
+#
+# Every builder takes the
 # shared `colors` list (from any color words in the prompt); the handful
 # that read `_last_prompt` do so to pick up cues (a "witch's" castle, a
 # "box" vs a "cube", floor count) that aren't colors.
@@ -56,13 +64,13 @@ _RULES: list[tuple[list[str], object]] = [
     (["dragon", "wyvern"], lambda colors: shapes.dragon(
         body=colors[0] if colors else "green")),
     (["castle", "fortress"], lambda colors: shapes.castle(
-        color=colors[0] if colors else ("purple" if "witch" in _last_prompt[0] else "cobblestone"))),
+        color=colors[0] if colors else ("purple" if word_matches("witch", _last_prompt[0]) else "cobblestone"))),
     (["tower", "turret", "lighthouse"], lambda colors: shapes.tower(
         color=colors[0] if colors else "cobblestone")),
     (["temple", "parthenon", "acropolis", "colonnade"], lambda colors: shapes.temple(
         stone=colors[0] if colors else "sand",
         roof=colors[1] if len(colors) > 1 else "light_gray")),
-    (["house", "cabin", "cottage", "home", "hut"], lambda colors: shapes.house(
+    (["house", "cabin", "cottage", "home", "hut", "mansion"], lambda colors: shapes.house(
         wall=colors[0] if colors else "oak_planks",
         roof=colors[1] if len(colors) > 1 else "red",
         floors=_parse_floor_count(_last_prompt[0]) or 1,
@@ -72,7 +80,7 @@ _RULES: list[tuple[list[str], object]] = [
     (["planet", "globe", "moon", "world", "orb", "ball", "sphere"], lambda colors: shapes.sphere(
         color=colors[0] if colors else "light_blue")),
     (["cube", "block", "box"], lambda colors: shapes.cube(
-        color=colors[0] if colors else "stone", hollow="box" in _last_prompt[0])),
+        color=colors[0] if colors else "stone", hollow=word_matches("box", _last_prompt[0]))),
     (["car", "truck", "vehicle"], lambda colors: shapes.car(
         body=colors[0] if colors else "red")),
     (["boat", "ship", "canoe"], lambda colors: shapes.boat()),
@@ -84,7 +92,7 @@ _RULES: list[tuple[list[str], object]] = [
      lambda colors: shapes.quadruped(
          body=colors[0] if colors else "brown", head=colors[0] if colors else "brown")),
     (["robot", "person", "human", "steve", "alex", "character", "man", "woman",
-      "knight", "warrior", "hero", "zombie", "player"], lambda colors: shapes.humanoid(
+      "knight", "warrior", "hero", "zombie", "player", "snowman"], lambda colors: shapes.humanoid(
         shirt=colors[0] if colors else "cyan", pants=colors[1] if len(colors) > 1 else "blue")),
 ]
 
@@ -124,7 +132,7 @@ def generate_from_text(prompt: str) -> tuple[list[Voxel], str]:
 
     matches = []
     for keywords, builder in _RULES:
-        matched = next((k for k in keywords if k in prompt_lower), None)
+        matched = next((k for k in keywords if word_matches(k, prompt_lower)), None)
         if matched:
             matches.append((matched, builder))
 
