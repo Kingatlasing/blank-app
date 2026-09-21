@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.voxelcraft import exporters, image_generator, research, text_generator
+from app.voxelcraft import exporters, image_generator, llm_builder, research, text_generator
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
 from app.voxelcraft.viewer import build_viewer_html
 
@@ -42,9 +42,8 @@ def _cached_research(prompt: str):
 st.title("🧱 VoxelCraft")
 st.caption(
     "Describe any object or building and get a blocky, Minecraft-style 3D voxel model, built from "
-    "VoxelCraft's own procedural shapes. Optionally, turn on online research to pull a real reference "
-    "photo and real-world dimensions (Wikipedia/Wikidata) and build from those instead — or supply "
-    "your own reference image directly."
+    "VoxelCraft's own procedural shapes. Optionally, research a real reference photo + dimensions "
+    "online, hand design off to your own local Ollama model, or supply your own reference image."
 )
 
 if "voxels" not in st.session_state:
@@ -53,6 +52,7 @@ if "voxels" not in st.session_state:
     st.session_state.source_caption = None
     st.session_state.source_url = None
     st.session_state.blueprint_caption = None
+    st.session_state.llm_code = None
 
 with st.sidebar:
     st.header("Generate")
@@ -69,23 +69,38 @@ with st.sidebar:
     )
 
     research_online = False
+    use_llm = False
+    ollama_host = "http://localhost:11434"
+    ollama_model = "qwen2.5-coder"
     img_source = None
     image_url = ""
     uploaded = None
     remove_bg = True
 
     if mode == "Text prompt":
-        research_online = st.checkbox(
-            "🔎 Optional: research a reference photo + real dimensions online",
-            value=False,
-            help="Off by default — generation uses VoxelCraft's own built-in procedural shapes. Turn "
-                 "this on to instead look up a real photo of your subject (Wikipedia, then Openverse), "
-                 "read what kind of object it is to decide whether to reconstruct it as a lathed 3D "
-                 "revolve (towers, bottles, trees, ...) or a relief sculpture (buildings, animals, "
-                 "vehicles, ...), pull real height/width/floor-count facts from Wikidata to correct the "
-                 "proportions, and build from all of that. Falls back to the procedural shapes if "
-                 "nothing usable is found.",
+        gen_strategy = st.radio(
+            "How should VoxelCraft build it?",
+            [
+                "Built-in procedural shapes",
+                "🔎 Research a reference photo + dimensions online",
+                "🧠 Design a custom structure with a local LLM (Ollama)",
+            ],
+            help="Procedural: VoxelCraft's own shape library, fully offline. Research: look up a real "
+                 "photo (Wikipedia/Openverse) and real dimensions (Wikidata). LLM: ask your local "
+                 "Ollama model to design something genuinely custom, beyond the shape library.",
         )
+        research_online = gen_strategy.startswith("🔎")
+        use_llm = gen_strategy.startswith("🧠")
+        if use_llm:
+            ollama_host = st.text_input("Ollama host", value="http://localhost:11434")
+            ollama_model = st.text_input("Ollama model", value="qwen2.5-coder")
+            st.caption(
+                "Sends your prompt to that local Ollama server, which writes Python code against a "
+                "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a restricted "
+                "sandbox here (no imports, no file/network access, 5s execution limit) to produce the "
+                "model. Can take a while on modest hardware. Falls back to procedural shapes if Ollama "
+                "is unreachable or the generated code doesn't work."
+            )
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
         if img_source == "From a URL":
@@ -122,8 +137,18 @@ if generate:
                 source_caption = None
                 source_url = None
                 blueprint_caption = None
+                llm_code = None
 
-                if research_online:
+                if use_llm:
+                    with st.spinner(f"Asking {ollama_model} (via Ollama) to design a custom structure — this can take a while on local hardware..."):
+                        try:
+                            voxels, note, llm_code = llm_builder.generate_llm_structure(
+                                prompt, model=ollama_model, host=ollama_host
+                            )
+                        except llm_builder.LLMBuildError as exc:
+                            st.sidebar.warning(f"LLM design failed ({exc}) — falling back to built-in procedural shapes.")
+
+                if research_online and voxels is None:
                     with st.spinner(f"Researching '{prompt}' online and working out how to build it in 3D..."):
                         cached = _cached_research(prompt)
                     if cached is not None:
@@ -143,6 +168,8 @@ if generate:
                     voxels, note = text_generator.generate_from_text(prompt)
                     if research_online:
                         note = "No usable reference photo found online, so " + note[0].lower() + note[1:]
+                    elif use_llm:
+                        note = "Falling back to a procedural shape: " + note[0].lower() + note[1:]
 
                 voxels = normalize(scale_voxels(voxels, scale_factor))
                 voxels, truncated = voxel_count_limit(voxels, MAX_VOXELS)
@@ -151,6 +178,7 @@ if generate:
                 st.session_state.source_caption = source_caption
                 st.session_state.source_url = source_url
                 st.session_state.blueprint_caption = blueprint_caption
+                st.session_state.llm_code = llm_code
                 st.session_state.title = prompt
         else:
             image = None
@@ -177,6 +205,7 @@ if generate:
                 st.session_state.source_caption = None
                 st.session_state.source_url = None
                 st.session_state.blueprint_caption = None
+                st.session_state.llm_code = None
                 st.session_state.title = prompt.strip() or "image model"
     except Exception as exc:  # noqa: BLE001 - surface any generation failure to the user
         st.sidebar.error(f"Couldn't generate a model: {exc}")
@@ -197,13 +226,15 @@ if voxels is None:
 - `a fluffy cloud` *(no exact match — falls back to an abstract sculpture, still unique per prompt!)*
 
 By default, prompts are built entirely from VoxelCraft's own procedural shape library — no internet
-required. Flip on **"🔎 Optional: research a reference photo + real dimensions online"** in the
-sidebar to instead have VoxelCraft look up a real photo (Wikipedia, then Openverse), work out how to
-build it in 3D from that photo (a lathed revolve for anything round about a vertical axis, like towers
-or bottles; a relief sculpture otherwise), pull real height/width/floor-count facts from Wikidata to
-correct the proportions, and sculpt the model from all of that — then export it as a literal,
-ordered `.mcfunction` build sequence. Or switch to "Reference image" to supply — and steer the
-reconstruction of — your own photo directly.
+required. In the sidebar, **"How should VoxelCraft build it?"** offers two alternatives: **🔎 Research
+online** looks up a real photo (Wikipedia, then Openverse), works out how to build it in 3D from that
+photo (a lathed revolve for anything round about a vertical axis; a relief sculpture otherwise), and
+pulls real height/width/floor-count facts from Wikidata to correct the proportions. **🧠 Design with a
+local LLM** sends your prompt to your own Ollama server, which writes Python code against a small
+geometry API to design something genuinely custom, beyond the shape library — run in a restricted
+local sandbox to build the model. Every model exports as a literal, ordered `.mcfunction` build
+sequence. Or switch to "Reference image" to supply — and steer the reconstruction of — your own photo
+directly.
         """
     )
 else:
@@ -215,6 +246,9 @@ else:
             st.caption(st.session_state.source_caption)
     if st.session_state.blueprint_caption:
         st.caption(st.session_state.blueprint_caption)
+    if st.session_state.llm_code:
+        with st.expander("🧠 Code the LLM wrote for this structure"):
+            st.code(st.session_state.llm_code, language="python")
 
     col_view, col_export = st.columns([3, 1])
 
@@ -283,12 +317,13 @@ else:
 st.divider()
 st.caption(
     "By default, everything above runs locally with VoxelCraft's own rule-based procedural shapes — "
-    "no internet or AI API needed. Online research is entirely optional: when turned on, it looks up a "
-    "real reference photo (Wikipedia, then Openverse — both free, keyless, openly-licensed sources), "
-    "reads the article text to pick a 3D reconstruction method (a lathed revolve for axially-symmetric "
-    "subjects, a relief sculpture otherwise), pulls real height/width/floor-count facts from Wikidata to "
-    "correct the model's proportions, and sculpts the photo into voxels quantized to real Minecraft "
-    "block colors — exported as a literal, ordered .mcfunction build sequence. If research is off, "
-    "finds nothing, or you're offline, VoxelCraft falls back to its built-in procedural shapes so "
-    "generation never fails outright."
+    "no internet or AI API needed. Online research is optional: when turned on, it looks up a real "
+    "reference photo (Wikipedia, then Openverse — both free, keyless, openly-licensed sources), reads "
+    "the article text to pick a 3D reconstruction method, pulls real dimensions from Wikidata, and "
+    "sculpts the photo into voxels. The local-LLM option is also optional: it sends your prompt to your "
+    "own Ollama server, which writes Python code against a small geometry API; that code runs in a "
+    "restricted local sandbox (no imports, no file/network access, a hard execution-time limit) to "
+    "produce the model. In every case, if the chosen option is off, unreachable, or finds/produces "
+    "nothing usable, VoxelCraft falls back to its built-in procedural shapes so generation never fails "
+    "outright."
 )
