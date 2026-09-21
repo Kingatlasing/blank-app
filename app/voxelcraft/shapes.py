@@ -141,6 +141,66 @@ def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red") -> list[Vox
     return _merge(base, roof_layers)
 
 
+def temple(stone="sand", roof="light_gray") -> list[Voxel]:
+    """A peristyle Greek temple (Parthenon-style): stepped platform, a ring
+    of freestanding columns, an entablature, a pedimented gable roof, and —
+    unlike anything built from a single reference photo — an actual hollow
+    cella (interior room) with a doorway, so there's a real inside to walk
+    into."""
+    stone_c, roof_c = hex_of(stone), hex_of(roof)
+    parts = []
+
+    # stepped stylobate (platform)
+    parts.append(_box(-7, 8, 0, 1, -14, 15, stone_c))
+    parts.append(_box(-6, 7, 1, 2, -13, 14, stone_c))
+
+    col_y0, col_y1 = 2, 11
+    col_positions: set[tuple[int, int]] = set()
+    for z in range(-12, 13, 3):
+        col_positions.add((-6, z))
+        col_positions.add((6, z))
+    for x in range(-6, 7, 3):
+        col_positions.add((x, -13))
+        col_positions.add((x, 13))
+    columns = []
+    for x, z in col_positions:
+        columns.extend(_box(x, x + 1, col_y0, col_y1, z, z + 1, stone_c))
+    parts.append(columns)
+
+    # entablature (architrave/frieze) capping the colonnade
+    parts.append(_hollow_box(-6, 7, col_y1, col_y1 + 2, -13, 14, stone_c))
+
+    # gabled roof: ridge runs the long (z) axis, sloping down in x, with
+    # solid triangular pediments filling the gable ends
+    ridge_y0 = col_y1 + 2
+    half_w = 6
+    roof = []
+    pediments = []
+    for layer in range(half_w + 1):
+        lo, hi = -half_w + layer, half_w - layer
+        if lo > hi:
+            break
+        y = ridge_y0 + layer
+        for z in range(-13, 14):
+            roof.append((lo, y, z, roof_c))
+            if hi != lo:
+                roof.append((hi, y, z, roof_c))
+        for z in (-13, 13):
+            for x in range(lo, hi + 1):
+                pediments.append((x, y, z, stone_c))
+    parts.append(roof)
+    parts.append(pediments)
+
+    # cella: a genuinely hollow interior room with a doorway. The floor
+    # (col_y0) stays solid straight through the threshold — only the wall
+    # above it is opened — so there's no 1-block pit to fall into.
+    cella = _hollow_box(-4, 5, col_y0, col_y1 - 1, -9, 10, stone_c)
+    door = {(x, y, z) for x, y, z, _ in _box(-1, 2, col_y0 + 1, col_y0 + 4, -9, -8, stone_c)}
+    parts.append([v for v in cella if (v[0], v[1], v[2]) not in door])
+
+    return _merge(*parts)
+
+
 def tower(radius=4, height=14, color="cobblestone") -> list[Voxel]:
     c = hex_of(color)
     out = []

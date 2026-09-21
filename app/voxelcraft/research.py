@@ -66,6 +66,16 @@ _REVOLVE_KEYWORDS = [
     "planet", "globe", "sphere", "balloon", "silo", "steeple", "flask",
 ]
 
+# Multi-part structures checked *before* the revolve keywords above: a
+# temple described as having "columns" is still a whole rectangular
+# building, not a single round object, so these always win.
+_BUILDING_KEYWORDS = [
+    "temple", "building", "house", "palace", "church", "cathedral", "stadium",
+    "bridge", "mansion", "fortress", "castle", "school", "museum", "library",
+    "mosque", "synagogue", "parliament", "capitol", "colonnade", "portico",
+    "peristyle", "complex", "compound", "structure", "hall",
+]
+
 
 @dataclass
 class BlueprintFacts:
@@ -131,6 +141,9 @@ def extract_subject(prompt: str) -> str:
 
 def _classify_build_method(title: str, extract: str) -> tuple[str, str]:
     text = f"{title} {extract}".lower()
+    building_hit = next((k for k in _BUILDING_KEYWORDS if re.search(rf"\b{k}\w*\b", text)), None)
+    if building_hit:
+        return "relief", f"'{building_hit}' suggests a multi-part building, not a single round object"
     hit = next((k for k in _REVOLVE_KEYWORDS if re.search(rf"\b{k}\w*\b", text)), None)
     if hit:
         return "revolve", f"'{hit}' suggests a shape that's round about a vertical axis"

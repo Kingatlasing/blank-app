@@ -26,6 +26,9 @@ _RULES: list[tuple[list[str], object]] = [
         color=colors[0] if colors else "cobblestone")),
     (["tower", "turret", "lighthouse"], lambda colors: shapes.tower(
         color=colors[0] if colors else "cobblestone")),
+    (["temple", "parthenon", "acropolis", "colonnade"], lambda colors: shapes.temple(
+        stone=colors[0] if colors else "sand",
+        roof=colors[1] if len(colors) > 1 else "light_gray")),
     (["house", "cabin", "cottage", "home", "hut"], lambda colors: shapes.house(
         wall=colors[0] if colors else "oak_planks",
         roof=colors[1] if len(colors) > 1 else "red")),
