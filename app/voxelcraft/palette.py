@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from .matching import word_matches
+
 
 @dataclass(frozen=True)
 class Swatch:
@@ -104,10 +106,15 @@ COLOR_WORDS: dict[str, str] = {
 
 
 def find_color_words(prompt_lower: str) -> list[str]:
-    """Return palette-swatch names mentioned in the prompt, longest phrase first."""
+    """Return palette-swatch names mentioned in the prompt, longest phrase
+    first.
+
+    Matched on whole words: substring matching turned "a knight" black
+    ("night"), "a skyscraper" light blue ("sky") and "a sandwich" sand.
+    """
     hits = []
     for phrase in sorted(COLOR_WORDS, key=len, reverse=True):
-        if phrase in prompt_lower:
+        if word_matches(phrase, prompt_lower):
             hits.append(COLOR_WORDS[phrase])
     # de-dupe, preserve order
     seen: set[str] = set()

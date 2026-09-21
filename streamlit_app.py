@@ -190,8 +190,12 @@ if generate:
                             note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
                             source_caption = f"Reference photo: {source_label}"
                             if facts.summary():
-                                note += " Proportions corrected using real-world dimensions from Wikidata."
-                                blueprint_caption = f"Blueprint data (Wikidata): {facts.summary()}"
+                                # facts.source, not a hard-coded "Wikidata": these
+                                # numbers come from the curated landmark table
+                                # whenever Wikidata has no entry or isn't reachable.
+                                facts_source = facts.source or "real-world reference data"
+                                note += f" Proportions corrected using real-world dimensions from {facts_source}."
+                                blueprint_caption = f"Blueprint data ({facts_source}): {facts.summary()}"
 
                 if voxels is None:
                     voxels, note = text_generator.generate_from_text(prompt)

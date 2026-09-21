@@ -57,6 +57,8 @@ def get_local_reference(subject: str) -> ResearchResult | None:
         diameter_m=entry.get("diameter_m"),
         floors=entry.get("floors"),
     )
+    if facts.summary():
+        facts.source = entry.get("facts_source", "the bundled reference library")
 
     return ResearchResult(
         image=image,
