@@ -30,8 +30,10 @@ from app.voxelcraft import (  # noqa: E402
 )
 from app.voxelcraft.known_facts import _ENTRIES, get_known_facts  # noqa: E402
 from app.voxelcraft.palette import PALETTE, find_color_words  # noqa: E402
+from app.voxelcraft.matching import phrase_in_text, word_matches  # noqa: E402
 from app.voxelcraft.research import (  # noqa: E402
-    BlueprintFacts, _classify_build_method, extract_subject, fetch_blueprint_facts,
+    CURATED_SOURCE, BlueprintFacts, _classify_build_method, extract_subject,
+    fetch_blueprint_facts, merge_facts,
 )
 
 KNOWN_HEX = {s.hex for s in PALETTE}
@@ -47,6 +49,36 @@ def check(ok: bool, label: str, detail: str = "") -> None:
 def section(name: str) -> None:
     print(f"\n--- {name} ---")
 
+
+# --------------------------------------------------------------------------
+section("the word matcher itself")
+for keyword, text, expected in [
+    ("cat", "a cathedral", False),
+    ("cat", "a cat", True),
+    ("cat", "two cats", True),
+    ("man", "a mansion", False),
+    ("house", "a lighthouse", False),
+    ("dome", "a domesticated dog", False),
+    ("cup", "a cupboard", False),
+    ("wishing well", "a wishing well", True),
+    # Needles that begin or end in punctuation: \b is a word/non-word
+    # transition, so it never matches beside one. Alias tables really do
+    # contain these, so the matcher uses lookarounds instead.
+    ("st.", "st. basil's cathedral", True),
+    ("bench (furniture)", "a bench (furniture) listing", True),
+]:
+    got = word_matches(keyword, text)
+    check(got == expected, f"word_matches({keyword!r}, {text!r}) is {expected}", f"got {got}")
+
+for phrase, text, expected in [
+    ("big ben", "the big ben clock tower", True),
+    ("ben", "big ben", True),
+    ("cat", "notre-dame cathedral", False),
+    ("st. basil's cathedral", "st. basil's cathedral", True),
+    ("bench (furniture)", "bench (furniture)", True),
+]:
+    got = phrase_in_text(phrase, text)
+    check(got == expected, f"phrase_in_text({phrase!r}, {text!r}) is {expected}", f"got {got}")
 
 # --------------------------------------------------------------------------
 section("known landmark facts: every alias finds its own entry")
@@ -271,6 +303,27 @@ check(offline.summary() != "" and offline.source is not None
       "curated facts are not labelled as Wikidata", f"source={offline.source!r}")
 check(fetch_blueprint_facts("Some Unknown Thing").source is None,
       "no facts means no source claim")
+
+# merge_facts is what any additional source (an ingested photo/facts
+# cache, say) slots into, so the attribution has to survive three-way
+# merges and name only the sources that actually contributed.
+three_way = merge_facts([
+    ("Wikidata", BlueprintFacts(height_m=330.0)),
+    ("ingested cache", BlueprintFacts(height_m=1.0, floors=7)),
+    (CURATED_SOURCE, BlueprintFacts(width_m=125.0, floors=99)),
+])
+check(three_way.height_m == 330.0 and three_way.floors == 7 and three_way.width_m == 125.0,
+      "each source only fills gaps the ones above it left", three_way.summary())
+check(three_way.source == f"Wikidata, ingested cache and {CURATED_SOURCE}",
+      "every contributing source is named", f"got {three_way.source!r}")
+shadowed = merge_facts([
+    ("Wikidata", BlueprintFacts(height_m=330.0, width_m=125.0)),
+    (CURATED_SOURCE, BlueprintFacts(height_m=1.0)),
+])
+check(shadowed.source == "Wikidata",
+      "a source that contributed nothing is not named", f"got {shadowed.source!r}")
+check(merge_facts([("Wikidata", BlueprintFacts()), ("absent", None)]).source is None,
+      "merging nothing claims no source")
 
 section("local reference library")
 check(local_library.get_local_reference("eiffel tower") is None,

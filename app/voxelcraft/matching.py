@@ -14,13 +14,19 @@ import re
 from functools import lru_cache
 
 
+# Both matchers bound their needle with ``(?<!\w)`` / ``(?!\w)`` rather
+# than ``\b``. ``\b`` is defined as a word/non-word transition, so it
+# silently fails to match next to a needle that itself begins or ends in
+# punctuation: ``\bst\.\b`` never matches "st. basil", because "." and
+# " " are both non-word. Keywords like "bench (furniture)" or "st." are
+# ordinary entries in a manifest, so the lookarounds are the safe form.
 @lru_cache(maxsize=2048)
 def _pattern(keyword: str) -> re.Pattern[str]:
     if " " in keyword or "-" in keyword:
-        # Multi-word keywords are matched literally (no trailing 's'): the
-        # plural, if any, belongs on the last word and is rare in practice.
+        # Multi-word keywords take no trailing 's': the plural, if any,
+        # belongs on the last word and is rare in practice.
         return re.compile(rf"(?<!\w){re.escape(keyword)}(?!\w)")
-    return re.compile(rf"\b{re.escape(keyword)}s?\b")
+    return re.compile(rf"(?<!\w){re.escape(keyword)}s?(?!\w)")
 
 
 def word_matches(keyword: str, text: str) -> bool:
@@ -37,5 +43,7 @@ def word_matches(keyword: str, text: str) -> bool:
 def phrase_in_text(phrase: str, text: str) -> bool:
     """True if `phrase` occurs in `text` on word boundaries. Unlike
     ``word_matches`` this never accepts a plural, so it is the right
-    check for proper names ("big ben" in "the big ben clock tower")."""
+    check for proper names ("big ben" in "the big ben clock tower") and
+    for alias tables, whose entries may be parenthesized or abbreviated
+    ("bench (furniture)", "st. basil's cathedral")."""
     return re.search(rf"(?<!\w){re.escape(phrase)}(?!\w)", text) is not None

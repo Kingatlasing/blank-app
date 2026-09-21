@@ -310,37 +310,56 @@ def _fetch_wikidata_facts(title: str) -> BlueprintFacts:
     )
 
 
+CURATED_SOURCE = "VoxelCraft's curated landmark table"
+
+_FACT_FIELDS = ("height_m", "width_m", "diameter_m", "floors")
+
+
+def merge_facts(candidates: list[tuple[str, BlueprintFacts | None]]) -> BlueprintFacts:
+    """Merge candidate facts field by field, highest precedence first, and
+    record which sources actually contributed in ``source``.
+
+    Each source only fills fields the ones before it left empty, so a
+    result can legitimately be one source's height and another's floor
+    count. ``source`` therefore names every source that contributed
+    rather than one winner, because that is what the UI has to be able
+    to say truthfully. Sources that contributed nothing are not named,
+    and a result with no facts at all gets no source.
+    """
+    merged = BlueprintFacts()
+    contributors: list[str] = []
+    for label, facts in candidates:
+        if facts is None:
+            continue
+        contributed = False
+        for field_name in _FACT_FIELDS:
+            if getattr(merged, field_name) is None and getattr(facts, field_name) is not None:
+                setattr(merged, field_name, getattr(facts, field_name))
+                contributed = True
+        if contributed:
+            contributors.append(label)
+    if len(contributors) > 1:
+        merged.source = f"{', '.join(contributors[:-1])} and {contributors[-1]}"
+    elif contributors:
+        merged.source = contributors[0]
+    return merged
+
+
 def fetch_blueprint_facts(title: str) -> BlueprintFacts:
     """Real-world dimensions for a named subject: live Wikidata first, with
     a hand-curated table of well-known landmarks (``known_facts.py``) used
     to fill in whatever Wikidata didn't return (or the whole thing, if
     Wikidata has nothing or isn't reachable). Wikidata's own values are
-    never overridden — it's the more current source when reachable."""
-    wikidata_facts = _fetch_wikidata_facts(title)
-    from .known_facts import get_known_facts
-    known = get_known_facts(title)
-    if not known:
-        wikidata_facts.source = "Wikidata" if wikidata_facts.summary() else None
-        return wikidata_facts
+    never overridden — it's the more current source when reachable.
 
-    merged = BlueprintFacts(
-        height_m=wikidata_facts.height_m or known.height_m,
-        width_m=wikidata_facts.width_m or known.width_m,
-        diameter_m=wikidata_facts.diameter_m or known.diameter_m,
-        floors=wikidata_facts.floors or known.floors,
-    )
-    used_wikidata = bool(wikidata_facts.summary())
-    used_curated = any(
-        getattr(wikidata_facts, f) is None and getattr(known, f) is not None
-        for f in ("height_m", "width_m", "diameter_m", "floors")
-    )
-    if used_wikidata and used_curated:
-        merged.source = "Wikidata and VoxelCraft's curated landmark table"
-    elif used_wikidata:
-        merged.source = "Wikidata"
-    elif used_curated:
-        merged.source = "VoxelCraft's curated landmark table"
-    return merged
+    Another source (a locally ingested cache, say) slots into the list
+    below at its precedence; ``merge_facts`` handles the attribution.
+    """
+    from .known_facts import get_known_facts
+    return merge_facts([
+        ("Wikidata", _fetch_wikidata_facts(title)),
+        (CURATED_SOURCE, get_known_facts(title)),
+    ])
 
 
 def _search_wikipedia(query: str) -> ResearchResult | None:
