@@ -91,16 +91,34 @@ with st.sidebar:
         )
         research_online = gen_strategy.startswith("🔎")
         use_llm = gen_strategy.startswith("🧠")
+        llm_method = "Write code (recommended)"
         if use_llm:
             ollama_host = st.text_input("Ollama host", value="http://localhost:11434")
             ollama_model = st.text_input("Ollama model", value="qwen2.5-coder")
-            st.caption(
-                "Sends your prompt to that local Ollama server, which writes Python code against a "
-                "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a restricted "
-                "sandbox here (no imports, no file/network access, 5s execution limit) to produce the "
-                "model. Can take a while on modest hardware. Falls back to procedural shapes if Ollama "
-                "is unreachable or the generated code doesn't work."
+            llm_method = st.radio(
+                "Generation method",
+                ["Write code (recommended)", "Hand-enumerate coordinates"],
+                help="Write code: the model writes a small Python program against a geometry API "
+                     "(box/sphere/cylinder/cone/merge), run in a local sandbox — precise, and scales to "
+                     "complex shapes. Hand-enumerate: the model lists each voxel's (x, y, z, color) "
+                     "directly, no code involved — simpler, but slower, capped at a few thousand "
+                     "voxels, and much less exact since it's the model eyeballing coordinates one at a "
+                     "time rather than computed geometry.",
             )
+            if llm_method.startswith("Write code"):
+                st.caption(
+                    "Sends your prompt to that local Ollama server, which writes Python code against a "
+                    "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a "
+                    "restricted sandbox here (no imports, no file/network access, 5s execution limit) "
+                    "to produce the model."
+                )
+            else:
+                st.caption(
+                    "Sends your prompt to that local Ollama server and asks it to list every voxel's "
+                    "(x, y, z, color) directly — no code execution, but slow and capped at a few "
+                    "thousand voxels; expect coarser, less exact results than the code method."
+                )
+            st.caption("Can take a while on modest hardware. Falls back to procedural shapes if Ollama is unreachable or produces nothing usable.")
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
         if img_source == "From a URL":
@@ -140,11 +158,20 @@ if generate:
                 llm_code = None
 
                 if use_llm:
-                    with st.spinner(f"Asking {ollama_model} (via Ollama) to design a custom structure — this can take a while on local hardware..."):
+                    spinner_msg = (
+                        f"Asking {ollama_model} (via Ollama) to design a custom structure — "
+                        "this can take a while on local hardware..."
+                    )
+                    with st.spinner(spinner_msg):
                         try:
-                            voxels, note, llm_code = llm_builder.generate_llm_structure(
-                                prompt, model=ollama_model, host=ollama_host
-                            )
+                            if llm_method.startswith("Write code"):
+                                voxels, note, llm_code = llm_builder.generate_llm_structure(
+                                    prompt, model=ollama_model, host=ollama_host
+                                )
+                            else:
+                                voxels, note = llm_builder.generate_llm_structure_direct(
+                                    prompt, model=ollama_model, host=ollama_host
+                                )
                         except llm_builder.LLMBuildError as exc:
                             st.sidebar.warning(f"LLM design failed ({exc}) — falling back to built-in procedural shapes.")
 

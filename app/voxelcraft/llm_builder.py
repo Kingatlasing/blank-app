@@ -1,15 +1,25 @@
 """Let a local Ollama model design a genuinely custom voxel structure,
 beyond anything in the fixed shape library.
 
-Rather than asking the model to enumerate thousands of (x, y, z, color)
-tuples directly (slow, token-hungry, and language models are bad at raw
-spatial reasoning done that way), we ask a *code* model — qwen2.5-coder is
-built for exactly this — to write a small Python function against a
-curated geometry API (box/sphere/cylinder/cone/merge primitives). We then
-run that function in a restricted sandbox and take its output as the
-model. This plays to a code model's actual strength.
+Two ways to ask it, in order of how well they tend to actually work:
 
-The sandbox is defense-in-depth, not a security boundary you'd trust
+1. **Write code** (the recommended default): ask a *code* model — qwen2.5-
+   coder is built for exactly this — to write a small Python function
+   against a curated geometry API (box/sphere/cylinder/cone/merge
+   primitives), then run that function in a restricted sandbox. This plays
+   to what a code model is actually good at, scales to complex shapes
+   without the model needing to emit one token per voxel, and produces
+   exact/regular geometry (a sphere is actually round).
+2. **Hand-enumerate coordinates**: ask the model to directly list
+   `[x, y, z, "#hex"]` entries, one per voxel, no code involved. This is
+   what you'd get from a model with no code ability at all — simpler, but
+   slow, token-expensive, capped much lower (a local chat model trails off
+   or gets sloppy well before "thousands" of coordinates), and the
+   geometry it produces is whatever the model eyeballs rather than
+   something exactly computed. It's offered because it's a real, simpler
+   option some people want — not because it works as well.
+
+The code sandbox is defense-in-depth, not a security boundary you'd trust
 against a hostile model: no imports, a builtins allowlist, an AST check
 that rejects import statements/dunder access/exec-family names, and a
 hard wall-clock limit on execution. It assumes what it actually is — your
@@ -29,9 +39,10 @@ from .palette import PALETTE, hex_of
 
 Voxel = tuple[int, int, int, str]
 
-_CHAT_TIMEOUT_S = 120  # local code-gen models can be slow on modest hardware
-_EXEC_TIMEOUT_S = 5    # the generated code itself must run fast
+_CHAT_TIMEOUT_S = 120   # local code-gen models can be slow on modest hardware
+_EXEC_TIMEOUT_S = 5     # the generated code itself must run fast
 _MAX_VOXELS = 20_000    # a generous budget before the app's own chunkiness scaling
+_DIRECT_MAX_VOXELS = 6_000  # hand-enumerated: capped much lower, see module docstring
 
 _PALETTE_NAMES = sorted(s.name for s in PALETTE)
 
@@ -64,20 +75,29 @@ Keep the whole model within roughly -30..30 on every axis and under
 {_MAX_VOXELS} total voxels. Reply with ONLY one Python code block
 (```python ... ```) defining `build`. No explanation before or after it."""
 
+_DIRECT_SYSTEM_PROMPT = f"""You are a 3D voxel structure designer for a Minecraft-style builder.
+List every voxel of a recognizable 3D model of whatever the user asks
+for, one per line, each formatted EXACTLY like: [x, y, z, "#RRGGBB"]
+`y` is up. Use plain integers for x/y/z and a 6-digit hex color in quotes.
+Keep the whole model within roughly -20..20 on every axis and under
+{_DIRECT_MAX_VOXELS} voxels total. Reply with ONLY the voxel list, one
+entry per line, no explanation, no markdown fences, no surrounding
+brackets or commas between lines — just the entries themselves."""
+
 
 class LLMBuildError(RuntimeError):
     """Raised for any failure researching/generating/executing the LLM's
     design — the caller is expected to catch this and fall back."""
 
 
-def _ollama_chat(prompt: str, model: str, host: str) -> str:
+def _ollama_chat(prompt: str, model: str, host: str, system_prompt: str) -> str:
     try:
         resp = requests.post(
             f"{host.rstrip('/')}/api/chat",
             json={
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": _SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"Design: {prompt}"},
                 ],
                 "stream": False,
@@ -263,8 +283,38 @@ def generate_llm_structure(
 ) -> tuple[list[Voxel], str, str]:
     """Returns (voxels, description, generated_code). Raises LLMBuildError
     on any failure — the caller decides whether/how to fall back."""
-    raw = _ollama_chat(prompt, model, host)
+    raw = _ollama_chat(prompt, model, host, _SYSTEM_PROMPT)
     code = _extract_code(raw)
     _precheck_code(code)
     voxels = _run_sandboxed(code)
-    return voxels, f"Designed a custom structure with {model} via Ollama.", code
+    return voxels, f"Designed a custom structure with {model} via Ollama (wrote code for it).", code
+
+
+# entries like [3, -1, 12, "#B02E26"], tolerant of markdown fences, stray
+# commentary, or a truncated final line — we just scan for the pattern
+# rather than requiring the whole response to be one valid JSON document
+_VOXEL_LINE_RE = re.compile(
+    r'\[\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*"(#[0-9a-fA-F]{6})"\s*\]'
+)
+
+
+def generate_llm_structure_direct(
+    prompt: str, model: str = "qwen2.5-coder", host: str = "http://localhost:11434",
+) -> tuple[list[Voxel], str]:
+    """The simpler, weaker alternative to `generate_llm_structure`: has the
+    model hand-enumerate (x, y, z, color) voxels directly instead of
+    writing code. Returns (voxels, description). Raises LLMBuildError on
+    any failure — the caller decides whether/how to fall back."""
+    raw = _ollama_chat(prompt, model, host, _DIRECT_SYSTEM_PROMPT)
+    matches = _VOXEL_LINE_RE.findall(raw)
+    if not matches:
+        raise LLMBuildError(
+            "Couldn't find any valid [x, y, z, \"#hex\"] voxel entries in the model's response."
+        )
+    voxels: list[Voxel] = [(int(x), int(y), int(z), c) for x, y, z, c in matches]
+    truncated = len(voxels) > _DIRECT_MAX_VOXELS
+    voxels = voxels[:_DIRECT_MAX_VOXELS]
+    note = f"Hand-enumerated {len(voxels)} voxel coordinates with {model} via Ollama, one at a time."
+    if truncated:
+        note += f" (capped at {_DIRECT_MAX_VOXELS} — this method doesn't scale to very large models.)"
+    return voxels, note
