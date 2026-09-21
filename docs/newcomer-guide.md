@@ -126,16 +126,19 @@ Module by module:
 | File | Lines | Job |
 |---|---|---|
 | `shapes.py` | 588 | 21 procedural builders — humanoid, tree, house, temple, tower, castle, sword, pickaxe, heart (flat and true 3D), star, dog, cat, dragon, car, boat, pyramid, plus `procedural_blob` |
-| `research.py` | 384 | Wikipedia → Openverse photo lookup, Wikidata dimensions, and picking a 3D reconstruction strategy |
+| `research.py` | 403 | Wikipedia → Openverse photo lookup, Wikidata dimensions, and picking a 3D reconstruction strategy |
 | `llm_builder.py` | 320 | Ollama prompt, AST pre-check, sandboxed execution of generated code |
 | `image_generator.py` | 266 | photo → voxels: background removal, palette quantization, relief/revolve/flat |
 | `text_generator.py` | 142 | 19-entry keyword table mapping prompt → builder; composes multiple subjects into one scene |
 | `palette.py` | 134 | the 37-swatch block palette (see §4) |
 | `viewer.py` | 121 | builds the self-contained three.js preview page |
 | `exporters.py` | 92 | `to_json`, `to_obj`, `to_mcfunction` |
-| `local_library.py` | 69 | bundled reference photos (see §4) |
-| `known_facts.py` | 68 | curated landmark dimensions (see §4) |
+| `local_library.py` | 162 | bundled reference photos and cached dimensions (see §4) |
+| `known_facts.py` | 77 | curated landmark dimensions (see §4) |
 | `transform.py` | 36 | `scale_voxels`, `normalize`, `voxel_count_limit` |
+
+Outside the package, `tools/ingest_library.py` (453 lines) generates the bundled
+reference library described in §4d.
 
 ### The one genuinely clever bit
 
@@ -197,10 +200,10 @@ and composed side by side into a single scene. Anything unmatched falls through 
 
 Its role is precise, and the precedence is the thing to remember:
 
-> `fetch_blueprint_facts()` asks **Wikidata first**, then uses this table only to
-> fill in fields Wikidata didn't return — or the whole subject, if Wikidata is
-> unreachable. A value Wikidata *did* return is **never** overridden, because it is
-> the more current source when you can reach it.
+> `fetch_blueprint_facts()` asks **Wikidata first**, then the ingested cache in
+> `library/facts.json`, then this table — each one filling in only the fields the
+> ones above it left empty. A value a higher source *did* return is **never**
+> overridden, because it is the more current source when you can reach it.
 
 Verified offline: `get_known_facts('the eiffel tower in paris')` → height 330 m,
 width 125 m, while the live Wikipedia lookup returned nothing.
@@ -216,27 +219,38 @@ the real object, instead of inheriting whatever foreshortening the photo had.
 
 ### d. The bundled reference library — `app/voxelcraft/library/`
 
-`manifest.json` plus an `images/` directory, checked **before** any live lookup.
-**As of `e8a8b61` it ships empty** (`manifest.json` is `{}`), so this is a no-op and
-every request falls through to live research. It is scaffolding waiting for entries —
-check the manifest before assuming it is still empty.
+`manifest.json`, `facts.json` and an `images/` directory, checked **before** any live
+lookup. **It still ships empty** (`manifest.json` is `{}`), so this is a no-op and
+every request falls through to live research — check the manifest before assuming it
+is still empty.
 
-The schema, per `library/README.md`:
+It is no longer filled in by hand: `tools/ingest_library.py` generates all three from
+Wikipedia, Wikidata, Commons and Openverse. The schema, per `library/README.md`:
 
 ```json
 {
-  "dog": {
-    "image": "images/dog.jpg",
-    "source_label": "Openverse photo by <creator> (CC-BY 4.0)",
+  "park bench": {
+    "aliases": ["bench (furniture)", "park bench"],
+    "wikipedia_title": "Bench (furniture)",
+    "image": "images/park-bench.png",
+    "source_label": "Openverse photo by <creator> (CC0)",
     "source_url": "https://openverse.org/image/...",
-    "build_method": "relief",
+    "license": "cc0",
+    "attribution": "<creator>",
+    "extract": "A bench is a long seat ...",
+    "build_method_override": null,
     "height_m": null, "width_m": null, "diameter_m": null, "floors": null
   }
 }
 ```
 
+Two things there are easy to misread. `extract` is stored because the `relief`
+vs `revolve` decision is **re-derived from it on every request** rather than frozen
+at ingest time, so a fix to `_classify_build_method` reaches bundled entries
+immediately; `build_method_override` is the escape hatch for correcting one by hand.
+
 The point is reliability: a bundled image never needs network, never rate-limits, and
-has been vetted by a human rather than trusted blind at generation time.
+its licence was verified at ingest time rather than trusted blind at generation time.
 `get_local_reference()` never raises — a missing or malformed entry is treated exactly
 like "not found", so a bad local file cannot break generation.
 
@@ -246,17 +260,24 @@ is empty rather than full:
 1. **Every entry must be individually confirmed openly licensed** (CC0, or CC-BY with
    the attribution recorded in `source_label`/`source_url`). This is deliberately not
    an attempt to mirror Wikipedia — that is neither storable nor legal to bulk-copy.
-2. **The dev sandbox has no outbound network**, so entries have to be added from an
-   environment that does.
+   The ingest enforces it in `_licence_ok`: share-alike, non-commercial,
+   no-derivatives and non-free files are rejected before download, and a subject whose
+   only photo is rejected is left out rather than bundled anyway.
+2. **The dev sandbox has no outbound network.** Its egress policy returns 403 for
+   `en.wikipedia.org`, `www.wikidata.org`, `commons.wikimedia.org` and
+   `api.openverse.org`, so the ingest has to run somewhere with real network access.
+   That is why the library is still empty despite the tooling existing.
 
-Adding one needs no code changes: drop the image in `images/`, add the manifest
-entry, and `get_local_reference(subject)` picks it up.
+To fill it: `python tools/ingest_library.py` (add `--dry-run` to see what it would
+fetch first). Accepted images land in `images/`, attribution is regenerated into
+`ATTRIBUTION.md`, and `get_local_reference(subject)` picks them up with no code
+changes.
 
 ### Lookup order, end to end
 
 ```
-local_library (bundled, empty today)  →  Wikipedia  →  Openverse   [photo]
-Wikidata (live)                       →  known_facts (curated)     [dimensions]
+local_library (bundled, empty today)  →  Wikipedia  →  Openverse          [photo]
+Wikidata (live)  →  facts.json (ingested)  →  known_facts (curated)  [dimensions]
 ```
 
 ---
