@@ -19,6 +19,12 @@ st.markdown(
 
 MAX_VOXELS = 40_000
 
+_DEPTH_STYLES = {
+    "Flat pixel art": "flat",
+    "3D relief": "relief",
+    "3D revolve (round objects)": "revolve",
+}
+
 
 @st.cache_data(show_spinner=False, ttl=3600)
 def _cached_research(prompt: str):
@@ -27,14 +33,17 @@ def _cached_research(prompt: str):
     result = research.research_reference_image(prompt)
     if result is None:
         return None
-    return result.image, result.subject, result.source_label, result.source_url
+    return (
+        result.image, result.subject, result.source_label, result.source_url,
+        result.build_method, result.reason,
+    )
 
 
 st.title("🧱 VoxelCraft")
 st.caption(
     "Describe any object or building — VoxelCraft researches a real reference photo for it online "
-    "(Wikipedia, then Openverse) and sculpts a blocky 3D Minecraft-style model from it. "
-    "You can also supply your own reference image instead."
+    "(Wikipedia, then Openverse), works out how to build it in 3D from that photo, and sculpts a "
+    "blocky Minecraft-style model. You can also supply your own reference image instead."
 )
 
 if "voxels" not in st.session_state:
@@ -60,14 +69,16 @@ with st.sidebar:
     img_source = None
     image_url = ""
     uploaded = None
+    remove_bg = True
 
     if mode == "Text prompt":
         research_online = st.checkbox(
-            "🔎 Research a reference photo online first",
+            "🔎 Research online: find a photo + work out how to build it in 3D",
             value=True,
-            help="Looks up a real photo of your subject (Wikipedia, then Openverse) and builds the "
-                 "model from it. If nothing is found (or you're offline), falls back to VoxelCraft's "
-                 "built-in procedural shapes.",
+            help="Looks up a real photo of your subject (Wikipedia, then Openverse), reads what kind "
+                 "of object it is to decide whether to reconstruct it as a lathed 3D revolve (towers, "
+                 "bottles, trees, ...) or a relief sculpture (buildings, animals, vehicles, ...), then "
+                 "builds it. Falls back to VoxelCraft's built-in procedural shapes if nothing is found.",
         )
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
@@ -76,15 +87,17 @@ with st.sidebar:
         else:
             uploaded = st.file_uploader("Upload image", type=["png", "jpg", "jpeg", "gif", "webp"])
 
-    show_image_controls = mode.startswith("Reference image") or research_online
-    if show_image_controls:
-        relief_mode = st.select_slider(
-            "Depth style", options=["Flat pixel art", "3D relief"], value="3D relief"
-        )
+    show_resolution = mode.startswith("Reference image") or research_online
+    if show_resolution:
         img_resolution = st.slider("Image detail (pixels wide)", 8, 64, 28)
     else:
-        relief_mode = "3D relief"
         img_resolution = 28
+
+    if mode.startswith("Reference image"):
+        depth_style = st.select_slider("3D reconstruction method", options=list(_DEPTH_STYLES), value="3D relief")
+        remove_bg = st.checkbox("Remove background first", value=True)
+    else:
+        depth_style = "3D relief"
 
     st.divider()
     scale_factor = st.slider("Chunkiness (block size)", 1, 4, 2, help="How many voxels wide each block is.")
@@ -92,7 +105,7 @@ with st.sidebar:
 
 if generate:
     try:
-        internal_mode = "flat" if relief_mode == "Flat pixel art" else "relief"
+        manual_mode = _DEPTH_STYLES[depth_style]
 
         if mode == "Text prompt":
             if not prompt.strip():
@@ -104,14 +117,15 @@ if generate:
                 source_url = None
 
                 if research_online:
-                    with st.spinner(f"Researching a reference photo for '{prompt}'..."):
+                    with st.spinner(f"Researching '{prompt}' online and working out how to build it in 3D..."):
                         cached = _cached_research(prompt)
                     if cached is not None:
-                        image, subject, source_label, source_url = cached
+                        image, subject, source_label, source_url, build_method, reason = cached
                         voxels = image_generator.image_to_voxels(
-                            image, resolution=img_resolution, mode=internal_mode
+                            image, resolution=img_resolution, mode=build_method, remove_bg=True
                         )
-                        note = f"Researched '{subject}' online and sculpted a 3D model from a real photo."
+                        method_label = {"revolve": "a lathed 3D revolve", "relief": "a 3D relief sculpture"}[build_method]
+                        note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
                         source_caption = f"Reference photo: {source_label}"
 
                 if voxels is None:
@@ -140,11 +154,13 @@ if generate:
                 st.sidebar.error("Upload an image or paste a URL first.")
 
             if image is not None:
-                voxels = image_generator.image_to_voxels(image, resolution=img_resolution, mode=internal_mode)
+                voxels = image_generator.image_to_voxels(
+                    image, resolution=img_resolution, mode=manual_mode, remove_bg=remove_bg
+                )
                 voxels = normalize(scale_voxels(voxels, scale_factor))
                 voxels, truncated = voxel_count_limit(voxels, MAX_VOXELS)
                 st.session_state.voxels = voxels
-                note = f"Built from your reference image ({len(voxels)} voxels)."
+                note = f"Built from your reference image using {depth_style.lower()} ({len(voxels)} voxels)."
                 st.session_state.note = note + (" (truncated — lower the detail slider)" if truncated else "")
                 st.session_state.source_caption = None
                 st.session_state.source_url = None
@@ -159,16 +175,18 @@ if voxels is None:
     st.markdown(
         """
 **Try prompts like:**
-- `the Eiffel Tower`
-- `a golden retriever`
-- `a red barn`
+- `the Eiffel Tower` *(→ researched, then lathed into a 3D revolve)*
+- `a lighthouse` *(→ 3D revolve)*
+- `a red barn` *(→ 3D relief)*
+- `a golden retriever` *(→ 3D relief)*
 - `a diamond sword` *(no great photo online → falls back to a built-in procedural shape)*
-- `a snowy pine tree`
 - `a green dragon` *(falls back to an abstract sculpture — still unique per prompt!)*
 
-Each one is **researched online first** (a real photo, via Wikipedia/Openverse) and sculpted into a
-voxel model — turn the checkbox off in the sidebar to use only VoxelCraft's built-in procedural shapes,
-or switch to "Reference image" to supply your own photo instead.
+Each one is **researched online first**: VoxelCraft finds a real photo (Wikipedia, then Openverse),
+reads what kind of subject it is to decide *how* to build it in 3D (a lathed revolve for anything
+round about a vertical axis, a relief sculpture otherwise), then sculpts it. Turn the checkbox off in
+the sidebar to use only VoxelCraft's built-in procedural shapes, or switch to "Reference image" to
+supply — and steer the reconstruction of — your own photo instead.
         """
     )
 else:
@@ -235,7 +253,9 @@ else:
 st.divider()
 st.caption(
     "Text prompts are researched online (Wikipedia, then Openverse — both free, keyless, openly-licensed "
-    "sources) for a real reference photo, which is quantized to real Minecraft block colors and sculpted "
-    "into voxels. If research is off, finds nothing, or you're offline, VoxelCraft falls back to its "
-    "built-in rule-based procedural shapes so generation never fails outright. No paid AI API is used."
+    "sources) for a real reference photo. The article text is read to pick a 3D reconstruction method "
+    "(a lathed revolve for axially-symmetric subjects, a relief sculpture otherwise), and the photo is "
+    "quantized to real Minecraft block colors and sculpted into voxels. If research is off, finds nothing, "
+    "or you're offline, VoxelCraft falls back to its built-in rule-based procedural shapes so generation "
+    "never fails outright. No paid AI API is used."
 )
