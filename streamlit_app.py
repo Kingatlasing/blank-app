@@ -1,7 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.voxelcraft import exporters, image_generator, llm_builder, research, text_generator
+from app.voxelcraft import exporters, image_generator, llm_builder, local_library, research, text_generator
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
 from app.voxelcraft.viewer import build_viewer_html
 
@@ -35,7 +35,7 @@ def _cached_research(prompt: str):
         return None
     return (
         result.image, result.subject, result.source_label, result.source_url,
-        result.build_method, result.reason, result.facts,
+        result.build_method, result.reason, result.facts, result.origin,
     )
 
 
@@ -90,6 +90,18 @@ with st.sidebar:
                  "Ollama model to design something genuinely custom, beyond the shape library.",
         )
         research_online = gen_strategy.startswith("🔎")
+        if research_online:
+            bundled_photos, cached_facts = local_library.library_status()
+            if bundled_photos or cached_facts:
+                st.caption(
+                    f"Bundled offline: {bundled_photos} reference photo(s) and {cached_facts} set(s) of "
+                    "real-world dimensions, checked before any network lookup."
+                )
+            else:
+                st.caption(
+                    "The bundled reference library is empty — every lookup will go to the network. "
+                    "Run `python tools/ingest_library.py` to populate it."
+                )
         use_llm = gen_strategy.startswith("🧠")
         llm_method = "Write code (recommended)"
         if use_llm:
@@ -172,7 +184,7 @@ if generate:
                     with st.spinner(f"Researching '{prompt}' online and working out how to build it in 3D..."):
                         cached = _cached_research(prompt)
                     if cached is not None:
-                        image, subject, source_label, source_url, build_method, reason, facts = cached
+                        image, subject, source_label, source_url, build_method, reason, facts, origin = cached
                         researched_voxels = image_generator.image_to_voxels(
                             image, resolution=img_resolution, mode=build_method,
                             remove_bg=True, target_ratio=facts.ratio,
@@ -187,11 +199,13 @@ if generate:
                         if not degenerate_photo:
                             voxels = researched_voxels
                             method_label = {"revolve": "a lathed 3D revolve", "relief": "a 3D relief sculpture"}[build_method]
-                            note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
+                            found = ("from the bundled reference library" if origin == "library"
+                                     else "online")
+                            note = f"Researched '{subject}' {found} and built {method_label} from a real photo ({reason})."
                             source_caption = f"Reference photo: {source_label}"
                             if facts.summary():
-                                note += " Proportions corrected using real-world dimensions from Wikidata."
-                                blueprint_caption = f"Blueprint data (Wikidata): {facts.summary()}"
+                                note += " Proportions corrected using real-world dimensions."
+                                blueprint_caption = f"Blueprint data: {facts.summary()}"
 
                 if voxels is None:
                     voxels, note = text_generator.generate_from_text(prompt)

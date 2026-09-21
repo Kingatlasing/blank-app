@@ -120,6 +120,10 @@ class ResearchResult:
     build_method: str  # "revolve" or "relief" — how to turn the photo into 3D
     reason: str  # human-readable explanation of why that method was picked
     facts: BlueprintFacts = field(default_factory=BlueprintFacts)
+    # "library" for a photo bundled by tools/ingest_library.py, "online" for
+    # one fetched live. The UI says which, so "researched online" is never
+    # claimed for a lookup that never touched the network.
+    origin: str = "online"
 
 
 def extract_subject(prompt: str) -> str:
@@ -272,22 +276,37 @@ def _fetch_wikidata_facts(title: str) -> BlueprintFacts:
 
 
 def fetch_blueprint_facts(title: str) -> BlueprintFacts:
-    """Real-world dimensions for a named subject: live Wikidata first, with
-    a hand-curated table of well-known landmarks (``known_facts.py``) used
-    to fill in whatever Wikidata didn't return (or the whole thing, if
-    Wikidata has nothing or isn't reachable). Wikidata's own values are
-    never overridden — it's the more current source when reachable."""
-    wikidata_facts = _fetch_wikidata_facts(title)
+    """Real-world dimensions for a named subject, filled in from three
+    sources in descending order of currency:
+
+    1. live Wikidata — the most current, when reachable;
+    2. ``library/facts.json`` — what Wikidata returned when
+       ``tools/ingest_library.py`` last ran, so an offline or rate-limited
+       app still gets real numbers rather than none;
+    3. ``known_facts.py`` — the hand-curated landmark table.
+
+    Each source only ever *fills in* fields the ones above it left empty;
+    a value from a higher source is never overridden.
+    """
     from .known_facts import get_known_facts
-    known = get_known_facts(title)
-    if not known:
-        return wikidata_facts
-    return BlueprintFacts(
-        height_m=wikidata_facts.height_m or known.height_m,
-        width_m=wikidata_facts.width_m or known.width_m,
-        diameter_m=wikidata_facts.diameter_m or known.diameter_m,
-        floors=wikidata_facts.floors or known.floors,
-    )
+    from .local_library import get_cached_facts
+
+    sources = [
+        _fetch_wikidata_facts(title),
+        get_cached_facts(title),
+        get_known_facts(title),
+    ]
+    merged = BlueprintFacts()
+    for facts in sources:
+        if facts is None:
+            continue
+        merged = BlueprintFacts(
+            height_m=merged.height_m or facts.height_m,
+            width_m=merged.width_m or facts.width_m,
+            diameter_m=merged.diameter_m or facts.diameter_m,
+            floors=merged.floors or facts.floors,
+        )
+    return merged
 
 
 def _search_wikipedia(query: str) -> ResearchResult | None:

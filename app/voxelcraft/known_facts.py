@@ -66,3 +66,12 @@ def get_known_facts(subject: str) -> BlueprintFacts | None:
         if any(alias in text or text in alias for alias in aliases):
             return facts
     return None
+
+
+def iter_known_entries() -> list[tuple[list[str], BlueprintFacts]]:
+    """The curated table as ``(aliases, facts)`` pairs, in match order.
+
+    Exposed for ``tools/ingest_library.py``, which reuses these aliases so an
+    automatically-ingested landmark matches every phrasing this table already
+    matches, instead of only its canonical name."""
+    return [(list(aliases), facts) for aliases, facts in _ENTRIES]
