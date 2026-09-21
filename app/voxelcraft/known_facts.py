@@ -1,4 +1,4 @@
-"""Verified real-world dimensions for well-known landmarks, hand-curated
+"""Verified real-world dimensions for 28 well-known landmarks, hand-curated
 via web search and cross-checked against multiple sources (Wikipedia plus
 institutional/tourism sites) in September 2026, since this dev sandbox
 can't reach Wikidata itself to verify automatically the way the live app
@@ -34,6 +34,23 @@ _ENTRIES: list[tuple[list[str], BlueprintFacts]] = [
     (["colosseum", "coliseum"], BlueprintFacts(height_m=48.0, width_m=156.0)),
     (["christ the redeemer"], BlueprintFacts(height_m=30.0, width_m=28.0)),
     (["space needle"], BlueprintFacts(height_m=184.0, diameter_m=42.0)),
+    (["burj khalifa"], BlueprintFacts(height_m=828.0, floors=163)),
+    (["cn tower"], BlueprintFacts(height_m=553.3)),
+    (["washington monument"], BlueprintFacts(height_m=169.0, width_m=16.8)),
+    (["arc de triomphe"], BlueprintFacts(height_m=49.5, width_m=44.8)),
+    (["notre-dame cathedral", "notre dame cathedral", "notre-dame de paris"],
+     BlueprintFacts(height_m=96.0)),
+    (["sagrada familia", "sagrada família"], BlueprintFacts(height_m=172.5)),
+    (["saint basil's cathedral", "st basil's cathedral", "st. basil's cathedral"],
+     BlueprintFacts(height_m=47.5)),
+    (["hagia sophia"], BlueprintFacts(height_m=55.6, diameter_m=31.7)),
+    (["gateway arch"], BlueprintFacts(height_m=192.0, width_m=192.0)),
+    (["tokyo tower"], BlueprintFacts(height_m=333.0)),
+    (["petronas towers", "petronas twin towers"], BlueprintFacts(height_m=452.0, floors=88)),
+    (["one world trade center", "freedom tower"], BlueprintFacts(height_m=541.3)),
+    (["chrysler building"], BlueprintFacts(height_m=319.0, floors=77)),
+    (["mount rushmore"], BlueprintFacts(height_m=18.0)),
+    (["stonehenge"], BlueprintFacts(height_m=4.0, diameter_m=30.0)),
 ]
 
 
