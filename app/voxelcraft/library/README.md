@@ -50,8 +50,8 @@ the source, creator and licence of every bundled image.
     "source_url": "https://openverse.org/image/...",
     "license": "cc0",
     "attribution": "<creator>",
-    "build_method": "relief",
-    "classified_because": "no rotational-symmetry cue found, ...",
+    "extract": "A bench is a long seat ...",
+    "build_method_override": null,
     "height_m": null, "width_m": null, "diameter_m": null, "floors": null
   }
 }
@@ -59,14 +59,22 @@ the source, creator and licence of every bundled image.
 
 - `aliases`: every phrasing that should match this entry. Landmarks reuse
   the aliases already curated in `known_facts.py`, so an ingested entry
-  matches everything that table matches. Matching works in both directions,
-  so "the eiffel tower in paris" hits the "eiffel tower" entry.
+  matches everything that table matches. An alias matches when it appears in
+  the subject as a whole word run, so "the eiffel tower in paris" hits the
+  "eiffel tower" entry while "a cat" does not hit "cathedral".
 - `image`: path relative to this directory; re-encoded to a bounded-size PNG
   so the bundle stays small and every entry loads identically.
 - `source_label` / `source_url` / `license` / `attribution`: required for
   attribution — an entry is never written without them.
-- `build_method`: `"relief"` or `"revolve"` (see `research.py`), decided at
-  ingest time from the article text rather than re-derived on every request.
+- `extract`: the article's intro text. Stored because the 3D-reconstruction
+  method (`relief` vs `revolve`) is **re-derived from it on every request**
+  rather than frozen at ingest time — so a fix to
+  `research._classify_build_method` reaches bundled entries immediately,
+  instead of leaving them on whatever verdict happened to be current when
+  they were ingested. Re-deriving costs one regex pass over ~600 characters.
+- `build_method_override`: normally `null`. Set it to `"relief"` or
+  `"revolve"` to correct an entry by hand; anything else is ignored and the
+  classifier decides.
 - The dimension fields are whatever Wikidata had; anything missing is `null`.
 
 ## `facts.json` — dimensions

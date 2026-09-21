@@ -310,14 +310,20 @@ def ingest_subject(ep: Endpoints, subject: str, aliases: list[str], args) -> dic
         return None
     title, extract, lead_file = article
 
+    # Store the *inputs* to the 3D-reconstruction decision (title + article
+    # extract), not the verdict. Storing the verdict would freeze it: every
+    # later fix to _classify_build_method would silently miss entries already
+    # ingested, and nothing would flag them as stale. Re-deriving per request
+    # costs one regex pass over ~600 characters and cannot rot.
+    # `build_method_override` stays available for a human correction.
     build_method, reason = _classify_build_method(title, extract)
     facts = wikidata_facts(ep, title)
 
     entry = {
         "aliases": sorted({subject, title.lower(), *aliases}),
         "wikipedia_title": title,
-        "build_method": build_method,
-        "classified_because": reason,
+        "extract": extract,
+        "build_method_override": None,
         **_facts_dict(facts),
     }
 

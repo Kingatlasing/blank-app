@@ -123,10 +123,17 @@ def get_local_reference(subject: str) -> ResearchResult | None:
     except Exception:
         return None
 
-    build_method = entry.get("build_method")
-    if build_method not in ("revolve", "relief"):
-        build_method, _reason = _classify_build_method(subject, "")
-    reason = entry.get("classified_because") or f"bundled reference library entry ({build_method})"
+    # Re-derived on every request from the stored article text, so a fix to
+    # _classify_build_method reaches bundled entries immediately instead of
+    # leaving them on whatever verdict was current when they were ingested.
+    # An explicit override wins, for entries a human has corrected by hand.
+    override = entry.get("build_method_override")
+    if override in ("revolve", "relief"):
+        build_method, reason = override, "set by hand in the reference library manifest"
+    else:
+        build_method, reason = _classify_build_method(
+            entry.get("wikipedia_title", subject), entry.get("extract", "")
+        )
 
     facts = BlueprintFacts(
         height_m=entry.get("height_m"),
