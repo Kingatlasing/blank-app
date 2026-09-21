@@ -120,11 +120,10 @@ with st.sidebar:
         else:
             uploaded = st.file_uploader("Upload image", type=["png", "jpg", "jpeg", "gif", "webp"])
 
-    show_resolution = mode.startswith("Reference image") or research_online
-    if show_resolution:
-        img_resolution = st.slider("Image detail (pixels wide)", 8, 64, 28)
-    else:
-        img_resolution = 28
+    # Fixed for now (sliders removed while stabilizing generation quality —
+    # to be reintroduced once research mode is reliable).
+    img_resolution = 28
+    scale_factor = 2
 
     if mode.startswith("Reference image"):
         depth_style = st.select_slider("3D reconstruction method", options=list(_DEPTH_STYLES), value="3D relief")
@@ -133,7 +132,6 @@ with st.sidebar:
         depth_style = "3D relief"
 
     st.divider()
-    scale_factor = st.slider("Chunkiness (block size)", 1, 4, 2, help="How many voxels wide each block is.")
     generate = st.button("✨ Generate model", type="primary", use_container_width=True)
 
 if generate:
