@@ -401,6 +401,39 @@ def quadruped(body="brown", head="brown", accent="black") -> list[Voxel]:
     return _merge(*parts)
 
 
+def dog(body="brown", snout="sand", nose="black", paw="white", ear="black") -> list[Voxel]:
+    """A standing dog, built at higher resolution/proportion fidelity than
+    `quadruped`: 4 distinct legs with "socked" paws, a raised head with a
+    protruding snout and a black nose tip, upright ears, a white chest
+    patch, and a small tail — verified against a rendered voxel preview
+    during development, not just eyeballed from the coordinates."""
+    body_c, snout_c, nose_c, paw_c, ear_c = hex_of(body), hex_of(snout), hex_of(nose), hex_of(paw), hex_of(ear)
+    leg_h = 8
+    z0, z1 = -3, 3
+    parts = []
+
+    parts.append(_box(3, 16, leg_h, leg_h + 4, z0, z1, body_c))
+    parts.append(_box(4, 15, leg_h + 4, leg_h + 5, z0 + 1, z1 - 1, body_c))
+    parts.append(_box(4, 9, leg_h, leg_h + 1, z0, z1, paw_c))  # chest/belly patch
+
+    parts.append(_box(14, 17, leg_h + 3, leg_h + 9, z0 + 1, z1 - 1, body_c))  # neck
+    parts.append(_box(16, 21, leg_h + 8, leg_h + 13, z0 + 1, z1 - 1, body_c))  # head
+    parts.append(_box(20, 24, leg_h + 8, leg_h + 11, z0 + 1, z1 - 1, snout_c))
+    parts.append(_box(23, 25, leg_h + 8, leg_h + 10, z0 + 1, z1 - 1, nose_c))
+    parts.append(_box(16, 18, leg_h + 13, leg_h + 17, z0 + 1, z0 + 2, ear_c))
+    parts.append(_box(16, 18, leg_h + 13, leg_h + 17, z1 - 2, z1 - 1, ear_c))
+
+    for lx in (4, 12):
+        for lz in (z0, z1 - 2):
+            parts.append(_box(lx, lx + 2, 2, leg_h, lz, lz + 2, body_c))
+            parts.append(_box(lx, lx + 2, 0, 2, lz, lz + 2, paw_c))
+
+    parts.append(_box(1, 3, leg_h + 3, leg_h + 5, z0 + 1, z1 - 1, body_c))  # tail
+    parts.append(_box(0, 2, leg_h + 5, leg_h + 8, z0 + 1, z1 - 1, body_c))
+
+    return _merge(*parts)
+
+
 def dragon(body="green", horn="light_gray", belly="lime") -> list[Voxel]:
     body_c, horn_c, belly_c = hex_of(body), hex_of(horn), hex_of(belly)
     parts = []
