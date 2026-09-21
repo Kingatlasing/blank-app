@@ -95,30 +95,24 @@ with st.sidebar:
         if use_llm:
             ollama_host = st.text_input("Ollama host", value="http://localhost:11434")
             ollama_model = st.text_input("Ollama model", value="qwen2.5-coder")
-            llm_method = st.radio(
-                "Generation method",
-                ["Write code (recommended)", "Hand-enumerate coordinates"],
-                help="Write code: the model writes a small Python program against a geometry API "
-                     "(box/sphere/cylinder/cone/merge), run in a local sandbox — precise, and scales to "
-                     "complex shapes. Hand-enumerate: the model lists each voxel's (x, y, z, color) "
-                     "directly, no code involved — simpler, but slower, capped at a few thousand "
-                     "voxels, and much less exact since it's the model eyeballing coordinates one at a "
-                     "time rather than computed geometry.",
+            st.caption(
+                "Sends your prompt to that local Ollama server, which writes Python code against a "
+                "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a restricted "
+                "sandbox here (no imports, no file/network access, 5s execution limit) to produce the "
+                "model. Can take a while on modest hardware. Falls back to procedural shapes if Ollama "
+                "is unreachable or produces nothing usable."
             )
-            if llm_method.startswith("Write code"):
-                st.caption(
-                    "Sends your prompt to that local Ollama server, which writes Python code against a "
-                    "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a "
-                    "restricted sandbox here (no imports, no file/network access, 5s execution limit) "
-                    "to produce the model."
-                )
-            else:
-                st.caption(
-                    "Sends your prompt to that local Ollama server and asks it to list every voxel's "
-                    "(x, y, z, color) directly — no code execution, but slow and capped at a few "
-                    "thousand voxels; expect coarser, less exact results than the code method."
-                )
-            st.caption("Can take a while on modest hardware. Falls back to procedural shapes if Ollama is unreachable or produces nothing usable.")
+            use_direct_enumeration = st.checkbox(
+                "⚙️ Advanced: have it hand-enumerate coordinates instead of writing code",
+                value=False,
+                help="Off by default (writing code is more precise and scales to complex shapes). "
+                     "Turning this on asks the model to list every voxel's (x, y, z, color) directly, "
+                     "no code involved — simpler, but slower, capped at a few thousand voxels, and "
+                     "much less exact since it's the model eyeballing coordinates one at a time rather "
+                     "than computed geometry.",
+            )
+            if use_direct_enumeration:
+                llm_method = "Hand-enumerate coordinates"
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
         if img_source == "From a URL":
