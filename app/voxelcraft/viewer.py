@@ -81,7 +81,11 @@ scene.add(mesh);
 
 // thin edge lines per-voxel-group would be expensive; add a single wireframe
 // ground grid instead so scale/orientation stays readable.
-const grid = new THREE.GridHelper(Math.max(span * 2, 16), Math.max(span * 2, 16), 0x3a4358, 0x272e3d);
+// divisions capped independent of model size — otherwise a large model's
+// grid lines pack together so densely they read as a solid gray plane
+// instead of a reference grid
+const gridSize = Math.max(span * 2, 16);
+const grid = new THREE.GridHelper(gridSize, Math.min(gridSize, 24), 0x3a4358, 0x272e3d);
 grid.position.set(0, -spanY / 2 - 0.5, 0);
 scene.add(grid);
 

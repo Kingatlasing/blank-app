@@ -58,12 +58,16 @@ _UNIT_TO_METERS = {
 
 # Subjects that are (roughly) symmetric about a vertical axis, where
 # "spin the silhouette into a lathe" is a good reconstruction strategy.
+# NOTE: matched with an optional trailing "s" only (see _word_matches) —
+# never a bare common word like "well", which would trip on "as well as"
+# in virtually every article, and nothing that's a prefix of an unrelated
+# common word ("dome" is a prefix of "domesticated", "cup" of "cupboard").
 _REVOLVE_KEYWORDS = [
     "tower", "spire", "column", "obelisk", "silo", "chimney", "lighthouse",
     "bottle", "vase", "dome", "statue", "monument", "trunk", "cylindrical",
-    "rocket", "missile", "pillar", "urn", "well", "fountain", "minaret",
+    "rocket", "missile", "pillar", "urn", "wishing well", "fountain", "minaret",
     "vessel", "jar", "cup", "mug", "barrel", "cannon", "candle", "totem",
-    "planet", "globe", "sphere", "balloon", "silo", "steeple", "flask",
+    "planet", "globe", "sphere", "balloon", "steeple", "flask",
 ]
 
 # Multi-part structures checked *before* the revolve keywords above: a
@@ -139,12 +143,24 @@ def extract_subject(prompt: str) -> str:
     return subject or text.strip() or prompt.strip()
 
 
+def _word_matches(keyword: str, text: str) -> bool:
+    """Whole-word match (keyword, optionally with a trailing 's') — NOT a
+    prefix match. `\\b{keyword}\\w*\\b` looks similar but is a real trap: it
+    matches any word that merely *starts with* the keyword, so "dome"
+    matched "domesticated" and "cup" matched "cupboard" in testing.
+    Multi-word keywords (e.g. "wishing well") are matched literally, with
+    no trailing 's'."""
+    if " " in keyword:
+        return re.search(re.escape(keyword), text) is not None
+    return re.search(rf"\b{re.escape(keyword)}s?\b", text) is not None
+
+
 def _classify_build_method(title: str, extract: str) -> tuple[str, str]:
     text = f"{title} {extract}".lower()
-    building_hit = next((k for k in _BUILDING_KEYWORDS if re.search(rf"\b{k}\w*\b", text)), None)
+    building_hit = next((k for k in _BUILDING_KEYWORDS if _word_matches(k, text)), None)
     if building_hit:
         return "relief", f"'{building_hit}' suggests a multi-part building, not a single round object"
-    hit = next((k for k in _REVOLVE_KEYWORDS if re.search(rf"\b{k}\w*\b", text)), None)
+    hit = next((k for k in _REVOLVE_KEYWORDS if _word_matches(k, text)), None)
     if hit:
         return "revolve", f"'{hit}' suggests a shape that's round about a vertical axis"
     return "relief", "no rotational-symmetry cue found, so treated as a flatter/profile shape"
