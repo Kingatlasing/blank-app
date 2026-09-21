@@ -23,13 +23,19 @@ kind of subject Wikipedia says this is:
 - ``relief`` — everything else (buildings, animals, vehicles, ...), where
   rotational symmetry would be wrong. We extrude the silhouette into a
   bas-relief sculpture instead (see ``image_generator.py``).
+
+On top of that, for named real-world subjects we also pull actual
+"blueprint" facts (height, width/diameter, floor count) from Wikidata —
+the structured-data sibling of Wikipedia — and use them to correct the
+model's proportions to match the real object, instead of whatever
+foreshortening/cropping the photo happened to have.
 """
 
 from __future__ import annotations
 
 import io
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import requests
 from PIL import Image
@@ -38,6 +44,17 @@ from .palette import COLOR_WORDS
 
 _TIMEOUT_S = 6
 _HEADERS = {"User-Agent": "VoxelCraft/1.0 (text-to-voxel research step)"}
+
+# Wikidata unit entities -> metres.
+_UNIT_TO_METERS = {
+    "Q11573": 1.0,       # metre
+    "Q828224": 1000.0,   # kilometre
+    "Q174728": 0.01,     # centimetre
+    "Q174789": 0.001,    # millimetre
+    "Q3710": 0.3048,     # foot
+    "Q218593": 0.0254,   # inch
+    "Q5745": 1609.34,    # mile
+}
 
 # Subjects that are (roughly) symmetric about a vertical axis, where
 # "spin the silhouette into a lathe" is a good reconstruction strategy.
@@ -51,6 +68,36 @@ _REVOLVE_KEYWORDS = [
 
 
 @dataclass
+class BlueprintFacts:
+    """Real-world dimensions pulled from Wikidata, when available."""
+    height_m: float | None = None
+    width_m: float | None = None
+    diameter_m: float | None = None
+    floors: int | None = None
+
+    @property
+    def ratio(self) -> float | None:
+        """height / (diameter, or width if no diameter) — the proportion
+        image_generator uses to correct the model's shape."""
+        base = self.diameter_m or self.width_m
+        if self.height_m and base:
+            return self.height_m / base
+        return None
+
+    def summary(self) -> str:
+        parts = []
+        if self.height_m:
+            parts.append(f"height {self.height_m:.0f} m")
+        if self.diameter_m:
+            parts.append(f"diameter {self.diameter_m:.0f} m")
+        elif self.width_m:
+            parts.append(f"width {self.width_m:.0f} m")
+        if self.floors:
+            parts.append(f"{self.floors} floors")
+        return ", ".join(parts)
+
+
+@dataclass
 class ResearchResult:
     image: Image.Image
     subject: str
@@ -58,6 +105,7 @@ class ResearchResult:
     source_url: str
     build_method: str  # "revolve" or "relief" — how to turn the photo into 3D
     reason: str  # human-readable explanation of why that method was picked
+    facts: BlueprintFacts = field(default_factory=BlueprintFacts)
 
 
 def extract_subject(prompt: str) -> str:
@@ -128,6 +176,71 @@ def _fetch_wikipedia_extract(title: str) -> str:
     return ""
 
 
+def _wikidata_qid_for_title(title: str) -> str | None:
+    try:
+        resp = requests.get(
+            "https://en.wikipedia.org/w/api.php",
+            params={
+                "action": "query", "prop": "pageprops", "ppprop": "wikibase_item",
+                "titles": title, "format": "json",
+            },
+            timeout=_TIMEOUT_S, headers=_HEADERS,
+        )
+        resp.raise_for_status()
+        pages = resp.json().get("query", {}).get("pages", {})
+        for page in pages.values():
+            qid = page.get("pageprops", {}).get("wikibase_item")
+            if qid:
+                return qid
+    except Exception:
+        pass
+    return None
+
+
+def _quantity_in_meters(claims: dict, prop: str) -> float | None:
+    try:
+        value = claims[prop][0]["mainsnak"]["datavalue"]["value"]
+        amount = float(value["amount"])
+        unit_qid = value.get("unit", "").rsplit("/", 1)[-1]
+        factor = _UNIT_TO_METERS.get(unit_qid)
+        return amount * factor if factor else None
+    except Exception:
+        return None
+
+
+def fetch_blueprint_facts(title: str) -> BlueprintFacts:
+    """Best-effort: real-world height/width/diameter/floor-count for a named
+    subject, from Wikidata (free, keyless). Any failure just means we build
+    from the photo's own proportions instead — this must never raise."""
+    qid = _wikidata_qid_for_title(title)
+    if not qid:
+        return BlueprintFacts()
+    try:
+        resp = requests.get(
+            "https://www.wikidata.org/w/api.php",
+            params={"action": "wbgetentities", "ids": qid, "props": "claims", "format": "json"},
+            timeout=_TIMEOUT_S, headers=_HEADERS,
+        )
+        resp.raise_for_status()
+        claims = resp.json().get("entities", {}).get(qid, {}).get("claims", {})
+    except Exception:
+        return BlueprintFacts()
+
+    floors = None
+    try:
+        amount = claims["P1101"][0]["mainsnak"]["datavalue"]["value"]["amount"]
+        floors = int(round(float(amount)))
+    except Exception:
+        pass
+
+    return BlueprintFacts(
+        height_m=_quantity_in_meters(claims, "P2048"),
+        width_m=_quantity_in_meters(claims, "P2049"),
+        diameter_m=_quantity_in_meters(claims, "P2386"),
+        floors=floors,
+    )
+
+
 def _search_wikipedia(query: str) -> ResearchResult | None:
     try:
         resp = requests.get(
@@ -161,6 +274,7 @@ def _search_wikipedia(query: str) -> ResearchResult | None:
         title = page.get("title", query)
         extract = _fetch_wikipedia_extract(title)
         method, reason = _classify_build_method(title, extract)
+        facts = fetch_blueprint_facts(title)
         return ResearchResult(
             image=image,
             subject=query,
@@ -168,6 +282,7 @@ def _search_wikipedia(query: str) -> ResearchResult | None:
             source_url=page.get("fullurl", "https://en.wikipedia.org/wiki/" + query.replace(" ", "_")),
             build_method=method,
             reason=reason,
+            facts=facts,
         )
     return None
 

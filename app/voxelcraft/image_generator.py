@@ -12,10 +12,13 @@ from PIL import Image
 from .palette import nearest_swatch
 
 Voxel = tuple[int, int, int, str]
+Pixel = tuple[int, int, int, int]  # r, g, b, a
+Grid = list[list["Pixel | None"]]  # None = background/transparent
 
 _MAX_BYTES = 12 * 1024 * 1024  # 12 MB safety cap on downloaded images
 _TIMEOUT_S = 15
 _BG_TOLERANCE_SQ = 900  # squared RGB distance treated as "same as the border"
+_RATIO_CLAMP = (0.25, 4.0)  # how far we'll ever stretch/squash toward a researched ratio
 
 
 def fetch_image_from_url(url: str) -> Image.Image:
@@ -70,24 +73,122 @@ def _background_mask(px, w: int, h: int) -> list[list[bool]]:
     return is_bg
 
 
-def _revolve(px, w: int, h: int, bg: list[list[bool]]) -> list[Voxel]:
-    """Spin each row of the silhouette around its central vertical axis,
-    like a lathe. Turns a single flat photo into a solid, roughly-correct
-    3D volume — the right call for anything symmetric about a vertical
-    axis (towers, bottles, trees, statues, ...)."""
+def _build_grid(image: Image.Image, resolution: int, remove_bg: bool) -> tuple[int, Grid]:
+    """Downsample the image and mask out the background, returning
+    (width, grid) with grid[row][col] = (r,g,b,a) or None for background/
+    transparent pixels. Rows with no subject pixels are trimmed off the top
+    and bottom so height measurements aren't skewed by empty padding."""
+    w, h = image.size
+    new_w = resolution
+    new_h = max(1, round(resolution * h / w))
+    small = image.resize((new_w, new_h), Image.NEAREST)
+    px = small.load()
+    bg = _background_mask(px, new_w, new_h) if remove_bg else [[False] * new_w for _ in range(new_h)]
+
+    grid: Grid = []
+    for row in range(new_h):
+        line: list[Pixel | None] = []
+        for col in range(new_w):
+            r, g, b, a = px[col, row]
+            line.append(None if bg[row][col] or a < 16 else (r, g, b, a))
+        grid.append(line)
+
+    subject_rows = [i for i, row in enumerate(grid) if any(v is not None for v in row)]
+    if subject_rows:
+        grid = grid[subject_rows[0]: subject_rows[-1] + 1]
+    return new_w, grid
+
+
+def _subject_bbox(grid: Grid) -> tuple[float, float] | None:
+    """Column range (min, max) spanned by non-background pixels across the whole grid."""
+    min_c = max_c = None
+    for row in grid:
+        cols = [c for c, v in enumerate(row) if v is not None]
+        if not cols:
+            continue
+        min_c = min(cols) if min_c is None else min(min_c, min(cols))
+        max_c = max(cols) if max_c is None else max(max_c, max(cols))
+    return (min_c, max_c) if min_c is not None else None
+
+
+def _natural_ratio(grid: Grid, w: int, mode: str) -> float | None:
+    """Current height-to-width ratio of the subject as framed in the photo,
+    used as the baseline a researched real-world ratio gets compared against."""
+    bbox = _subject_bbox(grid)
+    if bbox is None or not grid:
+        return None
+    height = len(grid)
+    if mode == "revolve":
+        axis = (bbox[0] + bbox[1] + 1) / 2.0
+        max_radius = 0.0
+        for row in grid:
+            cols = [c for c, v in enumerate(row) if v is not None]
+            if cols:
+                max_radius = max(max_radius, max(abs(c + 0.5 - axis) for c in cols))
+        width = 2 * max_radius
+    else:
+        width = bbox[1] - bbox[0] + 1
+    return height / width if width > 0 else None
+
+
+def _resample_rows(grid: Grid, new_h: int) -> Grid:
+    old_h = len(grid)
+    if old_h == 0 or new_h <= 0:
+        return []
+    if new_h == old_h:
+        return grid
+    out = []
+    for out_row in range(new_h):
+        src = round(out_row * (old_h - 1) / (new_h - 1)) if new_h > 1 else 0
+        out.append(grid[src])
+    return out
+
+
+def _extrude_from_grid(grid: Grid, mode: str, max_depth: int) -> list[Voxel]:
+    new_h = len(grid)
     voxels: list[Voxel] = []
-    axis = w / 2.0
-    for row in range(h):
-        cols = [c for c in range(w) if not bg[row][c] and px[c, row][3] >= 16]
+    for row_i, row in enumerate(grid):
+        y = new_h - 1 - row_i
+        for col_i, val in enumerate(row):
+            if val is None:
+                continue
+            r, g, b, _a = val
+            swatch = nearest_swatch((r, g, b))
+            if mode == "flat":
+                voxels.append((col_i, y, 0, swatch.hex))
+            else:
+                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+                depth = max(1, round(luminance * max_depth))
+                for z in range(depth):
+                    voxels.append((col_i, y, z, swatch.hex))
+    return voxels
+
+
+def _revolve_from_grid(grid: Grid, w: int) -> list[Voxel]:
+    """Spin each row of the (background-removed) silhouette around the
+    subject's own central vertical axis, like a lathe. Turns a single flat
+    photo into a properly solid 3D volume — right for towers, bottles,
+    trees, statues, etc. The axis is centered on the subject's own bounding
+    box rather than the raw image width, so an off-center photo still
+    revolves cleanly."""
+    bbox = _subject_bbox(grid)
+    if bbox is None:
+        return []
+    axis = (bbox[0] + bbox[1] + 1) / 2.0
+
+    voxels: list[Voxel] = []
+    new_h = len(grid)
+    for row_i, row in enumerate(grid):
+        cols = [c for c, v in enumerate(row) if v is not None]
         if not cols:
             continue
         radius = max(abs(c + 0.5 - axis) for c in cols)
         r_int = max(1, round(radius))
-        rs = sum(px[c, row][0] for c in cols) / len(cols)
-        gs = sum(px[c, row][1] for c in cols) / len(cols)
-        bs = sum(px[c, row][2] for c in cols) / len(cols)
+        rs = sum(row[c][0] for c in cols) / len(cols)
+        gs = sum(row[c][1] for c in cols) / len(cols)
+        bs = sum(row[c][2] for c in cols) / len(cols)
         swatch = nearest_swatch((round(rs), round(gs), round(bs)))
-        y = h - 1 - row
+        y = new_h - 1 - row_i
         for x in range(-r_int, r_int + 1):
             for z in range(-r_int, r_int + 1):
                 if x * x + z * z <= r_int * r_int:
@@ -101,6 +202,7 @@ def image_to_voxels(
     mode: str = "relief",
     max_depth: int = 6,
     remove_bg: bool = True,
+    target_ratio: float | None = None,
 ) -> list[Voxel]:
     """Downsample `image` to `resolution` pixels wide and reconstruct it as
     a 3D voxel model.
@@ -109,37 +211,28 @@ def image_to_voxels(
         pixel-art-on-a-wall style).
     mode="relief": extrudes each pixel into a column whose depth follows its
         brightness, giving a chunky bas-relief "statue" look.
-    mode="revolve": spins the silhouette around a central vertical axis
-        (see `_revolve`) for a properly solid, round-object reconstruction.
+    mode="revolve": spins the silhouette around its own central vertical
+        axis (see `_revolve_from_grid`) for a properly solid, round-object
+        reconstruction.
     remove_bg: flood-fills the background out from the border first, so the
         model is just the subject rather than a colored slab.
+    target_ratio: an optional real-world height-to-width (or, in "revolve"
+        mode, height-to-diameter) ratio — e.g. researched from Wikidata —
+        that the photo's own framing gets stretched or squashed to match,
+        so the model's proportions reflect the actual object rather than
+        however it happened to be cropped/angled in the photo.
     """
-    w, h = image.size
-    new_w = resolution
-    new_h = max(1, round(resolution * h / w))
-    small = image.resize((new_w, new_h), Image.NEAREST)
-    px = small.load()
+    new_w, grid = _build_grid(image, resolution, remove_bg)
+    if not grid:
+        return []
 
-    bg = _background_mask(px, new_w, new_h) if remove_bg else [[False] * new_w for _ in range(new_h)]
+    if target_ratio and mode in ("relief", "revolve"):
+        natural = _natural_ratio(grid, new_w, mode)
+        if natural and natural > 0:
+            scale = target_ratio / natural
+            scale = max(_RATIO_CLAMP[0], min(_RATIO_CLAMP[1], scale))
+            grid = _resample_rows(grid, max(1, round(len(grid) * scale)))
 
     if mode == "revolve":
-        return _revolve(px, new_w, new_h, bg)
-
-    voxels: list[Voxel] = []
-    for row in range(new_h):
-        for col in range(new_w):
-            if bg[row][col]:
-                continue
-            r, g, b, a = px[col, row]
-            if a < 16:
-                continue
-            swatch = nearest_swatch((r, g, b))
-            y = new_h - 1 - row  # image rows go top-down; voxel y goes up
-            if mode == "flat":
-                voxels.append((col, y, 0, swatch.hex))
-            else:
-                luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
-                depth = max(1, round(luminance * max_depth))
-                for z in range(depth):
-                    voxels.append((col, y, z, swatch.hex))
-    return voxels
+        return _revolve_from_grid(grid, new_w)
+    return _extrude_from_grid(grid, mode, max_depth)

@@ -29,21 +29,22 @@ _DEPTH_STYLES = {
 @st.cache_data(show_spinner=False, ttl=3600)
 def _cached_research(prompt: str):
     """Cache research lookups by prompt text so re-generating the same
-    prompt doesn't re-hit Wikipedia/Openverse every time."""
+    prompt doesn't re-hit Wikipedia/Openverse/Wikidata every time."""
     result = research.research_reference_image(prompt)
     if result is None:
         return None
     return (
         result.image, result.subject, result.source_label, result.source_url,
-        result.build_method, result.reason,
+        result.build_method, result.reason, result.facts,
     )
 
 
 st.title("🧱 VoxelCraft")
 st.caption(
     "Describe any object or building and get a blocky, Minecraft-style 3D voxel model, built from "
-    "VoxelCraft's own procedural shapes. Optionally, turn on online photo research (or supply your "
-    "own reference image) to steer the model from a real picture instead."
+    "VoxelCraft's own procedural shapes. Optionally, turn on online research to pull a real reference "
+    "photo and real-world dimensions (Wikipedia/Wikidata) and build from those instead — or supply "
+    "your own reference image directly."
 )
 
 if "voxels" not in st.session_state:
@@ -51,6 +52,7 @@ if "voxels" not in st.session_state:
     st.session_state.note = None
     st.session_state.source_caption = None
     st.session_state.source_url = None
+    st.session_state.blueprint_caption = None
 
 with st.sidebar:
     st.header("Generate")
@@ -74,14 +76,15 @@ with st.sidebar:
 
     if mode == "Text prompt":
         research_online = st.checkbox(
-            "🔎 Optional: research a reference photo online",
+            "🔎 Optional: research a reference photo + real dimensions online",
             value=False,
             help="Off by default — generation uses VoxelCraft's own built-in procedural shapes. Turn "
                  "this on to instead look up a real photo of your subject (Wikipedia, then Openverse), "
                  "read what kind of object it is to decide whether to reconstruct it as a lathed 3D "
                  "revolve (towers, bottles, trees, ...) or a relief sculpture (buildings, animals, "
-                 "vehicles, ...), and build from that. Falls back to the procedural shapes if nothing "
-                 "usable is found.",
+                 "vehicles, ...), pull real height/width/floor-count facts from Wikidata to correct the "
+                 "proportions, and build from all of that. Falls back to the procedural shapes if "
+                 "nothing usable is found.",
         )
     else:
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
@@ -118,18 +121,23 @@ if generate:
                 note = None
                 source_caption = None
                 source_url = None
+                blueprint_caption = None
 
                 if research_online:
                     with st.spinner(f"Researching '{prompt}' online and working out how to build it in 3D..."):
                         cached = _cached_research(prompt)
                     if cached is not None:
-                        image, subject, source_label, source_url, build_method, reason = cached
+                        image, subject, source_label, source_url, build_method, reason, facts = cached
                         voxels = image_generator.image_to_voxels(
-                            image, resolution=img_resolution, mode=build_method, remove_bg=True
+                            image, resolution=img_resolution, mode=build_method,
+                            remove_bg=True, target_ratio=facts.ratio,
                         )
                         method_label = {"revolve": "a lathed 3D revolve", "relief": "a 3D relief sculpture"}[build_method]
                         note = f"Researched '{subject}' online and built {method_label} from a real photo ({reason})."
                         source_caption = f"Reference photo: {source_label}"
+                        if facts.summary():
+                            note += " Proportions corrected using real-world dimensions from Wikidata."
+                            blueprint_caption = f"Blueprint data (Wikidata): {facts.summary()}"
 
                 if voxels is None:
                     voxels, note = text_generator.generate_from_text(prompt)
@@ -142,6 +150,7 @@ if generate:
                 st.session_state.note = note + (" (truncated — try a smaller chunkiness)" if truncated else "")
                 st.session_state.source_caption = source_caption
                 st.session_state.source_url = source_url
+                st.session_state.blueprint_caption = blueprint_caption
                 st.session_state.title = prompt
         else:
             image = None
@@ -167,6 +176,7 @@ if generate:
                 st.session_state.note = note + (" (truncated — lower the detail slider)" if truncated else "")
                 st.session_state.source_caption = None
                 st.session_state.source_url = None
+                st.session_state.blueprint_caption = None
                 st.session_state.title = prompt.strip() or "image model"
     except Exception as exc:  # noqa: BLE001 - surface any generation failure to the user
         st.sidebar.error(f"Couldn't generate a model: {exc}")
@@ -185,11 +195,13 @@ if voxels is None:
 - `a green dragon` *(falls back to an abstract sculpture — still unique per prompt!)*
 
 By default, prompts are built entirely from VoxelCraft's own procedural shape library — no internet
-required. Flip on **"🔎 Optional: research a reference photo online"** in the sidebar to instead have
-VoxelCraft look up a real photo (Wikipedia, then Openverse), work out how to build it in 3D from that
-photo (a lathed revolve for anything round about a vertical axis, like towers or bottles; a relief
-sculpture otherwise), and sculpt the model from it. Or switch to "Reference image" to supply — and
-steer the reconstruction of — your own photo directly.
+required. Flip on **"🔎 Optional: research a reference photo + real dimensions online"** in the
+sidebar to instead have VoxelCraft look up a real photo (Wikipedia, then Openverse), work out how to
+build it in 3D from that photo (a lathed revolve for anything round about a vertical axis, like towers
+or bottles; a relief sculpture otherwise), pull real height/width/floor-count facts from Wikidata to
+correct the proportions, and sculpt the model from all of that — then export it as a literal,
+ordered `.mcfunction` build sequence. Or switch to "Reference image" to supply — and steer the
+reconstruction of — your own photo directly.
         """
     )
 else:
@@ -199,6 +211,8 @@ else:
             st.caption(f"{st.session_state.source_caption} — [source]({st.session_state.source_url})")
         else:
             st.caption(st.session_state.source_caption)
+    if st.session_state.blueprint_caption:
+        st.caption(st.session_state.blueprint_caption)
 
     col_view, col_export = st.columns([3, 1])
 
@@ -231,16 +245,27 @@ else:
             use_container_width=True,
         )
         mcfunction = exporters.to_mcfunction(voxels)
+        step_count = sum(1 for line in mcfunction.splitlines() if line.startswith("fill "))
         st.download_button(
-            "⬇️ Download .mcfunction",
+            "⬇️ Download .mcfunction (assembly instructions)",
             data=mcfunction,
             file_name="build.mcfunction",
             mime="text/plain",
             use_container_width=True,
-            help="Drop into a datapack's data/<namespace>/functions/ folder, "
-                 "then run /function <namespace>:build in Minecraft Java Edition "
-                 "while standing where you want the model to appear.",
+            help="A literal, ordered list of block-placement commands that assembles the model — "
+                 "drop into a datapack's data/<namespace>/functions/ folder, then run "
+                 "/function <namespace>:build in Minecraft Java Edition while standing where you "
+                 "want the model to appear.",
         )
+        with st.expander(f"📋 Preview build steps ({step_count} placement commands)"):
+            st.caption(
+                "This is the actual construction sequence — each line places one run of real "
+                "Minecraft blocks. Run the whole file in-game (see below) to build it automatically, "
+                "or follow it by hand as an assembly guide."
+            )
+            st.code("\n".join(mcfunction.splitlines()[:40]), language=None)
+            if step_count > 38:
+                st.caption(f"...and {step_count - 38} more steps in the downloaded file.")
         with st.expander("How do I use the .mcfunction in real Minecraft?"):
             st.markdown(
                 """
@@ -256,10 +281,12 @@ else:
 st.divider()
 st.caption(
     "By default, everything above runs locally with VoxelCraft's own rule-based procedural shapes — "
-    "no internet or AI API needed. Online photo research is entirely optional: when turned on, it looks "
-    "up a real reference photo (Wikipedia, then Openverse — both free, keyless, openly-licensed sources), "
+    "no internet or AI API needed. Online research is entirely optional: when turned on, it looks up a "
+    "real reference photo (Wikipedia, then Openverse — both free, keyless, openly-licensed sources), "
     "reads the article text to pick a 3D reconstruction method (a lathed revolve for axially-symmetric "
-    "subjects, a relief sculpture otherwise), and sculpts the photo into voxels quantized to real "
-    "Minecraft block colors. If it's off, finds nothing, or you're offline, VoxelCraft falls back to its "
-    "built-in procedural shapes so generation never fails outright."
+    "subjects, a relief sculpture otherwise), pulls real height/width/floor-count facts from Wikidata to "
+    "correct the model's proportions, and sculpts the photo into voxels quantized to real Minecraft "
+    "block colors — exported as a literal, ordered .mcfunction build sequence. If research is off, "
+    "finds nothing, or you're offline, VoxelCraft falls back to its built-in procedural shapes so "
+    "generation never fails outright."
 )
