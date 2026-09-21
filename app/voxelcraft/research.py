@@ -237,10 +237,11 @@ def _quantity_in_meters(claims: dict, prop: str) -> float | None:
         return None
 
 
-def fetch_blueprint_facts(title: str) -> BlueprintFacts:
+def _fetch_wikidata_facts(title: str) -> BlueprintFacts:
     """Best-effort: real-world height/width/diameter/floor-count for a named
-    subject, from Wikidata (free, keyless). Any failure just means we build
-    from the photo's own proportions instead — this must never raise."""
+    subject, from Wikidata (free, keyless). Any failure just means we fall
+    back to the hand-curated table (or the photo's own proportions) instead
+    — this must never raise."""
     qid = _wikidata_qid_for_title(title)
     if not qid:
         return BlueprintFacts()
@@ -267,6 +268,25 @@ def fetch_blueprint_facts(title: str) -> BlueprintFacts:
         width_m=_quantity_in_meters(claims, "P2049"),
         diameter_m=_quantity_in_meters(claims, "P2386"),
         floors=floors,
+    )
+
+
+def fetch_blueprint_facts(title: str) -> BlueprintFacts:
+    """Real-world dimensions for a named subject: live Wikidata first, with
+    a hand-curated table of well-known landmarks (``known_facts.py``) used
+    to fill in whatever Wikidata didn't return (or the whole thing, if
+    Wikidata has nothing or isn't reachable). Wikidata's own values are
+    never overridden — it's the more current source when reachable."""
+    wikidata_facts = _fetch_wikidata_facts(title)
+    from .known_facts import get_known_facts
+    known = get_known_facts(title)
+    if not known:
+        return wikidata_facts
+    return BlueprintFacts(
+        height_m=wikidata_facts.height_m or known.height_m,
+        width_m=wikidata_facts.width_m or known.width_m,
+        diameter_m=wikidata_facts.diameter_m or known.diameter_m,
+        floors=wikidata_facts.floors or known.floors,
     )
 
 
