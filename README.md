@@ -4,6 +4,8 @@ Design accurate, scaled Minecraft block models of real-world landmarks — or li
 
 This is a self-contained HTML/CSS/JS app (`app/index.html`, rendered with [three.js](https://threejs.org/) for the 3D preview) shown full-screen through a thin Streamlit wrapper (`streamlit_app.py`). No backend, no build step — everything runs client-side in the browser.
 
+New here? [`docs/newcomer-guide.md`](docs/newcomer-guide.md) is the orientation guide: where this lives, how to run it, how the single-file codebase is laid out, and how its reference data is organized.
+
 ## What it does
 
 Ask it (by picking from the library, or describing a shape) for something like *"a 3/8 scale replica of Khufu's Pyramid, filled, with the interior chambers"* and it will:
