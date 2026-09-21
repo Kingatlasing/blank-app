@@ -117,18 +117,63 @@ def pyramid(base=11, height=6, color="sand") -> list[Voxel]:
 # Buildings
 # ---------------------------------------------------------------------------
 
-def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red") -> list[Voxel]:
+def _spiral_staircase(cx: int, cz: int, y0: int, height: int, radius=1, color="cobblestone") -> list[Voxel]:
+    """A helical staircase winding around a central support pole from y0 up
+    to y0+height — steps_per_turn positions per revolution, climbing a
+    voxel every few steps for a recognizably helical (not just zig-zag) look."""
+    c = hex_of(color)
+    voxels = []
+    steps_per_turn = 8
+    total_steps = max(1, height * 3)
+    for i in range(total_steps):
+        angle = 2 * math.pi * i / steps_per_turn
+        x = cx + round(radius * math.cos(angle))
+        z = cz + round(radius * math.sin(angle))
+        y = y0 + i // 3
+        voxels.append((x, y, z, c))
+    for dy in range(height + 1):
+        voxels.append((cx, y0 + dy, cz, c))  # central support pole
+    return voxels
+
+
+def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red",
+          floors=1, staircase=False) -> list[Voxel]:
     wall_c, roof_c = hex_of(wall), hex_of(roof)
     hw, hd = width // 2, depth // 2
-    parts = [_hollow_box(-hw, hw + 1, 0, wall_h, -hd, hd + 1, wall_c)]
-    # door gap
-    door = _box(-1, 1, 0, 2, -hd, -hd + 1, "#00000000")
-    door_keys = {(x, y, z) for x, y, z, _ in door}
-    base = [v for v in parts[0] if (v[0], v[1], v[2]) not in door_keys]
-    # pitched roof, shrinking each layer
+    floors = max(1, floors)
+
+    grid: dict[tuple[int, int, int], str] = {}
+    for level in range(floors):
+        y0, y1 = level * wall_h, (level + 1) * wall_h
+        for x, y, z, c in _hollow_box(-hw, hw + 1, y0, y1, -hd, hd + 1, wall_c):
+            grid[(x, y, z)] = c
+
+    # ground-floor door
+    for x in (-1, 0):
+        for y in (0, 1):
+            grid.pop((x, y, -hd), None)
+
+    base: list[Voxel]
+    if floors > 1 and staircase:
+        # punch a hole through the (double-thick, ceiling+floor) slab
+        # between every pair of stories, and wind a staircase up through it
+        stair_cx = hw - 2 if hw >= 3 else 0
+        stair_cz = hd - 2 if hd >= 3 else 0
+        for level in range(1, floors):
+            y_slab = level * wall_h
+            for dy in (y_slab - 1, y_slab):
+                for dx in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        grid.pop((stair_cx + dx, dy, stair_cz + dz), None)
+        stairs = _spiral_staircase(stair_cx, stair_cz, 0, floors * wall_h, radius=1)
+        base = _merge([(x, y, z, c) for (x, y, z), c in grid.items()], stairs)
+    else:
+        base = [(x, y, z, c) for (x, y, z), c in grid.items()]
+
+    # pitched roof on top of the topmost floor, shrinking each layer
     roof_layers = []
     layer_hw, layer_hd = hw + 1, hd + 1
-    y = wall_h
+    y = floors * wall_h
     while layer_hw >= 0 and layer_hd >= 0:
         for x in range(-layer_hw, layer_hw + 1):
             for z in range(-layer_hd, layer_hd + 1):
@@ -138,6 +183,7 @@ def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red") -> list[Vox
         layer_hw -= 1
         layer_hd -= 1
         y += 1
+
     return _merge(base, roof_layers)
 
 
@@ -294,6 +340,35 @@ def heart(color="red") -> list[Voxel]:
     return _extrude(grid, legend, thickness=2)
 
 
+def heart_3d(resolution=22, color="red") -> list[Voxel]:
+    """A genuine solid 3D heart — not a flat pixel-art cutout — using the
+    classic implicit heart-surface equation
+    (x^2 + 9/4 y^2 + z^2 - 1)^3 - x^2 z^3 - 9/80 y^2 z^3 <= 0,
+    rasterized onto a voxel grid. This is a real volumetric heart *shape*
+    (the same curve used in math/graphics demos of "the" 3D heart), not an
+    anatomically-accurate organ model — no keyword-driven generator can
+    produce true medical anatomy without an actual 3D scan/mesh to work
+    from."""
+    c = hex_of(color)
+    lo, hi = -1.3, 1.3
+    n = max(6, resolution)
+    step = (hi - lo) / (n - 1)
+    voxels = []
+    for i in range(n):
+        X = lo + i * step
+        for j in range(n):
+            Y = lo + j * step
+            for k in range(n):
+                Z = lo + k * step
+                val = (X * X + 2.25 * Y * Y + Z * Z - 1) ** 3 - X * X * Z ** 3 - 0.1125 * Y * Y * Z ** 3
+                if val <= 0:
+                    vx = i
+                    vy = k  # formula's z-axis runs point (low Z) -> lobe cleft (high Z); point faces down
+                    vz = j
+                    voxels.append((vx, vy, vz, c))
+    return voxels
+
+
 def star(color="yellow") -> list[Voxel]:
     legend = {"s": hex_of(color)}
     grid = [
@@ -323,6 +398,52 @@ def quadruped(body="brown", head="brown", accent="black") -> list[Voxel]:
         _box(-3, -2, 0, 3, 1, 2, accent_c),
         _box(2, 3, 3, 4, 2, 3, accent_c),  # tail
     ]
+    return _merge(*parts)
+
+
+def dragon(body="green", horn="light_gray", belly="lime") -> list[Voxel]:
+    body_c, horn_c, belly_c = hex_of(body), hex_of(horn), hex_of(belly)
+    parts = []
+
+    # torso + belly stripe
+    parts.append(_box(-2, 3, 4, 8, -5, 6, body_c))
+    parts.append(_box(-1, 2, 4, 5, -5, 6, belly_c))
+
+    # neck rising up and forward from the torso, then head + horns
+    neck = []
+    for i in range(4):
+        y0, z0 = 7 + i, 6 + i
+        neck.extend(_box(-1, 2, y0, y0 + 1, z0, z0 + 1, body_c))
+    parts.append(neck)
+    parts.append(_box(-2, 3, 10, 13, 9, 13, body_c))
+    parts.append(_box(-2, -1, 12, 14, 10, 11, horn_c))
+    parts.append(_box(1, 2, 12, 14, 10, 11, horn_c))
+
+    # tapering tail extending back from the torso
+    tail = []
+    z, half = -5, 2
+    while half >= 0 and z > -13:
+        tail.extend(_box(-half, half + 1, 5, 6, z - 1, z, body_c))
+        z -= 1
+        if (z + 13) % 3 == 0:
+            half -= 1
+    parts.append(tail)
+
+    # four legs
+    for dx in (-3, 2):
+        for dz in (-3, 2):
+            parts.append(_box(dx, dx + 1, 0, 4, dz, dz + 2, body_c))
+
+    # wings: swept panels jutting from the back, widening as they extend
+    wings = []
+    for i in range(7):
+        span_y = 7 + i // 2
+        span_x = 3 + i
+        for z in (0, 1):
+            wings.append((span_x, span_y, z, body_c))
+            wings.append((-span_x, span_y, z, body_c))
+    parts.append(wings)
+
     return _merge(*parts)
 
 

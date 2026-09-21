@@ -17,7 +17,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-MAX_VOXELS = 40_000
+MAX_VOXELS = 80_000
 
 _DEPTH_STYLES = {
     "Flat pixel art": "flat",
@@ -189,10 +189,12 @@ if voxels is None:
         """
 **Try prompts like:**
 - `a red house with a garden`
-- `a diamond sword`
-- `a golden castle`
+- `a house with two floors and a spiral staircase`
+- `a fully realistic heart` *(a real 3D heart-surface solid, not a flat cutout)*
+- `a Greek temple` *(has a genuinely hollow, walkable interior)*
+- `a witch's castle with a knight and dragon` *(composes all three into one scene)*
 - `a snowy pine tree`
-- `a green dragon` *(falls back to an abstract sculpture — still unique per prompt!)*
+- `a fluffy cloud` *(no exact match — falls back to an abstract sculpture, still unique per prompt!)*
 
 By default, prompts are built entirely from VoxelCraft's own procedural shape library — no internet
 required. Flip on **"🔎 Optional: research a reference photo + real dimensions online"** in the
