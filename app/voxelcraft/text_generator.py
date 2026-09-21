@@ -78,7 +78,9 @@ _RULES: list[tuple[list[str], object]] = [
     (["boat", "ship", "canoe"], lambda colors: shapes.boat()),
     (["dog", "puppy", "wolf", "fox"], lambda colors: shapes.dog(
         body=colors[0] if colors else "brown")),
-    (["cat", "pig", "cow", "sheep", "animal", "creature", "beast"],
+    (["cat", "kitten"], lambda colors: shapes.cat(
+        body=colors[0] if colors else "light_gray")),
+    (["pig", "cow", "sheep", "animal", "creature", "beast"],
      lambda colors: shapes.quadruped(
          body=colors[0] if colors else "brown", head=colors[0] if colors else "brown")),
     (["robot", "person", "human", "steve", "alex", "character", "man", "woman",

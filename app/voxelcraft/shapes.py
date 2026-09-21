@@ -434,6 +434,40 @@ def dog(body="brown", snout="sand", nose="black", paw="white", ear="black") -> l
     return _merge(*parts)
 
 
+def cat(body="light_gray", nose="pink", eye="green", paw="white", inner_ear="pink") -> list[Voxel]:
+    """A compact standing cat: 4 short legs with distinct paws, a rounded
+    head with a small nose and two eyes, triangular pointed ears, and a
+    tail sweeping up from the rear — proportioned differently from `dog`
+    (shorter legs, more compact body, pointed ears close together) rather
+    than reusing the same rig. Verified against a rendered voxel preview
+    during development."""
+    body_c, nose_c, eye_c, paw_c, inner_c = hex_of(body), hex_of(nose), hex_of(eye), hex_of(paw), hex_of(inner_ear)
+    leg_h = 4
+    z0, z1 = -3, 3
+    parts = []
+
+    parts.append(_box(3, 11, leg_h, leg_h + 3, z0, z1, body_c))  # torso
+    parts.append(_box(9, 13, leg_h + 2, leg_h + 6, z0 + 1, z1 - 1, body_c))  # head
+    parts.append(_box(12, 14, leg_h + 3, leg_h + 5, z0 + 2, z1 - 2, nose_c))
+    parts.append(_box(12, 13, leg_h + 5, leg_h + 6, z0 + 1, z0 + 2, eye_c))
+    parts.append(_box(12, 13, leg_h + 5, leg_h + 6, z1 - 2, z1 - 1, eye_c))
+    for ez in (z0 + 1, z1 - 2):  # two triangular (stepped) ears
+        parts.append(_box(9, 11, leg_h + 6, leg_h + 7, ez, ez + 1, body_c))
+        parts.append(_box(9, 10, leg_h + 7, leg_h + 9, ez, ez + 1, body_c))
+        parts.append(_box(9, 10, leg_h + 7, leg_h + 8, ez, ez + 1, inner_c))
+
+    for lx in (4, 8):
+        for lz in (z0, z1 - 2):
+            parts.append(_box(lx, lx + 2, 1, leg_h, lz, lz + 2, body_c))
+            parts.append(_box(lx, lx + 2, 0, 1, lz, lz + 2, paw_c))
+
+    parts.append(_box(1, 3, leg_h + 1, leg_h + 3, z0 + 2, z1 - 2, body_c))  # tail
+    parts.append(_box(0, 2, leg_h + 3, leg_h + 6, z0 + 2, z1 - 2, body_c))
+    parts.append(_box(-1, 1, leg_h + 6, leg_h + 9, z0 + 2, z1 - 2, body_c))
+
+    return _merge(*parts)
+
+
 def dragon(body="green", horn="light_gray", belly="lime") -> list[Voxel]:
     body_c, horn_c, belly_c = hex_of(body), hex_of(horn), hex_of(belly)
     parts = []

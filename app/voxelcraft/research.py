@@ -358,4 +358,7 @@ def research_reference_image(prompt: str) -> ResearchResult | None:
     subject = extract_subject(prompt)
     if not subject:
         return None
-    return _search_wikipedia(subject) or _search_openverse(subject)
+    from .local_library import get_local_reference
+    return (get_local_reference(subject)
+            or _search_wikipedia(subject)
+            or _search_openverse(subject))
