@@ -10,6 +10,8 @@ Turn any text prompt into a blocky, Minecraft-style 3D voxel model — or turn a
 
 ### How it works
 
+New here? [`docs/newcomer-guide.md`](docs/newcomer-guide.md) is a longer walkthrough: what lives on which branch, how to run this locally, and how the reference data is organized.
+
 - `app/voxelcraft/palette.py` — the shared Minecraft-block color palette (hex color ↔ real block id), plus color-word detection for prompts.
 - `app/voxelcraft/shapes.py` — procedural builders (humanoid, tree, house, castle, sword, pickaxe, heart, star, pyramid, vehicles, animals, a deterministic fallback sculpture, ...).
 - `app/voxelcraft/text_generator.py` — matches prompt keywords to a shape builder and recolors it from any color words found.
