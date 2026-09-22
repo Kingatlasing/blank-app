@@ -197,7 +197,7 @@ for prompt, expected_match in [
     ("a greek temple", "temple"),
     ("a cube", "cube"),
 ]:
-    _voxels, note = text_generator.generate_from_text(prompt)
+    _voxels, note, _chunkable = text_generator.generate_from_text(prompt)
     check(f"'{expected_match}'" in note, f"{prompt!r} builds {expected_match!r}", note)
 
 section("prompt -> a valid model, whatever the prompt")
@@ -208,7 +208,7 @@ for prompt in [
     "a blue sphere and a red cube", "a snowman riding a bicycle",
 ]:
     try:
-        voxels, _note = text_generator.generate_from_text(prompt)
+        voxels, _note, _chunkable = text_generator.generate_from_text(prompt)
         assert voxels, "empty model"
         for voxel in voxels:
             x, y, z, color = voxel

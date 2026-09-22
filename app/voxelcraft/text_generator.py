@@ -147,8 +147,15 @@ def _compose_scene(built: list[tuple[str, list[Voxel]]]) -> list[Voxel]:
     return placed
 
 
-def generate_from_text(prompt: str) -> tuple[list[Voxel], str]:
-    """Returns (voxels, description-of-what-was-built)."""
+def generate_from_text(prompt: str) -> tuple[list[Voxel], str, bool]:
+    """Returns (voxels, description-of-what-was-built, chunkable).
+
+    ``chunkable`` says whether the caller's chunkiness post-processing
+    (blowing each voxel up into a factor^3 cluster, for the deliberately
+    blocky Minecraft look) should apply. It's False whenever the result
+    includes anything from the high-resolution "detailed" tier
+    (`human_face`/`human_body`, see `catalog.py`) — forcibly re-blocking a
+    model built *for* smoothness would undo the entire point of it."""
     prompt_lower = prompt.lower()
     _last_prompt[0] = prompt_lower
     colors = find_color_words(prompt_lower)
@@ -160,19 +167,21 @@ def generate_from_text(prompt: str) -> tuple[list[Voxel], str]:
             matches.append((matched, builder))
 
     matched_keys = {k for k, _ in matches}
-    if matched_keys & {"face", "portrait", "body", "torso", "physique"}:
+    detailed_tier_keys = {"face", "portrait", "body", "torso", "physique"}
+    if matched_keys & detailed_tier_keys:
         matches = [(k, b) for k, b in matches if k not in _GENERIC_PERSON_KEYWORDS]
+    chunkable = not (matched_keys & detailed_tier_keys)
 
     if not matches:
         voxels = shapes.procedural_blob(prompt_lower, colors=colors or None)
-        return voxels, "No specific object recognized — generated an abstract voxel sculpture from your prompt."
+        return voxels, "No specific object recognized — generated an abstract voxel sculpture from your prompt.", chunkable
 
     if len(matches) == 1:
         matched, builder = matches[0]
         voxels = builder(colors)
-        return voxels, f"Recognized '{matched}' in your prompt."
+        return voxels, f"Recognized '{matched}' in your prompt.", chunkable
 
     built = [(matched, builder(colors)) for matched, builder in matches]
     voxels = _compose_scene(built)
     names = ", ".join(name for name, _ in built)
-    return voxels, f"Recognized multiple subjects ({names}) and composed them into one scene, side by side."
+    return voxels, f"Recognized multiple subjects ({names}) and composed them into one scene, side by side.", chunkable

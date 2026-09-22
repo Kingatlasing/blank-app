@@ -16,13 +16,15 @@ resolutions:
   same rough unit `castle`, `dog`, `car`, and the furniture shapes below
   all share. Anything in this tier can be placed directly alongside
   anything else in it.
-- ``"detailed"`` — `human_face`/`human_body`, built later at roughly 4x
-  the linear resolution for a rounded, proportioned look. They are **not**
+- ``"detailed"`` — `human_face`/`human_body`, built at roughly 8x the
+  blocky tier's linear resolution (~9x taller than `humanoid`) for a
+  proportioned, shaded, anatomically-landmarked look. They are **not**
   scale-compatible with the blocky tier without deliberate rescaling: a
-  `human_body` (~59 voxels tall) placed next to a blocky `house` (~5
-  voxels per floor) would tower over it. A blocky scene that needs a
-  person-sized figure should use `humanoid` instead; the detailed tier is
-  for a standalone "realistic person" request.
+  `human_body` (well over a hundred voxels tall) placed next to a blocky
+  `house` (~5 voxels per floor) would dwarf it. A blocky scene that needs
+  a person-sized figure should use `humanoid` instead; the detailed tier
+  is for a standalone "realistic person" request. (Exact dimensions are
+  measured below, not hand-maintained — check there for current numbers.)
 """
 
 from __future__ import annotations

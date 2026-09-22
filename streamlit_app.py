@@ -166,6 +166,11 @@ if generate:
                 blueprint_caption = None
                 llm_code = None
                 degenerate_photo = False
+                # Only the plain-text procedural path can produce a "detailed
+                # tier" shape (human_face/human_body); every other source
+                # (LLM code-gen that didn't touch that tier, hand-
+                # enumeration, photo research) is chunkable as before.
+                chunkable = True
 
                 if use_llm:
                     spinner_msg = (
@@ -175,7 +180,7 @@ if generate:
                     with st.spinner(spinner_msg):
                         try:
                             if llm_method.startswith("Write code"):
-                                voxels, note, llm_code = llm_builder.generate_llm_structure(
+                                voxels, note, llm_code, chunkable = llm_builder.generate_llm_structure(
                                     prompt, model=ollama_model, host=ollama_host
                                 )
                             else:
@@ -217,7 +222,7 @@ if generate:
                                 blueprint_caption = f"Blueprint data ({facts_source}): {facts.summary()}"
 
                 if voxels is None:
-                    voxels, note = text_generator.generate_from_text(prompt)
+                    voxels, note, chunkable = text_generator.generate_from_text(prompt)
                     if degenerate_photo:
                         note = ("The researched photo didn't reconstruct well (came out nearly "
                                  "one solid color), so ") + note[0].lower() + note[1:]
@@ -225,8 +230,10 @@ if generate:
                         note = "No usable reference photo found online, so " + note[0].lower() + note[1:]
                     elif use_llm:
                         note = "Falling back to a procedural shape: " + note[0].lower() + note[1:]
+                    if not chunkable:
+                        note += " (built at high resolution — chunkiness skipped so it stays smooth.)"
 
-                voxels = normalize(scale_voxels(voxels, scale_factor))
+                voxels = normalize(scale_voxels(voxels, scale_factor) if chunkable else voxels)
                 voxels, truncated = voxel_count_limit(voxels, MAX_VOXELS)
                 st.session_state.voxels = voxels
                 st.session_state.note = note + (" (truncated — try a smaller chunkiness)" if truncated else "")

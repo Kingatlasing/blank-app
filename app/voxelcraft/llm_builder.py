@@ -67,6 +67,14 @@ _EXEC_TIMEOUT_S = 10    # generated code must run fast — a multi-object scene 
 # sort last) rather than shrink gracefully — so this stays under that with
 # headroom, not "as generous as possible" in isolation.
 _MAX_VOXELS = 9_000
+# human_face/human_body alone run ~21k-24k voxels — well past the
+# blocky-safe budget above by design (see their docstrings in shapes.py).
+# Code that calls either skips the app's chunkiness scaling entirely (see
+# `chunkable` on generate_llm_structure), so this only has to fit under
+# streamlit_app.py's flat 80_000 post-processing cap directly, not survive
+# an 8x multiplication first — 45_000 comfortably covers face+body combined
+# (~45_230 measured) with a little room to spare.
+_MAX_VOXELS_DETAILED = 45_000
 _DIRECT_MAX_VOXELS = 6_000  # hand-enumerated: capped much lower, see module docstring
 
 _PALETTE_NAMES = sorted(s.name for s in PALETTE)
@@ -141,11 +149,12 @@ hand-build a spaceship, then lay them out together.
 
 SCALE MATTERS: the "[blocky tier]" shapes above all share one consistent
 scale and can be placed directly together. The "[detailed tier]" shapes
-(`human_face`, `human_body`) are built ~4x finer and are NOT scale-
+(`human_face`, `human_body`) are built ~8x finer and are NOT scale-
 compatible with the blocky tier — don't place a `human_body` next to a
-blocky `house`, it would tower over it; use `humanoid()` for a person-
-sized figure in a blocky scene, and reserve `human_face`/`human_body` for
-a standalone "realistic person" request.
+blocky `house`, it would dwarf it (check the catalog's measured
+dimensions above if unsure); use `humanoid()` for a person-sized figure
+in a blocky scene, and reserve `human_face`/`human_body` for a standalone
+"realistic person" request.
 
 LAYING OUT A SCENE: before writing code, work out roughly where each piece
 goes using the catalog's dimensions — e.g. a house's interior floor is
@@ -329,13 +338,35 @@ _SAFE_BUILTINS = {
 }
 
 
-def _run_sandboxed(code: str) -> list[Voxel]:
+_DETAILED_TIER_NAMES = {"human_face", "human_body"}
+
+
+def _run_sandboxed(code: str) -> tuple[list[Voxel], bool]:
+    """Returns (voxels, used_detailed_tier). used_detailed_tier is True if
+    the generated code called `human_face`/`human_body` — the caller uses
+    this to pick a voxel-count cap that won't truncate one of those (they
+    run ~21k-24k voxels alone, well past the blocky-tier-safe budget) and
+    to skip the app's chunkiness post-processing, which would undo the
+    detail tier's whole purpose."""
+    used_detailed_tier = False
+
+    def _tracked(name, fn):
+        def wrapper(*args, **kwargs):
+            nonlocal used_detailed_tier
+            used_detailed_tier = True
+            return fn(*args, **kwargs)
+        return wrapper
+
+    library_functions = {
+        name: (_tracked(name, fn) if name in _DETAILED_TIER_NAMES else fn)
+        for name, fn in _LIBRARY_FUNCTIONS.items()
+    }
     scope = {
         "box": _box, "hollow_box": _hollow_box, "sphere": _sphere,
         "cylinder": _cylinder, "cone": _cone, "merge": _merge, "color": hex_of,
         "translate": _translate, "bbox": _bbox,
         "math": math, "__builtins__": _SAFE_BUILTINS,
-        **_LIBRARY_FUNCTIONS,
+        **library_functions,
     }
 
     def _target():
@@ -385,19 +416,25 @@ def _run_sandboxed(code: str) -> list[Voxel]:
             continue
     if not voxels:
         raise LLMBuildError("build() returned data, but none of it was valid (x, y, z, '#hex') voxels.")
-    return voxels[:_MAX_VOXELS]
+    cap = _MAX_VOXELS_DETAILED if used_detailed_tier else _MAX_VOXELS
+    return voxels[:cap], used_detailed_tier
 
 
 def generate_llm_structure(
     prompt: str, model: str = "qwen2.5-coder", host: str = "http://localhost:11434",
-) -> tuple[list[Voxel], str, str]:
-    """Returns (voxels, description, generated_code). Raises LLMBuildError
-    on any failure — the caller decides whether/how to fall back."""
+) -> tuple[list[Voxel], str, str, bool]:
+    """Returns (voxels, description, generated_code, chunkable). Raises
+    LLMBuildError on any failure — the caller decides whether/how to fall
+    back. ``chunkable`` is False if the code called `human_face`/
+    `human_body` (see `_run_sandboxed`) — the caller should skip its own
+    chunkiness post-processing in that case, same as the plain
+    text-prompt path does for the same shapes."""
     raw = _ollama_chat(prompt, model, host, _SYSTEM_PROMPT)
     code = _extract_code(raw)
     _precheck_code(code)
-    voxels = _run_sandboxed(code)
-    return voxels, f"Designed a custom structure with {model} via Ollama (wrote code for it).", code
+    voxels, used_detailed_tier = _run_sandboxed(code)
+    return (voxels, f"Designed a custom structure with {model} via Ollama (wrote code for it).", code,
+            not used_detailed_tier)
 
 
 # entries like [3, -1, 12, "#B02E26"], tolerant of markdown fences, stray

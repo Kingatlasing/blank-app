@@ -42,6 +42,8 @@ PALETTE: list[Swatch] = [
     Swatch("pink", "#F38BAA", "minecraft:pink_wool"),
     Swatch("brown", "#724728", "minecraft:brown_wool"),
     Swatch("skin", "#E0AC85", "minecraft:terracotta"),
+    Swatch("skin_light", "#EFC29D", "minecraft:white_terracotta"),
+    Swatch("skin_dark", "#8B5A3C", "minecraft:brown_terracotta"),
     Swatch("oak_planks", "#B08F55", "minecraft:oak_planks"),
     Swatch("oak_log", "#6F5330", "minecraft:oak_log"),
     Swatch("leaves", "#3B6A1D", "minecraft:oak_leaves"),
