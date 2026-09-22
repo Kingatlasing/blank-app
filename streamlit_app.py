@@ -1,9 +1,9 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.voxelcraft import exporters, image_generator, llm_builder, local_library, research, text_generator
+from app.voxelcraft import exporters, image_generator, llm_builder, local_library, mesh_face, research, text_generator
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
-from app.voxelcraft.viewer import build_viewer_html
+from app.voxelcraft.viewer import build_mesh_viewer_html, build_viewer_html
 
 st.set_page_config(page_title="VoxelCraft", page_icon="🧱", layout="wide")
 
@@ -53,20 +53,40 @@ if "voxels" not in st.session_state:
     st.session_state.source_url = None
     st.session_state.blueprint_caption = None
     st.session_state.llm_code = None
+    st.session_state.mesh_vertices = None
+    st.session_state.mesh_faces = None
+    st.session_state.mesh_color = None
 
 with st.sidebar:
     st.header("Generate")
     mode = st.radio(
         "Source",
-        ["Text prompt", "Reference image (+ optional prompt)"],
+        ["Text prompt", "Reference image (+ optional prompt)", "🎭 Realistic face (polygon mesh)"],
         help="Text prompt builds from VoxelCraft's procedural shapes (with optional online photo "
-             "research). An image lets you supply your own reference photo instead.",
+             "research). An image lets you supply your own reference photo instead. Realistic face "
+             "builds a genuine polygon-mesh head — different technology from everything else here, "
+             "see its own note below.",
     )
 
-    prompt = st.text_input(
-        "Prompt",
-        placeholder="the Eiffel Tower, a golden retriever, a red barn, a diamond sword...",
-    )
+    mesh_color = "#E0AC85"
+    if mode.startswith("🎭"):
+        st.caption(
+            "A real polygon mesh (actual vertices/triangle faces, like a 3D sculpting tool would "
+            "make) — not voxels. Voxels, even at very high resolution, can't produce faceted planes "
+            "at arbitrary angles or a true tapered jaw; this uses a completely different technique "
+            "to get that low-poly-sculpt look. Because of that, it doesn't fit the rest of this app's "
+            "pipeline: no Minecraft-block palette (any color works), no `.mcfunction` export (blocks "
+            "don't apply to a smooth mesh), no chunkiness. It designs a face from proportions, the "
+            "same way the voxel shapes design a house from wall/roof primitives — it does not "
+            "reconstruct any specific real person from a photo."
+        )
+        mesh_color = st.color_picker("Skin tone", value="#E0AC85")
+        prompt = ""
+    else:
+        prompt = st.text_input(
+            "Prompt",
+            placeholder="the Eiffel Tower, a golden retriever, a red barn, a diamond sword...",
+        )
 
     research_online = False
     use_llm = False
@@ -130,7 +150,7 @@ with st.sidebar:
             )
             if use_direct_enumeration:
                 llm_method = "Hand-enumerate coordinates"
-    else:
+    elif mode.startswith("Reference image"):
         img_source = st.radio("Image source", ["From a URL", "Upload a file"], horizontal=True)
         if img_source == "From a URL":
             image_url = st.text_input("Image URL", placeholder="https://example.com/photo.png")
@@ -242,6 +262,24 @@ if generate:
                 st.session_state.blueprint_caption = blueprint_caption
                 st.session_state.llm_code = llm_code
                 st.session_state.title = prompt
+                st.session_state.mesh_vertices = None
+                st.session_state.mesh_faces = None
+        elif mode.startswith("🎭"):
+            with st.spinner("Sculpting a polygon-mesh face..."):
+                vertices, faces = mesh_face.build_head_mesh()
+            st.session_state.mesh_vertices = vertices
+            st.session_state.mesh_faces = faces
+            st.session_state.mesh_color = mesh_color
+            st.session_state.note = (
+                f"Built a {len(faces)}-triangle polygon-mesh face — a real vertex/face sculpt, not "
+                "voxels."
+            )
+            st.session_state.title = "realistic face (mesh)"
+            st.session_state.voxels = None
+            st.session_state.source_caption = None
+            st.session_state.source_url = None
+            st.session_state.blueprint_caption = None
+            st.session_state.llm_code = None
         else:
             image = None
             if img_source == "From a URL":
@@ -269,12 +307,42 @@ if generate:
                 st.session_state.blueprint_caption = None
                 st.session_state.llm_code = None
                 st.session_state.title = prompt.strip() or "image model"
+                st.session_state.mesh_vertices = None
+                st.session_state.mesh_faces = None
     except Exception as exc:  # noqa: BLE001 - surface any generation failure to the user
         st.sidebar.error(f"Couldn't generate a model: {exc}")
 
 voxels = st.session_state.voxels
+mesh_vertices = st.session_state.mesh_vertices
+mesh_faces = st.session_state.mesh_faces
 
-if voxels is None:
+if mesh_vertices is not None:
+    st.success(st.session_state.note)
+    col_view, col_export = st.columns([3, 1])
+    with col_view:
+        components.html(
+            build_mesh_viewer_html(mesh_vertices, mesh_faces, st.session_state.mesh_color),
+            height=620, scrolling=False,
+        )
+    with col_export:
+        st.subheader("Export")
+        st.metric("Vertices", len(mesh_vertices))
+        st.metric("Triangles", len(mesh_faces))
+        obj_text, mtl_text = exporters.mesh_to_obj(mesh_vertices, mesh_faces, st.session_state.mesh_color)
+        st.download_button(
+            "⬇️ Download OBJ mesh", data=obj_text, file_name="face.obj",
+            mime="text/plain", use_container_width=True,
+        )
+        st.download_button(
+            "⬇️ Download MTL colors", data=mtl_text, file_name="model.mtl",
+            mime="text/plain", use_container_width=True,
+        )
+        st.caption(
+            "A real vertex/face mesh (opens in Blender, MeshLab, etc.) — not the cube-per-voxel OBJ "
+            "the other modes export, and no `.mcfunction`, since discrete blocks don't apply to a "
+            "smooth polygon mesh."
+        )
+elif voxels is None:
     st.info("👈 Enter a prompt in the sidebar and click **Generate model** to get started.")
     st.markdown(
         """

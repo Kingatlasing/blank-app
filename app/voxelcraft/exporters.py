@@ -56,6 +56,25 @@ def to_obj(voxels: list[Voxel]) -> str:
     return "\n".join(lines_obj), "\n".join(lines_mtl)
 
 
+def mesh_to_obj(vertices: list[tuple[float, float, float]], faces: list[tuple[int, int, int]],
+                 color: str = "#E0AC85") -> tuple[str, str]:
+    """A real polygon-mesh OBJ (actual vertices/faces from `mesh_face.py`,
+    not one cube per voxel like `to_obj`) — this is what lets the mesh
+    tier's output open correctly in any 3D modeling tool as a smooth
+    faceted sculpt rather than a pile of unioned cubes. Returns
+    (obj_text, mtl_text), matching `to_obj`'s return shape."""
+    r = int(color[1:3], 16) / 255
+    g = int(color[3:5], 16) / 255
+    b = int(color[5:7], 16) / 255
+    mtl = f"newmtl mesh\nKd {r:.3f} {g:.3f} {b:.3f}\n"
+    lines = ["mtllib model.mtl", "", "usemtl mesh"]
+    for x, y, z in vertices:
+        lines.append(f"v {x:.5f} {y:.5f} {z:.5f}")
+    for a, b_, c in faces:
+        lines.append(f"f {a + 1} {b_ + 1} {c + 1}")  # OBJ indices are 1-based
+    return "\n".join(lines), mtl
+
+
 def to_mcfunction(voxels: list[Voxel], origin_note: str = "~ ~ ~") -> str:
     """Emit `/fill` commands (run-length-encoded along x) that build the
     model out of real Minecraft blocks, relative to wherever it's run from.

@@ -119,3 +119,109 @@ def build_viewer_html(voxels: list[Voxel]) -> str:
     html = _TEMPLATE.replace("__VOXELS__", json.dumps(payload))
     html = html.replace("__COUNT__", str(len(voxels)))
     return html
+
+
+_MESH_TEMPLATE = """<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; padding: 0; overflow: hidden; background: #1b1f2a; }
+  #info {
+    position: absolute; top: 8px; left: 12px; color: #cfe8ff; font: 13px monospace;
+    background: rgba(10,14,24,0.55); padding: 6px 10px; border-radius: 6px; pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div id="info">__COUNT__ triangles — drag to orbit, scroll to zoom</div>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const VERTS = __VERTS__;   // flat [x,y,z, x,y,z, ...]
+const FACES = __FACES__;   // flat [i,j,k, i,j,k, ...]
+const COLOR = __COLOR__;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1b1f2a);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 200);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+sun.position.set(4, 6, 5);
+scene.add(sun);
+const fill = new THREE.DirectionalLight(0x88aaff, 0.3);
+fill.position.set(-3, 1, -3);
+scene.add(fill);
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute("position", new THREE.Float32BufferAttribute(VERTS, 3));
+geometry.setIndex(FACES);
+geometry.computeVertexNormals();
+
+// flat (faceted) shading — this is what makes the low-poly planes
+// actually read as distinct facets, matching the reference sculpt style,
+// instead of Three.js smoothing them into a fake-smooth blob
+const material = new THREE.MeshStandardMaterial({ color: COLOR, flatShading: true, roughness: 0.85 });
+const mesh = new THREE.Mesh(geometry, material);
+scene.add(mesh);
+
+const wire = new THREE.LineSegments(
+  new THREE.WireframeGeometry(geometry),
+  new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.12 })
+);
+scene.add(wire);
+
+geometry.computeBoundingSphere();
+const radius = geometry.boundingSphere ? geometry.boundingSphere.radius : 1;
+
+camera.position.set(radius * 2.2, radius * 1.3, radius * 2.2);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.update();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
+"""
+
+
+def build_mesh_viewer_html(vertices: list[tuple[float, float, float]],
+                            faces: list[tuple[int, int, int]], color: str = "#E0AC85") -> str:
+    """The mesh-tier counterpart to `build_viewer_html`: renders a real
+    vertex/face polygon mesh (flat-shaded, so the low-poly facets stay
+    visible) instead of instanced voxel cubes."""
+    flat_verts = [coord for vertex in vertices for coord in vertex]
+    flat_faces = [idx for face in faces for idx in face]
+    html = _MESH_TEMPLATE.replace("__VERTS__", json.dumps(flat_verts))
+    html = html.replace("__FACES__", json.dumps(flat_faces))
+    html = html.replace("__COLOR__", json.dumps(color))
+    html = html.replace("__COUNT__", str(len(faces)))
+    return html
