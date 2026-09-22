@@ -10,13 +10,35 @@ Turn any text prompt into a blocky, Minecraft-style 3D voxel model — or turn a
 
 ### How it works
 
+New here? [`docs/newcomer-guide.md`](docs/newcomer-guide.md) is a longer walkthrough: what lives on which branch, how to run this locally, and how the reference data is organized.
+
 - `app/voxelcraft/palette.py` — the shared Minecraft-block color palette (hex color ↔ real block id), plus color-word detection for prompts.
 - `app/voxelcraft/shapes.py` — procedural builders (humanoid, tree, house, castle, sword, pickaxe, heart, star, pyramid, vehicles, animals, a deterministic fallback sculpture, ...).
 - `app/voxelcraft/text_generator.py` — matches prompt keywords to a shape builder and recolors it from any color words found.
 - `app/voxelcraft/image_generator.py` — fetches/loads an image and voxelizes it (flat pixel-art or 3D relief).
 - `app/voxelcraft/exporters.py` — JSON, OBJ/MTL, and `.mcfunction` export.
 - `app/voxelcraft/viewer.py` — builds the self-contained Three.js preview page.
+- `app/voxelcraft/research.py` — looks up a real reference photo (Wikipedia, then Openverse) and real dimensions (Wikidata) for a prompt, and decides how to rebuild the photo in 3D.
+- `app/voxelcraft/local_library.py` + `app/voxelcraft/library/` — reference photos and dimensions bundled with the app, checked before any network lookup.
+- `tools/ingest_library.py` — populates that bundle automatically (see below).
 - `streamlit_app.py` — the UI wiring it all together.
+
+### Populating the bundled reference library
+
+Research mode works without it, but every lookup then goes to the network. `tools/ingest_library.py`
+ingests the data ahead of time so the common subjects are instant, work offline, and never rate-limit:
+
+```
+$ python tools/ingest_library.py            # landmarks + common nouns
+$ python tools/ingest_library.py --dry-run  # report what it would fetch
+```
+
+For each subject it finds the Wikipedia article, classifies how the photo should be rebuilt in 3D
+(with the same classifier the live app uses), pulls height/width/floor-count from Wikidata, and
+downloads a reference photo — but **only** one confirmed public domain / CC0 / CC-BY. Share-alike and
+non-free images are rejected rather than bundled, and every accepted image's creator, licence and
+source URL are recorded in `app/voxelcraft/library/ATTRIBUTION.md`. See
+`app/voxelcraft/library/README.md` for the schema and the full policy.
 
 ### How to run it on your own machine
 
