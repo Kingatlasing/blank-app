@@ -80,6 +80,16 @@ _RULES: list[tuple[list[str], object]] = [
         body=colors[0] if colors else "brown")),
     (["cat", "kitten"], lambda colors: shapes.cat(
         body=colors[0] if colors else "light_gray")),
+    (["horse", "pony", "stallion", "mare"], lambda colors: shapes.horse(
+        body=colors[0] if colors else "brown")),
+    (["bird", "parrot", "chicken", "eagle", "owl", "duck"], lambda colors: shapes.bird(
+        body=colors[0] if colors else "red")),
+    (["fish", "shark", "goldfish", "salmon", "tuna"], lambda colors: shapes.fish(
+        body=colors[0] if colors else "orange")),
+    (["snake", "serpent", "python", "cobra"], lambda colors: shapes.snake(
+        body=colors[0] if colors else "green")),
+    (["plane", "airplane", "aircraft", "jet", "jumbo jet"], lambda colors: shapes.airplane(
+        body=colors[0] if colors else "light_gray")),
     (["pig", "cow", "sheep", "animal", "creature", "beast"],
      lambda colors: shapes.quadruped(
          body=colors[0] if colors else "brown", head=colors[0] if colors else "brown")),

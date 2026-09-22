@@ -468,6 +468,121 @@ def cat(body="light_gray", nose="pink", eye="green", paw="white", inner_ear="pin
     return _merge(*parts)
 
 
+def horse(body="brown", mane="black", hoof="black", muzzle="black") -> list[Voxel]:
+    """A standing horse: same box-rig approach as `dog`/`cat` but taller
+    legs, a long rising neck, and a mane running along the neck ridge
+    instead of ears, so it reads distinctly from the other quadrupeds."""
+    body_c, mane_c, hoof_c, muzzle_c = hex_of(body), hex_of(mane), hex_of(hoof), hex_of(muzzle)
+    parts = []
+    leg_h = 10
+    z0, z1 = -3, 3
+
+    parts.append(_box(2, 16, leg_h, leg_h + 5, z0, z1, body_c))  # torso
+    parts.append(_box(14, 17, leg_h + 4, leg_h + 12, z0 + 1, z1 - 1, body_c))  # neck
+    parts.append(_box(16, 21, leg_h + 11, leg_h + 15, z0 + 1, z1 - 1, body_c))  # head
+    parts.append(_box(20, 23, leg_h + 11, leg_h + 13, z0 + 1, z1 - 1, muzzle_c))
+    parts.append(_box(16, 18, leg_h + 15, leg_h + 17, z0 + 1, z1 - 1, mane_c))  # ears
+    parts.append(_box(14, 18, leg_h + 12, leg_h + 16, z0 + 2, z0 + 3, mane_c))  # mane
+
+    for lx in (3, 12):
+        for lz in (z0, z1 - 1):
+            parts.append(_box(lx, lx + 2, 1, leg_h, lz, lz + 1, body_c))
+            parts.append(_box(lx, lx + 2, 0, 1, lz, lz + 1, hoof_c))
+
+    parts.append(_box(0, 2, leg_h + 3, leg_h + 9, z0 + 1, z1 - 1, mane_c))  # tail
+    return _merge(*parts)
+
+
+def bird(body="red", beak="orange", wing="black", eye="black", leg="orange") -> list[Voxel]:
+    """A small perched/standing bird: plump body, a head with a protruding
+    beak and two eyes, folded wings along the sides, sweeping tail
+    feathers, and thin stick legs."""
+    body_c, beak_c, wing_c, eye_c, leg_c = hex_of(body), hex_of(beak), hex_of(wing), hex_of(eye), hex_of(leg)
+    parts = []
+    z0, z1 = -2, 2
+
+    parts.append(_box(0, 6, 3, 7, z0, z1, body_c))  # body
+    parts.append(_box(5, 8, 6, 9, z0 + 1, z1 - 1, body_c))  # head
+    parts.append(_box(7, 9, 7, 8, 0, 1, beak_c))
+    parts.append(_box(6, 7, 8, 9, z0 + 1, z0 + 2, eye_c))
+    parts.append(_box(6, 7, 8, 9, z1 - 2, z1 - 1, eye_c))
+    for wz in (z0, z1 - 1):  # folded wings along each side
+        parts.append(_box(1, 5, 4, 7, wz, wz + 1, wing_c))
+    parts.append(_box(-3, 0, 4, 6, z0 + 1, z1 - 1, wing_c))  # tail feathers
+    for lx in (2, 4):
+        parts.append(_box(lx, lx + 1, 0, 3, 0, 1, leg_c))
+        parts.append(_box(lx - 1, lx + 2, 0, 1, 0, 1, leg_c))  # foot
+    return _merge(*parts)
+
+
+def fish(body="orange", fin="white", eye="black", stripe="black") -> list[Voxel]:
+    """A tapered fish body (narrower at nose and tail) with a dorsal fin, a
+    bottom fin, a fanned tail fin, an eye, and a couple of vertical
+    stripes."""
+    body_c, fin_c, eye_c, stripe_c = hex_of(body), hex_of(fin), hex_of(eye), hex_of(stripe)
+    parts = []
+    length, half_h = 10, 3
+    for x in range(length):
+        taper = 0
+        if x < 2:
+            taper = 2 - x
+        elif x > length - 4:
+            taper = x - (length - 4)
+        h = max(half_h - taper, 1)
+        parts.append(_box(x, x + 1, -h, h + 1, -2, 3, body_c))
+    parts.append(_box(length - 4, length + 2, -1, 1, 0, 1, fin_c))  # tail fin center
+    parts.append(_box(length - 2, length + 3, -3, 4, 0, 1, fin_c))  # tail fin fan
+    parts.append(_box(4, 6, half_h, half_h + 3, 0, 1, fin_c))  # dorsal fin
+    parts.append(_box(3, 5, -half_h - 2, -half_h + 1, 0, 1, fin_c))  # bottom fin
+    parts.append(_box(8, 9, 1, 2, -1, 0, eye_c))
+    parts.append(_box(8, 9, 1, 2, 1, 2, eye_c))
+    for sx in (2, 5):
+        parts.append(_box(sx, sx + 1, -half_h, half_h + 1, -2, 3, stripe_c))
+    return _merge(*parts)
+
+
+def snake(body="green", belly="lime", eye="black", tongue="red") -> list[Voxel]:
+    """An S-curved body of tapering segments (sinusoidal path) ending in a
+    head with two eyes and a flicking forked tongue."""
+    body_c, belly_c, eye_c, tongue_c = hex_of(body), hex_of(belly), hex_of(eye), hex_of(tongue)
+    parts = []
+    length = 20
+    for i in range(length):
+        x = i
+        z = round(2.2 * math.sin(i * 0.5))
+        taper = 1 if i < length - 3 else 0  # taper the tail tip
+        parts.append(_box(x, x + 1, 0, 2, z - 1, z + 2 - taper, body_c))
+        parts.append(_box(x, x + 1, 0, 1, z - 1 + taper, z + 2 - taper, belly_c))
+    hz = round(2.2 * math.sin(length * 0.5))
+    parts.append(_box(length, length + 2, 0, 3, hz - 1, hz + 2, body_c))  # head
+    parts.append(_box(length + 1, length + 2, 1, 2, hz - 1, hz, eye_c))
+    parts.append(_box(length + 1, length + 2, 1, 2, hz + 1, hz + 2, eye_c))
+    parts.append(_box(length + 2, length + 4, 1, 2, hz, hz + 1, tongue_c))
+    return _merge(*parts)
+
+
+def airplane(body="light_gray", window="glass", accent="red", cockpit="glass") -> list[Voxel]:
+    """A commercial-jet silhouette: fuselage deliberately longer than the
+    wingspan (so it reads as a tube, not a symmetric cross), a glass nose,
+    cabin windows along the spine, low flat wings with wingtip lights, and
+    a single vertical tail fin with small horizontal stabilizers."""
+    body_c, window_c, accent_c, cockpit_c = hex_of(body), hex_of(window), hex_of(accent), hex_of(cockpit)
+    parts = []
+
+    parts.append(_box(0, 32, 3, 6, -2, 2, body_c))  # fuselage
+    parts.append(_box(30, 34, 4, 6, -1, 1, cockpit_c))  # nose glass
+    for wx in range(4, 28, 3):
+        parts.append(_box(wx, wx + 1, 5, 6, -1, 1, window_c))  # cabin windows
+
+    parts.append(_box(13, 19, 3, 4, -9, 10, body_c))  # main wings
+    for wz in (-9, 8):
+        parts.append(_box(15, 17, 3, 4, wz, wz + 1, accent_c))  # wingtip lights
+
+    parts.append(_box(0, 3, 6, 12, -1, 1, body_c))  # vertical tail fin
+    parts.append(_box(0, 3, 3, 4, -4, 5, body_c))  # horizontal stabilizers
+    return _merge(*parts)
+
+
 def dragon(body="green", horn="light_gray", belly="lime") -> list[Voxel]:
     body_c, horn_c, belly_c = hex_of(body), hex_of(horn), hex_of(belly)
     parts = []

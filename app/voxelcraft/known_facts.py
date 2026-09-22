@@ -1,4 +1,4 @@
-"""Verified real-world dimensions for 28 well-known landmarks, hand-curated
+"""Verified real-world dimensions for 37 well-known landmarks, hand-curated
 via web search and cross-checked against multiple sources (Wikipedia plus
 institutional/tourism sites) in September 2026, since this dev sandbox
 can't reach Wikidata itself to verify automatically the way the live app
@@ -51,6 +51,16 @@ _ENTRIES: list[tuple[list[str], BlueprintFacts]] = [
     (["chrysler building"], BlueprintFacts(height_m=319.0, floors=77)),
     (["mount rushmore"], BlueprintFacts(height_m=18.0)),
     (["stonehenge"], BlueprintFacts(height_m=4.0, diameter_m=30.0)),
+    (["neuschwanstein castle", "neuschwanstein"], BlueprintFacts(height_m=65.0)),
+    (["angkor wat"], BlueprintFacts(height_m=65.0)),
+    (["petra treasury", "al-khazneh", "al khazneh"], BlueprintFacts(height_m=39.0, width_m=25.0)),
+    (["el castillo", "chichen itza", "kukulcan pyramid", "pyramid of kukulcan"],
+     BlueprintFacts(height_m=30.0, width_m=55.3)),
+    (["blue mosque"], BlueprintFacts(height_m=43.0, diameter_m=23.5)),
+    (["london eye"], BlueprintFacts(height_m=135.0, diameter_m=120.0)),
+    (["willis tower", "sears tower"], BlueprintFacts(height_m=442.3, floors=110)),
+    (["shanghai tower"], BlueprintFacts(height_m=632.0, floors=128)),
+    (["burj al arab"], BlueprintFacts(height_m=321.0, floors=56)),
 ]
 
 
