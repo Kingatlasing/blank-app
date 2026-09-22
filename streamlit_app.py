@@ -1,7 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-from app.voxelcraft import exporters, image_generator, llm_builder, local_library, mesh_face, research, text_generator
+from app.voxelcraft import (
+    exporters, face_reconstruction, image_generator, llm_builder, local_library, mesh_face, research,
+    text_generator,
+)
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
 from app.voxelcraft.viewer import build_mesh_viewer_html, build_viewer_html
 
@@ -69,6 +72,7 @@ with st.sidebar:
     )
 
     mesh_color = "#E0AC85"
+    face_photo = None
     if mode.startswith("🎭"):
         st.caption(
             "A real polygon mesh (actual vertices/triangle faces, like a 3D sculpting tool would "
@@ -76,11 +80,26 @@ with st.sidebar:
             "at arbitrary angles or a true tapered jaw; this uses a completely different technique "
             "to get that low-poly-sculpt look. Because of that, it doesn't fit the rest of this app's "
             "pipeline: no Minecraft-block palette (any color works), no `.mcfunction` export (blocks "
-            "don't apply to a smooth mesh), no chunkiness. It designs a face from proportions, the "
-            "same way the voxel shapes design a house from wall/roof primitives — it does not "
-            "reconstruct any specific real person from a photo."
+            "don't apply to a smooth mesh), no chunkiness."
         )
         mesh_color = st.color_picker("Skin tone", value="#E0AC85")
+        face_photo = st.file_uploader(
+            "Optional: upload a face photo to shape the proportions",
+            type=["png", "jpg", "jpeg", "webp"],
+        )
+        if face_photo is not None:
+            st.caption(
+                "Detects ~478 real 3D face landmarks (Google's MediaPipe Face Landmarker — a real "
+                "pretrained model, not something built for this app) in your photo and retargets "
+                "this generic head's proportions to match: face width/height, eye spacing/size, "
+                "nose width/length/protrusion, mouth width, jaw width. **What this is not**: a scan "
+                "or a texture/geometry copy of the photo — a single 2D photo doesn't contain enough "
+                "information for that. It's the same faceted low-poly sculpt below, reshaped to your "
+                "photo's proportions, not a literal reconstruction of its surface. The first use "
+                "downloads a ~3.6MB model file (cached after that)."
+            )
+        else:
+            st.caption("No photo: builds the generic default proportions shown below.")
         prompt = ""
     else:
         prompt = st.text_input(
@@ -265,14 +284,25 @@ if generate:
                 st.session_state.mesh_vertices = None
                 st.session_state.mesh_faces = None
         elif mode.startswith("🎭"):
+            proportions, height_scale, photo_note = None, 1.0, ""
+            if face_photo is not None:
+                with st.spinner("Detecting face landmarks in your photo..."):
+                    try:
+                        image = image_generator.load_image_from_bytes(face_photo.read())
+                        proportions, height_scale = face_reconstruction.photo_to_proportions(image)
+                        photo_note = " Proportions matched to your uploaded photo."
+                    except face_reconstruction.FaceReconstructionError as exc:
+                        st.sidebar.warning(f"Couldn't use that photo ({exc}) — built the generic proportions instead.")
             with st.spinner("Sculpting a polygon-mesh face..."):
-                vertices, faces = mesh_face.build_head_mesh()
+                vertices, faces = mesh_face.build_head_mesh(
+                    ry=1.15 * height_scale, proportions=proportions,
+                )
             st.session_state.mesh_vertices = vertices
             st.session_state.mesh_faces = faces
             st.session_state.mesh_color = mesh_color
             st.session_state.note = (
                 f"Built a {len(faces)}-triangle polygon-mesh face — a real vertex/face sculpt, not "
-                "voxels."
+                f"voxels.{photo_note}"
             )
             st.session_state.title = "realistic face (mesh)"
             st.session_state.voxels = None

@@ -1,5 +1,9 @@
 .streamlit/secrets.toml
 
+# Downloaded on first use by face_reconstruction.py, cached locally —
+# not committed (it's a stable, versioned download from Google's model CDN).
+app/voxelcraft/models/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
