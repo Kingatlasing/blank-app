@@ -2,8 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from app.voxelcraft import (
-    exporters, face_reconstruction, image_generator, llm_builder, local_library, mesh_face, research,
-    text_generator,
+    exporters, face_reconstruction, image_generator, llm_builder, local_library, mesh_face, palette,
+    research, shapes, text_generator,
 )
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
 from app.voxelcraft.viewer import build_mesh_viewer_html, build_viewer_html
@@ -64,57 +64,92 @@ with st.sidebar:
     st.header("Generate")
     mode = st.radio(
         "Source",
-        ["Text prompt", "Reference image (+ optional prompt)", "🎭 Realistic face (polygon mesh)"],
+        ["Text prompt", "Reference image (+ optional prompt)", "🙂 Face (mesh or Minecraft-blocky)"],
         help="Text prompt builds from VoxelCraft's procedural shapes (with optional online photo "
-             "research). An image lets you supply your own reference photo instead. Realistic face "
-             "builds a genuine polygon-mesh head — different technology from everything else here, "
-             "see its own note below.",
+             "research). An image lets you supply your own reference photo instead. Face builds a "
+             "head either as a real polygon mesh or as a blocky Minecraft-style cube — see its own "
+             "note below.",
     )
 
     mesh_color = "#E0AC85"
     face_photo = None
-    if mode.startswith("🎭"):
-        st.caption(
-            "A real polygon mesh (actual vertices/triangle faces, like a 3D sculpting tool would "
-            "make) — not voxels. Voxels, even at very high resolution, can't produce faceted planes "
-            "at arbitrary angles or a true tapered jaw; this uses a completely different technique "
-            "to get that low-poly-sculpt look. Because of that, it doesn't fit the rest of this app's "
-            "pipeline: no Minecraft-block palette (any color works), no `.mcfunction` export (blocks "
-            "don't apply to a smooth mesh), no chunkiness."
+    face_style = "mesh"
+    mc_skin, mc_hair, mc_eye, mc_mouth = "#E0AC85", "#724728", "#1D1D21", "#8B5A3C"
+    mc_blockiness = 3
+    if mode.startswith("🙂"):
+        face_style = st.radio(
+            "Render style",
+            ["Smooth polygon mesh (realistic sculpt)", "🧱 Blocky Minecraft cube"],
+            help="Mesh: a real sculpted vertex/triangle head, proportioned and shaded — see the note "
+                 "about it below. Blocky: a plain cube at real Minecraft-skin pixel resolution, with "
+                 "flat pixel-art features — hard planes, not curves, so it actually looks like "
+                 "Minecraft rather than a rounded sculpt.",
         )
-        mesh_color = st.color_picker("Skin tone", value="#E0AC85")
-        face_source = st.radio(
-            "Proportions",
-            ["Generic default", "🎲 Random unique face", "📷 Upload a photo"],
-            help="Generic: the built-in average proportions. Random: a different, deterministic "
-                 "face per seed — same idea as this app's procedural shapes always giving the same "
-                 "shape for the same prompt. Photo: proportions measured from a real detected face.",
-        )
-        face_seed = ""
-        if face_source.startswith("🎲"):
-            face_seed = st.text_input("Seed (any text — same seed always gives the same face)", value="face-1")
+        if face_style.startswith("🧱"):
             st.caption(
-                "Retargets the generic head's proportions (eye spacing/size, nose width/length/"
-                "protrusion, mouth width, jaw width, overall face height) within plausible bounds, "
-                "deterministically from the seed text — not a random walk that changes on every "
-                "click. Still the same faceted low-poly sculpt below, just reshaped."
+                "A genuine blocky Minecraft-style head: a plain cube at the same 8x8-pixel "
+                "resolution real Minecraft skins use, with flat pixel-art eyes/eyebrows/nose-shadow/"
+                "mouth and a hair cap — hard rectangular planes, not the rounded, shaded sculpt the "
+                "mesh style makes. Built as real voxels, so unlike the mesh style it fits the rest "
+                "of this app's pipeline exactly: same Minecraft-block palette snapping, same OBJ/"
+                "JSON export, and a real `.mcfunction` you can run in Minecraft."
             )
-        if face_source.startswith("📷"):
-            face_photo = st.file_uploader(
-                "Upload a face photo",
-                type=["png", "jpg", "jpeg", "webp"],
+            mc_skin = st.color_picker("Skin tone", value="#E0AC85")
+            mc_hair = st.color_picker("Hair color", value="#724728")
+            mc_eye = st.color_picker("Eye color", value="#1D1D21")
+            mc_mouth = st.color_picker("Mouth color", value="#8B5A3C")
+            mc_blockiness = st.slider(
+                "Blockiness (voxels per Minecraft pixel)", 1, 5, 3,
+                help="Higher = bigger, chunkier cubes. The 8x8 pixel layout itself never changes — "
+                     "this only changes how big each pixel's cube is.",
             )
+            prompt = ""
+        else:
             st.caption(
-                "Detects ~478 real 3D face landmarks (Google's MediaPipe Face Landmarker — a real "
-                "pretrained model, not something built for this app) in your photo and retargets "
-                "this generic head's proportions to match: face width/height, eye spacing/size, "
-                "nose width/length/protrusion, mouth width, jaw width. **What this is not**: a scan "
-                "or a texture/geometry copy of the photo — a single 2D photo doesn't contain enough "
-                "information for that. It's the same faceted low-poly sculpt below, reshaped to your "
-                "photo's proportions, not a literal reconstruction of its surface. The first use "
-                "downloads a ~3.6MB model file (cached after that)."
+                "A real polygon mesh (actual vertices/triangle faces, like a 3D sculpting tool would "
+                "make) — not voxels. Voxels, even at very high resolution, can't produce faceted "
+                "planes at arbitrary angles or a true tapered jaw; this uses a completely different "
+                "technique to get that low-poly-sculpt look. Because of that, it doesn't fit the rest "
+                "of this app's pipeline: no Minecraft-block palette (any color works), no "
+                "`.mcfunction` export (blocks don't apply to a smooth mesh), no chunkiness."
             )
-        prompt = ""
+            mesh_color = st.color_picker("Skin tone", value="#E0AC85")
+            face_source = st.radio(
+                "Proportions",
+                ["Generic default", "🎲 Random unique face", "📷 Upload a photo"],
+                help="Generic: the built-in average proportions. Random: a different, deterministic "
+                     "face per seed — same idea as this app's procedural shapes always giving the "
+                     "same shape for the same prompt. Photo: proportions measured from a real "
+                     "detected face.",
+            )
+            face_seed = ""
+            if face_source.startswith("🎲"):
+                face_seed = st.text_input(
+                    "Seed (any text — same seed always gives the same face)", value="face-1"
+                )
+                st.caption(
+                    "Retargets the generic head's proportions (eye spacing/size, nose width/length/"
+                    "protrusion, mouth width, jaw width, overall face height) within plausible "
+                    "bounds, deterministically from the seed text — not a random walk that changes "
+                    "on every click. Still the same faceted low-poly sculpt below, just reshaped."
+                )
+            if face_source.startswith("📷"):
+                face_photo = st.file_uploader(
+                    "Upload a face photo",
+                    type=["png", "jpg", "jpeg", "webp"],
+                )
+                st.caption(
+                    "Detects ~478 real 3D face landmarks (Google's MediaPipe Face Landmarker — a "
+                    "real pretrained model, not something built for this app) in your photo and "
+                    "retargets this generic head's proportions to match: face width/height, eye "
+                    "spacing/size, nose width/length/protrusion, mouth width, jaw width. **What this "
+                    "is not**: a scan or a texture/geometry copy of the photo — a single 2D photo "
+                    "doesn't contain enough information for that. It's the same faceted low-poly "
+                    "sculpt below, reshaped to your photo's proportions, not a literal "
+                    "reconstruction of its surface. The first use downloads a ~3.6MB model file "
+                    "(cached after that)."
+                )
+            prompt = ""
     else:
         prompt = st.text_input(
             "Prompt",
@@ -297,7 +332,30 @@ if generate:
                 st.session_state.title = prompt
                 st.session_state.mesh_vertices = None
                 st.session_state.mesh_faces = None
-        elif mode.startswith("🎭"):
+        elif mode.startswith("🙂") and face_style.startswith("🧱"):
+            def _swatch_name(hex_value: str) -> str:
+                h = hex_value.lstrip("#")
+                rgb = tuple(int(h[i : i + 2], 16) for i in (0, 2, 4))
+                return palette.nearest_swatch(rgb).name
+
+            mc_voxels = shapes.minecraft_face(
+                skin=_swatch_name(mc_skin), hair=_swatch_name(mc_hair),
+                eye=_swatch_name(mc_eye), mouth=_swatch_name(mc_mouth),
+            )
+            mc_voxels = normalize(scale_voxels(mc_voxels, mc_blockiness))
+            st.session_state.voxels = mc_voxels
+            st.session_state.note = (
+                f"Built a {len(mc_voxels)}-voxel blocky Minecraft-style face — a plain 8x8-pixel "
+                "cube with flat pixel-art features, textured like a real Minecraft skin."
+            )
+            st.session_state.title = "Minecraft face"
+            st.session_state.source_caption = None
+            st.session_state.source_url = None
+            st.session_state.blueprint_caption = None
+            st.session_state.llm_code = None
+            st.session_state.mesh_vertices = None
+            st.session_state.mesh_faces = None
+        elif mode.startswith("🙂"):
             proportions, height_scale, photo_note = None, 1.0, ""
             if face_source.startswith("🎲"):
                 proportions, height_scale = mesh_face.random_proportions(face_seed or "face-1")

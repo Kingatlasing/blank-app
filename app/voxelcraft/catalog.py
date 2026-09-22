@@ -85,6 +85,7 @@ _REGISTRY: list[tuple[str, str, str, str]] = [
     ("cube", "blocky", "item", "a plain cube; hollow=True for a shell"),
     ("human_face", "detailed", "human", "a rounded, proportioned bust with eyes/nose/mouth/ears — standalone, not blocky-scene-compatible"),
     ("human_body", "detailed", "human", "a rounded, proportioned standing figure — standalone, not blocky-scene-compatible"),
+    ("minecraft_face", "blocky", "human", "a classic 8x8-pixel blocky Minecraft-skin-style head — flat cube, not rounded"),
 ]
 
 

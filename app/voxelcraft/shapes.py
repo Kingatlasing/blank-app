@@ -259,6 +259,55 @@ def human_face(skin="skin", hair="brown", eye="black", lips="red",
     return [(x, y, z, c) for (x, y, z), c in head.items()]
 
 
+def minecraft_face(skin="skin", hair="brown", eye="black", mouth="skin_dark") -> list[Voxel]:
+    """A classic blocky Minecraft-style head: a plain 8x8x8-pixel cube — the
+    same resolution real Minecraft skins use for the head — with flat
+    pixel-art eyes/eyebrows/nose-shadow/mouth and a hair cap, instead of the
+    rounded, shaded bust `human_face` sculpts. This is deliberately the
+    opposite look: hard rectangular planes and few, large same-colored
+    facets, so it reads as unmistakably "Minecraft" rather than a smooth
+    high-resolution sculpt. Callers typically blow this up with
+    `transform.scale_voxels` for a bigger, still-crisp render — each voxel
+    here is exactly one Minecraft-skin "pixel", so scaling never softens
+    the blockiness the way more sculpting resolution would."""
+    skin_c, hair_c = hex_of(skin), hex_of(hair)
+    eye_c, mouth_c = hex_of(eye), hex_of(mouth)
+    white_c, shadow_c = hex_of("white"), hex_of("skin_dark")
+
+    w = h = d = 8
+    voxels: dict[tuple[int, int, int], str] = {
+        (x, y, z): skin_c for x in range(w) for y in range(h) for z in range(d)
+    }
+
+    # hair cap: the top two rows everywhere, plus the back of the head down
+    # to ear height, so it reads as a haircut rather than a bald cube
+    for x in range(w):
+        for z in range(d):
+            for y in (h - 1, h - 2):
+                voxels[(x, y, z)] = hair_c
+    for x in range(w):
+        for y in range(3, h - 2):
+            for z in (0, 1):
+                voxels[(x, y, z)] = hair_c
+
+    front = d - 1  # the face plane
+
+    # eyebrows
+    for x in (1, 2, 5, 6):
+        voxels[(x, 5, front)] = hair_c
+    # eyes: one pupil pixel and one sclera-highlight pixel per side, mirrored
+    for x, c in ((1, white_c), (2, eye_c), (5, eye_c), (6, white_c)):
+        voxels[(x, 4, front)] = c
+    # nose: a one-row shadow at the bridge
+    for x in (3, 4):
+        voxels[(x, 3, front)] = shadow_c
+    # mouth
+    for x in (2, 3, 4, 5):
+        voxels[(x, 2, front)] = mouth_c
+
+    return [(x, y, z, c) for (x, y, z), c in voxels.items()]
+
+
 def human_body(skin="skin", shirt="cyan", pants="blue", hair="brown", shoe="black") -> list[Voxel]:
     """A proportioned, rounded standing figure at roughly double the
     linear scale of an earlier version (so ~8x the voxel count) — tapered
