@@ -19,17 +19,38 @@ Facial features (brow, eye sockets, nose, cheeks, mouth, chin, ears) are
 then layered on as localized Gaussian bumps/dents in that per-latitude,
 per-longitude radius.
 
+Feature *positions* (theta0 for brow/eye/nose/mouth/chin/ear) follow the
+classic figure-drawing head canon — eyes at the exact vertical midpoint of
+the whole head (crown to chin, not the face's midpoint; an early version
+had this wrong by a measurable amount, placing the eyes 38% of the way up
+toward the crown), the lower half then split into roughly equal thirds
+for nose-base/mouth/chin, ears spanning brow-to-nose-base — rather than
+independently eyeballed per feature.
+
 Every fix in this file's history came from actually rendering the
-intermediate mesh and looking at it (front/side/top + a real z-buffered
-rasterizer, not just 3D-camera renders, which turned out to hide real
-defects and show fake ones depending on the angle) — including a real bug
-worth documenting: splitting every quad along the same fixed diagonal
-folded a visible crease into any concave (saddle-curved) patch, like the
-rim of an eye socket. The fix is a standard one — pick whichever diagonal
-is shorter, per quad — but it's not optional at this curvature; without
-it, the eye/nose region rendered as a garbled mess of inverted triangles
-in more than one independent renderer, confirming it was a real geometry
-defect, not a rendering-angle artifact.
+intermediate mesh and looking at it (front/side/top via a real z-buffered
+rasterizer, cross-checked against an independent renderer, and — after a
+render looked wrong — also checked with per-vertex smooth-shaded normals
+before concluding anything was actually broken). Two different findings
+came out of that process, and they matter for different reasons:
+
+- A real geometry bug: splitting every quad along the same fixed diagonal
+  folded a visible crease into any concave (saddle-curved) patch, like
+  the rim of an eye socket. Confirmed as a genuine defect (not a
+  rendering-angle artifact) because it showed up as actually-inverted,
+  overlapping triangles in more than one independent renderer, and a
+  smooth-shaded render of the same vertices still looked torn. Fixed by
+  picking whichever diagonal is shorter, per quad.
+- A false alarm worth recording so it isn't "fixed" again by accident: a
+  convex bump (the nose) rendered with flat shading under one directional
+  light naturally shows alternating bright/dark facets radiating from its
+  peak — a normal, correct consequence of per-face normals on low-poly
+  geometry, not a defect. It looked identical to the real bug above at a
+  glance. The distinguishing tests: adjacent triangle-pair normals stay
+  near-parallel (dot product ~0.95-1.0, not inverted), and a smooth-
+  shaded render of the exact same vertices shows a perfectly clean
+  surface. Both came back clean here, which is what told two different-
+  looking renders apart as "expected shading" vs. "actual fold."
 
 "Realistic" here means a proportioned, faceted, low-poly *sculpt* in the
 style of the reference images this was built against — not a literal
@@ -41,7 +62,9 @@ library designs a house from wall/roof primitives).
 
 from __future__ import annotations
 
+import hashlib
 import math
+import random
 
 Vertex = tuple[float, float, float]
 Face = tuple[int, int, int]
@@ -64,20 +87,30 @@ _WIDTH_KEYPOINTS = [
 # fixed-diagonal bug described in the module docstring) is what produced
 # the garbled-mesh defect during development.
 #
+# theta0 values follow the classic figure-drawing/anatomical head canon
+# (the "eyes sit at the head's vertical midpoint, crown-to-chin — not the
+# face's midpoint" rule, with the lower half then split into roughly equal
+# thirds for nose base/mouth/chin, and ears spanning brow-to-nose-base) —
+# not independently re-tuned by eye. An earlier version placed the eyes
+# 38% of the way up toward the crown instead of at the true half (a real,
+# measurable error: cos(1.18) = 0.38 of ry above center, when it should be
+# cos(pi/2) = 0 — dead center), which was corrected against that canon
+# rather than by further guessing.
+#
 # Keyed by name (rather than a plain list) so `face_reconstruction.py` can
 # retarget specific features — widen eye spacing, scale nose size, etc. —
 # from measurements taken off a real photo, without touching the others.
 _FEATURES: dict[str, list[float]] = {
-    "brow": [1.05, 0.0, 0.10, 0.55, 0.06],
-    "eye_l": [1.18, 0.40, 0.15, 0.24, -0.15],
-    "eye_r": [1.18, -0.40, 0.15, 0.24, -0.15],
-    "nose": [1.40, 0.0, 0.32, 0.16, 0.28],
-    "cheek_l": [1.58, 0.52, 0.18, 0.22, 0.08],
-    "cheek_r": [1.58, -0.52, 0.18, 0.22, 0.08],
-    "mouth": [1.88, 0.0, 0.11, 0.20, -0.08],
-    "chin": [2.05, 0.0, 0.12, 0.22, 0.06],
-    "ear_l": [1.45, 1.5, 0.18, 0.19, 0.20],
-    "ear_r": [1.45, -1.5, 0.18, 0.19, 0.20],
+    "brow": [1.32, 0.0, 0.10, 0.55, 0.06],
+    "eye_l": [1.571, 0.40, 0.15, 0.24, -0.15],
+    "eye_r": [1.571, -0.40, 0.15, 0.24, -0.15],
+    "nose": [1.83, 0.0, 0.28, 0.16, 0.28],
+    "cheek_l": [1.75, 0.58, 0.16, 0.22, 0.08],
+    "cheek_r": [1.75, -0.58, 0.16, 0.22, 0.08],
+    "mouth": [2.53, 0.0, 0.11, 0.20, -0.08],
+    "chin": [2.86, 0.0, 0.12, 0.22, 0.06],
+    "ear_l": [1.71, 1.5, 0.18, 0.19, 0.20],
+    "ear_r": [1.71, -1.5, 0.18, 0.19, 0.20],
 }
 
 # Which single scalar in each feature's [theta0, phi0, sigma_t, sigma_p,
@@ -201,3 +234,33 @@ def build_head_mesh(
         faces.append((a, bottom_pole_idx, b))
 
     return verts, faces
+
+
+# Bounds for `random_proportions` — wide enough to give visibly distinct
+# faces, narrow enough that every combination still lands within the
+# clamp range `face_reconstruction.py` uses for real photos (0.55-1.8 on
+# most features), so a "unique" face stays as anatomically plausible as a
+# photo-derived one rather than wandering into the geometry's breaking
+# strain.
+_RANDOM_RANGES: dict[str, tuple[float, float]] = {
+    "eye_spacing": (0.85, 1.2),
+    "eye_size": (0.8, 1.3),
+    "nose_width": (0.75, 1.35),
+    "nose_length": (0.8, 1.25),
+    "nose_protrusion": (0.7, 1.4),
+    "mouth_width": (0.8, 1.25),
+    "jaw_width": (0.8, 1.3),
+}
+
+
+def random_proportions(seed: str) -> tuple[dict[str, float], float]:
+    """A deterministic "unique face" for any `seed` string — same
+    (proportions, height_scale) shape `face_reconstruction.photo_to_
+    proportions` returns, so both plug into `build_head_mesh` the same
+    way. Same idea as `shapes.procedural_blob`: hash the seed so the same
+    text always gives the same face, instead of a fresh random face on
+    every rerun."""
+    rng = random.Random(int(hashlib.sha256(seed.encode("utf-8")).hexdigest(), 16))
+    proportions = {name: rng.uniform(lo, hi) for name, (lo, hi) in _RANDOM_RANGES.items()}
+    height_scale = rng.uniform(0.9, 1.12)
+    return proportions, height_scale

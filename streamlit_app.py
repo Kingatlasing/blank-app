@@ -83,11 +83,27 @@ with st.sidebar:
             "don't apply to a smooth mesh), no chunkiness."
         )
         mesh_color = st.color_picker("Skin tone", value="#E0AC85")
-        face_photo = st.file_uploader(
-            "Optional: upload a face photo to shape the proportions",
-            type=["png", "jpg", "jpeg", "webp"],
+        face_source = st.radio(
+            "Proportions",
+            ["Generic default", "🎲 Random unique face", "📷 Upload a photo"],
+            help="Generic: the built-in average proportions. Random: a different, deterministic "
+                 "face per seed — same idea as this app's procedural shapes always giving the same "
+                 "shape for the same prompt. Photo: proportions measured from a real detected face.",
         )
-        if face_photo is not None:
+        face_seed = ""
+        if face_source.startswith("🎲"):
+            face_seed = st.text_input("Seed (any text — same seed always gives the same face)", value="face-1")
+            st.caption(
+                "Retargets the generic head's proportions (eye spacing/size, nose width/length/"
+                "protrusion, mouth width, jaw width, overall face height) within plausible bounds, "
+                "deterministically from the seed text — not a random walk that changes on every "
+                "click. Still the same faceted low-poly sculpt below, just reshaped."
+            )
+        if face_source.startswith("📷"):
+            face_photo = st.file_uploader(
+                "Upload a face photo",
+                type=["png", "jpg", "jpeg", "webp"],
+            )
             st.caption(
                 "Detects ~478 real 3D face landmarks (Google's MediaPipe Face Landmarker — a real "
                 "pretrained model, not something built for this app) in your photo and retargets "
@@ -98,8 +114,6 @@ with st.sidebar:
                 "photo's proportions, not a literal reconstruction of its surface. The first use "
                 "downloads a ~3.6MB model file (cached after that)."
             )
-        else:
-            st.caption("No photo: builds the generic default proportions shown below.")
         prompt = ""
     else:
         prompt = st.text_input(
@@ -285,7 +299,10 @@ if generate:
                 st.session_state.mesh_faces = None
         elif mode.startswith("🎭"):
             proportions, height_scale, photo_note = None, 1.0, ""
-            if face_photo is not None:
+            if face_source.startswith("🎲"):
+                proportions, height_scale = mesh_face.random_proportions(face_seed or "face-1")
+                photo_note = f" A unique face for seed {face_seed!r}."
+            elif face_photo is not None:
                 with st.spinner("Detecting face landmarks in your photo..."):
                     try:
                         image = image_generator.load_image_from_bytes(face_photo.read())
