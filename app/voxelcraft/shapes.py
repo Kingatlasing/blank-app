@@ -506,6 +506,72 @@ def castle(color="cobblestone") -> list[Voxel]:
 
 
 # ---------------------------------------------------------------------------
+# Furniture — sized to match `house()`'s scale (wall_h=5, so a room's
+# interior is about 4 voxels tall), so these sit sensibly inside one.
+# Each one's local origin is its floor-level footprint corner, so placing
+# it is just picking an (x, y, z) offset for that corner via `translate`.
+# ---------------------------------------------------------------------------
+
+def table(wood="oak_planks") -> list[Voxel]:
+    c = hex_of(wood)
+    parts = [_box(0, 4, 2, 3, 0, 4, c)]  # tabletop
+    for lx, lz in ((0, 0), (3, 0), (0, 3), (3, 3)):
+        parts.append(_box(lx, lx + 1, 0, 2, lz, lz + 1, c))  # legs
+    return _merge(*parts)
+
+
+def chair(wood="oak_planks") -> list[Voxel]:
+    c = hex_of(wood)
+    parts = [_box(0, 2, 1, 2, 0, 2, c)]  # seat
+    for lx, lz in ((0, 0), (1, 0), (0, 1), (1, 1)):
+        parts.append(_box(lx, lx + 1, 0, 1, lz, lz + 1, c))  # legs
+    parts.append(_box(0, 2, 1, 3, 1, 2, c))  # backrest
+    return _merge(*parts)
+
+
+def bed(sheet="white", frame="brown") -> list[Voxel]:
+    sheet_c, frame_c = hex_of(sheet), hex_of(frame)
+    parts = [
+        _box(0, 4, 0, 1, 0, 7, frame_c),  # base frame
+        _box(0, 4, 1, 2, 0, 7, sheet_c),  # mattress
+        _box(0, 4, 2, 3, 0, 1, frame_c),  # headboard
+    ]
+    return _merge(*parts)
+
+
+def sofa(cushion="red", frame="brown") -> list[Voxel]:
+    cushion_c, frame_c = hex_of(cushion), hex_of(frame)
+    parts = [
+        _box(0, 6, 0, 1, 0, 3, frame_c),
+        _box(0, 6, 1, 2, 0, 3, cushion_c),  # seat cushions
+        _box(0, 6, 2, 4, 0, 1, frame_c),  # backrest
+        _box(0, 1, 0, 3, 0, 3, frame_c),  # armrests
+        _box(5, 6, 0, 3, 0, 3, frame_c),
+    ]
+    return _merge(*parts)
+
+
+def shelf(wood="brown") -> list[Voxel]:
+    """A bookcase/shelf unit, flat against a wall (thin in z)."""
+    c = hex_of(wood)
+    return _hollow_box(0, 4, 0, 5, 0, 1, c)
+
+
+def lamp(shade="yellow", pole="iron") -> list[Voxel]:
+    shade_c, pole_c = hex_of(shade), hex_of(pole)
+    parts = [
+        _box(0, 1, 0, 1, 0, 1, pole_c),  # base
+        _box(0, 1, 1, 4, 0, 1, pole_c),  # pole
+        _box(-1, 2, 4, 5, -1, 2, shade_c),  # shade
+    ]
+    return _merge(*parts)
+
+
+def rug(color="red", width=4, length=6) -> list[Voxel]:
+    return _box(0, width, 0, 1, 0, length, hex_of(color))
+
+
+# ---------------------------------------------------------------------------
 # Items (flat pixel silhouettes, extruded a couple voxels thick)
 # ---------------------------------------------------------------------------
 

@@ -1,15 +1,28 @@
-"""Let a local Ollama model design a genuinely custom voxel structure,
-beyond anything in the fixed shape library.
+"""Let a local Ollama model design a genuinely custom voxel structure — or
+a whole multi-object *scene* — beyond anything in the fixed shape library.
 
 Two ways to ask it, in order of how well they tend to actually work:
 
 1. **Write code** (the recommended default): ask a *code* model — qwen2.5-
    coder is built for exactly this — to write a small Python function
    against a curated geometry API (box/sphere/cylinder/cone/merge
-   primitives), then run that function in a restricted sandbox. This plays
-   to what a code model is actually good at, scales to complex shapes
-   without the model needing to emit one token per voxel, and produces
-   exact/regular geometry (a sphere is actually round).
+   primitives) *and* the entire existing shape library (house, castle,
+   furniture, animals, vehicles, ...), then run that function in a
+   restricted sandbox. This plays to what a code model is actually good
+   at, scales to complex shapes and multi-object scenes without the model
+   needing to emit one token per voxel, and produces exact/regular
+   geometry (a sphere is actually round).
+
+   The model is given a *catalog* (``catalog.py``) of every library shape
+   with its real measured dimensions, so it can reason about relative
+   scale ("a table is much smaller than a house") instead of guessing,
+   and `translate`/`bbox` helpers so it can actually lay things out — call
+   `house()`, measure its interior with `bbox`, `translate` a `table()`
+   and `chair()` into it, `translate` a `dragon()` to stand outside, and
+   `merge` it all into one scene. Anything not in the catalog — a hybrid
+   creature, an invented vehicle — it builds from the geometry primitives
+   the same way it always could.
+
 2. **Hand-enumerate coordinates**: ask the model to directly list
    `[x, y, z, "#hex"]` entries, one per voxel, no code involved. This is
    what you'd get from a model with no code ability at all — simpler, but
@@ -17,7 +30,10 @@ Two ways to ask it, in order of how well they tend to actually work:
    or gets sloppy well before "thousands" of coordinates), and the
    geometry it produces is whatever the model eyeballs rather than
    something exactly computed. It's offered because it's a real, simpler
-   option some people want — not because it works as well.
+   option some people want — not because it works as well. This path
+   doesn't get the shape catalog or library access — hand-enumerating
+   coordinates for a whole scene one at a time isn't practical for a local
+   chat model regardless.
 
 The code sandbox is defense-in-depth, not a security boundary you'd trust
 against a hostile model: no imports, a builtins allowlist, an AST check
@@ -35,26 +51,114 @@ import re
 
 import requests
 
+from . import shapes
+from .catalog import catalog_prompt_text
 from .palette import PALETTE, hex_of
 
 Voxel = tuple[int, int, int, str]
 
 _CHAT_TIMEOUT_S = 120   # local code-gen models can be slow on modest hardware
-_EXEC_TIMEOUT_S = 5     # the generated code itself must run fast
-_MAX_VOXELS = 20_000    # a generous budget before the app's own chunkiness scaling
+_EXEC_TIMEOUT_S = 10    # generated code must run fast — a multi-object scene calls several library builders, so this allows more than a single primitive shape would need
+# The app applies a fixed 2x chunkiness scale to every generated model
+# (scale_voxels), which multiplies voxel count by 2**3 = 8, before capping
+# at streamlit_app.py's MAX_VOXELS=80_000. A pre-scale budget above
+# 80_000/8=10_000 would silently truncate mid-scene (voxel_count_limit
+# just slices the list, which can chop off whichever objects happen to
+# sort last) rather than shrink gracefully — so this stays under that with
+# headroom, not "as generous as possible" in isolation.
+_MAX_VOXELS = 9_000
 _DIRECT_MAX_VOXELS = 6_000  # hand-enumerated: capped much lower, see module docstring
 
 _PALETTE_NAMES = sorted(s.name for s in PALETTE)
 
-_SYSTEM_PROMPT = f"""You are a 3D voxel structure designer for a Minecraft-style builder.
+# Every library shape, callable by name from generated code with the same
+# keyword arguments as in shapes.py — this is what lets the model reuse
+# "a house" or "a dragon" instead of re-deriving one from primitives.
+_LIBRARY_FUNCTIONS = {
+    name: getattr(shapes, name)
+    for name in (
+        "house", "temple", "tower", "castle", "pyramid",
+        "table", "chair", "bed", "sofa", "shelf", "lamp", "rug",
+        "humanoid", "dog", "cat", "horse", "bird", "fish", "snake", "dragon", "quadruped",
+        "tree", "sphere", "car", "boat", "airplane",
+        "sword", "pickaxe", "heart_3d", "star", "cube",
+        "human_face", "human_body",
+    )
+}
+
+
+def _translate(voxels, dx, dy, dz) -> list[Voxel]:
+    dx, dy, dz = int(dx), int(dy), int(dz)
+    return [(x + dx, y + dy, z + dz, c) for x, y, z, c in voxels]
+
+
+def _bbox(voxels):
+    """(width, height, depth, min_x, min_y, min_z) — measure a group of
+    voxels (your own, or a library shape's output) to reason about how
+    big it is and where its corner sits, before deciding where to
+    `translate` something else relative to it."""
+    xs = [v[0] for v in voxels]
+    ys = [v[1] for v in voxels]
+    zs = [v[2] for v in voxels]
+    return (max(xs) - min(xs) + 1, max(ys) - min(ys) + 1, max(zs) - min(zs) + 1,
+            min(xs), min(ys), min(zs))
+
+
+_SYSTEM_PROMPT = f"""You are a 3D voxel scene designer for a Minecraft-style builder app.
 Write a single Python function named `build` that takes no arguments and
 returns a list of (x, y, z, color) tuples — one per voxel — describing a
-recognizable 3D model of whatever the user asks for. `y` is up. Design a
-genuinely custom structure suited to the request — combine and shape the
-primitives below creatively; don't just draw one box or sphere.
+recognizable 3D model (or a whole multi-object scene) of whatever the user
+asks for. `y` is up.
 
-You may ONLY use these helpers, already in scope. Write no import
-statements, no classes, no file or network access:
+WHAT THIS APP CAN AND CAN'T DO — design within these limits, don't assume
+more:
+- The output is ONE static list of colored voxels. No animation, no
+  physics, no interactivity, no separate movable parts at runtime — if the
+  user wants "a house with furniture", the furniture voxels just need to
+  already be in the right place in the one list you return.
+- Colors must come from the fixed palette (see `color(name)` below) — you
+  cannot invent arbitrary hex values by hand for realism; call `color()`.
+- Keep the whole scene within roughly -40..40 on every axis and under
+  {_MAX_VOXELS} total voxels combined. Budget accordingly: a house-sized
+  structure is a few hundred to a couple thousand voxels; don't spend the
+  whole budget on one item if the prompt describes a scene with several.
+
+HOW TO BUILD ANYTHING, FROM THE LIBRARY OR FROM SCRATCH OR BOTH:
+This app already has a library of named shapes with real, measured
+dimensions (not estimates) — reuse them by calling them by name instead of
+re-deriving something the library already has well:
+
+{catalog_prompt_text()}
+
+Call any of the above by name with any of its keyword arguments from
+shapes.py (e.g. `house(floors=2, staircase=True)`, `dragon(body="purple")`)
+— they're already in scope, no import needed. For anything the library
+doesn't have — a hybrid creature, an invented vehicle, an alien structure —
+build it from the geometry primitives below, the same way you always
+could. A single prompt can freely mix both: reuse `castle()` for the
+castle, hand-build a novel creature from primitives, reuse `airplane()` or
+hand-build a spaceship, then lay them out together.
+
+SCALE MATTERS: the "[blocky tier]" shapes above all share one consistent
+scale and can be placed directly together. The "[detailed tier]" shapes
+(`human_face`, `human_body`) are built ~4x finer and are NOT scale-
+compatible with the blocky tier — don't place a `human_body` next to a
+blocky `house`, it would tower over it; use `humanoid()` for a person-
+sized figure in a blocky scene, and reserve `human_face`/`human_body` for
+a standalone "realistic person" request.
+
+LAYING OUT A SCENE: before writing code, work out roughly where each piece
+goes using the catalog's dimensions — e.g. a house's interior floor is
+inset a couple voxels from its outer walls, so a table sitting on the
+floor needs `translate`d coordinates that keep it inside that footprint,
+not overlapping a wall. Call a library shape, `translate` it to its
+position, repeat for every piece, then `merge` everything into one list.
+Use `bbox` to check a shape's actual size/position when you need to
+reason about it rather than guessing.
+
+You may use these helpers, already in scope, plus every function listed
+in the catalog above. Write no import statements, no classes, no file or
+network access:
 
 - box(x0, x1, y0, y1, z0, z1, color) -> list of voxels filling that range
   (each bound is exclusive on the high end, like Python's range)
@@ -67,13 +171,17 @@ statements, no classes, no file or network access:
   y0 to a point at y1
 - merge(*voxel_lists) -> combines lists; later ones paint over earlier
   ones at the same coordinate
+- translate(voxels, dx, dy, dz) -> the same voxels shifted by that offset
+  — this is how you position a library shape or a hand-built piece
+- bbox(voxels) -> (width, height, depth, min_x, min_y, min_z) of a group
+  of voxels, to reason about size/position before placing the next thing
 - color(name) -> hex string for a named color. Valid names:
   {", ".join(_PALETTE_NAMES)}
 - the `math` module (sin, cos, pi, sqrt, radians, ...) is already available
 
-Keep the whole model within roughly -30..30 on every axis and under
-{_MAX_VOXELS} total voxels. Reply with ONLY one Python code block
-(```python ... ```) defining `build`. No explanation before or after it."""
+Reply with ONLY one Python code block (```python ... ```) defining
+`build`. You may reason about the layout in plain text before it, but the
+final answer must be exactly one code block with no other code blocks."""
 
 _DIRECT_SYSTEM_PROMPT = f"""You are a 3D voxel structure designer for a Minecraft-style builder.
 List every voxel of a recognizable 3D model of whatever the user asks
@@ -225,7 +333,9 @@ def _run_sandboxed(code: str) -> list[Voxel]:
     scope = {
         "box": _box, "hollow_box": _hollow_box, "sphere": _sphere,
         "cylinder": _cylinder, "cone": _cone, "merge": _merge, "color": hex_of,
+        "translate": _translate, "bbox": _bbox,
         "math": math, "__builtins__": _SAFE_BUILTINS,
+        **_LIBRARY_FUNCTIONS,
     }
 
     def _target():

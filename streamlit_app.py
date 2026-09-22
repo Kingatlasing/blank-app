@@ -108,9 +108,14 @@ with st.sidebar:
             ollama_host = st.text_input("Ollama host", value="http://localhost:11434")
             ollama_model = st.text_input("Ollama model", value="qwen2.5-coder")
             st.caption(
-                "Sends your prompt to that local Ollama server, which writes Python code against a "
-                "small geometry API (box/sphere/cylinder/cone/merge). That code runs in a restricted "
-                "sandbox here (no imports, no file/network access, 5s execution limit) to produce the "
+                "Sends your prompt to that local Ollama server, along with a catalog of every shape "
+                "already in this library (with real measured dimensions, so it knows a table is much "
+                "smaller than a house) and a small geometry API (box/sphere/cylinder/cone/merge). It "
+                "writes Python code that reuses library shapes, builds new ones from scratch, or both — "
+                "e.g. 'a fully furnished house' calls `house()` then places `table()`/`chair()` inside "
+                "its actual floor space; 'a witch's castle with a horse-fish thing and a flying "
+                "spaceship' reuses `castle()` and hand-builds the rest. That code runs in a restricted "
+                "sandbox here (no imports, no file/network access, 10s execution limit) to produce the "
                 "model. Can take a while on modest hardware. Falls back to procedural shapes if Ollama "
                 "is unreachable or produces nothing usable."
             )
@@ -280,9 +285,11 @@ required. In the sidebar, **"How should VoxelCraft build it?"** offers two alter
 online** looks up a real photo (Wikipedia, then Openverse), works out how to build it in 3D from that
 photo (a lathed revolve for anything round about a vertical axis; a relief sculpture otherwise), and
 pulls real height/width/floor-count facts from Wikidata to correct the proportions. **🧠 Design with a
-local LLM** sends your prompt to your own Ollama server, which writes Python code against a small
-geometry API to design something genuinely custom, beyond the shape library — run in a restricted
-local sandbox to build the model. Every model exports as a literal, ordered `.mcfunction` build
+local LLM** sends your prompt to your own Ollama server, along with the dimensions of every shape in
+this library and a small geometry API, so it can compose a whole scene — reusing library shapes,
+building new ones from scratch, or both, laid out relative to each other (`a fully furnished house`,
+`a witch's castle with a horse-fish thing outside and a flying spaceship`) — run in a restricted local
+sandbox to build the model. Every model exports as a literal, ordered `.mcfunction` build
 sequence. Or switch to "Reference image" to supply — and steer the reconstruction of — your own photo
 directly.
         """
