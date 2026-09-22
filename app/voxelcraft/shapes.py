@@ -67,6 +67,235 @@ def humanoid(skin="skin", shirt="cyan", pants="blue", shoe="stone") -> list[Voxe
 
 
 # ---------------------------------------------------------------------------
+# Realistic human (rounded, proportioned — not the blocky Steve rig above)
+# ---------------------------------------------------------------------------
+
+def _lerp(a: float, b: float, t: float) -> float:
+    return a + (b - a) * t
+
+
+def human_face(skin="skin", hair="brown", eye="black", lips="red",
+               eyebrow="black", iris="light_blue") -> list[Voxel]:
+    """A rounded bust-style head (not the flat 4x4 Steve head): an
+    ellipsoid skull/jaw with two separate brows, eyes with sclera+iris+
+    pupil, a protruding nose bridge with nostrils, lips, a tapered chin,
+    ears attached flush to the actual head surface, and a hair cap. Every
+    feature is placed on the head's *actual* computed surface at its
+    (x, y) column, rather than a hardcoded z, so nothing floats free of
+    the skull regardless of the jaw taper. "Realistic" here means a
+    proportioned, rounded head — not a literal photorealistic render,
+    which a keyword-driven voxel generator can't produce."""
+    skin_c, hair_c = hex_of(skin), hex_of(hair)
+    lips_c, eyebrow_c, iris_c = hex_of(lips), hex_of(eyebrow), hex_of(iris)
+    white_c, pupil_c = hex_of("white"), hex_of(eye)
+
+    rx, ry, rz = 8, 10, 9  # half-width, half-height, half-depth (front=+z)
+    cy = ry
+    skull: dict[tuple[int, int, int], str] = {}
+
+    for x in range(-rx, rx + 1):
+        for y in range(-ry, ry + 1):
+            for z in range(-rz, rz + 1):
+                # taper the jaw: narrower at the chin (low y) than at the
+                # temples, like a real skull
+                taper = 1.0 if y >= 0 else 1.0 - 0.35 * (-y / ry)
+                nx, ny, nz = x / (rx * taper), y / ry, z / (rz * taper)
+                if nx * nx + ny * ny + nz * nz <= 1.0:
+                    skull[(x, y + cy, z)] = skin_c
+
+    def front_surface_z(x: int, y: int) -> int | None:
+        zs = [z for (vx, vy, z) in skull if vx == x and vy == y]
+        return max(zs) if zs else None
+
+    def side_surface_x(y: int, z: int, sign: int) -> int | None:
+        xs = [x for (x, vy, vz) in skull if vy == y and vz == z and (x * sign) >= 0]
+        return (max(xs) if sign > 0 else min(xs)) if xs else None
+
+    voxels = dict(skull)
+
+    # hair cap: top ~35% of the head plus down the back (negative z half)
+    for (x, y, z) in list(voxels):
+        ry_frac = (y - cy) / ry
+        if ry_frac > 0.55 or (z < -2 and ry_frac > 0.15):
+            voxels[(x, y, z)] = hair_c
+
+    # two separate eyebrows (a gap over the nose bridge, not a unibrow)
+    for side in (-1, 1):
+        for dx in range(1, 4):
+            x = side * dx
+            z = front_surface_z(x, cy + 3)
+            if z is not None:
+                voxels[(x, cy + 3, z)] = eyebrow_c
+                voxels[(x, cy + 3, z - 1)] = eyebrow_c
+
+    # eyes: 2x2 sclera with an iris+pupil, sitting right on the surface
+    for ex in (-4, 4):
+        for dx in (0, 1):
+            for dy in (0, 1):
+                x, y = ex + dx, cy + 1 + dy
+                z = front_surface_z(x, y)
+                if z is not None:
+                    voxels[(x, y, z)] = white_c
+        z0 = front_surface_z(ex, cy + 1)
+        if z0 is not None:
+            voxels[(ex, cy + 1, z0)] = iris_c
+            voxels[(ex, cy + 1, max(z0 - 1, -rz))] = pupil_c
+
+    # nose: protrudes 1-2 voxels beyond the cheek surface, tapering from
+    # bridge to a slightly wider tip, with two nostril dots at the base
+    for i, y in enumerate(range(cy + 2, cy - 2, -1)):
+        half_w = 0 if i < 3 else 1
+        bump = 2 if i < 3 else 1
+        for x in range(-half_w, half_w + 1):
+            base_z = front_surface_z(x, y)
+            if base_z is not None:
+                voxels[(x, y, base_z + bump)] = skin_c
+    tip_y = cy - 1
+    for x in (-1, 1):
+        base_z = front_surface_z(x, tip_y)
+        if base_z is not None:
+            voxels[(x, tip_y, base_z + 1)] = eyebrow_c  # nostril shadow
+
+    # mouth: a lip-colored band sitting right on the surface below the nose
+    for x in range(-3, 4):
+        for y in (cy - 4, cy - 5):
+            z = front_surface_z(x, y)
+            if z is not None:
+                voxels[(x, y, z)] = lips_c
+
+    # ears: flush protrusions at the actual head width, mid-height
+    for side in (-1, 1):
+        for dy in range(-2, 3):
+            y = cy + dy
+            x0 = side_surface_x(y, 0, side)
+            if x0 is not None:
+                for d in range(1, 3):
+                    voxels[(x0 + side * d, y, 0)] = skin_c
+
+    return [(x, y, z, c) for (x, y, z), c in voxels.items()]
+
+
+def human_body(skin="skin", shirt="cyan", pants="blue", hair="brown", shoe="black") -> list[Voxel]:
+    """A proportioned, rounded standing figure — tapered elliptical legs
+    (thigh/knee/calf/ankle), a rounded hip merging into a waist-to-
+    shoulder torso, arms that hang clearly outside the torso silhouette
+    down to hand height, a neck, and a simplified rounded head — built
+    from radius-per-height-layer cross-sections (the same technique
+    `tower`/`sphere` use) rather than the flat 2-voxel-wide limbs of
+    `humanoid`. "Realistic" means proportioned and rounded, not a literal
+    photorealistic render."""
+    skin_c, shirt_c, pants_c = hex_of(skin), hex_of(shirt), hex_of(pants)
+    hair_c, shoe_c = hex_of(hair), hex_of(shoe)
+    voxels: dict[tuple[int, int, int], str] = {}
+
+    # legs: two tapered columns (thigh wide -> knee narrow -> calf
+    # slightly wider -> ankle narrow), elliptical cross-section (x wider
+    # than z)
+    leg_top, leg_bottom = 24, 3
+    hip_dx = 3  # each leg's center offset from the body midline
+    for y in range(leg_bottom, leg_top):
+        t = (y - leg_bottom) / (leg_top - leg_bottom)
+        if t > 0.6:
+            r = _lerp(2.6, 3.4, (t - 0.6) / 0.4)
+        elif t > 0.35:
+            r = _lerp(2.0, 2.6, (t - 0.35) / 0.25)
+        else:
+            r = _lerp(1.6, 2.3, t / 0.35)
+        rx_, rz_ = r, r * 0.8
+        color = pants_c if t > 0.15 else skin_c  # pant leg vs bare ankle
+        for leg_cx in (-hip_dx, hip_dx):
+            for x in range(-math.ceil(rx_), math.ceil(rx_) + 1):
+                for z in range(-math.ceil(rz_), math.ceil(rz_) + 1):
+                    if (x / rx_) ** 2 + (z / rz_) ** 2 <= 1.0:
+                        voxels[(leg_cx + x, y, z)] = color
+
+    # feet
+    for leg_cx in (-hip_dx, hip_dx):
+        for x in range(-2, 3):
+            for z in range(-1, 5):
+                voxels[(leg_cx + x, leg_bottom - 1, z)] = shoe_c
+                voxels[(leg_cx + x, leg_bottom - 2, z)] = shoe_c
+
+    # pelvis/waist: merges the two legs into one rounded hip block,
+    # narrowing slightly into the waist
+    waist_bottom, waist_top = leg_top, leg_top + 6
+    for y in range(waist_bottom, waist_top):
+        t = (y - waist_bottom) / (waist_top - waist_bottom)
+        rx_ = _lerp(6.0, 5.0, t)
+        rz_ = _lerp(3.4, 3.0, t)
+        for x in range(-math.ceil(rx_), math.ceil(rx_) + 1):
+            for z in range(-math.ceil(rz_), math.ceil(rz_) + 1):
+                if (x / rx_) ** 2 + (z / rz_) ** 2 <= 1.0:
+                    voxels[(x, y, z)] = pants_c
+
+    # torso: waist (narrow) widening to the chest/shoulders
+    torso_bottom, torso_top = waist_top, waist_top + 16
+    for y in range(torso_bottom, torso_top):
+        t = (y - torso_bottom) / (torso_top - torso_bottom)
+        rx_ = _lerp(5.0, 7.0, min(t / 0.85, 1.0))
+        if t > 0.85:
+            rx_ = _lerp(7.0, 6.0, (t - 0.85) / 0.15)  # tapers back in right at the shoulders
+        rz_ = _lerp(3.2, 4.2, min(t, 1.0))
+        for x in range(-math.ceil(rx_), math.ceil(rx_) + 1):
+            for z in range(-math.ceil(rz_), math.ceil(rz_) + 1):
+                if (x / rx_) ** 2 + (z / rz_) ** 2 <= 1.0:
+                    voxels[(x, y, z)] = shirt_c
+    shoulder_y = torso_top
+
+    # arms: hanging from the shoulders down past the waist, tapered,
+    # ending in a small hand, deliberately offset far enough out (past
+    # the torso's own widest point) to stay visible as a separate limb
+    # instead of being absorbed into the torso silhouette
+    arm_top, arm_bottom = shoulder_y - 1, leg_top + 2
+    shoulder_dx = 9
+    for y in range(arm_bottom, arm_top):
+        t = (y - arm_bottom) / (arm_top - arm_bottom)
+        r = _lerp(1.5, 2.2, t)
+        dx = _lerp(0, -1.5, 1 - t)  # sweeps slightly inward toward the hip as it goes down
+        color = skin_c if t < 0.18 else shirt_c  # hand vs sleeve
+        for side in (-1, 1):
+            center_x = round(side * shoulder_dx + side * dx)
+            for x in range(-math.ceil(r), math.ceil(r) + 1):
+                for z in range(-math.ceil(r), math.ceil(r) + 1):
+                    if (x / r) ** 2 + (z / r) ** 2 <= 1.0:
+                        voxels[(center_x + x, y, z)] = color
+
+    # neck
+    neck_bottom, neck_top = shoulder_y, shoulder_y + 3
+    for y in range(neck_bottom, neck_top):
+        for x in range(-2, 3):
+            for z in range(-2, 3):
+                if x * x + z * z <= 4:
+                    voxels[(x, y, z)] = skin_c
+
+    # head: a simplified rounded skull (no fine facial carving at this
+    # scale, unlike `human_face`) with eyes, a mouth line, and a hair cap
+    head_r = 5
+    head_cy = neck_top + head_r
+    for x in range(-head_r, head_r + 1):
+        for y in range(-head_r, head_r + 1):
+            for z in range(-head_r, head_r + 1):
+                taper = 1.0 if y >= 0 else 1.0 - 0.3 * (-y / head_r)
+                if (x / (head_r * taper)) ** 2 + (y / head_r) ** 2 + (z / (head_r * taper)) ** 2 <= 1.0:
+                    voxels[(x, head_cy + y, z)] = skin_c
+    for (x, y, z) in list(voxels):
+        if y >= neck_top and (y - head_cy) / head_r > 0.5:
+            voxels[(x, y, z)] = hair_c
+        elif y >= neck_top and z < -2 and (y - head_cy) / head_r > 0.05:
+            voxels[(x, y, z)] = hair_c
+    for ex in (-2, 2):  # eyes: found on the actual head surface, not a fixed z
+        zs = [z for (vx, vy, z) in voxels if vx == ex and vy == head_cy + 1 and voxels[(vx, vy, z)] == skin_c]
+        if zs:
+            voxels[(ex, head_cy + 1, max(zs))] = hex_of("black")
+    for x in range(-2, 3):  # mouth
+        zs = [z for (vx, vy, z) in voxels if vx == x and vy == head_cy - 3 and voxels[(vx, vy, z)] == skin_c]
+        if zs:
+            voxels[(x, head_cy - 3, max(zs))] = hex_of("red")
+
+    return [(x, y, z, c) for (x, y, z), c in voxels.items()]
+
+
+# ---------------------------------------------------------------------------
 # Nature
 # ---------------------------------------------------------------------------
 

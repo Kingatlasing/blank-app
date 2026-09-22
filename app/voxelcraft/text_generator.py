@@ -101,10 +101,23 @@ _RULES: list[tuple[list[str], object]] = [
     (["pig", "cow", "sheep", "animal", "creature", "beast"],
      lambda colors: shapes.quadruped(
          body=colors[0] if colors else "brown", head=colors[0] if colors else "brown")),
+    (["face", "portrait"], lambda colors: shapes.human_face(
+        skin=colors[0] if colors else "skin", hair=colors[1] if len(colors) > 1 else "brown")),
+    (["body", "torso", "physique"], lambda colors: shapes.human_body(
+        skin=colors[0] if colors else "skin", shirt=colors[1] if len(colors) > 1 else "cyan")),
     (["robot", "person", "human", "steve", "alex", "character", "man", "woman",
       "knight", "warrior", "hero", "zombie", "player", "snowman"], lambda colors: shapes.humanoid(
         shirt=colors[0] if colors else "cyan", pants=colors[1] if len(colors) > 1 else "blue")),
 ]
+
+# When a prompt matches one of the realistic face/body rules above, the
+# generic catch-all person rule below is redundant (and produces an
+# unwanted extra blocky figure composed alongside it, since "a realistic
+# human body" contains both "body" and "human"): drop it in that case.
+_GENERIC_PERSON_KEYWORDS = {
+    "robot", "person", "human", "steve", "alex", "character", "man", "woman",
+    "knight", "warrior", "hero", "zombie", "player", "snowman",
+}
 
 # a little closure-friendly slot so rules above can read cues from the raw
 # prompt (floor count, "witch's", "box" vs "cube") without changing every
@@ -145,6 +158,10 @@ def generate_from_text(prompt: str) -> tuple[list[Voxel], str]:
         matched = next((k for k in keywords if word_matches(k, prompt_lower)), None)
         if matched:
             matches.append((matched, builder))
+
+    matched_keys = {k for k, _ in matches}
+    if matched_keys & {"face", "portrait", "body", "torso", "physique"}:
+        matches = [(k, b) for k, b in matches if k not in _GENERIC_PERSON_KEYWORDS]
 
     if not matches:
         voxels = shapes.procedural_blob(prompt_lower, colors=colors or None)
