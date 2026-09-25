@@ -148,8 +148,90 @@ _BASELINE = {
     "nose_protrusion_z": 0.03, "mouth_width": 0.27, "jaw_width": 0.72, "face_aspect": 1.35,
 }
 
+# A profile silhouette measures actual forward protrusion directly, rather
+# than MediaPipe's rough monocular z-guess from a front photo (see the
+# module docstring) — a typical ratio, from measuring several real profile
+# photos/sculpts by the same method (see `profile_nose_protrusion`), sits
+# in the 0.20-0.30 range; this is the "1.0x, unremarkable" reference point
+# a caller's own measurement is compared against, same spirit as `_BASELINE`.
+_PROFILE_BASELINE_RATIO = 0.25
 
-def photo_to_proportions(image: Image.Image) -> tuple[dict[str, float], float]:
+
+def profile_nose_protrusion(profile_image: Image.Image) -> float:
+    """Measures how far the face protrudes forward, directly from a
+    profile (side-view) photo's own silhouette — independent of
+    MediaPipe, which does not reliably detect a face at all in a near-90-
+    degree profile (it is trained for near-frontal faces; see the module
+    docstring's disclosure), and whose z-values are a coarse guess even
+    when it does detect one.
+
+    Method: threshold the image to a head/background silhouette (assumes
+    a plain dark background, light subject — true of typical studio
+    references and 3D-sculpt renders), find the skull's own widest point
+    (a local peak in per-row silhouette width, before the neck narrows —
+    robust to how tightly the photo is cropped, unlike assuming the crop
+    width *is* the head width), then measure the largest perpendicular
+    deviation of the face-side edge from the straight line connecting a
+    point just below the crown to a point one head-width below the
+    skull's widest point — geometrically, that deviation is the nose tip.
+    Returns a raw ratio (deviation / skull width); the caller compares it
+    against `_PROFILE_BASELINE_RATIO` to get a `nose_protrusion`-style
+    multiplier, the same way `photo_to_proportions` treats every other
+    measurement here as a ratio against `_BASELINE`, not an absolute size.
+
+    Raises FaceReconstructionError if no clear silhouette is found."""
+    arr = np.array(profile_image.convert("L"))
+    h, w = arr.shape
+    fg = arr > 30
+    fg_rows = np.where(fg.any(axis=1))[0]
+    if len(fg_rows) < 10:
+        raise FaceReconstructionError(
+            "Couldn't find a clear silhouette in that profile photo — try one with a plain, "
+            "dark background and a well-lit head in full side profile."
+        )
+    y0, y_last = int(fg_rows.min()), int(fg_rows.max())
+
+    lefts = np.full(h, np.nan)
+    rights = np.full(h, np.nan)
+    widths = np.zeros(h)
+    for y in range(y0, y_last + 1):
+        xs = np.where(fg[y])[0]
+        if len(xs):
+            lefts[y], rights[y] = xs[0], xs[-1]
+            widths[y] = xs[-1] - xs[0]
+
+    peak_y, peak_w = y0, 0.0
+    for y in range(y0, min(y_last + 1, y0 + 3 * w)):
+        if widths[y] > peak_w:
+            peak_w, peak_y = widths[y], y
+        elif peak_w > 0 and widths[y] < peak_w * 0.85:
+            break  # width has clearly started dropping again: past the skull's widest point
+    if peak_w < 1:
+        raise FaceReconstructionError("Couldn't measure a head silhouette in that profile photo.")
+
+    top_y = y0 + int(0.15 * peak_w)
+    bottom_y = min(y_last, peak_y + int(peak_w))
+    ys = np.arange(top_y, bottom_y + 1)
+    left_slice, right_slice = lefts[top_y:bottom_y + 1], rights[top_y:bottom_y + 1]
+    # whichever edge varies more across this band has the eye/nose/mouth
+    # detail (the back-of-skull edge is close to a smooth, low-variance arc)
+    face_side_right = np.nanstd(right_slice) > np.nanstd(left_slice)
+    edge = right_slice if face_side_right else -left_slice
+    valid = ~np.isnan(edge)
+    ys_v, edge_v = ys[valid], edge[valid]
+    if len(ys_v) < 2:
+        raise FaceReconstructionError("Couldn't trace a face edge in that profile photo.")
+
+    x0v, y0v, x1v, y1v = edge_v[0], ys_v[0], edge_v[-1], ys_v[-1]
+    dy, dx = y1v - y0v, x1v - x0v
+    chord_len = math.hypot(dx, dy) or 1.0
+    deviation = np.abs(dx * (ys_v - y0v) - dy * (edge_v - x0v)) / chord_len
+    return float(deviation.max() / peak_w)
+
+
+def photo_to_proportions(
+    image: Image.Image, profile_image: Image.Image | None = None
+) -> tuple[dict[str, float], float]:
     """The main entry point: detect a face in `image` and return
     (feature_proportions, height_scale).
 
@@ -159,9 +241,17 @@ def photo_to_proportions(image: Image.Image) -> tuple[dict[str, float], float]:
     tall vs. wide), not a single Gaussian feature — multiply it onto
     `build_head_mesh`'s `ry` argument (e.g. `ry=1.15 * height_scale`).
 
+    `profile_image`, if given, is an optional side-view photo of the same
+    face: its silhouette (see `profile_nose_protrusion`) replaces the
+    front photo's rough z-based nose-protrusion guess with a real
+    measurement of how far the face actually protrudes. A profile photo
+    that MediaPipe can't use (it needs a near-frontal face) is exactly
+    what this is for. If it doesn't yield a usable silhouette either, the
+    front photo's estimate is kept rather than failing the whole call.
+
     Raises FaceReconstructionError (never silently) if no face is found
-    or the model can't be reached — the caller decides whether/how to
-    fall back to the generic head."""
+    in `image` or the model can't be reached — the caller decides
+    whether/how to fall back to the generic head."""
     landmarks = _detect_landmarks(image)
     m = _measure(landmarks)
 
@@ -177,5 +267,11 @@ def photo_to_proportions(image: Image.Image) -> tuple[dict[str, float], float]:
         "mouth_width": ratio("mouth_width"),
         "jaw_width": ratio("jaw_width"),
     }
+    if profile_image is not None:
+        try:
+            profile_ratio = profile_nose_protrusion(profile_image)
+            proportions["nose_protrusion"] = max(0.6, min(1.8, profile_ratio / _PROFILE_BASELINE_RATIO))
+        except FaceReconstructionError:
+            pass  # keep the front photo's z-based estimate
     height_scale = ratio("face_aspect", clamp=(0.8, 1.25))
     return proportions, height_scale

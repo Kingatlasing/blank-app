@@ -73,6 +73,7 @@ with st.sidebar:
 
     mesh_color = "#E0AC85"
     face_photo = None
+    face_profile_photo = None
     face_style = "mesh"
     mc_skin, mc_hair, mc_eye, mc_mouth = "#E0AC85", "#724728", "#1D1D21", "#8B5A3C"
     mc_blockiness = 3
@@ -135,7 +136,7 @@ with st.sidebar:
                 )
             if face_source.startswith("📷"):
                 face_photo = st.file_uploader(
-                    "Upload a face photo",
+                    "Upload a face photo (front-facing)",
                     type=["png", "jpg", "jpeg", "webp"],
                 )
                 st.caption(
@@ -148,6 +149,21 @@ with st.sidebar:
                     "sculpt below, reshaped to your photo's proportions, not a literal "
                     "reconstruction of its surface. The first use downloads a ~3.6MB model file "
                     "(cached after that)."
+                )
+                face_profile_photo = st.file_uploader(
+                    "Optionally, also add a side-profile photo",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    help="A front photo alone can only guess how far the nose protrudes — "
+                         "MediaPipe's landmarks are a rough monocular depth estimate, not a real "
+                         "measurement. A side profile shows that depth directly: this measures it "
+                         "from the actual silhouette (where the face's outline departs from the "
+                         "skull's own widest point) instead of guessing, and replaces the front "
+                         "photo's estimate with it.",
+                )
+                st.caption(
+                    "MediaPipe can't detect a face at all in a near-90° profile (it's built for "
+                    "front-facing photos) — this uses simple silhouette geometry instead, not face "
+                    "landmarks, so it works specifically because the photo *is* a profile."
                 )
             prompt = ""
     else:
@@ -364,8 +380,15 @@ if generate:
                 with st.spinner("Detecting face landmarks in your photo..."):
                     try:
                         image = image_generator.load_image_from_bytes(face_photo.read())
-                        proportions, height_scale = face_reconstruction.photo_to_proportions(image)
+                        profile_image = None
+                        if face_profile_photo is not None:
+                            profile_image = image_generator.load_image_from_bytes(face_profile_photo.read())
+                        proportions, height_scale = face_reconstruction.photo_to_proportions(
+                            image, profile_image=profile_image
+                        )
                         photo_note = " Proportions matched to your uploaded photo."
+                        if profile_image is not None:
+                            photo_note += " Nose depth measured from your profile photo's own silhouette."
                     except face_reconstruction.FaceReconstructionError as exc:
                         st.sidebar.warning(f"Couldn't use that photo ({exc}) — built the generic proportions instead.")
             with st.spinner("Sculpting a polygon-mesh face..."):
