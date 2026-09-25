@@ -709,12 +709,11 @@ const state = {
   money: 500,
   flags: {},
   badges: [],
-  stepCounter: 0,
-  encounterCooldown: 0,
   camera: { x: 0, y: 0 },
   dex: {}, // slug -> 'seen' | 'caught', for the Bestiary screen
   visitedCenters: {}, // MAPS key of every healing_center_* interior visited, for Fast Travel
-  biking: false
+  biking: false,
+  hiddenEncounters: {}, // MAPS key -> [{x,y,slug,level}] - wild creatures lurking in specific grass tiles
 };
 
 function markDexSeen(slug) { if (!state.dex[slug]) state.dex[slug] = 'seen'; }
@@ -1335,6 +1334,24 @@ MAPS.classic_route8 = {
   }
 })();
 
+(function computeClassicGrass() {
+  // TILED.maps (the original 5-map region) ships a real per-tile "grass" bitmap
+  // baked in from its source data, but CLASSIC_TILED (the 7-city/8-route second
+  // region) never got one, so wild encounters on every classic route silently
+  // never fired at all - the check `td.grass && ...` was always false there.
+  // There's no leftover build script to regenerate that bitmap from the source
+  // Tiled files, so derive it here from the same real "World" ground-layer tile
+  // indices already baked into CLASSIC_TILED: every tile is open grass field
+  // except the sandy path (world GID 19/20) and open water (GID 177) - rocks,
+  // trees and bushes are already excluded by the existing collision data, so
+  // they can't become hidden-encounter spots regardless of this bitmap.
+  const NOT_GRASS_WORLD_GIDS = new Set([19, 20, 177]);
+  for (const name in CLASSIC_TILED.maps) {
+    const td = CLASSIC_TILED.maps[name];
+    td.grass = td.world.map(gid => !NOT_GRASS_WORLD_GIDS.has(gid));
+  }
+})();
+
 /* ---------------------------- NPC dialogue functions ---------------------------- */
 function professorDialogue() {
   if (!state.flags.starterChosen) {
@@ -1520,14 +1537,7 @@ function onArrive() {
       }
     }
     if (td.grass && td.grass[state.y * td.w + state.x] && map.encounterTable && map.encounterTable.length) {
-      state.stepCounter++;
-      if (state.encounterCooldown > 0) { state.encounterCooldown--; }
-      else if (Math.random() < 0.12) {
-        state.encounterCooldown = 2;
-        const enc = weightedPick(map.encounterTable);
-        const lvl = enc.min + Math.floor(Math.random() * (enc.max - enc.min + 1));
-        startWildBattle(enc.slug, lvl, false);
-      }
+      checkHiddenEncounter(state.map);
     }
     return;
   }
@@ -1557,12 +1567,7 @@ function onArrive() {
   const ch = row ? row[state.x] : '.';
   const def = TILE_DEF[ch];
   if (def && def.encounter && map.encounterTable && map.encounterTable.length) {
-    state.stepCounter++;
-    if (Math.random() < 0.13) {
-      const enc = weightedPick(map.encounterTable);
-      const lvl = enc.min + Math.floor(Math.random() * (enc.max - enc.min + 1));
-      startWildBattle(enc.slug, lvl, false);
-    }
+    checkHiddenEncounter(state.map);
   }
 }
 function weightedPick(table) {
@@ -1570,6 +1575,76 @@ function weightedPick(table) {
   let r = Math.random() * total;
   for (const e of table) { if (r < e.w) return e; r -= e.w; }
   return table[0];
+}
+
+/* ---------------------------- Hidden wild encounters ----------------------------
+   Wild creatures lurk at specific grass tiles rather than popping up from a random
+   chance on every step - a tile is either hiding a creature or it isn't, and
+   walking onto that exact tile is what starts the battle (matches how tall grass
+   works in the source games, rather than an invisible dice roll under any grass). */
+function isGrassTile(map, x, y) {
+  if (map.tiledKey) {
+    const td = tiledSourceFor(map).data;
+    if (x < 0 || y < 0 || x >= td.w || y >= td.h) return false;
+    return !!(td.grass && td.grass[y * td.w + x]);
+  }
+  const row = map.tiles[y];
+  const ch = row ? row[x] : null;
+  const def = ch && TILE_DEF[ch];
+  return !!(def && def.encounter);
+}
+function mapDims(map) {
+  if (map.tiledKey) { const td = tiledSourceFor(map).data; return { w: td.w, h: td.h }; }
+  return { w: map.w, h: map.h };
+}
+const HIDDEN_ENCOUNTER_DENSITY = 40; // roughly one hidden creature per 40 grass tiles
+const HIDDEN_ENCOUNTER_MAX = 6;
+function spawnHiddenAt(map, x, y) {
+  const enc = weightedPick(map.encounterTable);
+  const level = enc.min + Math.floor(Math.random() * (enc.max - enc.min + 1));
+  return { x, y, slug: enc.slug, level };
+}
+function ensureHiddenEncounters(mapKey) {
+  const map = MAPS[mapKey];
+  if (!map.encounterTable || !map.encounterTable.length) return [];
+  if (!state.hiddenEncounters[mapKey]) {
+    const { w, h } = mapDims(map);
+    const grassTiles = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (isGrassTile(map, x, y) && !tileSolidAt(map, x, y)) grassTiles.push({ x, y });
+    }
+    const count = grassTiles.length ? Math.min(HIDDEN_ENCOUNTER_MAX, Math.max(1, Math.ceil(grassTiles.length / HIDDEN_ENCOUNTER_DENSITY))) : 0;
+    const list = [];
+    for (let i = 0; i < count; i++) {
+      const idx = Math.floor(Math.random() * grassTiles.length);
+      const spot = grassTiles.splice(idx, 1)[0];
+      list.push(spawnHiddenAt(map, spot.x, spot.y));
+    }
+    state.hiddenEncounters[mapKey] = list;
+  }
+  return state.hiddenEncounters[mapKey];
+}
+function respawnHiddenEncounter(mapKey) {
+  const map = MAPS[mapKey];
+  const { w, h } = mapDims(map);
+  const list = state.hiddenEncounters[mapKey] || (state.hiddenEncounters[mapKey] = []);
+  let tries = 30;
+  while (tries--) {
+    const nx = Math.floor(Math.random() * w), ny = Math.floor(Math.random() * h);
+    if (isGrassTile(map, nx, ny) && !tileSolidAt(map, nx, ny) &&
+        !(nx === state.x && ny === state.y) && !list.some(h => h.x === nx && h.y === ny)) {
+      list.push(spawnHiddenAt(map, nx, ny));
+      return;
+    }
+  }
+}
+function checkHiddenEncounter(mapKey) {
+  const list = ensureHiddenEncounters(mapKey);
+  const idx = list.findIndex(h => h.x === state.x && h.y === state.y);
+  if (idx < 0) return;
+  const enc = list.splice(idx, 1)[0];
+  respawnHiddenEncounter(mapKey);
+  startWildBattle(enc.slug, enc.level, false);
 }
 
 /* ---------------------------- Input ---------------------------- */
@@ -1790,7 +1865,7 @@ function renderTiledOverworld(map) {
 /* ---------------------------- Game loop / movement animation ---------------------------- */
 function updateMovementAnim() {
   if (state.moving) {
-    state.moveProgress = (state.moveProgress || 0) + (state.biking ? 0.44 : 0.22);
+    state.moveProgress = (state.moveProgress || 0) + (state.biking ? 0.22 : 0.11);
     state.animTimer++;
     state.px = state.moveFrom.x + (state.x - state.moveFrom.x) * Math.min(1, state.moveProgress);
     state.py = state.moveFrom.y + (state.y - state.moveFrom.y) * Math.min(1, state.moveProgress);
