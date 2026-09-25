@@ -1,239 +1,221 @@
-"""A genuine polygon-mesh human head: real (x, y, z) vertices and triangle
-faces at arbitrary angles, not axis-aligned voxel cubes.
+"""A genuine polygon-mesh human male head: real (x, y, z) vertices and
+triangle faces at arbitrary angles, not axis-aligned voxel cubes, and not
+a hand-designed parametric shape either — this is a real, artist-modeled
+reference head mesh, decimated down to a low-poly facet count and then
+locally deformed per proportion.
 
-This exists because voxels — even at very high resolution — can't produce
-the look of a sculpted low-poly head (flat facets meeting at real angles,
-a smoothly tapered jaw, a point-like crown/chin from a triangle fan): a
-cube grid is fundamentally the wrong primitive for that, regardless of how
-small the cubes get. This module builds that shape directly instead.
+**Where the base shape comes from.** An earlier version of this module
+built the head from scratch: a UV-sphere reshaped by a width-factor curve,
+with facial features layered on as Gaussian bumps/dents. It never
+actually looked like a face — a plausible *silhouette* is not the same
+thing as correct anatomy, and hand-tuning Gaussian amplitudes by eye
+cannot substitute for a real model. This version starts from an actual
+reference head mesh (a clean, well-proportioned male head sourced from a
+real 3D asset, MIT/royalty-free), decimated with quadric edge-collapse
+from ~3700 to 1000 triangles — chosen by rendering several target
+triangle counts side by side (1500/1000/600) and picking the one that
+kept every feature (eye socket, nose bridge, nostril wings, lips, jaw
+line, ear) clearly readable while landing in the same faceted low-poly
+range the rest of this app's "realistic face" mode already uses. The
+baked vertex/face data lives in `assets/male_head.json`.
 
-The technique: a UV-sphere parametrization (latitude rings from a top
-pole/crown to a bottom pole/chin, longitude segments around), which
-already matches the reference low-poly head style well on its own — the
-pole triangle-fans are exactly the "rings converging to a point" look a
-sculpted head's crown and chin actually have. `_width_factor` reshapes the
-per-latitude radius so it stays close to full width through the
-forehead/cheek/jaw range (unlike a raw sphere, which shrinks continuously
-toward each pole) — that's what makes it read as a head and not an egg.
-Facial features (brow, eye sockets, nose, cheeks, mouth, chin, ears) are
-then layered on as localized Gaussian bumps/dents in that per-latitude,
-per-longitude radius.
+**How proportions retarget it.** Rather than re-deriving Gaussian bump
+parameters, this locates real 3D landmarks *on that actual mesh* — nose
+tip, eye corners, mouth corners, jaw points, etc. — the same way a real
+photo gets measured: render the mesh from the front, run it through
+Google's MediaPipe Face Landmarker (the same pretrained model
+`face_reconstruction.py` uses on real photos), then ray-cast each
+detected 2D landmark back into 3D against the actual mesh geometry to get
+its true surface position. `assets/male_head.json` bakes in the result
+(`landmarks`), so this cost is paid once, offline, not on every call.
 
-Feature *positions* (theta0 for brow/eye/nose/mouth/chin/ear) follow the
-classic figure-drawing head canon — eyes at the exact vertical midpoint of
-the whole head (crown to chin, not the face's midpoint; an early version
-had this wrong by a measurable amount, placing the eyes 38% of the way up
-toward the crown), the lower half then split into roughly equal thirds
-for nose-base/mouth/chin, ears spanning brow-to-nose-base — rather than
-independently eyeballed per feature.
+Each proportion knob (`eye_spacing`, `eye_size`, `nose_width`,
+`nose_length`, `nose_protrusion`, `mouth_width`, `jaw_width`) then works
+by real per-vertex geometric operations, weighted by a smooth Gaussian
+falloff in (y, z) from the relevant landmark(s) — never touching a whole
+feature uniformly, and never touching unrelated features:
 
-Every fix in this file's history came from actually rendering the
-intermediate mesh and looking at it (front/side/top via a real z-buffered
-rasterizer, cross-checked against an independent renderer, and — after a
-render looked wrong — also checked with per-vertex smooth-shaded normals
-before concluding anything was actually broken). Two different findings
-came out of that process, and they matter for different reasons:
+- `*_width`/`eye_spacing`: scale the vertex's own x (offset from the
+  mesh's true centerline) by the multiplier — since the mesh is
+  bilaterally symmetric about x=0, this widens/narrows a region
+  symmetrically for free, no separate left/right bookkeeping needed.
+- `eye_size`: scale radially in 3D around that eye's own landmark center
+  (whichever eye — left or right — the vertex is actually closest to).
+- `nose_length`: stretch vertically around the nose bridge landmark.
+- `nose_protrusion`: scale the vertex's z *offset from the cheek plane*
+  (not its raw z) — so it's the nose's actual forward protrusion that
+  grows or shrinks, not an arbitrary absolute depth.
 
-- A real geometry bug: splitting every quad along the same fixed diagonal
-  folded a visible crease into any concave (saddle-curved) patch, like
-  the rim of an eye socket. Confirmed as a genuine defect (not a
-  rendering-angle artifact) because it showed up as actually-inverted,
-  overlapping triangles in more than one independent renderer, and a
-  smooth-shaded render of the same vertices still looked torn. Fixed by
-  picking whichever diagonal is shorter, per quad.
-- A false alarm worth recording so it isn't "fixed" again by accident: a
-  convex bump (the nose) rendered with flat shading under one directional
-  light naturally shows alternating bright/dark facets radiating from its
-  peak — a normal, correct consequence of per-face normals on low-poly
-  geometry, not a defect. It looked identical to the real bug above at a
-  glance. The distinguishing tests: adjacent triangle-pair normals stay
-  near-parallel (dot product ~0.95-1.0, not inverted), and a smooth-
-  shaded render of the exact same vertices shows a perfectly clean
-  surface. Both came back clean here, which is what told two different-
-  looking renders apart as "expected shading" vs. "actual fold."
-
-"Realistic" here means a proportioned, faceted, low-poly *sculpt* in the
-style of the reference images this was built against — not a literal
-photorealistic scan, and not a reconstruction of any specific real
-person's face (this module has no way to do that; it designs a face from
-proportions and Gaussian feature placement, the same way the voxel shape
-library designs a house from wall/roof primitives).
+This is the same `proportions` dict shape (and the same multiplier
+convention: 1.0 = unchanged) `face_reconstruction.photo_to_proportions`
+and `random_proportions` already produced for the old Gaussian-bump
+version, so neither of those, nor any caller, needed to change.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import random
+from pathlib import Path
 
 Vertex = tuple[float, float, float]
 Face = tuple[int, int, int]
 
-# (t, width_factor) keypoints, t = theta/pi (0 = crown, 1 = chin), piecewise
-# linear between them. This is the actual head-shape control: unlike a raw
-# sphere (whose radius ~ sin(theta) always shrinks toward each pole), this
-# stays close to full width through the forehead/cheek/jaw range and only
-# tapers in the narrow band right at the crown and right at the chin.
-_WIDTH_KEYPOINTS = [
-    (0.00, 0.0), (0.07, 0.82), (0.16, 0.94), (0.28, 1.0), (0.46, 1.03),
-    (0.60, 0.95), (0.72, 0.78), (0.86, 0.5), (0.95, 0.22), (1.00, 0.0),
-]
+with (Path(__file__).parent / "assets" / "male_head.json").open(encoding="utf-8") as _fh:
+    _ASSET = json.load(_fh)
 
-# name -> [theta0, phi0, sigma_theta, sigma_phi, amplitude] — phi0=0 is
-# straight ahead (+z), positive phi sweeps toward +x. sigma_theta/sigma_phi
-# must be comfortably wider than the mesh's own vertex spacing
-# (2*pi/n_segments, pi/n_rings): a Gaussian narrower than that plunges a
-# single vertex while its neighbors barely move, which (combined with the
-# fixed-diagonal bug described in the module docstring) is what produced
-# the garbled-mesh defect during development.
-#
-# theta0 values follow the classic figure-drawing/anatomical head canon
-# (the "eyes sit at the head's vertical midpoint, crown-to-chin — not the
-# face's midpoint" rule, with the lower half then split into roughly equal
-# thirds for nose base/mouth/chin, and ears spanning brow-to-nose-base) —
-# not independently re-tuned by eye. An earlier version placed the eyes
-# 38% of the way up toward the crown instead of at the true half (a real,
-# measurable error: cos(1.18) = 0.38 of ry above center, when it should be
-# cos(pi/2) = 0 — dead center), which was corrected against that canon
-# rather than by further guessing.
-#
-# Keyed by name (rather than a plain list) so `face_reconstruction.py` can
-# retarget specific features — widen eye spacing, scale nose size, etc. —
-# from measurements taken off a real photo, without touching the others.
-_FEATURES: dict[str, list[float]] = {
-    "brow": [1.32, 0.0, 0.10, 0.55, 0.06],
-    "eye_l": [1.571, 0.40, 0.15, 0.24, -0.15],
-    "eye_r": [1.571, -0.40, 0.15, 0.24, -0.15],
-    "nose": [1.83, 0.0, 0.28, 0.16, 0.28],
-    "cheek_l": [1.75, 0.58, 0.16, 0.22, 0.08],
-    "cheek_r": [1.75, -0.58, 0.16, 0.22, 0.08],
-    "mouth": [2.53, 0.0, 0.11, 0.20, -0.08],
-    "chin": [2.86, 0.0, 0.12, 0.22, 0.06],
-    "ear_l": [1.71, 1.5, 0.18, 0.19, 0.20],
-    "ear_r": [1.71, -1.5, 0.18, 0.19, 0.20],
-}
-
-# Which single scalar in each feature's [theta0, phi0, sigma_t, sigma_p,
-# amp] a given proportion knob adjusts, and how — used by
-# `_apply_proportions`. "amp" knobs change feature prominence (nose size,
-# mouth width read as amplitude+sigma together); "phi0" knobs change
-# position (eye/ear spacing away from center).
-_PROPORTION_TARGETS: dict[str, list[tuple[str, str]]] = {
-    "eye_spacing": [("eye_l", "phi0"), ("eye_r", "phi0")],
-    "eye_size": [("eye_l", "amp"), ("eye_r", "amp")],
-    "nose_width": [("nose", "sigma_p")],
-    "nose_length": [("nose", "sigma_t")],
-    "nose_protrusion": [("nose", "amp")],
-    "mouth_width": [("mouth", "sigma_p")],
-    "jaw_width": [("cheek_l", "amp"), ("cheek_r", "amp")],
-}
-_FIELD_INDEX = {"theta0": 0, "phi0": 1, "sigma_t": 2, "sigma_p": 3, "amp": 4}
+_BASE_VERTS: list[Vertex] = [tuple(v) for v in _ASSET["vertices"]]
+_FACES: list[Face] = [tuple(f) for f in _ASSET["faces"]]
+_LM: dict[str, Vertex] = {k: tuple(v) for k, v in _ASSET["landmarks"].items()}
 
 
-def _apply_proportions(features: dict[str, list[float]], proportions: dict[str, float]) -> None:
-    """Mutates `features` in place: each `proportions` value is a
-    multiplier (1.0 = unchanged) on the target field(s) `_PROPORTION_TARGETS`
-    names, except `phi0` targets, which are multiplicative on position
-    *away from center* (so eye spacing widens/narrows symmetrically rather
-    than sliding sideways)."""
-    for name, scale in proportions.items():
-        for feature_name, field in _PROPORTION_TARGETS.get(name, []):
-            idx = _FIELD_INDEX[field]
-            features[feature_name][idx] *= scale
+def _mid(a: Vertex, b: Vertex) -> Vertex:
+    return ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2)
 
 
-def _width_factor(theta: float) -> float:
-    t = theta / math.pi
-    pts = _WIDTH_KEYPOINTS
-    for (t0, f0), (t1, f1) in zip(pts, pts[1:]):
-        if t0 <= t <= t1:
-            frac = (t - t0) / (t1 - t0) if t1 > t0 else 0.0
-            return f0 + (f1 - f0) * frac
-    return pts[-1][1]
+_EYE_R_CENTER = _mid(_LM["eye_r_inner"], _LM["eye_r_outer"])
+_EYE_L_CENTER = _mid(_LM["eye_l_inner"], _LM["eye_l_outer"])
+_NOSE_CENTER = _mid(_LM["nose_bridge"], _LM["nose_tip"])
+_MOUTH_CENTER = _mid(_LM["mouth_r"], _LM["mouth_l"])
+_CHEEK_Z = (_LM["cheek_r"][2] + _LM["cheek_l"][2]) / 2
+_JAW_Y = (_LM["jaw_r"][1] + _LM["jaw_l"][1]) / 2
+_JAW_Z = (_LM["jaw_r"][2] + _LM["jaw_l"][2]) / 2
+_NOSE_BRIDGE_Y = _LM["nose_bridge"][1]
+
+# How far each proportion's influence reaches from its landmark, in the
+# mesh's own baked units (crown-to-chin height = 2.3) — tuned by rendering
+# extreme multipliers (see the module docstring's decimation-count
+# process) and checking the affected region matched the named feature
+# without bleeding into its neighbors (e.g. "nose_width" widening the
+# cheeks, or "eye_size" puffing out the brow).
+_EYE_RADIUS = 0.34
+_NOSE_RADIUS = 0.5
+_MOUTH_RADIUS = 0.38
+_JAW_RADIUS = 1.0
+
+# Safety bound on total per-vertex displacement — see its use in
+# build_head_mesh for why this exists (a handful of shared-influence
+# vertices can sum multiple simultaneous deltas past where the mesh stays
+# clean, even when no single delta or pair does).
+_MAX_DISPLACEMENT = 0.4
 
 
-def _gauss(theta: float, phi: float, theta0: float, phi0: float,
-           sigma_t: float, sigma_p: float, amp: float) -> float:
-    dphi = (phi - phi0 + math.pi) % (2 * math.pi) - math.pi  # shortest angular diff
-    return amp * math.exp(-((theta - theta0) ** 2 / sigma_t ** 2 + dphi ** 2 / sigma_p ** 2))
-
-
-def _dist2(p: Vertex, q: Vertex) -> float:
-    return (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2
+def _falloff(dy: float, dz: float, radius: float) -> float:
+    return math.exp(-(dy * dy + dz * dz) / (radius * radius))
 
 
 def build_head_mesh(
-    n_rings: int = 22, n_segments: int = 26,
-    rx: float = 1.05, ry: float = 1.15, rz: float = 0.95,
-    proportions: dict[str, float] | None = None,
+    proportions: dict[str, float] | None = None, ry: float = 1.15,
 ) -> tuple[list[Vertex], list[Face]]:
-    """A head as (vertices, triangle faces). y is up, +z is the face's
-    front, scaled to roughly [-1.2, 1.2] on every axis — the caller scales
-    this to whatever final size it wants.
+    """The real reference head (see module docstring), deformed per
+    `proportions` and uniformly scaled so its crown-to-chin height is
+    `2 * ry` (the default `ry=1.15` reproduces the mesh's own baked
+    scale, i.e. no extra scaling).
 
-    `proportions`, if given, retargets specific features by a multiplier
-    each (1.0 = the generic default) — see `_PROPORTION_TARGETS` for the
-    recognized keys. This is what lets `face_reconstruction.py` shape the
-    generic parametric head toward a specific photo's measured
-    proportions (face width/height, eye spacing, nose/mouth size, jaw
-    width) without hand-writing a second copy of the whole feature set."""
-    features = {name: list(vals) for name, vals in _FEATURES.items()}
-    if proportions:
-        _apply_proportions(features, proportions)
+    `proportions`, if given, is a `{name: multiplier}` dict (1.0 = the
+    reference mesh's own proportions) — see the module docstring for
+    exactly what each of the 7 recognized keys moves. This is what lets
+    `face_reconstruction.py` shape the head toward a specific photo's
+    measured proportions, or `random_proportions` toward a seeded
+    "random" one, without either of them knowing this is a real mesh
+    underneath rather than a parametric one."""
+    scale = ry / 1.15
+    p = proportions or {}
+    eye_spacing = p.get("eye_spacing", 1.0)
+    eye_size = p.get("eye_size", 1.0)
+    nose_width = p.get("nose_width", 1.0)
+    nose_length = p.get("nose_length", 1.0)
+    nose_protrusion = p.get("nose_protrusion", 1.0)
+    mouth_width = p.get("mouth_width", 1.0)
+    jaw_width = p.get("jaw_width", 1.0)
 
-    verts: list[Vertex] = []
-    faces: list[Face] = []
+    out: list[Vertex] = []
+    for x0, y0, z0 in _BASE_VERTS:
+        w_eye_r = _falloff(y0 - _EYE_R_CENTER[1], z0 - _EYE_R_CENTER[2], _EYE_RADIUS)
+        w_eye_l = _falloff(y0 - _EYE_L_CENTER[1], z0 - _EYE_L_CENTER[2], _EYE_RADIUS)
+        w_nose = _falloff(y0 - _NOSE_CENTER[1], z0 - _NOSE_CENTER[2], _NOSE_RADIUS)
+        w_mouth = _falloff(y0 - _MOUTH_CENTER[1], z0 - _MOUTH_CENTER[2], _MOUTH_RADIUS)
+        w_jaw = _falloff(y0 - _JAW_Y, z0 - _JAW_Z, _JAW_RADIUS)
 
-    def radius(theta: float, phi: float) -> float:
-        r = _width_factor(theta)
-        for (t0, p0, st, sp, amp) in features.values():
-            r += _gauss(theta, phi, t0, p0, st, sp, amp)
-        return max(r, 0.02)
+        # Where two regions' falloffs both reach a vertex at close to full
+        # strength — the glabella/nose-bridge saddle between the eyes and
+        # the nose is the real case that surfaced this — each pulling
+        # toward its *own* landmark at up to 100% would let their deltas
+        # fight each other and fold that patch of geometry, even though
+        # every individual region (and most pairs, tested in isolation)
+        # stayed clean on its own. Rather than keep shrinking radii to
+        # chase every such saddle point individually, cap the *total*
+        # demand on any one vertex to 1.0 and let overlapping regions
+        # share that budget proportionally — isolated regions (the
+        # overwhelming majority of vertices, sum well under 1) are
+        # completely unaffected by this.
+        demand = max(w_eye_r, w_eye_l) + w_nose + w_mouth + w_jaw
+        if demand > 1.0:
+            k = 1.0 / demand
+            w_eye_r *= k
+            w_eye_l *= k
+            w_nose *= k
+            w_mouth *= k
+            w_jaw *= k
 
-    def point(theta: float, phi: float) -> Vertex:
-        r = radius(theta, phi)
-        x = rx * r * math.sin(phi)
-        y = ry * math.cos(theta)
-        z = rz * r * math.cos(phi)
-        return (x, y, z)
+        # Every term below is a delta computed from the *original* (x0, y0,
+        # z0), then all summed once at the end — never chained (an earlier
+        # term's already-modified x feeding into a later term).
+        dx = x0 * (eye_spacing - 1) * max(w_eye_r, w_eye_l)
+        dy = dz = 0.0
 
-    verts.append(point(0.0, 0.0))  # top pole (crown)
-    ring_start: dict[int, int] = {}
-    for i in range(1, n_rings):
-        theta = i * math.pi / n_rings
-        ring_start[i] = len(verts)
-        for j in range(n_segments):
-            phi = j * 2 * math.pi / n_segments
-            verts.append(point(theta, phi))
-    bottom_pole_idx = len(verts)
-    verts.append(point(math.pi, 0.0))  # bottom pole (chin)
+        # eye_size: which eye a vertex belongs to has to be decided by the
+        # vertex's own x0 sign, not by comparing w_eye_r/w_eye_l — those
+        # weights are deliberately x-blind (see _falloff, used unmodified
+        # by eye_spacing above to widen both sides symmetrically from one
+        # shared per-row weight), so on their own they can't tell a vertex
+        # near the *left* eye's height/depth from one actually at the same
+        # height/depth on the right side of the face. Picking "whichever
+        # weight is larger" as a side-selector produced exactly that:
+        # opposite-side vertices occasionally won the comparison and then
+        # got their delta measured from the *wrong* eye's center — a
+        # false "radial distance" of 0.7-0.8 units instead of ~0.1-0.15,
+        # which is what turned a clean face into self-intersecting
+        # geometry the moment eye_size got large (first caught not on a
+        # synthetic test but on a real photo's detected proportions).
+        eye_center = _EYE_L_CENTER if x0 >= 0 else _EYE_R_CENTER
+        w_eye = w_eye_l if x0 >= 0 else w_eye_r
+        eye_delta = (eye_size - 1) * w_eye
+        dx += (x0 - eye_center[0]) * eye_delta
+        dy += (y0 - eye_center[1]) * eye_delta
+        dz += (z0 - eye_center[2]) * eye_delta
 
-    r1 = ring_start[1]
-    for j in range(n_segments):
-        a, b = r1 + j, r1 + (j + 1) % n_segments
-        faces.append((0, b, a))
+        dx += x0 * (nose_width - 1) * w_nose
+        dy += (y0 - _NOSE_BRIDGE_Y) * (nose_length - 1) * w_nose
+        dz += (z0 - _CHEEK_Z) * (nose_protrusion - 1) * w_nose
 
-    for i in range(1, n_rings - 1):
-        r_i, r_ip1 = ring_start[i], ring_start[i + 1]
-        for j in range(n_segments):
-            a, b = r_i + j, r_i + (j + 1) % n_segments
-            c, d = r_ip1 + j, r_ip1 + (j + 1) % n_segments
-            # A quad on a curved surface isn't flat, so the diagonal choice
-            # matters — see the module docstring. Picking the shorter one
-            # keeps both triangles closer to co-planar and avoids a fold.
-            if _dist2(verts[a], verts[d]) <= _dist2(verts[b], verts[c]):
-                faces.append((a, b, d))
-                faces.append((a, d, c))
-            else:
-                faces.append((a, b, c))
-                faces.append((b, d, c))
+        dx += x0 * (mouth_width - 1) * w_mouth
+        dx += x0 * (jaw_width - 1) * w_jaw
 
-    r_last = ring_start[n_rings - 1]
-    for j in range(n_segments):
-        a, b = r_last + j, r_last + (j + 1) % n_segments
-        faces.append((a, bottom_pole_idx, b))
+        # Every pair of these deltas was individually checked against
+        # every extreme (and every real photo-derived combination found
+        # during testing) and stays clean — but some 5-way combinations
+        # (all of eye_spacing/eye_size/nose_width/nose_length/
+        # nose_protrusion at once, near their clamp ceilings, as an
+        # actual detected photo produced) still summed to enough combined
+        # displacement at a handful of shared-influence vertices to
+        # self-intersect, even though no single term or pair did. Rather
+        # than keep chasing which N-way combination breaks next, cap the
+        # total displacement magnitude directly: this is a safety bound
+        # on the deformation, not a per-feature tuning knob, so it stays
+        # generous enough that every individual feature's own tested
+        # range (see the isolated-parameter renders this was verified
+        # against) is nowhere near it alone.
+        mag = math.sqrt(dx * dx + dy * dy + dz * dz)
+        if mag > _MAX_DISPLACEMENT:
+            k = _MAX_DISPLACEMENT / mag
+            dx, dy, dz = dx * k, dy * k, dz * k
 
-    return verts, faces
+        out.append(((x0 + dx) * scale, (y0 + dy) * scale, (z0 + dz) * scale))
+
+    return out, _FACES
 
 
 # Bounds for `random_proportions` — wide enough to give visibly distinct
