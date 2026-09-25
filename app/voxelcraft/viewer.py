@@ -1,10 +1,57 @@
-"""Builds the self-contained Three.js HTML page used to preview a model."""
+"""Builds the self-contained Three.js HTML page used to preview a model.
+
+Three.js + OrbitControls are vendored into `vendor/` (fetched from the
+official npm package, MIT licensed) instead of loaded from a CDN import map
+at runtime. A CDN import map (the more common approach) silently breaks in
+any environment that blocks that CDN host — the viewer renders a blank,
+black canvas with no visible error, which looks exactly like "nothing
+generated" even though the model data itself is fine.
+
+The two vendored files are embedded as JS string literals and turned into
+real ES modules client-side via `Blob` + `URL.createObjectURL` + dynamic
+`import()` (`_LOADER`, below) — genuine module resolution, not textual
+concatenation. Concatenating three.js and OrbitControls.js into one scope
+was tried first and breaks: OrbitControls declares its own top-level
+`_ray`/`_plane`/etc. helpers that collide with three.js's own internal
+module-scope names once both are minified/unminified into the same scope.
+Real `import`/`export` resolves by the *exported* name regardless of
+internal renaming, so it doesn't have that problem, and blob URLs need no
+network access — this works fully offline."""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 Voxel = tuple[int, int, int, str]
+
+_VENDOR_DIR = Path(__file__).parent / "vendor"
+_THREE_JS = (_VENDOR_DIR / "three.module.min.js").read_text(encoding="utf-8")
+_ORBIT_JS = (_VENDOR_DIR / "OrbitControls.js").read_text(encoding="utf-8")
+
+# Turns the two vendored sources into real, isolated ES modules at runtime
+# via blob URLs (no CDN, no network) and awaits them before the rest of the
+# page's <script type="module"> body runs — top-level await is allowed
+# there, so everything below can keep using `THREE.Foo` / `OrbitControls`
+# exactly as a static `import` would have provided them.
+_LOADER = """
+const THREE_SRC = __THREE_SRC__;
+const ORBIT_SRC = __ORBIT_SRC__;
+const threeBlobUrl = URL.createObjectURL(new Blob([THREE_SRC], { type: "text/javascript" }));
+const orbitPatched = ORBIT_SRC.replace("from 'three'", `from '${threeBlobUrl}'`);
+const orbitBlobUrl = URL.createObjectURL(new Blob([orbitPatched], { type: "text/javascript" }));
+const THREE = await import(threeBlobUrl);
+const { OrbitControls } = await import(orbitBlobUrl);
+"""
+
+
+def _inject_loader(html: str) -> str:
+    # substituted last so nothing in the (large) vendored source is ever
+    # itself scanned for a __PLACEHOLDER__ token
+    loader = _LOADER.replace("__THREE_SRC__", json.dumps(_THREE_JS))
+    loader = loader.replace("__ORBIT_SRC__", json.dumps(_ORBIT_JS))
+    return html.replace("__LOADER__", loader)
+
 
 _TEMPLATE = """<!DOCTYPE html>
 <html>
@@ -20,15 +67,8 @@ _TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div id="info">__COUNT__ voxels — drag to orbit, scroll to zoom</div>
-<script type="importmap">
-{ "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
 <script type="module">
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+__LOADER__
 
 const VOXELS = __VOXELS__;
 
@@ -63,7 +103,14 @@ const spanX=maxX-minX+1, spanY=maxY-minY+1, spanZ=maxZ-minZ+1;
 const span = Math.max(spanX, spanY, spanZ, 1);
 
 const geometry = new THREE.BoxGeometry(1, 1, 1);
-const material = new THREE.MeshLambertMaterial({ vertexColors: true, color: 0xffffff });
+// no `vertexColors: true` here: that flag expects a per-vertex `color`
+// geometry attribute, which this BoxGeometry never has, and WebGL treats
+// an enabled-but-unbound attribute as all-zero — that silently zeroed out
+// every voxel's color (multiplying the correct per-instance color by 0),
+// rendering solid black regardless of the real instanceColor data below.
+// InstancedMesh.setColorAt's per-instance color applies automatically
+// without this flag.
+const material = new THREE.MeshLambertMaterial({ color: 0xffffff });
 const mesh = new THREE.InstancedMesh(geometry, material, VOXELS.length);
 
 const dummy = new THREE.Object3D();
@@ -118,7 +165,7 @@ def build_viewer_html(voxels: list[Voxel]) -> str:
     payload = [{"x": x, "y": y, "z": z, "color": c} for x, y, z, c in voxels]
     html = _TEMPLATE.replace("__VOXELS__", json.dumps(payload))
     html = html.replace("__COUNT__", str(len(voxels)))
-    return html
+    return _inject_loader(html)
 
 
 _MESH_TEMPLATE = """<!DOCTYPE html>
@@ -135,15 +182,8 @@ _MESH_TEMPLATE = """<!DOCTYPE html>
 </head>
 <body>
 <div id="info">__COUNT__ triangles — drag to orbit, scroll to zoom</div>
-<script type="importmap">
-{ "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
-} }
-</script>
 <script type="module">
-import * as THREE from "three";
-import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+__LOADER__
 
 const VERTS = __VERTS__;   // flat [x,y,z, x,y,z, ...]
 const FACES = __FACES__;   // flat [i,j,k, i,j,k, ...]
@@ -224,4 +264,4 @@ def build_mesh_viewer_html(vertices: list[tuple[float, float, float]],
     html = html.replace("__FACES__", json.dumps(flat_faces))
     html = html.replace("__COLOR__", json.dumps(color))
     html = html.replace("__COUNT__", str(len(faces)))
-    return html
+    return _inject_loader(html)
