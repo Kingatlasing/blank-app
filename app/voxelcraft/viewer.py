@@ -214,8 +214,16 @@ geometry.computeVertexNormals();
 
 // flat (faceted) shading — this is what makes the low-poly planes
 // actually read as distinct facets, matching the reference sculpt style,
-// instead of Three.js smoothing them into a fake-smooth blob
-const material = new THREE.MeshStandardMaterial({ color: COLOR, flatShading: true, roughness: 0.85 });
+// instead of Three.js smoothing them into a fake-smooth blob.
+// side: DoubleSide — this mesh is decimated from a hand-sculpted, edited
+// reference (male_head.json), and single-sided rendering (the default)
+// silently culls any triangle whose winding doesn't match its neighbors,
+// which shows up as a solid-black hole punched through the face wherever
+// that happens (reported by a user as "holes on the right side of the
+// face"). Double-siding costs nothing visible on a closed, low-poly head
+// and removes this whole class of bug regardless of any future edits to
+// the underlying mesh data.
+const material = new THREE.MeshStandardMaterial({ color: COLOR, flatShading: true, roughness: 0.85, side: THREE.DoubleSide });
 const mesh = new THREE.Mesh(geometry, material);
 scene.add(mesh);
 
