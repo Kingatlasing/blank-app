@@ -1,1 +1,5 @@
 streamlit
+pillow
+requests
+numpy
+mediapipe
