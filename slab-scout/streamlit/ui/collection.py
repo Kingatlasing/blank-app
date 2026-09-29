@@ -5,7 +5,7 @@ import json
 
 import streamlit as st
 
-from ui.common import (VERDICTS, collection, current_value, esc, grade_color, money, need_code, open_card, rarity_pill,
+from ui.common import (record_image, VERDICTS, collection, current_value, esc, grade_color, money, need_code, open_card, rarity_pill,
                        remove_from_collection, tile)
 
 
@@ -57,7 +57,7 @@ def _grid(recs: list[dict], which: str):
         elif g.get("label"):
             pills += f"<span class='pill green'>{esc(g['label'])}</span>"
         with cols[i % 3]:
-            st.markdown(tile(k.get("name", ""), f"{k.get('set','')} · {k.get('rarity') or k.get('variant') or ''}", money(current_value(r) or None), r.get("thumb"), pills), unsafe_allow_html=True)
+            st.markdown(tile(k.get("name", ""), f"{k.get('set','')} · {k.get('rarity') or k.get('variant') or ''}", money(current_value(r) or None), r.get("thumb"), pills, record_image(r)), unsafe_allow_html=True)
             with st.popover("More", width="stretch"):
                 key = (r.get("match") or {}).get("catalog_key")
                 if key and st.button("Open card page", key=f"o_{r['id']}"):

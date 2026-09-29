@@ -35,6 +35,7 @@ class Card:
     psa9: float | None
     psa10: float | None
     path: str
+    img: str = ""  # price-guide photo id; "~id" = photo of another parallel of the same card
 
     @property
     def key(self) -> str:
@@ -42,9 +43,9 @@ class Card:
 
     @property
     def label(self) -> str:
-        v = f" [{self.variant}]" if self.variant else ""
-        n = f" #{self.number}" if self.number else ""
-        return f"{self.name}{v}{n}"
+        pr = (" 1 of 1" if self.print_run == 1 else f" /{self.print_run}") if self.print_run else ""
+        parts = [self.name, (self.variant or "Base") + pr, f"#{self.number}" if self.number else ""]
+        return " · ".join(p for p in parts if p)
 
 
 @lru_cache(maxsize=1)
@@ -159,6 +160,14 @@ def value(card: Card) -> tuple[float | None, bool]:
     t = tier(card) or {}
     v = t.get("ebay_median") or t.get("median_raw")
     return (float(v), True) if v else (None, False)
+
+
+def image_url(card: Card, size: int = 240) -> tuple[str, bool]:
+    """(url, is_other_parallel). Sizes: 60, 240, 1600."""
+    if not card.img:
+        return "", False
+    other = card.img.startswith("~")
+    return f"https://storage.googleapis.com/images.pricecharting.com/{card.img.lstrip('~')}/{size}.jpg", other
 
 
 def price_url(card: Card) -> str:

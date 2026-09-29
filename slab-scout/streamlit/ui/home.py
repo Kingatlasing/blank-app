@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from core import catalog
-from ui.common import collection, current_value, esc, money, need_code, open_card, portfolio_history, rarity_pill, tile
+from ui.common import card_image, record_image, collection, current_value, esc, money, need_code, open_card, portfolio_history, rarity_pill, tile
 
 
 def page():
@@ -57,7 +57,7 @@ def _grid(recs: list[dict], tag: str):
         k = r.get("card", {})
         with cols[i % 3]:
             st.markdown(tile(k.get("name", ""), f"{k.get('set','')} {('#' + k['number']) if k.get('number') else ''}",
-                             money(current_value(r) or None), r.get("thumb"), rarity_pill(r.get("print_run"))), unsafe_allow_html=True)
+                             money(current_value(r) or None), r.get("thumb"), rarity_pill(r.get("print_run")), record_image(r)), unsafe_allow_html=True)
             key = (r.get("match") or {}).get("catalog_key")
             if key and st.button("View", key=f"h_{tag}_{r['id']}", width="stretch"):
                 open_card(key)
@@ -73,6 +73,6 @@ def _discover():
     sets = catalog.sets()
     for i, c in enumerate(top):
         with cols[i % 3]:
-            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'}", money(c.raw), None, rarity_pill(c.print_run)), unsafe_allow_html=True)
+            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'}", money(c.raw), None, rarity_pill(c.print_run), card_image(c)), unsafe_allow_html=True)
             if st.button("View", key=f"d_{i}", width="stretch"):
                 open_card(c.key)

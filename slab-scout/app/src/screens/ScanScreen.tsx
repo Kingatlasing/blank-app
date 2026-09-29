@@ -1,12 +1,14 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, LayoutRectangle, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, LayoutRectangle, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import Slider from '@react-native-community/slider';
 import { C, S, money } from '../theme';
 import type { Settings } from '../types';
 import { Btn, Chip, LinkRow, Section, Slab, Thumb, Verdict } from '../components/ui';
-import { Candidate, DB_GAMES, searchAll, soldLinks } from '../core/databases';
+import { Candidate, DB_GAMES, soldLinks } from '../core/databases';
+import { identify, Scored } from '../core/identify';
+import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
 import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate } from '../core/grading';
 import { Centering, centeringText, centeringWorst, cropAndTrim, fingerprintCard, fingerprintRemote, hashDistance, measureCentering, thumbnail } from '../core/imageTools';
@@ -52,7 +54,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [rawText, setRawText] = useState('');
   const [setCode, setSetCode] = useState('');
   const [community, setCommunity] = useState<CatalogRow[]>([]);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
+  const [candidates, setCandidates] = useState<Scored[]>([]);
+  const [slab, setSlab] = useState<SlabInfo | null>(null);
   const [fields, setFields] = useState<CardFields>(EMPTY);
   const [source, setSource] = useState('');
   const [chosen, setChosen] = useState<Candidate | null>(null);
@@ -126,8 +129,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   }
 
   /* ---------- analysis ---------- */
-  async function findCandidates(name: string, number: string, code: string, g: string, cardUri: string) {
-    const list = await searchAll(name, number, code, g);
+  async function findCandidates(name: string, number: string, code: string, g: string, cardUri: string, lines: string[] = [], rawText = '') {
+    const list: Scored[] = await identify(lines.length ? lines : [name, number].filter(Boolean), rawText || `${name}\n${number}`, name, number, code, g);
     const mine = await fingerprintCard(cardUri);
     await Promise.all(
       list.slice(0, 6).map(async (c) => {
@@ -135,7 +138,9 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         c.official_distance = off ? hashDistance(mine, off) : null;
       }),
     );
-    list.sort((a, b) => (a.official_distance ?? 99) - (b.official_distance ?? 99));
+    // text evidence first; a matching artwork adds a little, a clearly different one takes a little away
+    const adj = (c: Scored) => c.score + (c.official_distance != null ? (c.official_distance <= 12 ? 8 : c.official_distance > 26 ? -12 : 0) : 0);
+    list.sort((a, b) => adj(b) - adj(a));
     return list;
   }
 
@@ -145,7 +150,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setChosen(null);
     setSource('card database');
   }
-  function pickCandidate(c: Candidate) {
+  function pickCandidate(c: Scored) {
     setCatPick(null);
     setFields({ game: c.game, name: c.name, set: c.set, number: c.number, year: c.year, brand: c.brand, rarity: c.rarity, variant: c.variant, card_type: TYPES.includes(c.card_type) ? c.card_type : 'Other' });
     setChosen(c);
@@ -177,6 +182,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       setProgress('Reading the text on the card…');
       const lines = await readText(front.uri);
       const parsed = parseText(lines, game === 'Auto' ? '' : game);
+      const sl = readLabel(lines);
+      setSlab(sl);
+      if (sl) {
+        parsed.name = nameGuess(sl) || parsed.name;
+        parsed.number = sl.number || parsed.number;
+        parsed.year = sl.year || parsed.year;
+        if (/POK[EÉ]MON/.test(sl.desc.toUpperCase())) parsed.game = 'Pokémon';
+      }
       setRawText(parsed.rawText);
       setSetCode(parsed.setCode);
       const g = game === 'Auto' ? parsed.game : game;
@@ -194,7 +207,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       let f: CardFields = { ...EMPTY, game: g, name: parsed.name, number: parsed.number || parsed.setCode, year: parsed.year, brand: parsed.brand, variant: parsed.serial ? `Serial ${parsed.serial}` : '' };
       let src = parsed.name ? 'text' : '';
-      let pick: Candidate | null = null;
+      let pick: Scored | null = null;
       const strong = comm.find((c) => !c.is_fake && c.distance! <= MATCH_STRONG);
       if (strong) {
         f = { game: strong.game, name: strong.name, set: strong.set_name, number: strong.number, year: strong.year, brand: strong.brand, rarity: strong.rarity, variant: strong.variant, card_type: strong.card_type || 'Base' };
@@ -215,12 +228,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         }
       }
 
-      let cands: Candidate[] = [];
+      let cands: Scored[] = [];
       if (!cat && (!g || DB_GAMES.includes(g)) && (f.name || f.number)) {
         setProgress('Searching free card databases…');
-        cands = await findCandidates(f.name, f.number, parsed.setCode, g, front.uri);
+        cands = await findCandidates(f.name, f.number, parsed.setCode, g, front.uri, sl ? sl.descLines : lines, sl ? sl.desc : parsed.rawText);
         const best = cands[0];
-        if (best && best.official_distance != null && best.official_distance <= OFFICIAL_OK && src !== 'community') {
+        if (best && (best.score >= 45 || (best.official_distance != null && best.official_distance <= OFFICIAL_OK)) && src !== 'community') {
           pick = best;
         }
       }
@@ -278,6 +291,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setBack(null);
     setSide('front');
     setCandidates([]);
+    setSlab(null);
     setCommunity([]);
     setCatHits([]);
     setCatPick(null);
@@ -461,9 +475,19 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           {error ? <View style={S.banner}><Text style={[S.body, { color: C.warn }]}>{error}</Text></View> : null}
 
           <View style={[S.card, { gap: 8 }]}>
+            {slab ? (
+              <View style={{ backgroundColor: C.surface2, borderRadius: 10, padding: 10, gap: 4 }}>
+                <Text style={S.eyebrow}>Graded slab · {slab.company}</Text>
+                <Text style={{ color: C.good, fontSize: 30, fontWeight: '800' }}>{gradeText(slab)}</Text>
+                <Text style={S.muted}>Cert #{slab.cert || 'not read'}{slab.desc ? ` · ${slab.desc.slice(0, 80)}` : ''}</Text>
+                {slab.lookup ? <Btn label={`Verify cert on ${slab.company} ↗`} onPress={() => Linking.openURL(slab.lookup).catch(() => {})} /> : null}
+              </View>
+            ) : null}
             <Text style={S.eyebrow}>{fields.name ? `Best match · ${source || 'your details'}` : 'No match yet'}</Text>
             <Text style={S.h2}>{fields.name || 'Type the name below, or turn on the AI boost'}</Text>
-            <Text style={S.muted}>{[fields.year, fields.set, fields.number && `#${fields.number}`].filter(Boolean).join(' · ')}</Text>
+            <Text style={S.muted}>{[fields.rarity, fields.set, fields.number && `#${fields.number}`, fields.year].filter(Boolean).join(' · ')}</Text>
+            {chosen && (chosen as Scored).why?.length ? <Text style={[S.muted, { fontSize: 12 }]}>Matched on: {(chosen as Scored).why.join(' · ')}</Text> : null}
+            {chosen && (chosen as Scored).score < 50 ? <Text style={[S.body, { color: C.warn }]}>Not sure about this one. Check the name and number, or pick another match below.</Text> : null}
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
               {fields.rarity ? <Chip gold label={fields.rarity} /> : null}
               <RarityChip printRun={catPick?.printRun} />

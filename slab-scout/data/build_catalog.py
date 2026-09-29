@@ -61,6 +61,34 @@ SET_NOTES = {
 }
 
 
+COLORS = r"(red|blue|green|gold|silver|black|orange|purple|pink|yellow|white|bronze|teal|aqua)"
+TAGS = re.compile(r"\[\s*(RC|TE|QB|WR|RB|DE|LB|CB|S|K|P|OL|DL|TE)\s*\]", re.I)
+
+
+def clean_name(name: str, variant: str, pr):
+    """Tidy listing titles into a real card name: 'Brock Bowers [ TE ] [ RC ]' -> 'Brock Bowers',
+    'CJ Stroud [ Rookie Heat Blue] /25' -> 'CJ Stroud' + 'Rookie Heat Blue' /25, 'Mac jones red' -> 'Mac Jones' + 'Red'."""
+    n = TAGS.sub("", name)
+    m = re.search(r"\s*/\s*(\d{1,4})\s*$", n)
+    if m:
+        pr = pr or m.group(1)
+        n = n[: m.start()]
+    if "[" in n:  # unclosed or extra bracket: the rest is the parallel
+        n, extra = n.split("[", 1)
+        extra = extra.replace("]", "").strip()
+        variant = variant or extra
+    m = re.search(rf"\s+{COLORS}$", n)
+    if m and n[m.start():].strip().islower():  # lower-case trailing color = parallel typed into the title
+        variant = variant or m.group(1).title()
+        n = n[: m.start()]
+    n = re.sub(r"\s+", " ", n).strip(" -,")
+    if n and n == n.lower():
+        n = n.title()
+    elif n and re.fullmatch(r"[A-Z][a-z]+ [a-z]+", n):  # 'Mac jones'
+        n = n.title()
+    return n or name, re.sub(r"\s+", " ", variant).strip(), pr
+
+
 def slug_meta(slug: str, title: str) -> dict:
     s = slug.lower()
     year = (re.search(r"(19|20)\d\d", s) or [""])[0]
@@ -124,6 +152,7 @@ def build():
             name = (m.group("name") or t).strip() if m else t
             variant = (m.group("variant") or "").strip() if m else ""
             number = (m.group("num") or "").strip() if m else ""
+            name, variant, pr = clean_name(name, variant, pr)
             if re.search(r"\b(box|pack|case|blaster|hanger)\b", t, re.I) and not number:
                 continue  # sealed product rows
             prun = int(pr) if str(pr).isdigit() else None
@@ -219,7 +248,31 @@ def build():
                 t["ebay_n"] = v["n"]
                 t["ebay_query"] = q
     json.dump(sorted(sets.values(), key=lambda s: (s["brand"], s["category"], s["name"])), open(os.path.join(OUT, "sets.json"), "w"), separators=(",", ":"))
-    json.dump({"fields": ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path"], "rows": cards}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
+    # Card photos: raw/slabscout-images*.json maps price-guide path -> image id. Parallels without their own
+    # photo borrow a sibling's (same subject + card number in the same set), flagged with a leading "~".
+    imgs = {}
+    for f in glob.glob(os.path.join(HERE, "raw", "slabscout-images*.json")):
+        imgs.update({k: v for k, v in json.load(open(f)).items() if v})
+    by_sib = {}
+    for r in cards:
+        h = imgs.get(r[8])
+        if h:
+            base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
+            by_sib.setdefault((r[0], r[1], base), h)
+            by_sib.setdefault((r[0], r[1], ""), h)
+    n_own = n_sib = 0
+    for r in cards:
+        h = imgs.get(r[8], "")
+        if h:
+            n_own += 1
+        else:
+            base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
+            sib = by_sib.get((r[0], r[1], base)) or by_sib.get((r[0], r[1], ""))
+            if sib:
+                h, n_sib = "~" + sib, n_sib + 1
+        r.append(h)
+    print(f"photos: {n_own} own, {n_sib} from another parallel, {len(cards) - n_own - n_sib} none")
+    json.dump({"fields": ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path", "img"], "rows": cards}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
     json.dump(sales_out, open(os.path.join(OUT, "sales.json"), "w"), separators=(",", ":"))
     print(f"{len(sets)} sets, {len(cards)} cards, {len(sales_out)} eBay searches")
     for s in sorted(sets.values(), key=lambda s: -s["cards"])[:8]:

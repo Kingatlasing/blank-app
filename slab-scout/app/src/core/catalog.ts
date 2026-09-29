@@ -47,6 +47,8 @@ export interface Card {
   psa10: number | null;
   path: string;
   key: string;
+  /** price-guide photo id; '~id' = photo of another parallel of the same card */
+  img: string;
 }
 
 export interface SoldListing {
@@ -70,8 +72,8 @@ function load() {
   const setsRaw: SetInfo[] = require('../../assets/catalog/sets.json');
   const cardsRaw: { fields: string[]; rows: any[][] } = require('../../assets/catalog/cards.json');
   _sets = Object.fromEntries(setsRaw.map((s) => [s.id, s]));
-  _cards = cardsRaw.rows.map(([setId, name, number, variant, printRun, raw, psa9, psa10, path]) => ({
-    setId, name, number: number || '', variant: variant || '', printRun, raw, psa9, psa10, path: path || '',
+  _cards = cardsRaw.rows.map(([setId, name, number, variant, printRun, raw, psa9, psa10, path, img]) => ({
+    setId, name, number: number || '', variant: variant || '', printRun, raw, psa9, psa10, path: path || '', img: img || '',
     key: cardKeyOf(setId, number || '', variant || '', name),
   }));
   _byKey = new Map(_cards.map((c) => [c.key, c]));
@@ -196,6 +198,12 @@ export function value(card: Card): [number | null, boolean] {
   const t = tier(card);
   const v = t?.ebay_median || t?.median_raw;
   return v ? [v, true] : [null, false];
+}
+
+/** [url, isAnotherParallel]. Sizes: 60, 240, 1600. */
+export function imageUrl(card: Card | null | undefined, size = 240): [string, boolean] {
+  if (!card?.img) return ['', false];
+  return [`https://storage.googleapis.com/images.pricecharting.com/${card.img.replace(/^~/, '')}/${size}.jpg`, card.img.startsWith('~')];
 }
 
 export function priceUrl(card: Card): string {

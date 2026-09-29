@@ -229,15 +229,26 @@ def portfolio_history(total: float) -> list[dict]:
 
 
 # ---------------- tiles ----------------
-def thumb_html(b64: str | None, label: str = "") -> str:
+def thumb_html(b64: str | None, label: str = "", url: str = "") -> str:
+    style = "width:100%;aspect-ratio:63/88;object-fit:contain;border-radius:8px;background:#20252E"
+    if url:  # the official photo looks best in grids; fall back to the person's own scan
+        return f'<img src="{esc(url)}" loading="lazy" style="{style}" alt="{esc(label)}">'
     if b64:
-        return f'<img src="data:image/jpeg;base64,{b64}" style="width:100%;aspect-ratio:63/88;object-fit:cover;border-radius:8px">'
+        return f'<img src="data:image/jpeg;base64,{b64}" style="{style}">'
     return f'<div class="ph">{esc(label)[:40]}</div>'
 
 
-def tile(title: str, sub: str, price: str, thumb: str | None = None, pills: str = "") -> str:
-    return (f'<div class="tile">{thumb_html(thumb, title)}<div class="nm">{esc(title)}</div>'
+def tile(title: str, sub: str, price: str, thumb: str | None = None, pills: str = "", url: str = "") -> str:
+    return (f'<div class="tile">{thumb_html(thumb, title, url)}<div class="nm">{esc(title)}</div>'
             f'<div class="sub">{esc(sub)}</div><div>{pills}</div><div class="px">{price}</div></div>')
+
+
+def card_image(c, size: int = 240) -> str:
+    return catalog.image_url(c, size)[0] if c else ""
+
+
+def record_image(rec: dict, size: int = 240) -> str:
+    return card_image(catalog_card((rec.get("match") or {}).get("catalog_key", "")), size) or (rec.get("match") or {}).get("image_url", "")
 
 
 def price_label(c) -> str:

@@ -19,6 +19,7 @@ def analyze_photo(data: bytes) -> dict:
     card, found = vision.detect_and_crop(img)
     lines = ocr.read_text(card)
     return {
+        "full": img,
         "card": card,
         "found": found,
         "lines": lines,
@@ -51,13 +52,14 @@ def official_similarity(card_img: Image.Image, candidates: list[dict]) -> None:
             return None
         try:
             off = Image.open(io.BytesIO(raw)).convert("RGB").resize((vision.CARD_W, vision.CARD_H))
-            return vision.hash_distance(vision.fingerprint(card_img), vision.fingerprint(off))
+            return vision.hash_distance(vision.fingerprint(card_img), vision.fingerprint(off)), off
         except Exception:
             return None
 
     with ThreadPoolExecutor(max_workers=6) as ex:
-        for c, d in zip(candidates, ex.map(one, candidates)):
-            c["official_distance"] = d
+        for c, r in zip(candidates, ex.map(one, candidates)):
+            c["official_distance"] = r[0] if r else None
+            c["_official"] = r[1] if r else None  # kept for the error / fading check
 
 
 def authenticity_signals(candidate: dict | None, fake_matches: list[dict], ai_auth: dict | None) -> dict:

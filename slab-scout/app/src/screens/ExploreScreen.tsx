@@ -3,7 +3,7 @@ import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { C, S } from '../theme';
 import { ChipRow, Grid, RarityChip, Tile } from '../components/cards';
 import { useApp } from '../appContext';
-import { printRunLabel, search, sets, value } from '../core/catalog';
+import { imageUrl, printRunLabel, search, sets, value } from '../core/catalog';
 import { money } from '../theme';
 
 export default function ExploreScreen() {
@@ -30,7 +30,7 @@ export default function ExploreScreen() {
           <Grid>
             {hits.map((c) => {
               const [v, est] = value(c);
-              return <Tile key={c.key} title={c.name} sub={`${all[c.setId]?.name || ''} · ${c.variant || 'Base'} · #${c.number}`} price={v ? `${est ? '~' : ''}${money(v)}` : '—'} printRun={c.printRun} onPress={() => app.openCard(c.key)} />;
+              return <Tile key={c.key} title={c.name} sub={`${all[c.setId]?.name || ''} · ${c.variant || 'Base'} · #${c.number}`} price={v ? `${est ? '~' : ''}${money(v)}` : '—'} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />;
             })}
           </Grid>
         </>

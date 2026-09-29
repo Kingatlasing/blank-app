@@ -3,8 +3,10 @@
 PSA centering limits (front / back), from PSA's published grading standards:
   10: 55/45 / 75/25   9: 60/40 / 90/10   8: 65/35 / 90/10   7: 70/30 / 90/10
    6: 80/20 / 90/10   5: 85/15 / 90/10   4: 85/15 / 90/10   3: 90/10 / 90/10
-TAG publishes a 1000-point score; the bands below are an approximation used
-for an estimate, not TAG's official conversion.
+TAG score bands (taggrading.com/pages/scale): 990-1000 Pristine 10, 950-989 Gem Mint 10, 900-949 9,
+then 50-point bands per half grade down to 100-149 = 1. TAG front centering: Pristine ~51/49,
+Gem Mint ~55/45, 9 ~60/40, 8.5 ~62.5/37.5, 8 ~65/35, then +2.5 per half grade. How TAG turns its
+8 subgrades into a score isn't published, so the TAG number here is an estimate.
 """
 from __future__ import annotations
 
@@ -27,8 +29,12 @@ CONDITION_HELP = {
 }
 
 TAG_BANDS = [(990, "10", "Pristine"), (950, "10", "Gem Mint"), (900, "9", "Mint"), (850, "8.5", "NM-MT+"),
-             (800, "8", "NM-MT"), (750, "7.5", "NM+"), (700, "7", "NM"), (600, "6", "EX-MT"),
-             (500, "5", "EX"), (400, "4", "VG-EX"), (300, "3", "VG"), (200, "2", "Good"), (0, "1", "Poor")]
+             (800, "8", "NM-MT"), (750, "7.5", "NM+"), (700, "7", "NM"), (650, "6.5", "EX-MT+"), (600, "6", "EX-MT"),
+             (550, "5.5", "EX+"), (500, "5", "EX"), (450, "4.5", "VG-EX+"), (400, "4", "VG-EX"), (350, "3.5", "VG+"),
+             (300, "3", "VG"), (250, "2.5", "Good+"), (200, "2", "Good"), (150, "1.5", "Fair"), (0, "1", "Poor")]
+# TAG front centering limit (larger side %) per grade
+TAG_CENTER = [(10.5, 51), (10, 55), (9, 60), (8.5, 62.5), (8, 65), (7.5, 67.5), (7, 70), (6.5, 72.5), (6, 75),
+              (5.5, 77.5), (5, 80), (4.5, 82.5), (4, 85), (3.5, 87.5), (3, 90), (2, 95), (1.5, 98.33)]
 
 
 def psa_centering_cap(front_worst: int | None, back_worst: int | None) -> int:
@@ -42,13 +48,13 @@ def psa_centering_cap(front_worst: int | None, back_worst: int | None) -> int:
 
 
 def centering_subgrade(front_worst: int | None, back_worst: int | None) -> float:
+    """TAG-style centering subgrade from the front split (10.5 stands for Pristine)."""
     if front_worst is None:
         return 9.0
-    cap = psa_centering_cap(front_worst, back_worst)
-    # Finer steps inside a band so 51/49 beats 55/45.
-    if cap == 10:
-        return 10.0 if front_worst <= 52 else 9.5
-    return float(cap)
+    for g, lim in TAG_CENTER:
+        if front_worst <= lim:
+            return min(g, 10.0) if g <= 10 else 10.0
+    return 1.0
 
 
 def tag_from_subs(subs: dict[str, float]) -> tuple[int, str, str]:
@@ -64,17 +70,19 @@ def tag_from_subs(subs: dict[str, float]) -> tuple[int, str, str]:
     return score, "1", "Poor"
 
 
-def estimate(front_worst: int | None, back_worst: int | None, corners: str, edges: str, surface: str) -> dict:
+def estimate(front_worst: int | None, back_worst: int | None, corners, edges, surface) -> dict:
+    """corners / edges / surface: a checklist answer ("Light wear") or a measured subgrade (8.0)."""
+    val = lambda v: float(v) if isinstance(v, (int, float)) else CONDITION_OPTIONS.get(v, 9.0)
     subs = {
         "centering": centering_subgrade(front_worst, back_worst),
-        "corners": CONDITION_OPTIONS.get(corners, 9.0),
-        "edges": CONDITION_OPTIONS.get(edges, 9.0),
-        "surface": CONDITION_OPTIONS.get(surface, 9.0),
+        "corners": val(corners),
+        "edges": val(edges),
+        "surface": val(surface),
     }
     cond = min(subs["corners"], subs["edges"], subs["surface"])
     cap = psa_centering_cap(front_worst, back_worst)
     # PSA: a card is graded by its weakest attribute; allow one tiny flaw at 9.
-    psa = min(cap, 10 if cond >= 10 else 9 if cond >= 9 else 8 if cond >= 8 else 6 if cond >= 6.5 else 4 if cond >= 4 else 2)
+    psa = min(cap, 10 if cond >= 10 else int(max(1, cond)))
     low = max(1, psa - 1)
     high = min(10, psa + (1 if cond >= 9 and cap > psa else 0))
     score, tag_grade, tag_label = tag_from_subs(subs)

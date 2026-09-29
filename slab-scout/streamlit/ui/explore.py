@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from core import catalog
-from ui.common import price_label, collection, esc, money, need_code, open_card, open_set, rarity_pill, tile
+from ui.common import card_image, price_label, collection, esc, money, need_code, open_card, open_set, rarity_pill, tile
 
 
 def page():
@@ -53,7 +53,7 @@ def _card_grid(cards: list, cols_n: int = 3):
     cols = st.columns(cols_n)
     for i, c in enumerate(cards):
         with cols[i % cols_n]:
-            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'} · #{c.number}", price_label(c), None, rarity_pill(c.print_run)), unsafe_allow_html=True)
+            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'} · #{c.number}", price_label(c), None, rarity_pill(c.print_run), card_image(c)), unsafe_allow_html=True)
             if st.button("View", key=f"g_{c.key}", width="stretch"):
                 open_card(c.key)
 

@@ -7,7 +7,7 @@ import type { VaultRecord } from '../core/community';
 import { soldLinks } from '../core/databases';
 import { Grid, Segmented, Tile } from '../components/cards';
 import { useApp } from '../appContext';
-import { currentValue } from '../core/portfolio';
+import { currentValue, recordImage } from '../core/portfolio';
 
 type Group = 'brand' | 'type' | 'category' | 'value';
 const GROUPS: [Group, string][] = [['brand', 'Brand'], ['type', 'Type'], ['category', 'Category'], ['value', 'Value']];
@@ -85,7 +85,7 @@ export default function VaultScreen() {
             ) : null}
             <Grid>
               {sec.items.map((c) => (
-                <Tile key={c.id} title={c.card?.name} sub={[c.card?.set, c.card?.rarity].filter(Boolean).join(' · ')} price={money(rawOf(c) || undefined)} thumb={c.thumb} printRun={c.print_run}
+                <Tile key={c.id} title={c.card?.name} sub={[c.card?.set, c.card?.rarity].filter(Boolean).join(' · ')} price={money(rawOf(c) || undefined)} thumb={c.thumb} uri={recordImage(c)} printRun={c.print_run}
                   badge={c.grade?.label || (c.grade?.psa != null ? `PSA ${c.grade.psa}` : undefined)} onPress={() => { setOpenId(c.id); setConfirmDel(false); }} />
               ))}
             </Grid>

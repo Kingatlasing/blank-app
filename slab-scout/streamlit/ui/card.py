@@ -24,8 +24,15 @@ def page():
     if nav[1].button("Set"):
         open_set(c.set_id)
 
-    st.markdown(f"### {esc(c.name)}")
-    st.markdown(f"{esc(s.get('name',''))} · #{esc(c.number)}  \n<span class='pill gold'>{esc(c.variant or 'Base')}</span>{rarity_pill(c.print_run)}"
+    img, other = catalog.image_url(c, 1600)
+    if img:
+        pic, info = st.columns([1, 1.6])
+        pic.image(img, width="stretch", caption="Photo of another parallel of this card" if other else None)
+        info_ctx = info
+    else:
+        info_ctx = st.container()
+    info_ctx.markdown(f"### {esc(c.name)}")
+    info_ctx.markdown(f"{esc(s.get('name',''))} · #{esc(c.number)}  \n<span class='pill gold'>{esc(c.variant or 'Base')}</span>{rarity_pill(c.print_run)}"
                 f"<span class='pill'>{esc(s.get('brand',''))}</span>", unsafe_allow_html=True)
 
     m = st.columns(3)

@@ -1,6 +1,6 @@
 /** Collection value helpers shared by the Portfolio, Collection, Card and Scan screens. */
 import type { VaultRecord } from './community';
-import { Card, getCard, oddsText, priceUrl, sets, tier, value } from './catalog';
+import { Card, getCard, imageUrl, oddsText, priceUrl, sets, tier, value } from './catalog';
 
 /** Latest catalog price when the record is linked to the card database, else the price saved at scan time. */
 export function currentValue(r: VaultRecord): number {
@@ -10,6 +10,11 @@ export function currentValue(r: VaultRecord): number {
     if (v) return v;
   }
   return Number(r.pricing?.raw?.mid) || 0;
+}
+
+/** Official photo for a record: the card database photo, else the matched database image. */
+export function recordImage(r: VaultRecord): string {
+  return imageUrl(getCard(r.match?.catalog_key))[0] || r.match?.image_url || '';
 }
 
 export const inCollection = (r: VaultRecord) => (r.list || 'collection') === 'collection';

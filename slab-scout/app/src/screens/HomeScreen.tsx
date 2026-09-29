@@ -4,8 +4,8 @@ import { C, S, money } from '../theme';
 import { Btn } from '../components/ui';
 import { Grid, Tile, ValueChart } from '../components/cards';
 import { useApp } from '../appContext';
-import { cards, sets, value } from '../core/catalog';
-import { currentValue, inCollection, today } from '../core/portfolio';
+import { cards, imageUrl, sets, value } from '../core/catalog';
+import { currentValue, inCollection, recordImage, today } from '../core/portfolio';
 
 export default function HomeScreen() {
   const app = useApp();
@@ -68,14 +68,14 @@ export default function HomeScreen() {
               <Text style={S.h2}>Most valuable</Text>
               <Grid>
                 {top.map((r) => (
-                  <Tile key={r.id} title={r.card?.name} sub={[r.card?.set, r.card?.number && `#${r.card.number}`].filter(Boolean).join(' ')} price={money(currentValue(r) || undefined)} thumb={r.thumb} printRun={r.print_run}
+                  <Tile key={r.id} title={r.card?.name} sub={[r.card?.set, r.card?.number && `#${r.card.number}`].filter(Boolean).join(' ')} price={money(currentValue(r) || undefined)} thumb={r.thumb} uri={recordImage(r)} printRun={r.print_run}
                     onPress={r.match?.catalog_key ? () => app.openCard(r.match.catalog_key!) : () => app.goTab('collection')} />
                 ))}
               </Grid>
               <Text style={S.h2}>Recently added</Text>
               <Grid>
                 {recent.map((r) => (
-                  <Tile key={r.id} title={r.card?.name} sub={r.card?.set} price={money(currentValue(r) || undefined)} thumb={r.thumb} printRun={r.print_run}
+                  <Tile key={r.id} title={r.card?.name} sub={r.card?.set} price={money(currentValue(r) || undefined)} thumb={r.thumb} uri={recordImage(r)} printRun={r.print_run}
                     onPress={r.match?.catalog_key ? () => app.openCard(r.match.catalog_key!) : () => app.goTab('collection')} />
                 ))}
               </Grid>
@@ -91,7 +91,7 @@ export default function HomeScreen() {
       <Text style={S.h2}>Top chase cards right now</Text>
       <Grid>
         {chase.map((c) => (
-          <Tile key={c.key} title={c.name} sub={`${allSets[c.setId]?.name || ''} · ${c.variant || 'Base'}`} price={money(value(c)[0] ?? undefined)} printRun={c.printRun} onPress={() => app.openCard(c.key)} />
+          <Tile key={c.key} title={c.name} sub={`${allSets[c.setId]?.name || ''} · ${c.variant || 'Base'}`} price={money(value(c)[0] ?? undefined)} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />
         ))}
       </Grid>
     </ScrollView>

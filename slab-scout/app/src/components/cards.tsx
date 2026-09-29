@@ -14,11 +14,11 @@ export function RarityChip({ printRun }: { printRun?: number | null }) {
   );
 }
 
-export function Tile({ title, sub, price, thumb, printRun, onPress, badge }: { title: string; sub?: string; price: string; thumb?: string; printRun?: number | null; onPress?: () => void; badge?: string }) {
+export function Tile({ title, sub, price, thumb, uri, printRun, onPress, badge }: { title: string; sub?: string; price: string; thumb?: string; uri?: string; printRun?: number | null; onPress?: () => void; badge?: string }) {
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [st.tile, pressed && { opacity: 0.7 }]}>
-      {thumb ? (
-        <Image source={{ uri: `data:image/jpeg;base64,${thumb}` }} style={st.img} />
+      {uri || thumb ? (
+        <Image source={{ uri: uri || `data:image/jpeg;base64,${thumb}` }} style={[st.img, { resizeMode: 'contain', backgroundColor: C.surface2 }]} />
       ) : (
         <View style={st.ph}>
           <Text style={st.phText} numberOfLines={3}>{title}</Text>

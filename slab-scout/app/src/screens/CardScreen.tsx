@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { C, S, money } from '../theme';
 import { Btn, LinkRow } from '../components/ui';
 import { ChipRow, Header, RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
-import { getCard, oddsText, priceUrl, printRunLabel, relatedSales, sets, siblings, tier, value } from '../core/catalog';
+import { getCard, imageUrl, oddsText, priceUrl, printRunLabel, relatedSales, sets, siblings, tier, value } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import type { Sale } from '../core/community';
 
@@ -58,6 +58,12 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
   return (
     <ScrollView style={S.screen} contentContainerStyle={[S.pad, { paddingBottom: 50 }]} keyboardShouldPersistTaps="handled">
       <Header onBack={onBack} right={<Pressable onPress={() => app.openSet(c.setId)}><Text style={{ color: C.accent, fontWeight: '700' }}>Set ›</Text></Pressable>} />
+      {imageUrl(c, 1600)[0] ? (
+        <View style={{ alignItems: 'center', gap: 4 }}>
+          <Image source={{ uri: imageUrl(c, 1600)[0] }} style={{ width: '62%', aspectRatio: 63 / 88, borderRadius: 10, resizeMode: 'contain', backgroundColor: C.surface2 }} />
+          {imageUrl(c)[1] ? <Text style={S.muted}>Photo of another parallel of this card</Text> : null}
+        </View>
+      ) : null}
       <View style={{ gap: 6 }}>
         <Text style={S.h1}>{c.name}</Text>
         <Text style={S.muted}>{s.name} · #{c.number}</Text>
