@@ -66,7 +66,7 @@ def _line_quads(gray: np.ndarray, max_quads: int = 80) -> list:
     if segs is None:
         return []
     V, Hs = [], []
-    for x1, y1, x2, y2 in segs[:, 0]:
+    for x1, y1, x2, y2 in np.asarray(segs).reshape(-1, 4):  # OpenCV 4 gives (N,1,4), OpenCV 5 (N,4)
         ang = np.degrees(np.arctan2(y2 - y1, x2 - x1)) % 180
         L = float(np.hypot(x2 - x1, y2 - y1))
         if min(x1, x2) < 3 or max(x1, x2) > w - 4 or min(y1, y2) < 3 and max(y1, y2) < 3 or min(y1, y2) > h - 4:

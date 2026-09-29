@@ -47,6 +47,28 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
         words = [w for w in identify.norm(c.name).split() if len(w) >= 3]
         if words and all(f" {w} " in text_n for w in words) and (parsed.get("game") or "") not in identify.TCG_GAMES:
             cands.append({"kind": "catalog", "card": c, "score": 62, "why": [f"name {c.name} ✓"]})
+    # 1b. Photo match against the price-guide photos (sports / non-sport cards): picks the exact card and
+    #     parallel among the name matches, or among the player's cards when only the name was read
+    if not code_hit and (parsed.get("game") or "") not in identify.TCG_GAMES and g not in identify.TCG_GAMES:
+        pool = []
+        for x in cands:
+            if x["kind"] == "catalog":
+                pool += [x["card"]] + catalog.siblings(x["card"])
+        if not pool and parsed.get("name"):
+            pool = catalog.search(parsed["name"], limit=40)
+        if pool:
+            pm = pipeline.catalog_photo_match(vision.tight_card(f["card"], f["edges"]), pool)
+            by_key = {x["card"].key: x for x in cands if x["kind"] == "catalog"}
+            for r in pm[:6]:
+                if r["distance"] > 24 and r["score"] < 55:
+                    continue  # doesn't look like it
+                bonus = 30 if r["distance"] <= 10 else 18 if r["distance"] <= 16 else 6
+                why = f"photo matches the price-guide picture ({r['distance']}/64 artwork, {r['colour'] * 100:.0f}% colours)"
+                if r["card"].key in by_key:
+                    by_key[r["card"].key]["score"] += bonus
+                    by_key[r["card"].key]["why"].append(why)
+                else:
+                    cands.append({"kind": "catalog", "card": r["card"], "score": 50 + bonus, "why": [why]})
     # 2. Community fingerprint matches (cards people confirmed before)
     for m in comm:
         if not m.get("is_fake"):

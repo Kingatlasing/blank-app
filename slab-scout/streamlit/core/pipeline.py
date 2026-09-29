@@ -63,6 +63,51 @@ def official_similarity(card_img: Image.Image, candidates: list[dict]) -> None:
             c["_official"] = r[1] if r else None  # kept for the error / fading check
 
 
+def _colour_hist(img: Image.Image):
+    import numpy as np
+    a = np.asarray(img.convert("HSV").resize((64, 90)), dtype=np.float32)
+    h, _ = np.histogramdd(a.reshape(-1, 3), bins=(12, 4, 4), range=((0, 256), (0, 256), (0, 256)))
+    h = h.ravel()
+    return h / max(h.sum(), 1)
+
+
+def catalog_photo_match(card_img: Image.Image, cards: list, size: int = 240, limit: int = 24) -> list[dict]:
+    """Compare the scanned card with price-guide photos of candidate catalog cards.
+    Returns [{card, distance (0-64, artwork), colour (0-1, same parallel colours), score}] best first.
+    Parallels usually share artwork but differ in colour, so both are used."""
+    from . import catalog
+    import numpy as np
+    seen, pool = set(), []
+    for c in cards:
+        if not c.img or c.img.startswith("~") or c.img in seen:
+            continue
+        seen.add(c.img)
+        pool.append(c)
+        if len(pool) >= limit:
+            break
+    if not pool:
+        return []
+    mine_fp = vision.fingerprint(card_img)
+    mine_h = _colour_hist(card_img)
+
+    def one(c):
+        raw = databases.fetch_image(catalog.image_url(c, size)[0])
+        if not raw:
+            return None
+        try:
+            off = Image.open(io.BytesIO(raw)).convert("RGB").resize((vision.CARD_W, vision.CARD_H))
+        except Exception:
+            return None
+        d = vision.hash_distance(mine_fp, vision.fingerprint(off))
+        col = float(np.minimum(mine_h, _colour_hist(off)).sum())  # histogram intersection
+        return {"card": c, "distance": d, "colour": round(col, 3), "score": round((1 - d / 64) * 70 + col * 30, 1)}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        out = [r for r in ex.map(one, pool) if r]
+    out.sort(key=lambda r: -r["score"])
+    return out
+
+
 def authenticity_signals(candidate: dict | None, fake_matches: list[dict], ai_auth: dict | None) -> dict:
     """Combine free checks (+ AI when available) into a verdict. Never blocks a scan."""
     reasons: list[str] = []

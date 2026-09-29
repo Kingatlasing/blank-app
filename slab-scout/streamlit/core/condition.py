@@ -262,8 +262,8 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
     hl = cv2.HoughLinesP(edges_c, 1, np.pi / 180, 80, minLineLength=int(min(w, h) * 0.55), maxLineGap=20)
     creases = []
     near_edge = lambda x, y: x < w * 0.12 or x > w * 0.88 or y < h * 0.12 or y > h * 0.88
-    for l in (hl if hl is not None else []):
-        x1, y1, x2, y2 = l[0]
+    for l in (np.asarray(hl).reshape(-1, 4) if hl is not None else []):
+        x1, y1, x2, y2 = (int(v) for v in l)
         ang = abs(np.degrees(np.arctan2(y2 - y1, x2 - x1))) % 180
         # a crease runs across the card (both ends near an edge) and isn't a straight frame / text line
         if min(ang, abs(90 - ang), abs(180 - ang)) > 12 and near_edge(x1, y1) and near_edge(x2, y2):
@@ -365,7 +365,8 @@ def _views(card, a, gray, white_m, bg_m, scratch_mask, specks_m, stain_m, crease
     views["Surface detail (contrast boosted)"] = Image.fromarray(hp)
     # defect map: the card is dimmed so the marks stand out on any border colour
     over = (a.astype(np.float32) * 0.45).astype(np.uint8)
-    marks = [((white_m | bg_m) & _edge_band(h, w), (255, 0, 255)),  # whitening only counts at the edges (scratch_mask.astype(bool), (255, 230, 0)),
+    marks = [((white_m | bg_m) & _edge_band(h, w), (255, 0, 255)),  # whitening only counts at the edges
+             (scratch_mask.astype(bool), (255, 230, 0)),
              (specks_m.astype(bool), (0, 220, 255)), (stain_m.astype(bool), (120, 255, 0))]
     for m, col in marks:
         m = cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)  # make tiny defects visible
