@@ -195,7 +195,7 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
     for i in range(1, n):
         x, y, bw, bh, area = stats[i]
         length = float(np.hypot(bw, bh))
-        thin = area / max(1.0, length) < 3.0 and (bw * bh) > area * 3  # a line, not a blob or a letter
+        thin = area / max(1.0, length) < 4.5 and (bw * bh) > area * 3  # a line, not a blob or a letter
         if length >= 30 and thin:
             scratch_len += length
             scratches.append((x, y, bw, bh))
@@ -336,7 +336,7 @@ def _views(card, a, gray, white_m, bg_m, scratch_mask, specks_m, stain_m, crease
     views["Surface detail (contrast boosted)"] = Image.fromarray(hp)
     # defect map: the card is dimmed so the marks stand out on any border colour
     over = (a.astype(np.float32) * 0.45).astype(np.uint8)
-    marks = [(white_m | (bg_m & _edge_band(h, w)), (255, 0, 255)), (scratch_mask.astype(bool), (255, 230, 0)),
+    marks = [((white_m | bg_m) & _edge_band(h, w), (255, 0, 255)),  # whitening only counts at the edges (scratch_mask.astype(bool), (255, 230, 0)),
              (specks_m.astype(bool), (0, 220, 255)), (stain_m.astype(bool), (120, 255, 0))]
     for m, col in marks:
         m = cv2.dilate(m.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)  # make tiny defects visible
@@ -350,9 +350,12 @@ def _views(card, a, gray, white_m, bg_m, scratch_mask, specks_m, stain_m, crease
 
 
 def _edge_band(h, w, px=EDGE + MARGIN):
+    """The band along the card edge, skipping the few straightening-margin pixels at the very edge."""
     m = np.zeros((h, w), bool)
     m[:px, :] = m[-px:, :] = True
     m[:, :px] = m[:, -px:] = True
+    m[:MARGIN, :] = m[-MARGIN:, :] = False
+    m[:, :MARGIN] = m[:, -MARGIN:] = False
     return m
 
 

@@ -18,7 +18,7 @@ export interface Rect {
 }
 
 const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-function b64ToBytes(b64: string): Uint8Array {
+export function b64ToBytes(b64: string): Uint8Array {
   const clean = b64.replace(/[^A-Za-z0-9+/]/g, '');
   const out = new Uint8Array(Math.floor((clean.length * 3) / 4));
   let o = 0;
@@ -34,7 +34,7 @@ function b64ToBytes(b64: string): Uint8Array {
   return out.subarray(0, o);
 }
 
-async function pixels(uri: string, w: number, h: number): Promise<{ data: Uint8Array; width: number; height: number }> {
+export async function pixels(uri: string, w: number, h: number): Promise<{ data: Uint8Array; width: number; height: number }> {
   const ctx = ImageManipulator.manipulate(uri).resize({ width: w, height: h });
   const ref = await ctx.renderAsync();
   const out = await ref.saveAsync({ base64: true, compress: 1, format: SaveFormat.JPEG });

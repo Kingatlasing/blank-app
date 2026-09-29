@@ -10,10 +10,12 @@ import { Candidate, DB_GAMES, soldLinks } from '../core/databases';
 import { identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
-import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate } from '../core/grading';
+import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate, subgradeToOption } from '../core/grading';
 import { Centering, centeringText, centeringWorst, cropAndTrim, fingerprintCard, fingerprintRemote, hashDistance, measureCentering, thumbnail } from '../core/imageTools';
 import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
+import { Inspection, inspectCard, LEGEND } from '../core/condition';
+import CenteringTool from '../components/CenteringTool';
 import { Card as CatCard, matchText, printRunLabel, sets as catSets, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
@@ -64,9 +66,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [autoCen, setAutoCen] = useState<Centering | null>(null);
   const [cen, setCen] = useState<Centering>({ left: 40, right: 40, top: 40, bottom: 40 });
   const [backCen, setBackCen] = useState<Centering | null>(null);
-  const [corners, setCorners] = useState('One tiny flaw');
-  const [edges, setEdges] = useState('One tiny flaw');
-  const [surface, setSurface] = useState('One tiny flaw');
+  const [corners, setCorners] = useState('');
+  const [edges, setEdges] = useState('');
+  const [surface, setSurface] = useState('');
+  const [insp, setInsp] = useState<Inspection | null>(null);
+  const [inspBack, setInspBack] = useState<Inspection | null>(null);
+  const [view, setView] = useState('Defect map');
   const [sales, setSales] = useState<Sale[]>([]);
   const [saved, setSaved] = useState<{ vault?: boolean; wish?: boolean; comm?: boolean; fake?: boolean }>({});
   const [fakeWhy, setFakeWhy] = useState('');
@@ -176,6 +181,13 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       setPhash(ph);
       setThumb(th);
       setAutoCen(ac);
+      setProgress('Inspecting corners, edges and surface…');
+      const [fi, bi] = await Promise.all([inspectCard(front.uri).catch(() => null), back ? inspectCard(back.uri, null, true).catch(() => null) : Promise.resolve(null)]);
+      setInsp(fi);
+      setInspBack(bi);
+      setCorners('');
+      setEdges('');
+      setSurface('');
       setCen(ac || { left: 40, right: 40, top: 40, bottom: 40 });
       setBackCen(bc);
 
@@ -262,6 +274,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       }
       setAiRes(ai);
       setUseAiGrade(!!ai?.psa);
+      const offUrl = pick?.image_url || '';
+      if (offUrl) inspectCard(front.uri, offUrl).then((r) => r && setInsp(r)).catch(() => {});
       if (cat) pickCatalog(cat);
       else if (pick) pickCandidate(pick);
       else {
@@ -292,6 +306,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setSide('front');
     setCandidates([]);
     setSlab(null);
+    setInsp(null);
+    setInspBack(null);
     setCommunity([]);
     setCatHits([]);
     setCatPick(null);
@@ -332,7 +348,15 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     return { verdict: v, reasons };
   })();
 
-  const est = estimate(centeringWorst(cen), backCen ? centeringWorst(backCen) : null, corners, edges, surface);
+  const autoSub = {
+    corners: Math.min(insp?.subgrades.corners ?? 9, inspBack?.subgrades.corners ?? 10),
+    edges: Math.min(insp?.subgrades.edges ?? 9, inspBack?.subgrades.edges ?? 10),
+    surface: Math.min(insp?.subgrades.surface ?? 9, inspBack?.subgrades.surface ?? 10),
+  };
+  const pickedSub = (user: string, auto: number) => (user && user !== subgradeToOption(auto) ? user : auto);
+  const overridden = [[corners, autoSub.corners], [edges, autoSub.edges], [surface, autoSub.surface]].some(([u, a]) => u && u !== subgradeToOption(a as number));
+  const est = estimate(centeringWorst(cen), backCen ? centeringWorst(backCen) : null, pickedSub(corners, autoSub.corners), pickedSub(edges, autoSub.edges), pickedSub(surface, autoSub.surface));
+  est.method = insp ? (overridden ? 'inspection + your checklist' : 'automatic inspection') : 'checklist';
   let grade: GradeResult = { ...est, centering: { front: centeringText(cen), back: backCen ? centeringText(backCen) : '' } };
   if (useAiGrade && aiRes?.psa) {
     const cnd = aiRes.condition || {};
@@ -589,27 +613,9 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           </Section>
 
           <Section n={3} title="Centering">
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <View style={{ width: 130, aspectRatio: 63 / 88 }}>
-                <Image source={{ uri: front!.uri }} style={{ width: '100%', height: '100%', borderRadius: 4 }} />
-                <View style={[st.cl, { left: `${(cen.left / 630) * 100}%` }]} />
-                <View style={[st.cl, { right: `${(cen.right / 630) * 100}%` }]} />
-                <View style={[st.ch, { top: `${(cen.top / 880) * 100}%` }]} />
-                <View style={[st.ch, { bottom: `${(cen.bottom / 880) * 100}%` }]} />
-              </View>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={S.eyebrow}>Front</Text>
-                <Text style={[S.h3, S.mono]}>{centeringText(cen)}</Text>
-                {backCen ? <><Text style={S.eyebrow}>Back</Text><Text style={[S.body, S.mono]}>{centeringText(backCen)}</Text></> : null}
-                {!autoCen ? <Text style={S.muted}>No clear border found (full-art card?). Set the lines by hand.</Text> : null}
-              </View>
-            </View>
-            {(['left', 'right', 'top', 'bottom'] as const).map((k) => (
-              <View key={k} style={S.row}>
-                <Text style={[S.muted, { width: 52 }]}>{k}</Text>
-                <Slider style={{ flex: 1 }} minimumValue={1} maximumValue={k === 'left' || k === 'right' ? 200 : 250} step={1} value={cen[k]} onValueChange={(v) => setCen((c) => ({ ...c, [k]: v }))} minimumTrackTintColor={C.accent} maximumTrackTintColor={C.surface2} thumbTintColor={C.accent} />
-              </View>
-            ))}
+            <Text style={[S.h3, S.mono]}>Front {centeringText(cen)}{backCen ? `  ·  Back ${centeringText(backCen)}` : ''}</Text>
+            {!autoCen ? <Text style={S.muted}>No clear border found (full-art card?). Set the lines yourself.</Text> : null}
+            <CenteringTool key={front!.uri} uri={front!.uri} auto={autoCen || cen} onChange={setCen} />
           </Section>
 
           <Section n={4} title="Condition & grade">
@@ -619,20 +625,74 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                 <Switch value={useAiGrade} onValueChange={setUseAiGrade} trackColor={{ true: C.accent, false: C.surface2 }} />
               </View>
             ) : null}
-            {!(useAiGrade && aiRes?.psa) &&
-              ([['corners', corners, setCorners], ['edges', edges, setEdges], ['surface', surface, setSurface]] as [string, string, (v: string) => void][]).map(([k, v, set]) => (
-                <View key={k} style={{ gap: 4 }}>
-                  <Text style={S.eyebrow}>{k}</Text>
-                  <Text style={S.muted}>{CONDITION_HELP[k]}</Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                    {CONDITION_OPTIONS.map(([o]) => (
-                      <Pressable key={o} onPress={() => set(o)} style={[S.chip, { paddingVertical: 6 }, v === o && { backgroundColor: C.accent }]}>
-                        <Text style={[S.chipText, v === o && { color: C.accentInk }]}>{o}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
+            {insp ? (
+              <View style={{ gap: 8 }}>
+                <Text style={S.eyebrow}>Automatic inspection</Text>
+                {[...insp.photoNotes, ...(inspBack?.photoNotes || [])].map((n) => (
+                  <View key={n} style={S.banner}><Text style={[S.muted, { color: C.warn }]}>{n}</Text></View>
+                ))}
+                <View style={S.row}>
+                  {(['corners', 'edges', 'surface'] as const).map((k) => (
+                    <View key={k} style={{ flex: 1, backgroundColor: C.surface2, borderRadius: 10, padding: 8 }}>
+                      <Text style={S.eyebrow}>{k}</Text>
+                      <Text style={{ color: autoSub[k] >= 9 ? C.good : autoSub[k] >= 7 ? C.warn : C.crit, fontSize: 22, fontWeight: '800' }}>{autoSub[k]}</Text>
+                    </View>
+                  ))}
                 </View>
-              ))}
+                {[...insp.findings, ...(inspBack?.findings || [])].sort((a, b) => b.severity - a.severity).slice(0, 10).map((f, i) => (
+                  <Text key={i} style={S.body}>
+                    {f.severity >= 0.6 ? '🔴' : f.severity >= 0.25 ? '🟠' : '🟡'} <Text style={{ fontWeight: '700' }}>{f.where}</Text>: {f.what}{f.sure === 'possible' ? ' (possible)' : ''}
+                  </Text>
+                ))}
+                {!insp.findings.length && !inspBack?.findings.length ? <Text style={S.muted}>No corner whitening, edge chips, scratches or stains found in this photo.</Text> : null}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                  {[...insp.views.map((v) => v.name), ...(inspBack ? inspBack.views.map((v) => `Back · ${v.name}`) : [])].map((n) => (
+                    <Pressable key={n} onPress={() => setView(n)} style={[S.chip, { paddingVertical: 7, paddingHorizontal: 12 }, view === n && { backgroundColor: C.accent }]}>
+                      <Text style={[S.chipText, view === n && { color: C.accentInk }]}>{n}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                {(() => {
+                  const isBack = view.startsWith('Back · ');
+                  const v = (isBack ? inspBack : insp)?.views.find((x) => x.name === view.replace('Back · ', ''));
+                  if (!v) return null;
+                  if (v.name === 'Corners')
+                    return (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                        {v.uris.map((u, i) => <Image key={i} source={{ uri: u }} style={{ width: '48%', aspectRatio: 1, borderRadius: 6 }} />)}
+                      </View>
+                    );
+                  if (v.name === 'Edges')
+                    return (
+                      <View style={{ gap: 6 }}>
+                        {v.uris.slice(0, 2).map((u, i) => <Image key={i} source={{ uri: u }} style={{ width: '100%', aspectRatio: 630 / 40, borderRadius: 4 }} />)}
+                        <View style={{ flexDirection: 'row', gap: 6, justifyContent: 'center' }}>
+                          {v.uris.slice(2).map((u, i) => <Image key={i} source={{ uri: u }} style={{ width: 40, height: 880 * (40 / 40) * 0.4, borderRadius: 4, resizeMode: 'stretch' }} />)}
+                        </View>
+                      </View>
+                    );
+                  return <Image source={{ uri: v.uris[0] }} style={{ width: '100%', aspectRatio: 63 / 88, borderRadius: 8 }} />;
+                })()}
+                {view.endsWith('Defect map') ? <Text style={S.muted}>{LEGEND}</Text> : null}
+              </View>
+            ) : null}
+            {!(useAiGrade && aiRes?.psa) &&
+              ([['corners', corners, setCorners], ['edges', edges, setEdges], ['surface', surface, setSurface]] as [string, string, (v: string) => void][]).map(([k, v, set]) => {
+                const shown = v || subgradeToOption(autoSub[k as 'corners' | 'edges' | 'surface']);
+                return (
+                  <View key={k} style={{ gap: 4 }}>
+                    <Text style={S.eyebrow}>{k}{insp ? ' (pre-set from the inspection; change it if it looks wrong)' : ''}</Text>
+                    <Text style={S.muted}>{CONDITION_HELP[k]}</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {CONDITION_OPTIONS.map(([o]) => (
+                        <Pressable key={o} onPress={() => set(o)} style={[S.chip, { paddingVertical: 6 }, shown === o && { backgroundColor: C.accent }]}>
+                          <Text style={[S.chipText, shown === o && { color: C.accentInk }]}>{o}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  </View>
+                );
+              })}
             <View style={S.row}>
               <Slab who="PSA · estimate" grade={grade.psa} label={grade.psa_label} sub={grade.psa_range ? `Likely ${grade.psa_range}` : undefined} />
               <Slab who="TAG-style · est." grade={grade.tag_grade} label={grade.tag_label} sub={grade.tag_score ? `Score ${grade.tag_score} / 1000` : undefined} />
