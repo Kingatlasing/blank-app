@@ -16,7 +16,7 @@ import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import CenteringTool from '../components/CenteringTool';
-import { Card as CatCard, matchText, printRunLabel, sets as catSets, value as catValue } from '../core/catalog';
+import { Card as CatCard, imageUrl, matchText, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
@@ -249,6 +249,39 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       // Built-in card database first: a card code like CDT-BBG-199 pins the exact parallel.
       const cm = matchText(parsed.rawText, parsed.name, parsed.number);
+      if (!cm.byCode && parsed.name && !DB_GAMES.includes(g)) {
+        // also look in the downloadable sets (every Upper Deck / Topps baseball card...)
+        try {
+          setProgress('Searching the card database…');
+          const more = await searchRemote(`${parsed.name} ${parsed.number ? parsed.number.split('/')[0] : ''}`, 20);
+          cm.cards = [...cm.cards, ...more.filter((m) => !cm.cards.some((c) => c.key === m.key))];
+        } catch {
+          /* offline: bundled cards only */
+        }
+      }
+      // photo match against the price-guide pictures picks the exact card and parallel
+      if (!cm.byCode && cm.cards.length) {
+        setProgress('Comparing with card photos…');
+        const pool: CatCard[] = [];
+        const seenImg = new Set<string>();
+        for (const c of cm.cards.slice(0, 6).flatMap((c) => [c, ...siblings(c)])) {
+          if (!c.img || c.img.startsWith('~') || seenImg.has(c.img)) continue;
+          seenImg.add(c.img);
+          pool.push(c);
+          if (pool.length >= 16) break;
+        }
+        if (pool.length) {
+          const mine = await fingerprintCard(front.uri);
+          const dists = await Promise.all(pool.map(async (c) => {
+            const fp = await fingerprintRemote(imageUrl(c)[0]);
+            return { c, d: fp ? hashDistance(mine, fp) : 64 };
+          }));
+          dists.sort((x, y) => x.d - y.d);
+          if (dists[0] && dists[0].d <= 14) {
+            cm.cards = [dists[0].c, ...cm.cards.filter((c) => c.key !== dists[0].c.key)];
+          }
+        }
+      }
       setCatHits(cm.cards.slice(0, 6));
       let cat: CatCard | null = null;
       if (cm.cards.length && (cm.byCode || !strong)) {
