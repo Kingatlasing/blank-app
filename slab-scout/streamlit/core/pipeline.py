@@ -24,7 +24,8 @@ def analyze_photo(data: bytes) -> dict:
         "found": found,
         "lines": lines,
         "phash": vision.fingerprint(card),
-        "centering": vision.measure_centering(card),
+        "centering": vision.measure_centering(card, found),
+        "edges": vision.find_lines(card, found),
     }
 
 

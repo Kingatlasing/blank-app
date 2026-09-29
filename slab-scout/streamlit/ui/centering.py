@@ -20,14 +20,16 @@ _HTML = """
   <div class="bar">
     <button data-mode="drag" class="on">Drag lines</button>
     <button data-mode="tap">Tap corners</button>
-    <button data-act="reset" class="ghost">Reset</button>
+    <button data-act="reset" class="ghost">Re-detect</button>
   </div>
+  <div class="status"></div>
   <div class="hint"></div>
   <div class="stage"><img alt="card"/><svg></svg></div>
   <div class="nudge">
     <span class="sel">Tap a line to select it</span>
     <button data-n="-5">«</button><button data-n="-1">‹</button><button data-n="1">›</button><button data-n="5">»</button>
   </div>
+  <input class="slide" type="range" min="0" max="630" step="1" value="0" disabled aria-label="Move the selected line"/>
   <div class="read"><div><b class="lr">—</b><span>left / right</span></div><div><b class="tb">—</b><span>top / bottom</span></div><div><b class="cap">—</b><span>PSA centering cap</span></div></div>
 </div>
 """
@@ -44,6 +46,8 @@ _CSS = """
 .stage svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .nudge{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
 .nudge .sel{font-size:13px;opacity:.85;margin-right:4px}
+.slide{width:100%;accent-color:var(--st-primary-color);height:28px}
+.status{font-size:12px;opacity:.75}
 .read{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .read div{background:var(--st-secondary-background-color);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column}
 .read b{font-size:20px;font-variant-numeric:tabular-nums}
@@ -92,6 +96,14 @@ export default function (component) {
     v.ot = Math.max(0, Math.min(v.ot, v.it - 1)); v.it = Math.min(v.it, v.ib - 10);
     v.ob = Math.min(H, Math.max(v.ob, v.ib + 1));
   }
+  const slide = root.querySelector('.slide');
+  function syncSlide() {
+    if (!st.sel) { slide.disabled = true; return; }
+    slide.disabled = false;
+    slide.max = LINES[st.sel][0] === 'x' ? W : H;
+    slide.value = Math.round(v[st.sel]);
+  }
+  root.querySelector('.status').textContent = data.status || '';
   function readout() {
     const L = v.il - v.ol, R = v.or - v.ir, T = v.it - v.ot, B = v.ob - v.ib;
     const lr = split(L, R), tb = split(T, B);
@@ -141,6 +153,7 @@ export default function (component) {
     });
     readout();
     selLabel.textContent = st.sel ? LINES[st.sel][2] : 'Tap a line to select it';
+    syncSlide();
   }
   function toPoint(e) {
     const r = svg.getBoundingClientRect();
@@ -158,7 +171,7 @@ export default function (component) {
   function setHint() {
     hint.textContent = st.mode === 'tap'
       ? `Step ${st.tapStep + 1} of 4: ${TAP_STEPS[st.tapStep]}`
-      : 'Drag the orange lines onto the inner border, and the blue dashed lines onto the card edge. The numbers update as you drag.';
+      : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue dashed = card edge.';
   }
 
   // one-time listeners (the component function re-runs on every Streamlit rerun)
@@ -202,6 +215,11 @@ export default function (component) {
     root.querySelector('[data-act=reset]').addEventListener('click', () => {
       Object.assign(v, data.auto); st.sel = null; st.tapStep = 0; st.taps = []; draw(); commit();
     });
+    slide.addEventListener('input', () => {  // live while sliding
+      if (!st.sel) return;
+      v[st.sel] = Number(slide.value); clampAll(); draw();
+    });
+    slide.addEventListener('change', () => commit());
     root.querySelectorAll('.nudge [data-n]').forEach((b) => b.addEventListener('click', () => {
       if (!st.sel) return;
       v[st.sel] += Number(b.dataset.n);
@@ -224,7 +242,9 @@ def _data_url(im: Image.Image) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
-def _auto_lines(card: Image.Image, auto: vision.Centering | None) -> dict:
+def _auto_lines(card: Image.Image, auto: vision.Centering | None, edges: dict | None = None) -> dict:
+    if edges:
+        return {k: int(edges[k]) for k in ("ol", "ot", "or", "ob", "il", "it", "ir", "ib")}
     w, h = card.size
     a = auto or vision.Centering(round(w * 0.06), round(w * 0.06), round(h * 0.05), round(h * 0.05))
     return {"ol": 0, "ot": 0, "or": w, "ob": h, "il": a.left, "it": a.top, "ir": w - a.right, "ib": h - a.bottom}
@@ -237,15 +257,19 @@ def _to_centering(lines: dict) -> vision.Centering:
     )
 
 
-def current(card: Image.Image, auto: vision.Centering | None, key: str) -> vision.Centering:
-    """The centering currently set in the tool (or the automatic measurement), without drawing anything."""
-    return _to_centering(st.session_state.get(f"_cenlines_{key}") or _auto_lines(card, auto))
+def current(card: Image.Image, auto: vision.Centering | None, key: str, edges: dict | None = None) -> vision.Centering:
+    """The centering currently set in the tool (or the automatic placement), without drawing anything."""
+    return _to_centering(st.session_state.get(f"_cenlines_{key}") or _auto_lines(card, auto, edges))
 
 
-def centering_tool(card: Image.Image, auto: vision.Centering | None, key: str) -> vision.Centering:
+def centering_tool(card: Image.Image, auto: vision.Centering | None, key: str, edges: dict | None = None) -> vision.Centering:
     """Shows the interactive tool and returns the centering the person set (border widths in px)."""
     w, h = card.size
-    auto_lines = _auto_lines(card, auto)
+    auto_lines = _auto_lines(card, auto, edges)
+    found = (edges or {}).get("found") or {}
+    missing = [k for k, ok in found.items() if not ok]
+    status = ("Auto-placed: card edges and inner border found on all four sides." if edges and not missing else
+              f"Auto-placed, but no clear border on the {', '.join(missing)} (full-art card?). Set those lines yourself." if edges else "")
     skey = f"_cenlines_{key}"
     img_key = f"_cenimg_{key}"
     if img_key not in st.session_state:
@@ -257,6 +281,6 @@ def centering_tool(card: Image.Image, auto: vision.Centering | None, key: str) -
             st.session_state[skey] = val
 
     lines = st.session_state.get(skey, auto_lines)
-    _component(key=key, data={"img": st.session_state[img_key], "w": w, "h": h, "v": lines, "auto": auto_lines},
+    _component(key=key, data={"img": st.session_state[img_key], "w": w, "h": h, "v": lines, "auto": auto_lines, "status": status},
                on_lines_change=_changed)
     return _to_centering(st.session_state.get(skey, auto_lines))

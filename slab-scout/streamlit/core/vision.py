@@ -135,7 +135,8 @@ def _border_depth(profile: np.ndarray, limit: int) -> int | None:
         return None
     # The border is the FIRST strong colour change coming in from the edge,
     # not the strongest one (that is often the artwork box further in).
-    thresh = max(18.0, 0.4 * peak)
+    # capped so dark text or artwork further in (very strong edges) can't hide an ordinary border edge
+    thresh = max(18.0, min(0.4 * peak, 60.0))
     hits = np.nonzero(k >= thresh)[0]
     idx = int(hits[0])
     # walk to the local maximum of that first edge
@@ -144,25 +145,63 @@ def _border_depth(profile: np.ndarray, limit: int) -> int | None:
     return idx + 5
 
 
-def measure_centering(card: Image.Image) -> Centering | None:
-    """Estimate border widths by looking for the inner frame line along many scan lines."""
+def _outer_depth(hsv_v: np.ndarray, limit: int) -> int:
+    """How many pixels of dark table show before the card starts (0 when the photo is cropped tight)."""
+    dark = hsv_v[:limit] < 60
+    run = 0
+    for d in dark:
+        if not d:
+            break
+        run += 1
+    # a dark run that goes on and on is a dark-bordered card, not table
+    return run if run < limit else 0
+
+
+def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
+    """All eight centering lines in card-image pixels: outer card edge (ol, ot, or, ob) and inner border
+    (il, it, ir, ib). `found` says which inner lines were detected (False = guessed default).
+    When the card outline was found in the photo the crop is tight, so only a thin sliver of table is
+    expected; otherwise (centre-crop fallback) up to 10% of table may show on each side."""
     a = np.array(card.convert("RGB")).astype("int16")
     h, w = a.shape[:2]
+    v = a.max(axis=2)
+    rows = np.linspace(h * 0.25, h * 0.75, 21).astype(int)
+    cols = np.linspace(w * 0.25, w * 0.75, 21).astype(int)
+    frac = 0.02 if outline_found else 0.10
+    lim_ox, lim_oy = max(3, int(w * frac)), max(3, int(h * frac))
+
+    def med(vals, need=5):
+        vals = [x for x in vals if x is not None]
+        return int(np.median(vals)) if len(vals) >= need else None
+
+    ol = med([_outer_depth(v[r, :], lim_ox) for r in rows]) or 0
+    orr = med([_outer_depth(v[r, ::-1], lim_ox) for r in rows]) or 0
+    ot = med([_outer_depth(v[:, c], lim_oy) for c in cols]) or 0
+    ob = med([_outer_depth(v[::-1, c], lim_oy) for c in cols]) or 0
     lim_x, lim_y = int(w * 0.2), int(h * 0.2)
-    rows = np.linspace(h * 0.25, h * 0.75, 15).astype(int)
-    cols = np.linspace(w * 0.25, w * 0.75, 15).astype(int)
 
-    def med(vals):
-        vals = [v for v in vals if v is not None]
-        return int(np.median(vals)) if len(vals) >= 5 else None
+    def inner(profiles, start, lim):
+        return med([(lambda d: d + start if d is not None else None)(_border_depth(p[start:], lim)) for p in profiles])
 
-    left = med([_border_depth(a[r, :, :], lim_x) for r in rows])
-    right = med([_border_depth(a[r, ::-1, :], lim_x) for r in rows])
-    top = med([_border_depth(a[:, c, :], lim_y) for c in cols])
-    bottom = med([_border_depth(a[::-1, c, :], lim_y) for c in cols])
-    if None in (left, right, top, bottom):
+    il = inner([a[r, :, :] for r in rows], ol, lim_x)
+    ir = inner([a[r, ::-1, :] for r in rows], orr, lim_x)
+    it = inner([a[:, c, :] for c in cols], ot, lim_y)
+    ib = inner([a[::-1, c, :] for c in cols], ob, lim_y)
+    found = {"left": il is not None, "right": ir is not None, "top": it is not None, "bottom": ib is not None}
+    # sensible defaults (standard ~3 mm border) where no border line was found
+    il = il if il is not None else ol + round(w * 0.055)
+    ir = ir if ir is not None else orr + round(w * 0.055)
+    it = it if it is not None else ot + round(h * 0.045)
+    ib = ib if ib is not None else ob + round(h * 0.045)
+    return {"ol": ol, "ot": ot, "or": w - orr, "ob": h - ob, "il": il, "it": it, "ir": w - ir, "ib": h - ib, "found": found}
+
+
+def measure_centering(card: Image.Image, outline_found: bool = True) -> Centering | None:
+    """Border widths from the automatically placed lines (None when no border line was found)."""
+    L = find_lines(card, outline_found)
+    if not all(L["found"].values()):
         return None
-    return Centering(left, right, top, bottom)
+    return Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])
 
 
 def draw_centering(card: Image.Image, c: Centering) -> Image.Image:

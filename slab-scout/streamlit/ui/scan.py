@@ -395,7 +395,7 @@ def _grade_auth(scan: dict, x: dict):
         return grade, auth
     f = scan["front"]
     key = scan["id"]
-    front_c = centering.current(f["card"], f["centering"], f"cen_{key}")
+    front_c = centering.current(f["card"], f["centering"], f"cen_{key}", f.get("edges"))
     back_c = scan["back"]["centering"] if scan["back"] else None
     auto = _auto_subs(scan, x)
     # the person's own checklist answers override the automatic ones
@@ -444,9 +444,7 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         if (scan.get("ai") or {}).get("psa"):
             st.toggle("Use the AI's grade", value=True, key=f"useai_{key}")
         st.markdown(f"**Centering** {esc(grade['centering']['front'])}" + (f" · back {esc(grade['centering']['back'])}" if grade['centering'].get('back') else ""))
-        if not f["centering"]:
-            st.caption("No clear border found automatically (full-art card?). Set the lines yourself.")
-        centering.centering_tool(f["card"], f["centering"], f"cen_{key}")
+        centering.centering_tool(f["card"], f["centering"], f"cen_{key}", f.get("edges"))
         _inspection_panel(scan, x, key)
         reasons = "".join(f"<li>{esc(r)}</li>" for r in auth["reasons"]) or "<li>Pick a database match or use the AI boost to compare against the real card.</li>"
         st.markdown(f"<div class='verdict' style='background:{bg};border:1px solid {fg}'><b style='color:{fg}'>{label}</b><ul style='margin:6px 0 0 0'>{reasons}</ul></div>", unsafe_allow_html=True)

@@ -194,7 +194,7 @@ async function firstEdges(cardUri: string, frac: number): Promise<Edges> {
     const k = grad.map((_, i) => ((grad[i - 1] ?? grad[i]) + grad[i] + (grad[i + 1] ?? grad[i])) / 3);
     const peak = Math.max(...k);
     if (peak < 18) return null;
-    const thresh = Math.max(18, 0.4 * peak);
+    const thresh = Math.max(18, Math.min(0.4 * peak, 60)); // capped: strong text/art edges further in can't hide the border
     let idx = k.findIndex((v) => v >= thresh);
     while (idx + 1 < k.length && k[idx + 1] >= k[idx]) idx++;
     return (idx + 3) * 2;
@@ -214,6 +214,66 @@ async function firstEdges(cardUri: string, frac: number): Promise<Edges> {
     right: med(rows.map((y) => depth(rowLine(y).reverse(), limX))),
     top: med(cols.map((x) => depth(colLine(x), limY))),
     bottom: med(cols.map((x) => depth(colLine(x).reverse(), limY))),
+  };
+}
+
+export type Lines = { ol: number; ot: number; or: number; ob: number; il: number; it: number; ir: number; ib: number };
+
+/**
+ * All eight centering lines in 630x880 card units: outer card edge (ol/ot/or/ob, where the dark table
+ * stops) and inner border (il/it/ir/ib). Same rules as the web app's vision.find_lines.
+ * `tight` = the photo was trimmed to the card (camera guide), so only a thin sliver of table can show.
+ */
+export async function findLines(cardUri: string, tight = true): Promise<{ lines: Lines; found: Record<'left' | 'right' | 'top' | 'bottom', boolean> }> {
+  const img = await pixels(cardUri, 315, 440);
+  const { data } = img;
+  const W = img.width, H = img.height, sx = CARD_W / W, sy = CARD_H / H;
+  const px = (x: number, y: number) => {
+    const i = (y * W + x) * 3;
+    return [data[i], data[i + 1], data[i + 2]];
+  };
+  const frac = tight ? 0.02 : 0.1;
+  const outer = (line: number[][], limit: number) => {
+    let run = 0;
+    for (let i = 0; i < limit && i < line.length; i++) {
+      if (Math.max(...line[i]) >= 60) break;
+      run++;
+    }
+    return run < limit ? run : 0; // endless dark = a dark-bordered card, not table
+  };
+  const depth = (line: number[][], start: number, limit: number): number | null => {
+    const seg = line.slice(start + 2, start + limit);
+    if (seg.length < 5) return null;
+    const grad: number[] = [];
+    for (let i = 1; i < seg.length; i++) grad.push(Math.abs(seg[i][0] - seg[i - 1][0]) + Math.abs(seg[i][1] - seg[i - 1][1]) + Math.abs(seg[i][2] - seg[i - 1][2]));
+    const k = grad.map((_, i) => ((grad[i - 1] ?? grad[i]) + grad[i] + (grad[i + 1] ?? grad[i])) / 3);
+    const peak = Math.max(...k);
+    if (peak < 18) return null;
+    const thresh = Math.max(18, Math.min(0.4 * peak, 60)); // capped: strong text/art edges further in can't hide the border
+    let idx = k.findIndex((v) => v >= thresh);
+    while (idx + 1 < k.length && k[idx + 1] >= k[idx]) idx++;
+    return start + idx + 3;
+  };
+  const med = (vals: (number | null)[], need = 5) => {
+    const v = vals.filter((x): x is number => x != null).sort((a, b) => a - b);
+    return v.length >= need ? v[Math.floor(v.length / 2)] : null;
+  };
+  const rows = Array.from({ length: 21 }, (_, i) => Math.round(H * 0.25 + (i * H * 0.5) / 20));
+  const cols = Array.from({ length: 21 }, (_, i) => Math.round(W * 0.25 + (i * W * 0.5) / 20));
+  const rowLine = (y: number) => Array.from({ length: W }, (_, x) => px(x, y));
+  const colLine = (x: number) => Array.from({ length: H }, (_, y) => px(x, y));
+  const R = rows.map(rowLine), Rr = R.map((l) => [...l].reverse()), Cc = cols.map(colLine), Cr = Cc.map((l) => [...l].reverse());
+  const limOX = Math.max(2, Math.round(W * frac)), limOY = Math.max(2, Math.round(H * frac));
+  const ol = med(R.map((l) => outer(l, limOX))) ?? 0, or = med(Rr.map((l) => outer(l, limOX))) ?? 0;
+  const ot = med(Cc.map((l) => outer(l, limOY))) ?? 0, ob = med(Cr.map((l) => outer(l, limOY))) ?? 0;
+  const limX = Math.round(W * 0.2), limY = Math.round(H * 0.2);
+  const il = med(R.map((l) => depth(l, ol, limX))), ir = med(Rr.map((l) => depth(l, or, limX)));
+  const it = med(Cc.map((l) => depth(l, ot, limY))), ib = med(Cr.map((l) => depth(l, ob, limY)));
+  const found = { left: il != null, right: ir != null, top: it != null, bottom: ib != null };
+  const L = (il ?? ol + W * 0.055) * sx, Rt = (ir ?? or + W * 0.055) * sx, T = (it ?? ot + H * 0.045) * sy, B = (ib ?? ob + H * 0.045) * sy;
+  return {
+    lines: { ol: ol * sx, ot: ot * sy, or: CARD_W - or * sx, ob: CARD_H - ob * sy, il: L, it: T, ir: CARD_W - Rt, ib: CARD_H - B },
+    found,
   };
 }
 

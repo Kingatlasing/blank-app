@@ -11,7 +11,7 @@ import { identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
 import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate, subgradeToOption } from '../core/grading';
-import { Centering, centeringText, centeringWorst, cropAndTrim, fingerprintCard, fingerprintRemote, hashDistance, measureCentering, thumbnail } from '../core/imageTools';
+import { Centering, centeringText, centeringWorst, cropAndTrim, findLines, fingerprintCard, fingerprintRemote, hashDistance, Lines, measureCentering, thumbnail } from '../core/imageTools';
 import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
@@ -32,6 +32,8 @@ const EMPTY: CardFields = { game: '', name: '', set: '', number: '', year: '', b
 interface Shot {
   uri: string;
   base64: string;
+  /** trimmed to the card with the camera guide (vs. a loose photo from the library) */
+  tight?: boolean;
 }
 type Phase = 'capture' | 'review' | 'working' | 'result';
 
@@ -66,6 +68,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [autoCen, setAutoCen] = useState<Centering | null>(null);
   const [cen, setCen] = useState<Centering>({ left: 40, right: 40, top: 40, bottom: 40 });
   const [backCen, setBackCen] = useState<Centering | null>(null);
+  const [autoLines, setAutoLines] = useState<Lines | null>(null);
+  const [lineStatus, setLineStatus] = useState('');
   const [corners, setCorners] = useState('');
   const [edges, setEdges] = useState('');
   const [surface, setSurface] = useState('');
@@ -114,7 +118,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setBusy(true);
     try {
       const pic = await cam.current.takePictureAsync({ quality: 0.95, shutterSound: false });
-      store2(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height)));
+      store2({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true });
     } catch {
       setError("Couldn't take the photo. Try again.");
     } finally {
@@ -127,7 +131,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     const a = res.assets[0];
     setBusy(true);
     try {
-      store2(await cropAndTrim(a.uri, a.width, a.height));
+      store2({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false });
     } finally {
       setBusy(false);
     }
@@ -181,6 +185,17 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       setPhash(ph);
       setThumb(th);
       setAutoCen(ac);
+      try {
+        const fl = await findLines(front.uri, front.tight !== false);
+        setAutoLines(fl.lines);
+        const miss = Object.entries(fl.found).filter(([, ok]) => !ok).map(([k]) => k);
+        setLineStatus(miss.length ? `Auto-placed, but no clear border on the ${miss.join(', ')} (full-art card?). Set those lines yourself.` : 'Auto-placed: card edges and inner border found on all four sides.');
+        const L = fl.lines;
+        if (!miss.length) setCen({ left: Math.round(L.il - L.ol), right: Math.round(L.or - L.ir), top: Math.round(L.it - L.ot), bottom: Math.round(L.ob - L.ib) });
+      } catch {
+        setAutoLines(null);
+        setLineStatus('');
+      }
       setProgress('Inspecting corners, edges and surface…');
       const [fi, bi] = await Promise.all([inspectCard(front.uri).catch(() => null), back ? inspectCard(back.uri, null, true).catch(() => null) : Promise.resolve(null)]);
       setInsp(fi);
@@ -615,7 +630,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <Section n={3} title="Centering">
             <Text style={[S.h3, S.mono]}>Front {centeringText(cen)}{backCen ? `  ·  Back ${centeringText(backCen)}` : ''}</Text>
             {!autoCen ? <Text style={S.muted}>No clear border found (full-art card?). Set the lines yourself.</Text> : null}
-            <CenteringTool key={front!.uri} uri={front!.uri} auto={autoCen || cen} onChange={setCen} />
+            <CenteringTool key={front!.uri + (autoLines ? 'L' : '')} uri={front!.uri} auto={autoCen || cen} lines={autoLines} status={lineStatus} onChange={setCen} />
           </Section>
 
           <Section n={4} title="Condition & grade">

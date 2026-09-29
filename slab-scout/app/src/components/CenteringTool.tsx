@@ -6,7 +6,8 @@
 import React, { useMemo, useRef, useState } from 'react';
 import { LayoutChangeEvent, PanResponder, Pressable, StyleSheet, Text, View, Image } from 'react-native';
 import { C, S } from '../theme';
-import { CARD_H, CARD_W, Centering } from '../core/imageTools';
+import Slider from '@react-native-community/slider';
+import { CARD_H, CARD_W, Centering, Lines as AutoLines } from '../core/imageTools';
 
 type Lines = { ol: number; ot: number; or: number; ob: number; il: number; it: number; ir: number; ib: number };
 type Key = keyof Lines;
@@ -33,8 +34,8 @@ function clamp(v: Lines): Lines {
   return o;
 }
 
-export default function CenteringTool({ uri, auto, onChange }: { uri: string; auto: Centering; onChange: (c: Centering) => void }) {
-  const autoLines = useMemo(() => fromCentering(auto), [auto]);
+export default function CenteringTool({ uri, auto, lines, status, onChange }: { uri: string; auto: Centering; lines?: AutoLines | null; status?: string; onChange: (c: Centering) => void }) {
+  const autoLines = useMemo(() => (lines ? { ...lines } : fromCentering(auto)), [auto, lines]);
   const [v, setV] = useState<Lines>(autoLines);
   const [mode, setMode] = useState<'drag' | 'tap'>('drag');
   const [step, setStep] = useState(0);
@@ -149,11 +150,12 @@ export default function CenteringTool({ uri, auto, onChange }: { uri: string; au
           </Pressable>
         ))}
         <Pressable onPress={() => { setSel(null); setStep(0); commit(autoLines); }} style={[S.chip, { paddingVertical: 7, paddingHorizontal: 12, marginLeft: 'auto' }]}>
-          <Text style={S.chipText}>Reset</Text>
+          <Text style={S.chipText}>Re-detect</Text>
         </Pressable>
       </View>
+      {status ? <Text style={[S.muted, { fontSize: 12 }]}>{status}</Text> : null}
       <Text style={[S.muted, { minHeight: 36 }]}>
-        {mode === 'tap' ? `Step ${step + 1} of 4: ${TAP_STEPS[step]}` : 'Drag the orange lines onto the inner border and the blue lines onto the card edge. The numbers update as you drag.'}
+        {mode === 'tap' ? `Step ${step + 1} of 4: ${TAP_STEPS[step]}` : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue = card edge.'}
       </Text>
       <View style={{ alignSelf: 'center', width: '88%', aspectRatio: CARD_W / CARD_H }} onLayout={(e: LayoutChangeEvent) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers}>
         <Image source={{ uri }} style={StyleSheet.absoluteFill} />
@@ -167,6 +169,19 @@ export default function CenteringTool({ uri, auto, onChange }: { uri: string; au
           </Pressable>
         ))}
       </View>
+      <Slider
+        style={{ width: '100%', height: 36, opacity: sel ? 1 : 0.35 }}
+        disabled={!sel}
+        minimumValue={0}
+        maximumValue={sel && (sel === 'ol' || sel === 'or' || sel === 'il' || sel === 'ir') ? CARD_W : CARD_H}
+        step={1}
+        value={sel ? v[sel] : 0}
+        onValueChange={(x) => sel && setV(clamp({ ...live.current.v, [sel]: x }))}
+        onSlidingComplete={(x) => sel && commit(clamp({ ...live.current.v, [sel]: x }))}
+        minimumTrackTintColor={C.accent}
+        maximumTrackTintColor={C.surface2}
+        thumbTintColor={C.accent}
+      />
       <View style={S.row}>
         {([[`${lr[0]}/${lr[1]}`, 'Left / right', C.ink], [`${tb[0]}/${tb[1]}`, 'Top / bottom', C.ink], [cap === 10 ? '10 ✓' : `max ${cap}`, 'PSA centering cap', capColor]] as [string, string, string][]).map(([big, lab, col]) => (
           <View key={lab} style={{ flex: 1, backgroundColor: C.surface2, borderRadius: 10, padding: 8 }}>
