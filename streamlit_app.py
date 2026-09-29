@@ -2,8 +2,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 
 from app.voxelcraft import (
-    exporters, face_reconstruction, image_generator, llm_builder, local_library, mesh_face, palette,
-    research, shapes, text_generator,
+    exporters, face_reconstruction, image_generator, llm_builder, local_library, mesh_body, mesh_face,
+    palette, research, shapes, text_generator,
 )
 from app.voxelcraft.transform import normalize, scale_voxels, voxel_count_limit
 from app.voxelcraft.viewer import build_mesh_viewer_html, build_viewer_html
@@ -64,11 +64,14 @@ with st.sidebar:
     st.header("Generate")
     mode = st.radio(
         "Source",
-        ["Text prompt", "Reference image (+ optional prompt)", "🙂 Face (mesh or Minecraft-blocky)"],
+        [
+            "Text prompt", "Reference image (+ optional prompt)",
+            "🙂 Face (mesh or Minecraft-blocky)", "🧍 Body (mesh)",
+        ],
         help="Text prompt builds from VoxelCraft's procedural shapes (with optional online photo "
              "research). An image lets you supply your own reference photo instead. Face builds a "
-             "head either as a real polygon mesh or as a blocky Minecraft-style cube — see its own "
-             "note below.",
+             "head either as a real polygon mesh or as a blocky Minecraft-style cube. Body builds a "
+             "full male or female polygon-mesh body — see each one's own note below.",
     )
 
     mesh_color = "#E0AC85"
@@ -166,6 +169,33 @@ with st.sidebar:
                     "landmarks, so it works specifically because the photo *is* a profile."
                 )
             prompt = ""
+    elif mode.startswith("🧍"):
+        st.caption(
+            "A real polygon-mesh body (actual vertices/triangle faces) decimated from a real, "
+            "artist-modeled reference mesh — [MakeHuman](https://github.com/makehumancommunity/"
+            "makehuman)'s base body, released CC0 (public domain). Male/female shape presets and "
+            "the random-body option retarget real proportions (shoulder width, chest, waist, hip, "
+            "arm length, leg length) measured from that reference mesh's own geometry and from "
+            "standard figure-drawing anatomical ratios — not a literal scan, the same low-poly "
+            "faceted sculpt just reshaped. This is a separate, self-contained mesh from the Face "
+            "option above (its own head, not yet the same detailed face sculpt) — not currently "
+            "combined into one figure."
+        )
+        mesh_color = st.color_picker("Skin tone", value="#E0AC85")
+        body_sex = st.radio("Sex", ["Male", "Female"], horizontal=True)
+        body_source = st.radio(
+            "Proportions",
+            ["Default for this sex", "🎲 Random unique body"],
+            help="Default: this sex's typical proportions. Random: a different, deterministic body "
+                 "per seed, jittered around this sex's typical shape — same idea as the face's "
+                 "random-seed option.",
+        )
+        body_seed = ""
+        if body_source.startswith("🎲"):
+            body_seed = st.text_input(
+                "Seed (any text — same seed always gives the same body)", value="body-1"
+            )
+        prompt = ""
     else:
         prompt = st.text_input(
             "Prompt",
@@ -403,6 +433,29 @@ if generate:
                 f"voxels.{photo_note}"
             )
             st.session_state.title = "realistic face (mesh)"
+            st.session_state.voxels = None
+            st.session_state.source_caption = None
+            st.session_state.source_url = None
+            st.session_state.blueprint_caption = None
+            st.session_state.llm_code = None
+        elif mode.startswith("🧍"):
+            sex = body_sex.lower()
+            body_note = ""
+            if body_source.startswith("🎲"):
+                proportions, height = mesh_body.random_proportions(body_seed or "body-1", sex)
+                body_note = f" A unique {sex} body for seed {body_seed!r}."
+            else:
+                proportions, height = mesh_body.sex_proportions(sex)
+            with st.spinner("Sculpting a polygon-mesh body..."):
+                vertices, faces = mesh_body.build_body_mesh(proportions=proportions, height=height)
+            st.session_state.mesh_vertices = vertices
+            st.session_state.mesh_faces = faces
+            st.session_state.mesh_color = mesh_color
+            st.session_state.note = (
+                f"Built a {len(faces)}-triangle polygon-mesh {sex} body — a real vertex/face sculpt, "
+                f"not voxels.{body_note}"
+            )
+            st.session_state.title = f"realistic {sex} body (mesh)"
             st.session_state.voxels = None
             st.session_state.source_caption = None
             st.session_state.source_url = None
