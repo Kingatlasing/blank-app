@@ -44,7 +44,8 @@ async function pokemonIndex() {
 
 /** Real card names found in the top lines of text (longest exact phrase wins; close spelling as fallback). */
 function matchNames(lines: string[], names: Set<string>, nameList: string[]): { name: string; score: number; exact: boolean }[] {
-  const top = lines.slice(0, Math.max(3, Math.ceil(lines.length * 0.45)));
+  const unglue = (t: string) => t.replace(/([a-z])(ex|EX|GX|VMAX|VSTAR)\b/g, '$1 $2').replace(/\b([A-Z][a-z]{2,})[C@©€eE]\b/g, '$1 ex');
+  const top = lines.slice(0, Math.max(3, Math.ceil(lines.length * 0.45))).map(unglue);
   const found = new Map<string, { score: number; exact: boolean }>();
   top.forEach((line, li) => {
     const words = norm(line.replace(/\bHP\s*\d+|\d+\s*HP\b/gi, ' ')).split(' ').filter(Boolean);
@@ -105,7 +106,13 @@ export async function identifyPokemon(lines: string[], rawText: string, number: 
   const total = number.includes('/') ? numKey(number.split('/')[1]) : '';
   const setOf = (id: string) => (id.includes('-') ? id.slice(0, id.lastIndexOf('-')) : '');
   let pool = new Map<string, { b: any; hit: boolean; exact: boolean }>();
-  for (const n of names.slice(0, 3)) for (const b of idx.byName.get(n.name) || []) pool.set(b.id, { b, hit: true, exact: n.exact });
+  const SUFFIXES = ['ex', 'gx', 'v', 'vmax', 'vstar'];
+  for (const n of names.slice(0, 3)) {
+    for (const b of idx.byName.get(n.name) || []) pool.set(b.id, { b, hit: true, exact: n.exact });
+    // the suffix logo (ex, V, VMAX...) is often unreadable: consider those versions too
+    if (!SUFFIXES.some((x) => n.name.endsWith(' ' + x)))
+      for (const x of SUFFIXES) for (const b of idx.byName.get(`${n.name} ${x}`) || []) if (!pool.has(b.id)) pool.set(b.id, { b, hit: true, exact: false });
+  }
   if (local) {
     const same = new Map([...pool].filter(([, v]) => numKey(v.b.localId || '') === local));
     if (same.size) pool = same;
@@ -123,7 +130,9 @@ export async function identifyPokemon(lines: string[], rawText: string, number: 
   };
   const ranked = [...pool.values()].sort((a, b) => pre(b) - pre(a)).slice(0, 10);
   const hpM = rawText.match(/\bHP\s*(\d{2,3})\b|\b(\d{2,3})\s*HP\b/i);
-  const hp = hpM ? hpM[1] || hpM[2] : '';
+  // 'HP' and the number are often read as separate pieces near the name at the top
+  const hpLine = lines.slice(0, 6).map((l) => l.trim()).find((l) => /^\d{2,3}$/.test(l) && +l >= 30 && +l <= 400 && +l % 10 === 0);
+  const hp = hpM ? hpM[1] || hpM[2] : hpLine || '';
   const fulls = await Promise.all(ranked.map((v) => get(`https://api.tcgdex.net/v2/en/cards/${v.b.id}`)));
   const out: Scored[] = [];
   ranked.forEach((v, i) => {
@@ -153,7 +162,8 @@ export async function identifyPokemon(lines: string[], rawText: string, number: 
       why.push(`HP ${hp} ✓`);
     }
     const moves = [...(full.attacks || []), ...(full.abilities || [])].map((a: any) => a?.name || '').filter(Boolean);
-    const hits = moves.filter((m: string) => text.includes(` ${norm(m)} `));
+    const squashed = text.replace(/ /g, ''); // OCR often drops spaces: 'ChaoticPain'
+    const hits = moves.filter((m: string) => text.includes(` ${norm(m)} `) || (norm(m).length >= 8 && squashed.includes(norm(m).replace(/ /g, ''))));
     if (hits.length) {
       score += Math.min(15, 6 * hits.length);
       why.push(`attack ${hits.slice(0, 2).join(', ')} ✓`);
@@ -184,4 +194,19 @@ export async function identify(lines: string[], rawText: string, name: string, n
     if (game === 'Lorcana') out.push(...(await searchLorcana(name)).map((c) => ({ ...c, score: 50, why: [`name ${c.name} ✓`] })));
   } catch {}
   return out.sort((a, b) => b.score - a.score);
+}
+
+/** The game's name if this photo is the BACK of a card (just the logo, no card name), else ''. */
+export function cardBack(lines: string[]): string {
+  const words = lines.map((t) => norm(t)).filter((t) => t.length >= 4);
+  if (words.length > 8) return '';
+  const toks = words.flatMap((w) => w.split(' '));
+  const poke = toks.filter((t) => similarity(t, 'pokemon') >= 0.55).length;
+  const texty = lines.some((t) => t.trim().split(/\s+/).length >= 3 || /\d{2,}/.test(t)); // rules text, HP, numbers = a front
+  const other = toks.filter((t) => t.length >= 4 && similarity(t, 'pokemon') < 0.55).length; // e.g. a card name
+  if (poke >= 2 && !texty && other <= 1) return 'Pokémon';
+  const blob = words.join(' ');
+  if (blob.includes('deckmaster') || (blob.includes('magic') && blob.includes('gathering'))) return 'Magic: The Gathering';
+  if (blob.includes('konami') && words.length <= 3) return 'Yu-Gi-Oh!';
+  return '';
 }

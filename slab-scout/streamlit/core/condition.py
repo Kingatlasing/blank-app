@@ -27,7 +27,7 @@ from PIL import Image
 
 CORNER = 70     # px of each corner inspected (card is 630 px wide ≈ 10 px per mm)
 EDGE = 14       # px band along each edge
-MARGIN = 5      # px ignored at the very edge (straightening wobble)
+MARGIN = 7      # px ignored at the very edge (straightening wobble, edge blur)
 
 
 @dataclass
@@ -97,7 +97,7 @@ def _corner_boxes(w: int, h: int):
 
 def _rounding_expected(c: int) -> np.ndarray:
     """Mask of the area outside a standard rounded corner (radius ≈ 3.2 mm ≈ 32 px), for the top-left box."""
-    r = 32
+    r = 38  # standard 3.2 mm corner radius (~32 px) plus a little slack for an imperfect crop
     yy, xx = np.mgrid[0:c, 0:c]
     outside = ((xx < r) & (yy < r) & ((xx - r) ** 2 + (yy - r) ** 2 > r * r))
     return outside
@@ -154,12 +154,34 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
             band = band[::-1, :]
         band &= ~exp
         white_frac = float((wm & band).sum()) / max(1, band.sum())
-        missing = float((bm & ~exp & band).sum()) / max(1, band.sum())  # band already skips the straightening margin
+        # background showing in the corner, measured separately in the horizontal and vertical strips and
+        # compared with the same strip along the straight edge next to it (an imperfect / slightly rotated
+        # crop shows a little background there too): only the excess counts as a missing / dinged corner
+        hstrip = np.zeros_like(band)
+        hstrip[MARGIN:MARGIN + 14, MARGIN:] = True
+        vstrip = np.zeros_like(band)
+        vstrip[MARGIN:, MARGIN:MARGIN + 14] = True
+        if "right" in name:
+            hstrip, vstrip = hstrip[:, ::-1], vstrip[:, ::-1]
+        if "bottom" in name:
+            hstrip, vstrip = hstrip[::-1, :], vstrip[::-1, :]
+        hstrip &= ~exp
+        vstrip &= ~exp
+        sx = slice(x1, min(w, x1 + CORNER)) if x0 == 0 else slice(max(0, x0 - CORNER), x0)
+        sy = slice(y1, min(h, y1 + CORNER)) if y0 == 0 else slice(max(0, y0 - CORNER), y0)
+        hb = bg_m[y0:y1, sx][MARGIN:MARGIN + 14, :] if y0 == 0 else bg_m[y0:y1, sx][CORNER - MARGIN - 14:CORNER - MARGIN, :]
+        vb = bg_m[sy, x0:x1][:, MARGIN:MARGIN + 14] if x0 == 0 else bg_m[sy, x0:x1][:, CORNER - MARGIN - 14:CORNER - MARGIN]
+        mh = float((bm & hstrip).sum()) / max(1, hstrip.sum()) - (float(hb.mean()) if hb.size else 0.0) * 1.2
+        mv = float((bm & vstrip).sum()) / max(1, vstrip.sum()) - (float(vb.mean()) if vb.size else 0.0) * 1.2
+        missing = max(0.0, mh, mv) * 0.5 + max(0.0, min(mh, mv)) * 0.5
+        res.metrics.setdefault('corner_missing', {})[name] = round(missing, 3)
+        # photo crops wobble by a few px, so only a clearly missing chunk counts (small dings: check the zoom)
+        missing = max(0.0, missing - 0.2) / 0.8
         sev = min(1.0, white_frac * 6 + missing * 4)
         corner_sev[name] = sev
         if white_frac > 0.01:
             res.findings.append(Finding("corners", f"{name} corner ({side})", f"Whitening / fraying ({white_frac*100:.1f}% of the corner edge)", min(1, white_frac * 6)))
-        if missing > 0.04:
+        if missing > 0.02:
             res.findings.append(Finding("corners", f"{name} corner ({side})", "Corner looks rounded, bent or dinged (background showing)", min(1, missing * 4), "possible"))
     worst = max(corner_sev.values())
     second = sorted(corner_sev.values())[-2]
@@ -171,7 +193,7 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
                   "left": (MARGIN, CORNER, MARGIN + EDGE, h - CORNER), "right": (w - MARGIN - EDGE, CORNER, w - MARGIN, h - CORNER)}
     chips_total, edge_sev = 0, {}
     for name, (x0, y0, x1, y1) in edge_boxes.items():
-        wm = (white_m[y0:y1, x0:x1] | bg_m[y0:y1, x0:x1]).astype(np.uint8)
+        wm = white_m[y0:y1, x0:x1].astype(np.uint8)  # whitening / chipping (background along an edge is crop wobble)
         n, _, stats, _ = cv2.connectedComponentsWithStats(wm, 8)
         chips = [s for s in stats[1:] if s[cv2.CC_STAT_AREA] >= 4]
         frac = float(wm.mean())
@@ -186,9 +208,14 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
     # ---------- surface ----------
     inner = np.zeros_like(gray, bool)
     inner[MARGIN + EDGE:h - MARGIN - EDGE, MARGIN + EDGE:w - MARGIN - EDGE] = True
+    # flat areas (borders, text boxes, plain backgrounds): the only places a phone photo can reliably show
+    # scratches and specks; holo foil and artwork are too busy
+    grad = cv2.blur(np.abs(cv2.Laplacian(cv2.GaussianBlur(gray, (3, 3), 0), cv2.CV_32F)), (25, 25))
+    flat = grad < 6
+    res.metrics["flat_pct"] = round(float(flat[inner].mean()) * 100, 1)
     # thin bright lines (scratches catch the light): white top-hat, then keep long thin components
     tophat = cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9)))
-    lines_m = ((tophat > 40) & inner).astype(np.uint8)
+    lines_m = ((tophat > 40) & inner & cv2.dilate(flat.astype(np.uint8), np.ones((5, 5), np.uint8)).astype(bool)).astype(np.uint8)
     n, lab_img, stats, _ = cv2.connectedComponentsWithStats(lines_m, 8)
     scratch_len, scratches = 0, []
     scratch_mask = np.zeros_like(lines_m)
@@ -202,8 +229,6 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
             scratch_mask[lab_img == i] = 1
     # small dark specks on light areas (print specks, dents, debris)
     blackhat = cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7)))
-    grad = cv2.blur(np.abs(cv2.Laplacian(cv2.GaussianBlur(gray, (3, 3), 0), cv2.CV_32F)), (25, 25))
-    flat = grad < 6
     specks_m = ((blackhat > 45) & inner & (gray > 120) & flat).astype(np.uint8)
     n2, _, st2, _ = cv2.connectedComponentsWithStats(specks_m, 8)
     specks = [s for s in st2[1:] if 4 <= s[cv2.CC_STAT_AREA] <= 60]
@@ -234,20 +259,24 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
     stain_m = keep
     # possible creases / folds: long straight lines that aren't horizontal/vertical frame lines
     edges_c = cv2.Canny(cv2.GaussianBlur(gray, (5, 5), 0), 40, 120)
-    hl = cv2.HoughLinesP(edges_c, 1, np.pi / 180, 70, minLineLength=int(min(w, h) * 0.3), maxLineGap=25)
+    hl = cv2.HoughLinesP(edges_c, 1, np.pi / 180, 80, minLineLength=int(min(w, h) * 0.55), maxLineGap=20)
     creases = []
+    near_edge = lambda x, y: x < w * 0.12 or x > w * 0.88 or y < h * 0.12 or y > h * 0.88
     for l in (hl if hl is not None else []):
         x1, y1, x2, y2 = l[0]
         ang = abs(np.degrees(np.arctan2(y2 - y1, x2 - x1))) % 180
-        if min(ang, abs(90 - ang), abs(180 - ang)) > 12:  # diagonal-ish: frames and text are straight
+        # a crease runs across the card (both ends near an edge) and isn't a straight frame / text line
+        if min(ang, abs(90 - ang), abs(180 - ang)) > 12 and near_edge(x1, y1) and near_edge(x2, y2):
             creases.append((x1, y1, x2, y2))
+    if len(creases) > 3:  # many long diagonal lines = holo pattern or artwork, not a crease
+        creases = []
 
     sev = 0.0
     if scratches:
         s_sev = min(1.0, scratch_len / 900)
         sev = max(sev, s_sev)
         res.findings.append(Finding("surface", side, f"{len(scratches)} possible scratch{'es' if len(scratches) != 1 else ''} (total ~{scratch_len/10:.0f} mm)", s_sev, "possible" if len(scratches) < 3 else "likely"))
-    if len(specks) > 6:
+    if len(specks) > 12:
         p_sev = min(0.5, len(specks) / 60)
         sev = max(sev, p_sev)
         res.findings.append(Finding("surface", side, f"{len(specks)} small specks / dimples (print dots, debris or dents)", p_sev, "possible"))

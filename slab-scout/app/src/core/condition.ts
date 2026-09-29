@@ -18,7 +18,7 @@ import { CARD_H, CARD_W, pixels } from './imageTools';
 
 const CORNER = 70;
 const EDGE = 14;
-const MARGIN = 5;
+const MARGIN = 7;
 
 export interface Finding {
   area: 'corners' | 'edges' | 'surface' | 'error';
@@ -257,7 +257,7 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
   }
 
   // ----- corners -----
-  const R = 32;
+  const R = 38; // standard 3.2 mm corner radius (~32 px) plus slack for an imperfect crop
   const cornerSev: Record<string, number> = {};
   const corners: [string, number, number, boolean, boolean][] = [
     ['top-left', 0, 0, false, false], ['top-right', w - CORNER, 0, true, false], ['bottom-left', 0, h - CORNER, false, true], ['bottom-right', w - CORNER, h - CORNER, true, true],
@@ -275,10 +275,21 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
         if (white[i]) wh++;
         if (dark[i]) miss++;
       }
-    const wf = wh / Math.max(1, band), mf = miss / Math.max(1, band);
+    // baseline: background in the same strip along the straight edges next to this corner (crop wobble)
+    let bTot = 0, bOn = 0;
+    for (let k = CORNER; k < CORNER * 2; k++)
+      for (let j = MARGIN; j < MARGIN + 14; j++) {
+        const hx = fx ? w - 1 - k : k, hy = fy ? h - 1 - j : j; // along the top/bottom edge
+        const vx = fx ? w - 1 - j : j, vy = fy ? h - 1 - k : k; // along the left/right edge
+        bTot += 2;
+        bOn += dark[hy * w + hx] + dark[vy * w + vx];
+      }
+    const base = bOn / Math.max(1, bTot);
+    const wf = wh / Math.max(1, band);
+    const mf = Math.max(0, miss / Math.max(1, band) - base * 1.2 - 0.2) / 0.8; // only a clearly missing chunk counts
     cornerSev[name] = Math.min(1, wf * 6 + mf * 4);
     if (wf > 0.01) findings.push({ area: 'corners', where: `${name} corner (${side})`, what: `Whitening / fraying (${(wf * 100).toFixed(1)}% of the corner edge)`, severity: Math.min(1, wf * 6), sure: 'likely' });
-    if (mf > 0.04) findings.push({ area: 'corners', where: `${name} corner (${side})`, what: 'Corner looks rounded, bent or dinged (background showing)', severity: Math.min(1, mf * 4), sure: 'possible' });
+    if (mf > 0.02) findings.push({ area: 'corners', where: `${name} corner (${side})`, what: 'Corner looks rounded, bent or dinged (background showing)', severity: Math.min(1, mf * 4), sure: 'possible' });
   }
   const cs = Object.values(cornerSev).sort((a, b) => b - a);
   const cornersG = sevToGrade(cs[0] * 0.75 + cs[1] * 0.25);
@@ -288,8 +299,7 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
     ['top', CORNER, MARGIN, w - CORNER, MARGIN + EDGE], ['bottom', CORNER, h - MARGIN - EDGE, w - CORNER, h - MARGIN],
     ['left', MARGIN, CORNER, MARGIN + EDGE, h - CORNER], ['right', w - MARGIN - EDGE, CORNER, w - MARGIN, h - CORNER],
   ];
-  const edgeMask = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) edgeMask[i] = white[i] | dark[i];
+  const edgeMask = white; // whitening / chipping (background along an edge is crop wobble)
   const edgeSev: number[] = [];
   let chipsTotal = 0;
   for (const [name, x0, y0, x1, y1] of edgeBoxes) {
@@ -331,7 +341,7 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
     for (let x = 0; x < hw; x++) {
       if (!inner(x, y)) continue;
       const i = y * hw + x;
-      if (gMax[i] - opened[i] > 40) scratchM[i] = 1;
+      if (gMax[i] - opened[i] > 40 && busy[i] < 8) scratchM[i] = 1; // flat areas only: holo foil and artwork are too busy
       if (closed[i] - gMin[i] > 45 && gMin[i] > 120 && busy[i] < 6) speckM[i] = 1;
     }
   const scratches = components(scratchM, hw, hh).filter((c) => {
@@ -370,7 +380,7 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
     sev = Math.max(sev, ss);
     findings.push({ area: 'surface', where: side, what: `${scratches.length} possible scratch${scratches.length === 1 ? '' : 'es'} (total ~${Math.round(total / 10)} mm)`, severity: ss, sure: scratches.length < 3 ? 'possible' : 'likely' });
   }
-  if (specks.length > 6) {
+  if (specks.length > 12) {
     const ps = Math.min(0.5, specks.length / 60);
     sev = Math.max(sev, ps);
     findings.push({ area: 'surface', where: side, what: `${specks.length} small specks / dimples (print dots, debris or dents)`, severity: ps, sure: 'possible' });

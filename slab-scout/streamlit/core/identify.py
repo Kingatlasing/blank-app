@@ -47,10 +47,35 @@ def _num(s: str) -> str:
     return f"{m.group(1)}{m.group(2)}{m.group(3)}" if m else s
 
 
+SUFFIXES = ("ex", "gx", "v", "vmax", "vstar", "lv x", "prime", "break")
+
+
+def _unglue(text: str) -> str:
+    """OCR runs the name into its suffix logo: 'Pikachuex' -> 'Pikachu ex', 'GengarEX' -> 'Gengar EX',
+    and reads the stylised ex logo as a stray letter: 'GengarC' / 'Gengar@' -> 'Gengar ex'."""
+    t = re.sub(r"([a-z])(ex|EX|GX|VMAX|VSTAR)\b", r"\1 \2", text)
+    t = re.sub(r"\b([A-Z][a-z]{2,})[C@©€eE]\b", r"\1 ex", t)
+    return t
+
+
+def rows(lines: list[tuple[str, float, float]], tol: float = 0.012) -> list[tuple[str, float, float]]:
+    """Text on the same printed line often comes back as separate pieces ('Pikachu' | 'ex'): join
+    pieces whose heights match (both orders, since the reader doesn't give left/right)."""
+    out = []
+    for i, (t1, c1, y1) in enumerate(lines):
+        for t2, c2, y2 in lines[i + 1:]:
+            if abs(y1 - y2) <= tol and len(t1) + len(t2) < 40:
+                out.append((f"{t1} {t2}", min(c1, c2), y1))
+                out.append((f"{t2} {t1}", min(c1, c2), y1))
+    return out
+
+
 def phrases(lines: list[tuple[str, float, float]], max_y: float = 1.0, max_words: int = 5) -> list[tuple[str, float]]:
-    """Every run of 1-5 consecutive words on each line, with a weight favouring big text near the top."""
+    """Every run of 1-5 consecutive words on each line (and on joined same-row pieces), with a weight
+    favouring text near the top."""
     out: list[tuple[str, float]] = []
-    for text, conf, y in lines:
+    for text, conf, y in list(lines) + rows(lines):
+        text = _unglue(text)
         if y > max_y or conf < 0.4:
             continue
         t = re.sub(r"\b(hp|HP)\s*\d+|\d+\s*(hp|HP)\b", " ", text)
@@ -74,7 +99,7 @@ def match_names(lines, names: set[str], name_list: list[str], max_y: float = 0.4
         for text, conf, y in lines:
             if y > max_y or conf < 0.5:
                 continue
-            t = norm(re.sub(r"\b(hp|HP)\s*\d+", " ", text))
+            t = norm(re.sub(r"\b(hp|HP)\s*\d+", " ", _unglue(text)))
             if len(t) < 4:
                 continue
             for cand in difflib.get_close_matches(t, name_list, n=2, cutoff=0.8):
@@ -110,9 +135,20 @@ def _set_of(brief_id: str) -> str:
     return brief_id.rsplit("-", 1)[0] if "-" in brief_id else ""
 
 
-def _hp(text: str) -> str:
+def _hp(text: str, lines=None) -> str:
     m = re.search(r"\bHP\s*(\d{2,3})\b|\b(\d{2,3})\s*HP\b", text, re.I)
-    return (m.group(1) or m.group(2)) if m else ""
+    if m:
+        return m.group(1) or m.group(2)
+    # 'HP' and the number read as separate pieces near the top of the card
+    if lines:
+        top = [(t.strip(), y) for t, c, y in lines]
+        hp_y = [y for t, y in top if t.upper() == "HP"]
+        first_y = min((y for t, y in top if re.search(r"[A-Za-z]{3}", t)), default=0.0)
+        for t, y in top:
+            if re.fullmatch(r"\d{2,3}", t) and 30 <= int(t) <= 400 and int(t) % 10 == 0 and (not hp_y or min(abs(y - hy) for hy in hp_y) < 0.03):
+                if hp_y or y < first_y + 0.06:  # the HP sits on the name line at the top of the card
+                    return t
+    return ""
 
 
 def identify_pokemon(lines, parsed: dict, limit: int = 6) -> list[dict]:
@@ -131,6 +167,11 @@ def identify_pokemon(lines, parsed: dict, limit: int = 6) -> list[dict]:
     for nm, sc, exact in names[:3]:
         for b in idx["by_name"].get(nm, []):
             pool[b["id"]] = {"brief": b, "name_exact": exact, "name_hit": True}
+        # the suffix logo (ex, V, VMAX...) is often unreadable: consider those versions too
+        if not any(nm.endswith(" " + sfx) for sfx in SUFFIXES):
+            for sfx in SUFFIXES:
+                for b in idx["by_name"].get(f"{nm} {sfx}", []):
+                    pool.setdefault(b["id"], {"brief": b, "name_exact": False, "name_hit": True})
     if local:
         same_num = {k: v for k, v in pool.items() if _num(v["brief"].get("localId", "")) == local}
         if same_num:
@@ -146,11 +187,18 @@ def identify_pokemon(lines, parsed: dict, limit: int = 6) -> list[dict]:
     def pre(v):
         b = v["brief"]
         cnt = set_count.get(_set_of(b["id"]))
-        return (v["name_hit"] * 2 + (local and _num(b.get("localId", "")) == local) * 2
-                + bool(total and cnt and _num(str(cnt)) == total) * 2)
+        return (int(v["name_hit"]) * 2 + int(bool(local) and _num(b.get("localId", "")) == local) * 2
+                + int(bool(total and cnt and _num(str(cnt)) == total)) * 2)
 
+    hp = _hp(raw, lines)
+    if hp and len(pool) > 10 and names:
+        # many versions of this Pokémon: let the database narrow by HP
+        base = names[0][0]
+        got = db._get("https://api.tcgdex.net/v2/en/cards", {"name": base, "hp": f"eq:{hp}"}) or []
+        keep = {b["id"] for b in got}
+        if keep & set(pool):
+            pool = {k: v for k, v in pool.items() if k in keep}
     ranked = sorted(pool.values(), key=pre, reverse=True)[:10]
-    hp = _hp(raw)
     out = []
     for v in ranked:
         b = v["brief"]
@@ -177,7 +225,8 @@ def identify_pokemon(lines, parsed: dict, limit: int = 6) -> list[dict]:
             score += 10
             why.append(f"HP {hp} ✓")
         moves = [a.get("name", "") for a in (full.get("attacks") or []) + (full.get("abilities") or [])]
-        hits = [m for m in moves if m and f" {norm(m)} " in text]
+        squashed = text.replace(" ", "")  # OCR often drops spaces: 'ChaoticPain'
+        hits = [m for m in moves if m and (f" {norm(m)} " in text or len(norm(m)) >= 8 and norm(m).replace(" ", "") in squashed)]
         if hits:
             score += min(15, 6 * len(hits))
             why.append("attack " + ", ".join(hits[:2]) + " ✓")
@@ -308,6 +357,34 @@ def identify_lorcana(lines, parsed: dict, limit: int = 6) -> list[dict]:
 
 
 TCG_GAMES = ("Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana")
+
+
+def card_back(lines, card_img=None) -> str:
+    """Name of the game if this photo is the BACK of a card (no name, just the logo), else ''."""
+    words = [norm(t) for t, c, y in lines if len(t.strip()) >= 4]
+    if len(words) > 8:
+        return ""
+    sim = lambda a, b: difflib.SequenceMatcher(None, a, b).ratio()
+    poke = sum(1 for w_ in words for tok in w_.split() if sim(tok, "pokemon") >= 0.55)
+    if card_img is not None:
+        import numpy as np
+        a = np.asarray(card_img.convert("RGB"), dtype="float32")
+        edge = np.concatenate([a[8:30, 60:-60].reshape(-1, 3), a[-30:-8, 60:-60].reshape(-1, 3), a[60:-60, 8:30].reshape(-1, 3), a[60:-60, -30:-8].reshape(-1, 3)])
+        r, g, b = np.median(edge, axis=0)
+        blue_border = b > r + 40 and b > g + 20
+    else:
+        blue_border = False
+    texty = any(len(t.split()) >= 3 or re.search(r"\d{2,}", t) for t, c, y in lines)  # rules text / HP / numbers = a front
+    toks = [tok for w_ in words for tok in w_.split()]
+    other = sum(1 for tok in toks if len(tok) >= 4 and sim(tok, "pokemon") < 0.55)  # e.g. a card name
+    if not texty and other <= 1 and (poke >= 2 or poke >= 1 and blue_border):
+        return "Pokémon"
+    blob = " ".join(words)
+    if "deckmaster" in blob or ("magic" in blob and "gathering" in blob):
+        return "Magic: The Gathering"
+    if "konami" in blob and len(words) <= 3:
+        return "Yu-Gi-Oh!"
+    return ""
 
 
 def identify(lines, parsed: dict, game: str = "") -> list[dict]:

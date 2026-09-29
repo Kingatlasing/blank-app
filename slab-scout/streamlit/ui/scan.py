@@ -23,9 +23,13 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     sl = _read_slab(f, game)
     if sl:
         return _analyze_slab(front, f, b, sl, game)
-    f["inspect"] = condition.inspect_card(f["card"])
+    back_of = identify.card_back(f["lines"], f["card"])
+    if back_of:
+        return {"front": f, "back": b, "parsed": ocr.parse(f["lines"], "Auto"), "cands": [], "fakes": [], "is_back": back_of,
+                "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": back_of}
+    f["inspect"] = condition.inspect_card(vision.tight_card(f["card"], f["edges"]))
     if b:
-        b["inspect"] = condition.inspect_card(b["card"], is_back=True)
+        b["inspect"] = condition.inspect_card(vision.tight_card(b["card"], b["edges"]), is_back=True)
     parsed = ocr.parse(f["lines"], "" if game in ("Auto", "Sports", "Kakawow / Disney / Marvel", "Non-sport (history, music…)", "Other") else game)
     store = get_store()
     comm = pipeline.community_matches(store, f["phash"])
@@ -50,6 +54,19 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     # 3. Official databases: name + number + set size + HP/ATK/DEF + attacks
     if not code_hit and g in ("", "Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana"):
         dbc = identify.identify(f["lines"], parsed, g)[:6]
+        if not dbc or dbc[0].get("score", 0) < 60:
+            # the crop may have missed text (busy photo, card in hand): read the whole photo too
+            full = f["full"]
+            if max(full.size) > 1600:
+                k = 1600 / max(full.size)
+                full = full.resize((int(full.width * k), int(full.height * k)))
+            fl = ocr.read_text(full)
+            fp = ocr.parse(fl, "" if game == "Auto" else game)
+            fp["number"] = fp.get("number") or parsed.get("number", "")
+            more = identify.identify(fl, fp, g or fp.get("game") or parsed.get("game") or "")[:6]
+            if more and (not dbc or more[0].get("score", 0) > dbc[0].get("score", 0)):
+                dbc = more
+                parsed = {**parsed, **{k: v for k, v in fp.items() if v}}
         pipeline.official_similarity(f["card"], dbc[:4])
         for c in dbc:
             d = c.get("official_distance")
@@ -249,6 +266,12 @@ def _result(scan: dict):
     f = scan["front"]
     cands = scan["cands"]
     sl = scan.get("slab")
+    if scan.get("is_back"):
+        a, b2 = st.columns([1, 1.4])
+        a.image(f["card"], width="stretch")
+        b2.info(f"This is the **back** of a {scan['is_back']} card. Scan the front to identify and price it, then add this photo "
+                "under **Add the back** to include it in grading (back centering counts for PSA and TAG).")
+        return
     left, right = st.columns([1, 1.4])
     left.image(f["full"] if sl else f["card"], width="stretch")
     with right:
@@ -256,9 +279,16 @@ def _result(scan: dict):
             _slab_header(sl)
         if not cands:
             st.markdown("**No match yet.**")
-            st.caption("Type the name below, turn on the free AI boost in the menu, or confirm it for the community so the next scan is recognised.")
+            st.caption("Type the name below, turn on the free AI boost in the menu, or confirm it for the community so the next scan is recognised. "
+                       "The grade estimate below works either way.")
             _manual_search(scan, game_of(scan), expanded=True)
-            return
+            x = {"kind": "ai", "c": {"name": scan["parsed"].get("name", ""), "number": scan["parsed"].get("number", ""), "set": "", "rarity": ""},
+                 "score": 0, "why": []}
+            grade, auth = _grade_auth(scan, x)
+    if not cands:
+        _details(scan, x, grade, auth)
+        return
+    with right:
         i = min(s.get("pick", 0), len(cands) - 1)
         x = cands[i]
         off_url = (x.get("c") or {}).get("image_url", "") if x["kind"] in ("tcgdb", "ai") else card_image(x["card"]) if x["kind"] == "catalog" else ""
@@ -330,15 +360,24 @@ def _slab_header(sl: dict):
         st.caption("Label: " + sl["desc"][:160])
 
 
-def _inspection(scan: dict, x: dict):
-    """Front inspection, redone against the official image of the chosen match (error / fading check)."""
+def _user_lines(scan: dict) -> dict:
+    """The card edges: the person's adjusted blue lines from the centering tool, else the automatic ones."""
     f = scan["front"]
+    return st.session_state.get(f"_cenlines_cen_{scan['id']}") or f["edges"]
+
+
+def _inspection(scan: dict, x: dict):
+    """Front inspection on the card cut to its edges (re-run when the person moves the blue lines), and
+    against the official image of the chosen match (error / fading check)."""
+    f = scan["front"]
+    L = _user_lines(scan)
     off = (x.get("c") or {}).get("_official") if x["kind"] == "tcgdb" else None
-    if off is None:
-        return f["inspect"]
-    ck = f"_insp_{(x.get('c') or {}).get('ref_id')}"
+    ck = "_insp_" + str((x.get("c") or {}).get("ref_id") if off is not None else "") + "_" + "_".join(str(round(L[k])) for k in ("ol", "ot", "or", "ob"))
     if ck not in scan:
-        scan[ck] = condition.inspect_card(f["card"], official=off)
+        if off is None and L is f["edges"]:
+            scan[ck] = f["inspect"]
+        else:
+            scan[ck] = condition.inspect_card(vision.tight_card(f["card"], L), official=off)
     return scan[ck]
 
 
@@ -469,6 +508,9 @@ def _inspection_panel(scan: dict, x: dict, key: str):
     bi = (scan.get("back") or {}).get("inspect")
     auto = _auto_subs(scan, x)
     st.markdown("**Condition inspection** (automatic)")
+    if not scan["front"].get("found") and not st.session_state.get(f"_cenlines_cen_{scan['id']}"):
+        st.warning("Couldn't find the card's edges clearly (busy background, hands, or a case). Drag the blue lines onto "
+                   "the card's edges in the centering tool above and the inspection will re-check the card.")
     for note in fi.photo_notes + (bi.photo_notes if bi else []):
         st.warning(note)
     m = st.columns(3)

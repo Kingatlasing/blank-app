@@ -264,11 +264,53 @@ export async function findLines(cardUri: string, tight = true): Promise<{ lines:
   const colLine = (x: number) => Array.from({ length: H }, (_, y) => px(x, y));
   const R = rows.map(rowLine), Rr = R.map((l) => [...l].reverse()), Cc = cols.map(colLine), Cr = Cc.map((l) => [...l].reverse());
   const limOX = Math.max(2, Math.round(W * frac)), limOY = Math.max(2, Math.round(H * frac));
-  const ol = med(R.map((l) => outer(l, limOX))) ?? 0, or = med(Rr.map((l) => outer(l, limOX))) ?? 0;
-  const ot = med(Cc.map((l) => outer(l, limOY))) ?? 0, ob = med(Cr.map((l) => outer(l, limOY))) ?? 0;
   const limX = Math.round(W * 0.2), limY = Math.round(H * 0.2);
-  const il = med(R.map((l) => depth(l, ol, limX))), ir = med(Rr.map((l) => depth(l, or, limX)));
-  const it = med(Cc.map((l) => depth(l, ot, limY))), ib = med(Cr.map((l) => depth(l, ob, limY)));
+  const nearX = Math.max(3, Math.round(W * 0.025)), nearY = Math.max(3, Math.round(H * 0.025));
+  /** Inner edge of the border: where the colour stops matching the border colour just inside the card edge. */
+  const byColour = (line: number[][], start: number, limit: number): number | null => {
+    const seg = line.slice(start, start + limit);
+    if (seg.length < 8) return null;
+    const ref = [0, 1, 2].map((c) => [...seg.slice(1, 5).map((p) => p[c])].sort((a, b) => a - b)[2]);
+    const d = seg.map((p) => Math.abs(p[0] - ref[0]) + Math.abs(p[1] - ref[1]) + Math.abs(p[2] - ref[2]));
+    const sm = d.map((_, i) => ((d[i - 1] ?? d[i]) + d[i] + (d[i + 1] ?? d[i])) / 3);
+    const noise = [...sm.slice(1, 5)].sort((a, b) => a - b)[2] + 1;
+    const thr = Math.max(40, noise * 4);
+    let run = 0;
+    for (let i = 5; i < sm.length; i++) {
+      run = sm[i] > thr ? run + 1 : 0;
+      if (run >= 2) return start + i - 1;
+    }
+    return null;
+  };
+  /** Per scan line: table -> thin bands at the edge (slab rim, background) -> card edge -> border edge. */
+  const side = (lines: number[][][], limO: number, limI: number, near: number): [number, number | null] => {
+    const outs: number[] = [], ins: (number | null)[] = [];
+    const skip = Math.max(3, Math.round(lines[0].length * 0.012));
+    for (const l of lines) {
+      const o = outer(l, limO);
+      let start = o, out = o, inner: number | null = null;
+      for (let k = 0; k < 4; k++) {
+        const d = depth(l, start, limI);
+        if (d == null) break;
+        if (d - start <= near && d <= l.length * 0.035) { // background bands only right at the photo edge
+          out = d;
+          start = d + skip;
+          continue;
+        }
+        inner = d;
+        break;
+      }
+      const cb = byColour(l, out + 1, limI);
+      if (cb != null && (inner == null || cb < inner)) inner = cb;
+      outs.push(out);
+      ins.push(inner);
+    }
+    return [med(outs) ?? 0, med(ins)];
+  };
+  const [ol, il] = side(R, limOX, limX, nearX);
+  const [or, ir] = side(Rr, limOX, limX, nearX);
+  const [ot, it] = side(Cc, limOY, limY, nearY);
+  const [ob, ib] = side(Cr, limOY, limY, nearY);
   const found = { left: il != null, right: ir != null, top: it != null, bottom: ib != null };
   const L = (il ?? ol + W * 0.055) * sx, Rt = (ir ?? or + W * 0.055) * sx, T = (it ?? ot + H * 0.045) * sy, B = (ib ?? ob + H * 0.045) * sy;
   return {

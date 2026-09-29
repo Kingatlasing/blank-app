@@ -7,7 +7,7 @@ import { C, S, money } from '../theme';
 import type { Settings } from '../types';
 import { Btn, Chip, LinkRow, Section, Slab, Thumb, Verdict } from '../components/ui';
 import { Candidate, DB_GAMES, soldLinks } from '../core/databases';
-import { identify, Scored } from '../core/identify';
+import { cardBack, identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
 import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate, subgradeToOption } from '../core/grading';
@@ -208,6 +208,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       setProgress('Reading the text on the card…');
       const lines = await readText(front.uri);
+      const backOf = cardBack(lines);
+      if (backOf) {
+        setPhase('review');
+        setError(`That's the back of a ${backOf} card. Take the front photo first (step 1), then the back (step 2); the back is used for grading.`);
+        return;
+      }
       const parsed = parseText(lines, game === 'Auto' ? '' : game);
       const sl = readLabel(lines);
       setSlab(sl);
