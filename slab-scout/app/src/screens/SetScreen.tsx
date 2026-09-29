@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Image, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { C, S, money } from '../theme';
 import { Btn } from '../components/ui';
 import { ChipRow, Header, RarityChip, Segmented } from '../components/cards';
 import { useApp } from '../appContext';
-import { oddsText, printRunLabel, setCards, sets, value } from '../core/catalog';
+import { loadSet, oddsText, printRunLabel, setCards, sets, useCatalogVersion, value } from '../core/catalog';
 
 type Show = 'all' | 'owned' | 'missing' | 'value';
 
@@ -14,7 +14,18 @@ export default function SetScreen({ setId, onBack }: { setId: string; onBack: ()
   const [q, setQ] = useState('');
   const [tierSel, setTierSel] = useState('All');
   const [show, setShow] = useState<Show>('all');
-  const all = useMemo(() => (s ? setCards(s.id) : []), [s]);
+  const ver = useCatalogVersion();
+  const [loading, setLoading] = useState(false);
+  const [loadErr, setLoadErr] = useState('');
+  useEffect(() => {
+    if (!s?.remote) return;
+    setLoading(true);
+    setLoadErr('');
+    loadSet(s.id)
+      .catch((e) => setLoadErr(String(e?.message || e)))
+      .finally(() => setLoading(false));
+  }, [s]);
+  const all = useMemo(() => (s ? setCards(s.id) : []), [s, ver]);
   const owned = useMemo(() => new Set(app.vault.filter((r) => (r.list || 'collection') === 'collection').map((r) => r.match?.catalog_key || '')), [app.vault]);
   const have = all.filter((c) => owned.has(c.key)).length;
 
@@ -44,6 +55,11 @@ export default function SetScreen({ setId, onBack }: { setId: string; onBack: ()
         <Text style={S.muted}>{[s.box?.packs_per_box ? `${s.box.packs_per_box} packs × ${s.box.cards_per_pack} cards per box` : '', s.box?.note || ''].filter(Boolean).join(' · ')}</Text>
       ) : null}
       {s.notes ? <Text style={S.muted}>{s.notes}</Text> : null}
+      {s.image ? <Image source={{ uri: s.image }} style={{ width: 150, height: 210, borderRadius: 8 }} resizeMode="contain" /> : null}
+      {loading ? (
+        <View style={[S.row, { gap: 8 }]}><ActivityIndicator color={C.accent} /><Text style={S.muted}>Downloading this set's {s.cards.toLocaleString()} cards…</Text></View>
+      ) : null}
+      {loadErr ? <Text style={[S.muted, { color: C.crit }]}>{loadErr}. Check your connection and reopen the set.</Text> : null}
 
       <View style={{ gap: 4 }}>
         <Text style={S.body}>You own {have} of {all.length.toLocaleString()} ({((have / Math.max(1, all.length)) * 100).toFixed(1)}%)</Text>

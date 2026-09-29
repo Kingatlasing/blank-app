@@ -1,9 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { C, S } from '../theme';
 import { ChipRow, Grid, RarityChip, Tile } from '../components/cards';
 import { useApp } from '../appContext';
-import { imageUrl, printRunLabel, search, sets, value } from '../core/catalog';
+import { Card, imageUrl, printRunLabel, search, searchRemote, sets, value } from '../core/catalog';
 import { money } from '../theme';
 
 export default function ExploreScreen() {
@@ -19,14 +19,43 @@ export default function ExploreScreen() {
     () => Object.values(all).filter((s) => (brand === 'All' || s.brand === brand) && (cat === 'All' || s.category === cat)).sort((a, b) => (+b.year || 0) - (+a.year || 0) || b.cards - a.cards),
     [all, brand, cat],
   );
-  const hits = useMemo(() => (q.trim().length >= 2 ? search(q, 45) : []), [q]);
+  const [hits, setHits] = useState<Card[]>([]);
+  const [searching, setSearching] = useState(false);
+  useEffect(() => {
+    if (q.trim().length < 2) return setHits([]);
+    setHits(search(q, 45)); // bundled cards: instant
+    setSearching(true);
+    const t = setTimeout(() => {
+      searchRemote(q, 45)
+        .then(setHits)
+        .catch(() => {})
+        .finally(() => setSearching(false));
+    }, 400);
+    return () => clearTimeout(t);
+  }, [q]);
+  const setHitsList = useMemo(() => {
+    const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length || q.trim().length < 2) return [];
+    return Object.values(all).filter((s) => words.every((w) => `${s.name} ${s.year} ${s.brand}`.toLowerCase().includes(w))).slice(0, 12);
+  }, [q, all]);
 
   const header = (
     <View style={{ gap: 12, marginBottom: 12 }}>
       <TextInput style={S.input} value={q} onChangeText={setQ} placeholder="Search: Stitch black gold, CDT-G-171, Elvis relic…" placeholderTextColor={C.ink2} autoCorrect={false} clearButtonMode="while-editing" />
       {q.trim().length >= 2 ? (
         <>
-          <Text style={S.muted}>{hits.length} match{hits.length === 1 ? '' : 'es'}{hits.length === 45 ? ' (top 45)' : ''}</Text>
+          {setHitsList.length ? (
+            <View style={{ gap: 6 }}>
+              <Text style={S.h3}>Sets</Text>
+              {setHitsList.map((s) => (
+                <Pressable key={s.id} onPress={() => app.openSet(s.id)} style={({ pressed }) => [S.card, { paddingVertical: 10 }, pressed && { opacity: 0.7 }]}>
+                  <Text style={S.body}>{s.name}</Text>
+                  <Text style={S.muted}>{s.brand} · {s.category} · {s.cards.toLocaleString()} cards</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          <Text style={S.muted}>{hits.length} card match{hits.length === 1 ? '' : 'es'}{hits.length === 45 ? ' (top 45)' : ''}{searching ? ' · searching all sets…' : ''}</Text>
           <Grid>
             {hits.map((c) => {
               const [v, est] = value(c);

@@ -131,6 +131,7 @@ def build():
     merged: dict[str, dict] = {}
     fetched = {}
     inline_imgs: dict[str, str] = {}
+    remote_ids: set[str] = set()
     for f in raw_files:
         d = json.load(open(f))
         for slug, s in d["sets"].items():
@@ -139,6 +140,8 @@ def build():
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
+                if "-baseball" in os.path.basename(f) or "-brands" in os.path.basename(f):
+                    remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     for slug, s in merged.items():
         rows = s["rows"]
@@ -227,6 +230,7 @@ def build():
             if (b["year"], re.sub(r"\W", "", name.lower())) in priced_names or not b["rows"]:
                 continue
             sid = "ba-" + code
+            remote_ids.add(sid)
             for r in b["rows"]:
                 cards.append([sid, r["name"], r["n"], "", None, None, None, None, ""])
             sets[sid] = {
@@ -292,6 +296,9 @@ def build():
                 t["ebay_median"] = v["median"]
                 t["ebay_n"] = v["n"]
                 t["ebay_query"] = q
+    for sid in remote_ids:
+        if sid in sets:
+            sets[sid]["remote"] = True
     json.dump(sorted(sets.values(), key=lambda s: (s["brand"], s["category"], s["name"])), open(os.path.join(OUT, "sets.json"), "w"), separators=(",", ":"))
     # Card photos: raw/slabscout-images*.json maps price-guide path -> image id. Parallels without their own
     # photo borrow a sibling's (same subject + card number in the same set), flagged with a leading "~".
@@ -317,11 +324,44 @@ def build():
                 h, n_sib = "~" + sib, n_sib + 1
         r.append(h)
     print(f"photos: {n_own} own, {n_sib} from another parallel, {len(cards) - n_own - n_sib} none")
-    json.dump({"fields": ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path", "img"], "rows": cards}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
+    fields = ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path", "img"]
+    json.dump({"fields": fields, "rows": cards}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
+    write_phone(sets, cards, fields, remote_ids)
     json.dump(sales_out, open(os.path.join(OUT, "sales.json"), "w"), separators=(",", ":"))
     print(f"{len(sets)} sets, {len(cards)} cards, {len(sales_out)} eBay searches")
     for s in sorted(sets.values(), key=lambda s: -s["cards"])[:8]:
         print(" ", s["name"], s["cards"], [ (t["name"], t["print_run"], t["median_raw"]) for t in s["tiers"][:4]])
+
+
+def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
+    """Phone app: bundle only the smaller sets; the big brand pulls are split into per-set files and
+    name-search shards (catalog/remote/...) that the app downloads from GitHub when needed."""
+    app_dir = os.path.join(HERE, "..", "app", "assets", "catalog")
+    remote = os.path.join(OUT, "remote")
+    for sub in ("sets", "names"):
+        d = os.path.join(remote, sub)
+        os.makedirs(d, exist_ok=True)
+        for f in glob.glob(os.path.join(d, "*.json")):
+            os.remove(f)
+    local, by_set, shards = [], {}, {}
+    for r in cards:
+        if r[0] not in remote_ids:
+            local.append(r)
+            continue
+        by_set.setdefault(r[0], []).append(r)
+        words = re.findall(r"[a-z0-9]+", r[1].lower())
+        for k in {(w[:2] if w[0].isalpha() else "0") for w in (words[:1] + words[-1:])}:
+            shards.setdefault(k, []).append(r)
+    for sid, rows in by_set.items():
+        json.dump(rows, open(os.path.join(remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json"), "w"), separators=(",", ":"))
+    for k, rows in shards.items():
+        json.dump(rows, open(os.path.join(remote, "names", k + ".json"), "w"), separators=(",", ":"))
+    if os.path.isdir(app_dir):
+        json.dump({"fields": fields, "rows": local}, open(os.path.join(app_dir, "cards.json"), "w"), separators=(",", ":"))
+        for f in ("sets.json", "sales.json"):
+            with open(os.path.join(OUT, f)) as a, open(os.path.join(app_dir, f), "w") as b:
+                b.write(a.read())
+    print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
 
 
 if __name__ == "__main__":

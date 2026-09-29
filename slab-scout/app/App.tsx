@@ -13,6 +13,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import { Segmented } from './src/components/cards';
 import { DEFAULT_SETTINGS, getApiKey, loadSettings, saveSettings } from './src/storage';
 import { Store, VaultRecord } from './src/core/community';
+import { loadKeys, useCatalogVersion } from './src/core/catalog';
 import { AppCtx, Ctx, Tab } from './src/appContext';
 import { C, S } from './src/theme';
 import type { Settings } from './src/types';
@@ -37,6 +38,7 @@ export default function App() {
   const [vault, setVault] = useState<VaultRecord[]>([]);
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultErr, setVaultErr] = useState('');
+  useCatalogVersion(); // re-render screens when downloaded card lists arrive
 
   const store = useMemo(() => new Store(settings.supabaseUrl, settings.supabaseKey), [settings.supabaseUrl, settings.supabaseKey]);
   const needsCode = store.shared && settings.vaultCode.length < 6;
@@ -47,7 +49,10 @@ export default function App() {
     setVaultLoading(true);
     setVaultErr('');
     try {
-      setVault(await store.vaultList(settings.vaultCode));
+      const list = await store.vaultList(settings.vaultCode);
+      setVault(list);
+      // cards from downloadable sets: fetch their sets so photos and prices show
+      loadKeys(list.map((r) => r.match?.catalog_key)).catch(() => {});
     } catch (e: any) {
       setVaultErr(String(e?.message || e));
     } finally {

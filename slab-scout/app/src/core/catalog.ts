@@ -4,6 +4,8 @@
  * Loaded lazily on first use so the app opens fast.
  */
 
+import { useEffect, useState } from 'react';
+
 export interface Tier {
   name: string;
   print_run: number | null;
@@ -34,6 +36,10 @@ export interface SetInfo {
   prices_as_of?: string;
   estimate_source?: string;
   odds_list?: { type: string; odds: string }[];
+  /** card list is not bundled; download with loadSet() */
+  remote?: boolean;
+  /** sample card photo for sets without per-card photos */
+  image?: string;
 }
 
 export interface Card {
@@ -67,15 +73,114 @@ let _sales: Record<string, { n: number; median: number; sales: SoldListing[] }> 
 
 export const cardKeyOf = (setId: string, number: string, variant: string, name: string) => `${setId}|${number}|${variant}|${name}`;
 
+/** Big brand pulls (every Upper Deck / Topps baseball set...) live on GitHub, one file per set plus
+ * name-search shards, and are downloaded when a set is opened or a search needs them. */
+export const REMOTE = 'https://raw.githubusercontent.com/Kingatlasing/blank-app/slab-scout/slab-scout/data/catalog/remote';
+const _loadedSets = new Set<string>();
+const _loadedShards = new Set<string>();
+const _pending = new Map<string, Promise<any>>();
+let _version = 0;
+const _listeners = new Set<() => void>();
+/** Re-render hook: bumps whenever downloaded cards are added. */
+export function onCatalogChange(fn: () => void) {
+  _listeners.add(fn);
+  return () => _listeners.delete(fn);
+}
+export const catalogVersion = () => _version;
+/** Re-renders the component when downloaded cards arrive. */
+export function useCatalogVersion() {
+  const [v, setV] = useState(_version);
+  useEffect(() => {
+    const off = onCatalogChange(() => setV(_version));
+    return () => {
+      off();
+    };
+  }, []);
+  return v;
+}
+
+const toCard = ([setId, name, number, variant, printRun, raw, psa9, psa10, path, img]: any[]): Card => ({
+  setId, name, number: number || '', variant: variant || '', printRun, raw, psa9, psa10, path: path || '', img: img || '',
+  key: cardKeyOf(setId, number || '', variant || '', name),
+});
+
+function addRows(rows: any[][]) {
+  load();
+  let added = 0;
+  for (const r of rows) {
+    const c = toCard(r);
+    if (_byKey!.has(c.key)) continue;
+    _byKey!.set(c.key, c);
+    _cards!.push(c);
+    const a = _bySet!.get(c.setId);
+    if (a) a.push(c);
+    else _bySet!.set(c.setId, [c]);
+    added++;
+  }
+  if (added) {
+    _index = null;
+    _version++;
+    _listeners.forEach((f) => f());
+  }
+}
+
+async function fetchJson(url: string) {
+  if (_pending.has(url)) return _pending.get(url);
+  const p = fetch(url).then((r) => {
+    if (!r.ok) throw new Error(`Couldn't download card list (${r.status})`);
+    return r.json();
+  });
+  _pending.set(url, p);
+  try {
+    return await p;
+  } finally {
+    _pending.delete(url);
+  }
+}
+
+export const isLoaded = (setId: string) => !sets()[setId]?.remote || _loadedSets.has(setId);
+
+/** Make sure a set's cards are in memory (downloads remote sets once per app session). */
+export async function loadSet(setId: string): Promise<Card[]> {
+  load();
+  const s = _sets![setId];
+  if (s?.remote && !_loadedSets.has(setId)) {
+    const rows = await fetchJson(`${REMOTE}/sets/${encodeURIComponent(setId.replace(/[^\w.-]/g, '_'))}.json`);
+    addRows(rows);
+    _loadedSets.add(setId);
+  }
+  return setCards(setId);
+}
+
+/** Loads the sets behind a list of card keys (e.g. everything in the vault). */
+export async function loadKeys(keys: (string | null | undefined)[]) {
+  const ids = new Set(keys.filter(Boolean).map((k) => String(k).split('|')[0]));
+  await Promise.all([...ids].map((id) => loadSet(id).catch(() => [])));
+}
+
+/** Search the downloadable sets by card name: fetches the shards for the query's words. */
+export async function searchRemote(query: string, limit = 60): Promise<Card[]> {
+  const toks = tokens(query).filter((t) => t.length >= 2 && !/^\d+$/.test(t));
+  const keys = [...new Set(toks.map((t) => t.slice(0, 2)))].filter((k) => !_loadedShards.has(k)).slice(0, 3);
+  await Promise.all(
+    keys.map(async (k) => {
+      try {
+        addRows(await fetchJson(`${REMOTE}/names/${k}.json`));
+      } catch {
+        /* no shard for these letters */
+      }
+      _loadedShards.add(k);
+    }),
+  );
+  return search(query, limit);
+}
+
 function load() {
   if (_cards) return;
   const setsRaw: SetInfo[] = require('../../assets/catalog/sets.json');
   const cardsRaw: { fields: string[]; rows: any[][] } = require('../../assets/catalog/cards.json');
   _sets = Object.fromEntries(setsRaw.map((s) => [s.id, s]));
-  _cards = cardsRaw.rows.map(([setId, name, number, variant, printRun, raw, psa9, psa10, path, img]) => ({
-    setId, name, number: number || '', variant: variant || '', printRun, raw, psa9, psa10, path: path || '', img: img || '',
-    key: cardKeyOf(setId, number || '', variant || '', name),
-  }));
+  _cards = cardsRaw.rows.map(toCard);
   _byKey = new Map(_cards.map((c) => [c.key, c]));
   _bySet = new Map();
   for (const c of _cards) {

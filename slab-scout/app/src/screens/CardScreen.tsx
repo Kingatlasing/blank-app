@@ -4,7 +4,7 @@ import { C, S, money } from '../theme';
 import { Btn, LinkRow } from '../components/ui';
 import { ChipRow, Header, RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
-import { getCard, imageUrl, oddsText, priceUrl, printRunLabel, relatedSales, sets, siblings, tier, value } from '../core/catalog';
+import { getCard, loadSet, useCatalogVersion, imageUrl, oddsText, priceUrl, printRunLabel, relatedSales, sets, siblings, tier, value } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import type { Sale } from '../core/community';
 
@@ -12,7 +12,16 @@ const CONDITIONS = ['Raw', 'PSA 10', 'PSA 9', 'PSA 8', 'TAG 10', 'TAG 9', 'BGS 9
 
 export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBack: () => void }) {
   const app = useApp();
+  useCatalogVersion();
   const c = getCard(cardKey);
+  const [loadingSet, setLoadingSet] = useState(false);
+  useEffect(() => {
+    if (getCard(cardKey)) return;
+    const sid = cardKey.split('|')[0];
+    if (!sets()[sid]?.remote) return;
+    setLoadingSet(true);
+    loadSet(sid).catch(() => {}).finally(() => setLoadingSet(false));
+  }, [cardKey]);
   const [cond, setCond] = useState('Raw');
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -26,7 +35,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
     if (fields) app.store.salesFor(fields).then(setComm).catch(() => setComm([]));
   }, [fields, app.store]);
 
-  if (!c || !s) return <View style={[S.screen, S.pad]}><Header onBack={onBack} /><Text style={S.body}>Card not found.</Text></View>;
+  if (!c || !s) return <View style={[S.screen, S.pad]}><Header onBack={onBack} /><Text style={S.body}>{loadingSet ? 'Loading card…' : 'Card not found.'}</Text></View>;
 
   const t = tier(c);
   const [v, est] = value(c);
