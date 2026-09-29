@@ -124,7 +124,7 @@ def settings_sidebar():
         store = get_store()
         st.caption("Community catalog: " + ("connected (shared)" if store.shared else "this device only"))
         sets_ = catalog.sets()
-        st.caption(f"Card database: {len(sets_)} sets · {len(catalog.cards()):,} cards" + (f" · prices from {max((x.get('prices_as_of') or '') for x in sets_.values())}" if sets_ else ""))
+        st.caption(f"Card database: {len(sets_)} sets · {catalog.total_cards():,} cards" + (f" · prices from {max((x.get('prices_as_of') or '') for x in sets_.values())}" if sets_ else ""))
 
 
 def vault_code() -> str:
@@ -184,14 +184,8 @@ def current_value(rec: dict) -> float:
         return 0.0
 
 
-@st.cache_data(show_spinner=False)
-def _card_map() -> dict:
-    return {c.key: i for i, c in enumerate(catalog.cards())}
-
-
 def catalog_card(key: str):
-    i = _card_map().get(key)
-    return catalog.cards()[i] if i is not None else None
+    return catalog.get(key)
 
 
 def record_from_catalog(c, thumb: str = "", extra: dict | None = None) -> dict:

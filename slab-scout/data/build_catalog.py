@@ -325,8 +325,10 @@ def build():
         r.append(h)
     print(f"photos: {n_own} own, {n_sib} from another parallel, {len(cards) - n_own - n_sib} none")
     fields = ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path", "img"]
-    json.dump({"fields": fields, "rows": cards}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
+    # cards.json holds the bundled (smaller) sets; the big brand pulls live in catalog/remote and both
+    # apps load them per set / per name shard when needed
     write_phone(sets, cards, fields, remote_ids)
+    json.dump({"fields": fields, "rows": [r for r in cards if r[0] not in remote_ids]}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
     json.dump(sales_out, open(os.path.join(OUT, "sales.json"), "w"), separators=(",", ":"))
     print(f"{len(sets)} sets, {len(cards)} cards, {len(sales_out)} eBay searches")
     for s in sorted(sets.values(), key=lambda s: -s["cards"])[:8]:

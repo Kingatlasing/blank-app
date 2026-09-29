@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 
@@ -48,20 +49,111 @@ class Card:
         return " · ".join(p for p in parts if p)
 
 
+class _Cat:
+    """Bundled cards plus big brand pulls loaded per set / per name shard from catalog/remote on demand."""
+
+    def __init__(self):
+        self.sets: dict = {}
+        self.cards: list[Card] = []
+        self.by_key: dict[str, Card] = {}
+        self.by_set: dict[str, list[Card]] = {}
+        self.index: dict[str, list[int]] = {}
+        self.sales: dict = {}
+        self.loaded_sets: set[str] = set()
+        self.loaded_shards: set[str] = set()
+        self.dir: str | None = None
+
+    def add(self, rows) -> None:
+        for r in rows:
+            c = Card(*r)
+            if c.key in self.by_key:
+                continue
+            i = len(self.cards)
+            self.cards.append(c)
+            self.by_key[c.key] = c
+            self.by_set.setdefault(c.set_id, []).append(c)
+            s = self.sets.get(c.set_id, {})
+            text = f"{c.name} {c.variant} {c.number} {s.get('name','')} {s.get('brand','')} {s.get('category','')}".lower()
+            for tok in set(re.findall(r"[a-z0-9]+", text)):
+                self.index.setdefault(tok, []).append(i)
+
+
+_lock = threading.Lock()
+
+
 @lru_cache(maxsize=1)
-def load() -> tuple[dict, list[Card], dict]:
+def _cat() -> _Cat:
+    cat = _Cat()
     d = _dir()
     if not d:
-        return {}, [], {}
-    sets = {s["id"]: s for s in json.load(open(os.path.join(d, "sets.json")))}
-    raw = json.load(open(os.path.join(d, "cards.json")))
-    cards = [Card(*r) for r in raw["rows"]]
-    sales = json.load(open(os.path.join(d, "sales.json"))) if os.path.exists(os.path.join(d, "sales.json")) else {}
-    return sets, cards, sales
+        return cat
+    cat.dir = d
+    cat.sets = {s["id"]: s for s in json.load(open(os.path.join(d, "sets.json")))}
+    cat.add(json.load(open(os.path.join(d, "cards.json")))["rows"])
+    sp = os.path.join(d, "sales.json")
+    cat.sales = json.load(open(sp)) if os.path.exists(sp) else {}
+    return cat
+
+
+def _remote_file(*parts: str) -> str:
+    d = _cat().dir or ""
+    return os.path.join(d, "remote", *parts)
+
+
+def ensure_set(set_id: str) -> None:
+    cat = _cat()
+    s = cat.sets.get(set_id)
+    if not s or not s.get("remote") or set_id in cat.loaded_sets:
+        return
+    with _lock:
+        if set_id in cat.loaded_sets:
+            return
+        p = _remote_file("sets", re.sub(r"[^\w.-]", "_", set_id) + ".json")
+        if os.path.exists(p):
+            cat.add(json.load(open(p)))
+        cat.loaded_sets.add(set_id)
+
+
+def _ensure_shards(query: str) -> None:
+    cat = _cat()
+    toks = [t for t in re.findall(r"[a-z0-9]+", query.lower()) if len(t) >= 2 and not t.isdigit()]
+    for k in {t[:2] for t in toks}:
+        if k in cat.loaded_shards:
+            continue
+        with _lock:
+            p = _remote_file("names", k + ".json")
+            if os.path.exists(p) and k not in cat.loaded_shards:
+                cat.add(json.load(open(p)))
+            cat.loaded_shards.add(k)
+
+
+def load() -> tuple[dict, list[Card], dict]:
+    cat = _cat()
+    return cat.sets, cat.cards, cat.sales
 
 
 def sets() -> dict:
-    return load()[0]
+    return _cat().sets
+
+
+def cards() -> list[Card]:
+    """Cards currently in memory (bundled + any downloaded sets). Use total_cards() for the full count."""
+    return _cat().cards
+
+
+def total_cards() -> int:
+    return sum(s.get("cards", 0) for s in sets().values())
+
+
+def get(key: str) -> Card | None:
+    if not key:
+        return None
+    ensure_set(key.split("|")[0])
+    return _cat().by_key.get(key)
+
+
+def sales() -> dict:
+    return _cat().sales
 
 
 @lru_cache(maxsize=1)
@@ -73,32 +165,17 @@ def set_index() -> list[dict]:
     return json.load(open(p)) if p and os.path.exists(p) else []
 
 
-def cards() -> list[Card]:
-    return load()[1]
-
-
-def sales() -> dict:
-    return load()[2]
-
-
-@lru_cache(maxsize=1)
-def _index() -> dict[str, list[int]]:
-    """Token -> card indexes, for fast search."""
-    idx: dict[str, list[int]] = {}
-    for i, c in enumerate(cards()):
-        s = sets().get(c.set_id, {})
-        text = f"{c.name} {c.variant} {c.number} {s.get('name','')} {s.get('brand','')} {s.get('category','')}".lower()
-        for tok in set(re.findall(r"[a-z0-9]+", text)):
-            idx.setdefault(tok, []).append(i)
-    return idx
-
-
 def search(query: str, limit: int = 60, set_id: str = "") -> list[Card]:
+    if set_id:
+        ensure_set(set_id)
+    else:
+        _ensure_shards(query)
+    cat = _cat()
     toks = re.findall(r"[a-z0-9]+", query.lower())
     if not toks:
-        pool = [c for c in cards() if not set_id or c.set_id == set_id]
+        pool = set_cards(set_id) if set_id else cat.cards
         return pool[:limit]
-    idx = _index()
+    idx = cat.index
     hits: set[int] | None = None
     for t in toks:
         ids = set(idx.get(t, []))
@@ -107,7 +184,7 @@ def search(query: str, limit: int = 60, set_id: str = "") -> list[Card]:
         hits = ids if hits is None else hits & ids
         if not hits:
             return []
-    res = [cards()[i] for i in hits]
+    res = [cat.cards[i] for i in hits]
     if set_id:
         res = [c for c in res if c.set_id == set_id]
     res.sort(key=lambda c: (-(c.raw or 0), c.name))
@@ -145,16 +222,9 @@ def _dedupe(cs: list[Card]) -> list[Card]:
     return out
 
 
-@lru_cache(maxsize=1)
-def _by_set() -> dict[str, list[Card]]:
-    out: dict[str, list[Card]] = {}
-    for c in cards():
-        out.setdefault(c.set_id, []).append(c)
-    return out
-
-
 def set_cards(set_id: str) -> list[Card]:
-    return _by_set().get(set_id, [])
+    ensure_set(set_id)
+    return _cat().by_set.get(set_id, [])
 
 
 def siblings(card: Card) -> list[Card]:
