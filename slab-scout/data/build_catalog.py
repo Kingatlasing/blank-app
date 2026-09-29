@@ -108,6 +108,11 @@ def slug_meta(slug: str, title: str) -> dict:
     else:
         category = "Non-sport"
     name = re.sub(r"\s*(Checklist|Prices).*$", "", title).strip() or slug
+    if not re.search(r"(19|20)\d\d", name) and re.match(r"^[a-z]+-cards-(19|20)\d\d-", s):
+        # SportsCardsPro brand-page labels are short ("'91 Upper Deck"): rebuild the name from the slug
+        rest = s.split("-cards-", 1)[1]
+        name = " ".join(w if w.isdigit() else w.replace("%27", "'").title() for w in rest.split("-"))
+        name = re.sub(r"\bUd\b", "UD", re.sub(r"\bSp\b", "SP", name))
     name = re.sub(r"\s+(Hockey|Football|Baseball|Basketball|Other)\s+Cards?$", "", name)
     return {"year": year, "brand": brand, "category": category, "name": name}
 
@@ -125,6 +130,7 @@ def build():
     raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json")))
     merged: dict[str, dict] = {}
     fetched = {}
+    inline_imgs: dict[str, str] = {}
     for f in raw_files:
         d = json.load(open(f))
         for slug, s in d["sets"].items():
@@ -141,6 +147,8 @@ def build():
         host = s.get("host", "pricecharting")
         base_url = "https://www.sportscardspro.com" if host == "sportscardspro" else "https://www.pricecharting.com"
         meta = slug_meta(slug, s.get("title", slug))
+        if s.get("brand") and meta["brand"] == "Other":
+            meta["brand"] = s["brand"]
         tiers: dict[str, dict] = {}
         for r in rows:
             if isinstance(r, list):  # compact format
@@ -148,6 +156,8 @@ def build():
                 u = "/game/" + u
             else:
                 t, pr, raw, g9, p10, u = r["t"], r.get("pr", ""), r.get("raw"), r.get("g9"), r.get("psa10"), r.get("u", "")
+                if r.get("img"):
+                    inline_imgs[u.replace("/game/", "")] = r["img"]
             m = TITLE_RE.match(t.strip())
             name = (m.group("name") or t).strip() if m else t
             variant = (m.group("variant") or "").strip() if m else ""
@@ -206,6 +216,41 @@ def build():
             "odds_list": c.get("odds", []), "estimate_source": est.get("source", ""),
         }
 
+    # Baseball Almanac checklists (every Topps baseball set: numbers + names, a sample card photo, no prices).
+    # Skipped when a priced SportsCardsPro set already covers the same year + name.
+    ba_file = os.path.join(RAW, "slabscout-ba-topps.json")
+    if os.path.exists(ba_file):
+        ba = json.load(open(ba_file))
+        priced_names = {(s["year"], re.sub(r"\W", "", s["name"].lower())) for s in sets.values()}
+        for code, b in ba["sets"].items():
+            name = re.sub(r"\s+Baseball Cards?$", "", b["title"]).strip()
+            if (b["year"], re.sub(r"\W", "", name.lower())) in priced_names or not b["rows"]:
+                continue
+            sid = "ba-" + code
+            for r in b["rows"]:
+                cards.append([sid, r["name"], r["n"], "", None, None, None, None, ""])
+            sets[sid] = {
+                "id": sid, "name": name, "year": b["year"], "brand": "Topps", "category": "Baseball", "cards": len(b["rows"]),
+                "tiers": [{"name": "Base", "print_run": None, "count": len(b["rows"]), "priced": 0, "median_raw": None, "top_raw": None}],
+                "box": None, "notes": "Checklist from Baseball Almanac (no prices yet).", "source": "baseball-almanac",
+                "source_url": "https://www.baseball-almanac.com/baseball_cards/baseball_cards_oneset.php?s=" + code,
+                "base_url": "", "prices_as_of": "", "image": b.get("sample", ""),
+            }
+
+    # Set index: every set/product the checklist sites list (name, year, where to find it, cover photo)
+    index = []
+    idx_file = os.path.join(RAW, "slabscout-set-index.json")
+    if os.path.exists(idx_file):
+        seen = set()
+        for it in json.load(open(idx_file))["sets"]:
+            key = (it.get("source"), it.get("url"))
+            if key in seen or not it.get("name"):
+                continue
+            seen.add(key)
+            index.append({k: it.get(k, "") for k in ("name", "year", "sport", "brand", "source", "url", "img")})
+    json.dump(index, open(os.path.join(OUT, "set_index.json"), "w"), separators=(",", ":"))
+    print(f"set index: {len(index)} products")
+
     # eBay sold listings -> attach tier medians where the search matches a set + tier
     sales_out = {}
     ebay = os.path.join(RAW, "slabscout-ebay-sold.json")
@@ -250,7 +295,7 @@ def build():
     json.dump(sorted(sets.values(), key=lambda s: (s["brand"], s["category"], s["name"])), open(os.path.join(OUT, "sets.json"), "w"), separators=(",", ":"))
     # Card photos: raw/slabscout-images*.json maps price-guide path -> image id. Parallels without their own
     # photo borrow a sibling's (same subject + card number in the same set), flagged with a leading "~".
-    imgs = {}
+    imgs = dict(inline_imgs)
     for f in glob.glob(os.path.join(HERE, "raw", "slabscout-images*.json")):
         imgs.update({k: v for k, v in json.load(open(f)).items() if v})
     by_sib = {}

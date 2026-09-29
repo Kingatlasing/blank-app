@@ -26,9 +26,22 @@ def page():
     cats = sorted({s["category"] for s in sets.values() if brand in ("All", s["brand"])})
     cat = st.pills("Category", ["All"] + cats, default="All", label_visibility="collapsed") or "All"
     shown = [s for s in sets.values() if brand in ("All", s["brand"]) and cat in ("All", s["category"])]
+    years = sorted({s.get("year") or "" for s in shown if s.get("year")}, reverse=True)
+    f1, f2 = st.columns([1, 2])
+    year = f1.selectbox("Year", ["All years"] + years, label_visibility="collapsed")
+    sq = f2.text_input("Find a set", placeholder="Find a set, e.g. 1991 Upper Deck, SP Authentic", label_visibility="collapsed")
+    if year != "All years":
+        shown = [s for s in shown if s.get("year") == year]
+    if sq.strip():
+        words = sq.lower().split()
+        shown = [s for s in shown if all(w in f"{s['name']} {s.get('year','')} {s['brand']}".lower() for w in words)]
     shown.sort(key=lambda s: (-(int(s.get("year") or 0)), -s["cards"]))
+    per = 40
+    n_pages = max(1, (len(shown) + per - 1) // per)
+    st.caption(f"{len(shown):,} sets with card lists")
+    pg = st.number_input("Page", 1, n_pages, 1, key="explore_pg") if n_pages > 1 else 1
     owned = _owned_keys()
-    for s in shown:
+    for s in shown[(pg - 1) * per: pg * per]:
         have = sum(1 for k in owned if k.startswith(s["id"] + "|"))
         chase = next((t for t in sorted(s["tiers"], key=lambda t: t["print_run"] or 10**6) if t.get("print_run")), None)
         with st.container(border=True):
@@ -39,6 +52,29 @@ def page():
                        + (f"<span class='pill green'>you own {have}</span>" if have else ""), unsafe_allow_html=True)
             if b.button("Open", key=f"set_{s['id']}", width="stretch"):
                 open_set(s["id"])
+    _directory()
+
+
+def _directory():
+    """Every product the checklist sites list, with a cover photo and a link to its checklist."""
+    idx = catalog.set_index()
+    if not idx:
+        return
+    with st.expander(f"Set directory: {len(idx):,} more products from Topps, Upper Deck, Checklist Insider and BaseballCardPedia"):
+        st.caption("These are listed by the checklist sites. Card-by-card prices are only in the sets above; open a link for the full checklist.")
+        q = st.text_input("Search the directory", placeholder="e.g. 2026 Bowman Chrome, Allen & Ginter, 1989 Fleer", key="dir_q", label_visibility="collapsed")
+        view = idx
+        if q.strip():
+            words = q.lower().split()
+            view = [i for i in idx if all(w in f"{i['name']} {i.get('year','')} {i.get('sport','')} {i.get('brand','')}".lower() for w in words)]
+        view = sorted(view, key=lambda i: (-(int(i["year"]) if str(i.get("year", "")).isdigit() else 0), i["name"]))[:300]
+        df = pd.DataFrame([{"Photo": i.get("img") or None, "Product": i["name"], "Year": i.get("year", ""), "Sport": i.get("sport", ""),
+                            "Source": i.get("source", ""), "Checklist": i.get("url", "")} for i in view])
+        if len(df):
+            st.dataframe(df, hide_index=True, width="stretch", column_config={
+                "Photo": st.column_config.ImageColumn(width="small"),
+                "Checklist": st.column_config.LinkColumn(display_text="Open ↗")})
+            st.caption(f"Showing {len(df)} of {len(idx):,}" if len(df) == 300 else f"{len(df)} products")
 
 
 def _owned_keys() -> set[str]:
@@ -76,6 +112,8 @@ def set_page():
         st.caption(" · ".join(x for x in [f"{box['packs_per_box']} packs × {box['cards_per_pack']} cards per box" if box.get("packs_per_box") else "", box.get("note", "")] if x))
     if s.get("notes"):
         st.caption(s["notes"])
+    if s.get("image"):
+        st.image(s["image"], caption="Sample card from this set", width=220)
 
     cards = catalog.set_cards(s["id"])
     owned = _owned_keys()

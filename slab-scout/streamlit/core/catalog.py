@@ -64,6 +64,15 @@ def sets() -> dict:
     return load()[0]
 
 
+@lru_cache(maxsize=1)
+def set_index() -> list[dict]:
+    """Every product the checklist sites list (Topps, Upper Deck, Checklist Insider, BaseballCardPedia):
+    name, year, sport, brand, source, url, img. Card-level data only exists for sets in sets()."""
+    d = _dir()
+    p = os.path.join(d, "set_index.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else []
+
+
 def cards() -> list[Card]:
     return load()[1]
 
@@ -136,8 +145,16 @@ def _dedupe(cs: list[Card]) -> list[Card]:
     return out
 
 
+@lru_cache(maxsize=1)
+def _by_set() -> dict[str, list[Card]]:
+    out: dict[str, list[Card]] = {}
+    for c in cards():
+        out.setdefault(c.set_id, []).append(c)
+    return out
+
+
 def set_cards(set_id: str) -> list[Card]:
-    return [c for c in cards() if c.set_id == set_id]
+    return _by_set().get(set_id, [])
 
 
 def siblings(card: Card) -> list[Card]:
