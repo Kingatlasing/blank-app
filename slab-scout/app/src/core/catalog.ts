@@ -5,6 +5,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Directory, File, Paths } from 'expo-file-system';
 
 export interface Tier {
   name: string;
@@ -138,6 +139,115 @@ async function fetchJson(url: string) {
   }
 }
 
+/* ---------- offline copy on the phone ----------
+ * Every downloaded set / name shard is saved under documents/catalog, so it keeps working without internet.
+ * "Download everything" in Settings fetches all of them up front (see remote/index.json). */
+let _dir: Directory | null = null;
+function cacheDir(): Directory {
+  if (!_dir) {
+    _dir = new Directory(Paths.document, 'catalog');
+    if (!_dir.exists) _dir.create({ intermediates: true, idempotent: true });
+  }
+  return _dir;
+}
+const cacheFile = (rel: string) => new File(cacheDir(), rel.replace(/\//g, '__'));
+
+async function cachedJson(rel: string) {
+  try {
+    const f = cacheFile(rel);
+    if (f.exists) return JSON.parse(await f.text());
+  } catch {
+    /* corrupt / missing: download again */
+  }
+  const data = await fetchJson(`${REMOTE}/${rel}`);
+  try {
+    const f = cacheFile(rel);
+    if (!f.exists) f.create();
+    f.write(JSON.stringify(data));
+  } catch {
+    /* no space: still usable this session */
+  }
+  return data;
+}
+
+export interface OfflineStatus { files: number; total: number; bytes: number; totalBytes: number; version: string }
+
+/** How much of the card database is saved on this phone. Pass the online index to compare. */
+export async function offlineStatus(): Promise<OfflineStatus> {
+  let idx: { version: string; files: [string, number][]; bytes: number } | null = null;
+  try {
+    idx = await fetchJson(`${REMOTE}/index.json`);
+  } catch {
+    try {
+      const f = cacheFile('index.json');
+      if (f.exists) idx = JSON.parse(await f.text());
+    } catch {
+      idx = null;
+    }
+  }
+  let files = 0;
+  let bytes = 0;
+  for (const [rel, size] of idx?.files || []) {
+    if (cacheFile(rel).exists) {
+      files++;
+      bytes += size;
+    }
+  }
+  return { files, total: idx?.files.length || 0, bytes, totalBytes: idx?.bytes || 0, version: idx?.version || '' };
+}
+
+/** Save the whole card database on the phone (skips files already saved). */
+export async function downloadAll(onProgress: (done: number, total: number) => void, signal?: { cancelled: boolean }) {
+  const idx: { version: string; files: [string, number][] } = await fetchJson(`${REMOTE}/index.json`);
+  // newer data online: drop saved files that changed so they download again
+  try {
+    const old = cacheFile('index.json');
+    if (old.exists) {
+      const prev: { version: string; files: [string, number][] } = JSON.parse(await old.text());
+      if (prev.version !== idx.version) {
+        const was = new Map(prev.files);
+        for (const [rel, size] of idx.files) {
+          const f = cacheFile(rel);
+          if (f.exists && was.get(rel) !== size) f.delete();
+        }
+      }
+    }
+  } catch {
+    /* no previous copy */
+  }
+  const todo = idx.files.filter(([rel]) => !cacheFile(rel).exists);
+  let done = idx.files.length - todo.length;
+  onProgress(done, idx.files.length);
+  const q = [...todo];
+  await Promise.all(
+    [0, 1, 2, 3].map(async () => {
+      while (q.length && !signal?.cancelled) {
+        const [rel] = q.shift()!;
+        try {
+          await File.downloadFileAsync(`${REMOTE}/${rel}`, cacheFile(rel), { idempotent: true });
+        } catch {
+          /* retry next time */
+        }
+        done++;
+        onProgress(done, idx.files.length);
+      }
+    }),
+  );
+  const f = cacheFile('index.json');
+  if (!f.exists) f.create();
+  f.write(JSON.stringify(idx));
+}
+
+/** Delete the saved copy (the bundled sets stay). */
+export function clearOffline() {
+  try {
+    cacheDir().delete();
+  } catch {
+    /* already gone */
+  }
+  _dir = null;
+}
+
 export const isLoaded = (setId: string) => !sets()[setId]?.remote || _loadedSets.has(setId);
 
 /** Make sure a set's cards are in memory (downloads remote sets once per app session). */
@@ -145,7 +255,7 @@ export async function loadSet(setId: string): Promise<Card[]> {
   load();
   const s = _sets![setId];
   if (s?.remote && !_loadedSets.has(setId)) {
-    const rows = await fetchJson(`${REMOTE}/sets/${encodeURIComponent(setId.replace(/[^\w.-]/g, '_'))}.json`);
+    const rows = await cachedJson(`sets/${setId.replace(/[^\w.-]/g, '_')}.json`);
     addRows(rows);
     _loadedSets.add(setId);
   }
@@ -165,7 +275,7 @@ export async function searchRemote(query: string, limit = 60): Promise<Card[]> {
   await Promise.all(
     keys.map(async (k) => {
       try {
-        addRows(await fetchJson(`${REMOTE}/names/${k}.json`));
+        addRows(await cachedJson(`names/${k}.json`));
       } catch {
         /* no shard for these letters */
       }

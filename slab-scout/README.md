@@ -43,6 +43,8 @@ Free Streamlit apps go to sleep when nobody uses them for a while. The first vis
 
 **Run it on your own computer instead:** `cd streamlit`, then `pip install -r requirements.txt`, then `streamlit run app.py`.
 
+**Offline:** run it on your own computer (above, once with internet to install). The whole card database ships in `data/catalog` (bundled sets in `cards.json`, the big brand pulls in `remote/`), so Explore, search, set pages and prices work with no internet. Card photos and the free Pokémon / Yu-Gi-Oh! / Magic lookups still need a connection.
+
 ## Part 2 · Community catalog & synced vault (free Supabase, optional but recommended)
 
 Without this, each app keeps its own catalog and vault. On free Streamlit hosting, that data resets whenever the app restarts. With it, every scan by anyone makes the app smarter, and your vault syncs between the phone app and Streamlit.
@@ -81,6 +83,8 @@ You need a computer with **Node.js LTS** (nodejs.org). In the `app` folder, run 
 - **iPhone real install:** `npx eas-cli@latest build -p ios --profile preview` needs an Apple Developer account ($99/year). Without one, use the Streamlit app or Expo Go.
 
 ---
+
+**Phone offline:** More → **Offline card database → Download everything** saves every set on the phone (about 60 MB, once, best on Wi-Fi). After that search, set pages, prices and scanning work without internet; "Check for updates" pulls only the files that changed.
 
 ## The card database (and how to refresh prices)
 

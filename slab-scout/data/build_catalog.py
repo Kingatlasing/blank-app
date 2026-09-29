@@ -363,6 +363,11 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
         for f in ("sets.json", "sales.json"):
             with open(os.path.join(OUT, f)) as a, open(os.path.join(app_dir, f), "w") as b:
                 b.write(a.read())
+    import time as _t
+    files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
+    files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
+    json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
+              open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
     print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
 
 

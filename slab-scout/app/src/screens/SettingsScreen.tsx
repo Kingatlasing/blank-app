@@ -6,6 +6,7 @@ import { C, S } from '../theme';
 import type { ProviderId, Settings } from '../types';
 import { Btn } from '../components/ui';
 import { ocrAvailable } from '../core/ocr';
+import { clearOffline, downloadAll, offlineStatus, OfflineStatus } from '../core/catalog';
 
 export default function SettingsScreen({ settings, onChange, onKeyChange }: { settings: Settings; onChange: (s: Settings) => void; onKeyChange: () => void }) {
   const [key, setKey] = useState('');
@@ -91,6 +92,8 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
         </View>
       ) : null}
 
+      <OfflineCatalog />
+
       <Text style={[S.h2, { marginTop: 8 }]}>Vault & community</Text>
       <View style={S.card}>
         <Text style={S.eyebrow}>Vault code</Text>
@@ -119,3 +122,66 @@ const st = StyleSheet.create({
   radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: C.ink2 },
   radioOn: { borderColor: C.accent, backgroundColor: C.accent },
 });
+
+
+/** Save the whole card database on the phone so search, sets and prices work without internet. */
+function OfflineCatalog() {
+  const [st, setSt] = useState<OfflineStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [prog, setProg] = useState<[number, number] | null>(null);
+  const [err, setErr] = useState('');
+  const sig = React.useRef({ cancelled: false });
+  const refresh = () => offlineStatus().then(setSt).catch(() => setSt(null));
+  useEffect(() => {
+    refresh();
+  }, []);
+  const mb = (b: number) => `${(b / 1e6).toFixed(0)} MB`;
+  const all = st && st.total > 0 && st.files >= st.total;
+  async function go() {
+    setBusy(true);
+    setErr('');
+    sig.current = { cancelled: false };
+    try {
+      await downloadAll((d, t) => setProg([d, t]), sig.current);
+    } catch (e: any) {
+      setErr(`${e?.message || e}. Check your connection and try again; finished files are kept.`);
+    } finally {
+      setBusy(false);
+      setProg(null);
+      refresh();
+    }
+  }
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={[S.h2, { marginTop: 8 }]}>Offline card database</Text>
+      <Text style={S.muted}>
+        The phone always has the smaller sets. The big ones (every Upper Deck and Topps baseball set, and more) download when you open them. Save everything once and search, sets, prices and photo IDs work with no internet.
+      </Text>
+      {st ? (
+        <Text style={S.body}>
+          {all ? '✓ Everything is saved on this phone' : `Saved: ${st.files.toLocaleString()} of ${st.total.toLocaleString()} files`} · {mb(st.bytes)} of {mb(st.totalBytes)}
+        </Text>
+      ) : (
+        <Text style={S.muted}>Checking…</Text>
+      )}
+      {prog ? (
+        <View style={{ gap: 4 }}>
+          <View style={{ height: 8, borderRadius: 4, backgroundColor: C.surface2, overflow: 'hidden' }}>
+            <View style={{ height: 8, backgroundColor: C.accent, width: `${(prog[0] / Math.max(1, prog[1])) * 100}%` }} />
+          </View>
+          <Text style={S.muted}>{prog[0].toLocaleString()} / {prog[1].toLocaleString()} files</Text>
+        </View>
+      ) : null}
+      {err ? <Text style={[S.muted, { color: C.crit }]}>{err}</Text> : null}
+      <View style={[S.row, { gap: 8 }]}>
+        {busy ? (
+          <Btn label="Stop" onPress={() => (sig.current.cancelled = true)} />
+        ) : (
+          <Btn primary label={all ? 'Check for updates' : st && st.files ? 'Finish download' : `Download everything${st ? ` (${mb(st.totalBytes)})` : ''}`} onPress={go} />
+        )}
+        {st && st.files && !busy ? <Btn danger label="Delete saved copy" onPress={() => { clearOffline(); refresh(); }} /> : null}
+      </View>
+      <Text style={S.muted}>Photos of cards still need internet the first time they're shown. Best on Wi-Fi.</Text>
+    </View>
+  );
+}
