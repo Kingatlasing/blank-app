@@ -13,7 +13,7 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import { Segmented } from './src/components/cards';
 import { DEFAULT_SETTINGS, getApiKey, loadSettings, saveSettings } from './src/storage';
 import { Store, VaultRecord } from './src/core/community';
-import { loadKeys, useCatalogVersion } from './src/core/catalog';
+import { getCard, loadKeys, savePhotos, useCatalogVersion } from './src/core/catalog';
 import { AppCtx, Ctx, Tab } from './src/appContext';
 import { C, S } from './src/theme';
 import type { Settings } from './src/types';
@@ -52,7 +52,10 @@ export default function App() {
       const list = await store.vaultList(settings.vaultCode);
       setVault(list);
       // cards from downloadable sets: fetch their sets so photos and prices show
-      loadKeys(list.map((r) => r.match?.catalog_key)).catch(() => {});
+      const keys = list.map((r) => r.match?.catalog_key);
+      loadKeys(keys)
+        .then(() => savePhotos(keys.map((k) => getCard(k)))) // collection photos work offline
+        .catch(() => {});
     } catch (e: any) {
       setVaultErr(String(e?.message || e));
     } finally {

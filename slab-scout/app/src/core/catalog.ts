@@ -415,10 +415,41 @@ export function value(card: Card): [number | null, boolean] {
   return v ? [v, true] : [null, false];
 }
 
-/** [url, isAnotherParallel]. Sizes: 60, 240, 1600. */
+const photoFile = (id: string, size: number) => {
+  const d = new Directory(cacheDir(), 'photos');
+  if (!d.exists) d.create({ intermediates: true, idempotent: true });
+  return new File(d, `${id}-${size}.jpg`);
+};
+
+/** [url, isAnotherParallel]. Sizes: 60, 240, 1600. Uses the copy saved on the phone when there is one. */
 export function imageUrl(card: Card | null | undefined, size = 240): [string, boolean] {
   if (!card?.img) return ['', false];
-  return [`https://storage.googleapis.com/images.pricecharting.com/${card.img.replace(/^~/, '')}/${size}.jpg`, card.img.startsWith('~')];
+  const id = card.img.replace(/^~/, '');
+  try {
+    const f = photoFile(id, size);
+    if (f.exists) return [f.uri, card.img.startsWith('~')];
+  } catch {
+    /* no file system (web): use the online photo */
+  }
+  return [`https://storage.googleapis.com/images.pricecharting.com/${id}/${size}.jpg`, card.img.startsWith('~')];
+}
+
+/** Save these cards' photos on the phone (your collection) so they show offline. */
+export async function savePhotos(cs: (Card | null | undefined)[], size = 240) {
+  const ids = [...new Set(cs.filter((c): c is Card => !!c?.img).map((c) => c.img.replace(/^~/, '')))];
+  const q = ids.filter((id) => !photoFile(id, size).exists);
+  await Promise.all(
+    [0, 1, 2].map(async () => {
+      while (q.length) {
+        const id = q.shift()!;
+        try {
+          await File.downloadFileAsync(`https://storage.googleapis.com/images.pricecharting.com/${id}/${size}.jpg`, photoFile(id, size), { idempotent: true });
+        } catch {
+          /* offline: try again next time */
+        }
+      }
+    }),
+  );
 }
 
 export function priceUrl(card: Card): string {

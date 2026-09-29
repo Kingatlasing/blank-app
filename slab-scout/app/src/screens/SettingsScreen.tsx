@@ -181,7 +181,7 @@ function OfflineCatalog() {
         )}
         {st && st.files && !busy ? <Btn danger label="Delete saved copy" onPress={() => { clearOffline(); refresh(); }} /> : null}
       </View>
-      <Text style={S.muted}>Photos of cards still need internet the first time they're shown. Best on Wi-Fi.</Text>
+      <Text style={S.muted}>Photos of the cards in your collection are saved on the phone automatically. Other card photos load from the price guide when you're online. Best on Wi-Fi.</Text>
     </View>
   );
 }
