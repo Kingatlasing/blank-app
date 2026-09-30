@@ -38,6 +38,9 @@ class Centering:
         return max(self.lr[0], self.tb[0])
 
 
+BORDER_X, BORDER_Y = 0.046, 0.038  # standard border as a share of card width / height (PSA 10 references)
+
+
 def _ratio(a: int, b: int) -> tuple[int, int]:
     total = max(a + b, 1)
     big = round(max(a, b) * 100 / total)
@@ -149,6 +152,32 @@ def _side_support(emap: np.ndarray, quad, n: int = 40) -> float:
     return min(fr)
 
 
+def _side_contrast(rgb: np.ndarray, quad, n: int = 30, off: int = 5) -> float | None:
+    """Weakest side's colour difference between just outside and just inside the outline. A real card edge
+    separates card from table (big difference); a rectangle traced along table texture or artwork doesn't."""
+    o = _order(np.array(quad, dtype="float32"))
+    h, w = rgb.shape[:2]
+    c = o.mean(axis=0)
+    a = rgb.astype("float32")
+    sides = []
+    for p, q in ((o[0], o[1]), (o[1], o[2]), (o[2], o[3]), (o[3], o[0])):
+        d = q - p
+        nrm = np.array([-d[1], d[0]]) / (np.linalg.norm(d) + 1e-6)
+        if np.dot((p + q) / 2 - c, nrm) < 0:
+            nrm = -nrm  # point outward
+        diffs = []
+        for t in np.linspace(0.15, 0.85, n):
+            m = p + d * t
+            xo, yo = (m + nrm * off).astype(int)
+            xi, yi = (m - nrm * off).astype(int)
+            if 0 <= xo < w and 0 <= yo < h and 0 <= xi < w and 0 <= yi < h:
+                diffs.append(float(np.abs(a[yo, xo] - a[yi, xi]).sum()))
+        if len(diffs) >= n // 3:
+            sides.append(float(np.median(diffs)))
+        # else: this side runs along the photo's own edge (card fills the frame): nothing outside to compare
+    return min(sides) if sides else None
+
+
 def _rounded_corner_score(rgb: np.ndarray, quad) -> float:
     """How strongly the corner tips differ from the border colour next to them (high = rounded card corners
     with background showing, low = square window / frame)."""
@@ -180,7 +209,20 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
     scale = 1000 / max(h, w)
     small = cv2.resize(rgb, (int(w * scale), int(h * scale))) if scale < 1 else rgb.copy()
     s = scale if scale < 1 else 1.0
+    sh, sw = small.shape[:2]
+    frame = np.array([[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]], dtype="float32")
+    if abs(min(w, h) / max(w, h) - CARD_W / CARD_H) < 0.025 and _rounded_corner_score(small, frame) >= 100:
+        # a scan / cut-out image where the card fills the whole frame (background only in the rounded corner
+        # tips): the photo's own border IS the card edge
+        return _refine(img.resize((CARD_W, CARD_H)) if w <= h else img.rotate(90, expand=True).resize((CARD_W, CARD_H))), True
+    best = _best_quad(small)
+    if best is None:
+        return _center_crop(img), False
+    return _refine(_warp(rgb, _order(best) / s)), True
 
+
+def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = None):
+    """Most likely card outline in a photo (<=1000 px), or None."""
     gray = cv2.cvtColor(small, cv2.COLOR_RGB2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
     img_area = small.shape[0] * small.shape[1]
@@ -229,7 +271,7 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
         # formed by text or artwork. Keep outlines whose sides follow real edges (or colour blobs), then
         # prefer ROUNDED CORNERS (background showing at the corner tips: only the card has them) and size.
         emap = cv2.dilate(cv2.Canny(gray, 30, 110), np.ones((3, 3), np.uint8), iterations=2)
-        scored = []
+        scored, srcs = [], []
         for area, err, quad, src in tagged:
             sup = _side_support(emap, quad)
             if src == "contour" and sup < 0.55 or src == "lines" and sup < 0.7:
@@ -240,17 +282,50 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
             upright = np.linalg.norm(o[3] - o[0]) >= np.linalg.norm(o[1] - o[0])
             if not upright and src != "contour":
                 continue  # sideways blobs are almost always overlays / background; landscape cards need a clear outline
-            scored.append((area, _rounded_corner_score(small, quad), sup, err, quad))
+            scored.append((area, _rounded_corner_score(small, quad), sup, err, quad, _side_contrast(small, quad)))
+            srcs.append(src)
+        # a real card edge separates card from table (strong colour change on every side); outlines traced along
+        # table texture or artwork don't. Keep outlines at least half as contrasty as the best one.
+        if scored:
+            known = [c[5] for c in scored if c[5] is not None]
+            best_c = max(known) if known else 0
+            if debug is not None:
+                debug += [(src_, c) for src_, c in zip(srcs, scored)]
+            # drop outlines with far less contrast than the best; the rest carry their contrast share into the score
+            scored = [c[:5] + (1.0 if c[5] is None or not best_c else c[5] / best_c,) for c in scored
+                      if c[5] is None or c[5] >= 0.25 * best_c]
         rounded = [c for c in scored if c[1] >= 45]
         pool = rounded or scored
+        if nested:  # only a card clearly inside a holder: rounded corners, most of the crop, not the crop itself
+            pool = [c for c in rounded if 0.70 * img_area <= c[0] <= 0.985 * img_area and c[3] < 0.04]
         if pool:
             top = max(c[0] for c in pool)
-            best = max(pool, key=lambda c: (c[0] >= 0.8 * top, c[2] + c[0] / top))[4]
+            # sides on real edges + size + how clearly the corners are rounded - how far from card proportions
+            # + how sharply card and background differ
+            best = max(pool, key=lambda c: (c[0] >= 0.8 * top, c[2] + c[0] / top + min(c[1], 300) / 300 - 5 * c[3] + 1.5 * c[5]))[4]
 
-    if best is None:
-        return _center_crop(img), False
+    return best
 
-    pts = _order(best) / s
+
+def _refine(card: Image.Image) -> Image.Image:
+    """The outline found first can be a slab window, top-loader or sleeve with the card inside it. If a
+    rounded-corner card outline sits inside the crop (covering 70-97% of it), cut to that instead."""
+    a = np.array(card)
+    q = _best_quad(a, nested=True)
+    if q is None:
+        return card
+    o = _order(np.array(q, dtype="float32"))
+    # the ring between the two outlines must look like a holder (grey / black / clear plastic: low colour,
+    # not bright white), not the card's own coloured or white border around its inner panel
+    mask = np.zeros(a.shape[:2], np.uint8)
+    cv2.fillConvexPoly(mask, o.astype(np.int32), 1)
+    ring = cv2.cvtColor(a, cv2.COLOR_RGB2HSV)[mask == 0]
+    if not len(ring) or ring[:, 1].mean() >= 60 or ring[:, 2].mean() >= 190:
+        return card
+    return _warp(a, o)
+
+
+def _warp(rgb: np.ndarray, pts: np.ndarray) -> Image.Image:
     tl, tr, br, bl = pts
     wide = max(np.linalg.norm(tr - tl), np.linalg.norm(br - bl))
     tall = max(np.linalg.norm(bl - tl), np.linalg.norm(br - tr))
@@ -261,7 +336,7 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
     out = Image.fromarray(warped)
     if dst_w > dst_h:  # landscape card (some Yu-Gi-Oh!/sports inserts): rotate to portrait for consistency
         out = out.rotate(90, expand=True)
-    return out.resize((CARD_W, CARD_H)), True
+    return out.resize((CARD_W, CARD_H))
 
 
 def _center_crop(img: Image.Image) -> Image.Image:
@@ -381,11 +456,12 @@ def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
     ot, it = side([a[:, c, :] for c in cols], [v[:, c] for c in cols], lim_oy, lim_y, near_y)
     ob, ib = side([a[::-1, c, :] for c in cols], [v[::-1, c] for c in cols], lim_oy, lim_y, near_y)
     found = {"left": il is not None, "right": ir is not None, "top": it is not None, "bottom": ib is not None}
-    # sensible defaults (standard ~3 mm border) where no border line was found
-    il = il if il is not None else ol + round(w * 0.055)
-    ir = ir if ir is not None else orr + round(w * 0.055)
-    it = it if it is not None else ot + round(h * 0.045)
-    ib = ib if ib is not None else ob + round(h * 0.045)
+    # where no border line was found, use the border of a perfectly centred card: measured on PSA 10 50/50
+    # reference cards (fronts and backs), the border is ~4.6% of the width and ~3.8% of the height
+    il = il if il is not None else ol + round(w * BORDER_X)
+    ir = ir if ir is not None else orr + round(w * BORDER_X)
+    it = it if it is not None else ot + round(h * BORDER_Y)
+    ib = ib if ib is not None else ob + round(h * BORDER_Y)
     return {"ol": ol, "ot": ot, "or": w - orr, "ob": h - ob, "il": il, "it": it, "ir": w - ir, "ib": h - ib, "found": found}
 
 
