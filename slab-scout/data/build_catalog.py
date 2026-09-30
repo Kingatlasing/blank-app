@@ -163,7 +163,12 @@ def build():
                 if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic", "-tcg")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
+    # video-game menu entries that came along with one card-category page (not cards)
+    NOT_CARDS = {"amiibo", "amiibo-cards", "disney-infinity", "game-&-watch", "starlink", "super-famicom", "famicom",
+                 "skylanders", "strategy-guide"}
     for slug, s in merged.items():
+        if slug in NOT_CARDS:
+            continue
         rows = s["rows"]
         if not rows:
             continue
@@ -174,6 +179,8 @@ def build():
             meta["brand"] = s["brand"]
         if s.get("category"):
             meta["category"] = s["category"]
+        if "kakawow" in slug.lower():  # Kakawow Disney / Marvel / Star Wars / Harry Potter: one Kakawow shelf
+            meta["category"], meta["brand"] = "Kakawow", "Kakawow"
         tiers: dict[str, dict] = {}
         for r in rows:
             if isinstance(r, list):  # compact format
