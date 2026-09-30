@@ -17,11 +17,18 @@ OFFICIAL_BAD = 24   # over this: art doesn't match the official card
 def analyze_photo(data: bytes) -> dict:
     img = vision.load_image(data)
     card, found = vision.detect_and_crop(img)
+    skew = {"applied": False, "tilt": 0.0}
+    if found:  # photographed at an angle: straighten all four edges before grading
+        try:
+            card, skew = vision.rectify(card)
+        except Exception:
+            pass
     lines = ocr.read_text(card)
     return {
         "full": img,
         "card": card,
         "found": found,
+        "skew": skew,
         "lines": lines,
         "phash": vision.fingerprint(card),
         "centering": vision.measure_centering(card, found),

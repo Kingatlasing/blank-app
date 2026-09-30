@@ -389,6 +389,85 @@ def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
     return {"ol": ol, "ot": ot, "or": w - orr, "ob": h - ob, "il": il, "it": it, "ir": w - ir, "ib": h - ib, "found": found}
 
 
+def _edge_along(a: np.ndarray, side: str, n: int = 25, depth_frac: float = 0.035) -> list[tuple[float, float]]:
+    """Points on one card edge: for n scan lines across the middle 70% of that side, the strongest colour step
+    within `depth_frac` of the image border. Returns (position along the side, depth in from the border)."""
+    h, w = a.shape[:2]
+    out = []
+    along = h if side in ("left", "right") else w
+    depth = max(8, int((w if side in ("left", "right") else h) * depth_frac))
+    for t in np.linspace(0.15, 0.85, n):
+        i = int(t * (along - 1))
+        if side == "left":
+            prof = a[max(0, i - 1): i + 2, :depth].mean(axis=0)
+        elif side == "right":
+            prof = a[max(0, i - 1): i + 2, ::-1][:, :depth].mean(axis=0)
+        elif side == "top":
+            prof = a[:depth, max(0, i - 1): i + 2].mean(axis=1)
+        else:
+            prof = a[::-1][:depth, max(0, i - 1): i + 2].mean(axis=1)
+        g = np.abs(np.diff(prof, axis=0)).sum(axis=1)
+        g = np.convolve(g, np.ones(3) / 3, mode="same")
+        k = int(np.argmax(g))
+        if g[k] >= 30:
+            out.append((float(i), float(k) + 0.5))
+    return out
+
+
+def _fit_edge(pts: list[tuple[float, float]]):
+    """Robust straight line depth = m * pos + c through edge points (drops outliers once)."""
+    if len(pts) < 8:
+        return None
+    p = np.array(pts)
+    m, c = np.polyfit(p[:, 0], p[:, 1], 1)
+    res = np.abs(p[:, 1] - (m * p[:, 0] + c))
+    keep = res <= max(2.0, 2.5 * float(np.median(res)))
+    if keep.sum() < 8:
+        return None
+    m, c = np.polyfit(p[keep, 0], p[keep, 1], 1)
+    spread = float(np.abs(p[keep, 1] - (m * p[keep, 0] + c)).mean())
+    return m, c, spread
+
+
+def rectify(card: Image.Image) -> tuple[Image.Image, dict]:
+    """Compensate for a card photographed at an angle: after the corner-based warp, the edges can still be
+    a few pixels skewed. Fit a straight line to each of the four edges along their whole length and warp
+    again so all four edges are exactly straight and square. Returns (card, info) where info has the tilt
+    corrected in degrees ('tilt') and whether it was applied."""
+    a = np.array(card.convert("RGB")).astype("float32")
+    h, w = a.shape[:2]
+    fits = {s: _fit_edge(_edge_along(a, s)) for s in ("left", "right", "top", "bottom")}
+    if any(f is None or f[2] > 3.0 for f in fits.values()):
+        return card, {"applied": False, "tilt": 0.0}
+    (ml, cl, _), (mr, cr, _), (mt, ct, _), (mb, cb, _) = (fits[s] for s in ("left", "right", "top", "bottom"))
+    # edge lines in image coordinates: left x = ml*y + cl ; right x = w-1-(mr*y + cr) ; top y = mt*x + ct ; bottom y = h-1-(mb*x + cb)
+    tilt = float(np.degrees(np.arctan(np.mean([ml, -mr, -mt, mb]))))
+    if max(abs(ml), abs(mr), abs(mt), abs(mb)) < 0.004 and max(cl, cr, ct, cb) < 3:
+        return card, {"applied": False, "tilt": round(tilt, 2)}
+
+    def corner(x_of_y, y_of_x):
+        y = h / 2
+        for _ in range(20):  # fixed point: intersect the two lines
+            x = x_of_y(y)
+            y = y_of_x(x)
+        return x, y
+
+    L = lambda y: ml * y + cl
+    R = lambda y: w - 1 - (mr * y + cr)
+    T = lambda x: mt * x + ct
+    B = lambda x: h - 1 - (mb * x + cb)
+    src = np.array([corner(L, T), corner(R, T), corner(R, B), corner(L, B)], dtype="float32")
+    wd = (np.linalg.norm(src[1] - src[0]) + np.linalg.norm(src[2] - src[3])) / 2
+    ht = (np.linalg.norm(src[3] - src[0]) + np.linalg.norm(src[2] - src[1])) / 2
+    # only ever a small correction: the card edge sits within ~3.5% of the frame (the printed border is further in)
+    if not wd or abs(wd / ht - CARD_W / CARD_H) > 0.04 or wd < w * 0.93 or ht < h * 0.93:
+        return card, {"applied": False, "tilt": round(tilt, 2)}  # the fitted lines aren't the card's outline
+    dst = np.array([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]], dtype="float32")
+    M = cv2.getPerspectiveTransform(src, dst)
+    out = cv2.warpPerspective(np.array(card.convert("RGB")), M, (CARD_W, CARD_H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    return Image.fromarray(out), {"applied": True, "tilt": round(tilt, 2)}
+
+
 def tight_card(card: Image.Image, lines: dict) -> Image.Image:
     """The card cut exactly to its outer edges (for condition inspection), back at 630 x 880."""
     ol, ot, orr, ob = lines["ol"], lines["ot"], lines["or"], lines["ob"]

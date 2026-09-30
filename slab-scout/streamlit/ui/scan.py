@@ -95,7 +95,9 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     # 1c. Picture alone: the scan's fingerprint against every price-guide photo (works with no readable text)
     if not code_hit:
         have = {x["card"].key for x in cands if x["kind"] == "catalog"}
-        pics = catalog.photo_lookup(f["phash"])
+        # 64-bit fingerprints of unrelated cards often sit ~12 apart, so only close ones count: <= 6 on its own,
+        # <= 10 only to back up a card the text already points to
+        pics = catalog.photo_lookup(f["phash"], max_distance=10)
         if len(pics) > 1 and pics[1][1] - pics[0][1] <= 4:
             # same artwork, several parallels: let the colours decide (compares with the actual photos)
             try:
@@ -110,8 +112,8 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                     if x["kind"] == "catalog" and x["card"].key == c.key:
                         x["score"] += 20 if dist <= 8 else 10
                         x["why"].append(why)
-            else:
-                cands.append({"kind": "catalog", "card": c, "score": 78 - dist * 2, "why": [why]})
+            elif dist <= 6:
+                cands.append({"kind": "catalog", "card": c, "score": 80 - dist * 3, "why": [why]})
                 have.add(c.key)
     # 2. Community fingerprint matches (cards people confirmed before)
     for m in comm:
@@ -549,6 +551,8 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         if (scan.get("ai") or {}).get("psa"):
             st.toggle("Use the AI's grade", value=True, key=f"useai_{key}")
         st.markdown(f"**Centering** {esc(grade['centering']['front'])}" + (f" · back {esc(grade['centering']['back'])}" if grade['centering'].get('back') else ""))
+        if (f.get("skew") or {}).get("applied"):
+            st.caption("📐 The photo was taken at a slight angle, so the card was straightened (all four edges made square) before measuring centering and checking corners and edges.")
         centering.centering_tool(f["card"], f["centering"], f"cen_{key}", f.get("edges"))
         _inspection_panel(scan, x, key)
         reasons = "".join(f"<li>{esc(r)}</li>" for r in auth["reasons"]) or "<li>Pick a database match or use the AI boost to compare against the real card.</li>"
