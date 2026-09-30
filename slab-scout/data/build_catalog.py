@@ -208,6 +208,7 @@ def build():
                 tv["print_run"] = prun
             if rawp:
                 tv["prices"].append(rawp)
+        s["rows"] = None  # free the raw rows as we go (the build runs close to the memory limit)
         tier_list = []
         odds = ODDS.get(slug, {})
         for t in tiers.values():
@@ -225,6 +226,10 @@ def build():
             "box": BOX.get(slug), "notes": SET_NOTES.get(slug, ""),
             "source": host, "source_url": f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
         }
+
+    merged.clear()
+    import gc
+    gc.collect()
 
     # Hand-built checklists (no price site coverage yet)
     for f in glob.glob(os.path.join(HERE, "checklists", "*.json")):
@@ -401,6 +406,8 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
         write_gz(os.path.join(remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json.gz"), rows)
     for k, rows in shards.items():
         write_gz(os.path.join(remote, "names", k + ".json.gz"), rows)
+    n_sets, n_shards = len(by_set), len(shards)
+    del by_set, shards
     if os.path.isdir(app_dir):
         json.dump({"fields": fields, "rows": local}, open(os.path.join(app_dir, "cards.json"), "w"), separators=(",", ":"))
         for f in ("sets.json", "sales.json"):
@@ -408,9 +415,14 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
                 b.write(a.read())
     # photo fingerprints (perceptual hash of each price-guide photo): [hash, photo id, set] so a scan can be
     # matched by picture alone, even with no readable text
+    import gc
+    gc.collect()
+    wanted = {(r[9] or "").lstrip("~") for r in cards if r[9]}
     ph = {}
     for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")):
-        ph.update(load_json(f))
+        ph.update((k, v) for k, v in load_json(f).items() if k in wanted)  # only photos a card uses
+        gc.collect()
+    del wanted
     seen, prows = set(), []
     for r in cards:
         im = (r[9] or "").lstrip("~")
@@ -425,14 +437,14 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     for old in ("phash.json", "phash.json.gz"):
         if os.path.exists(os.path.join(remote, old)):
             os.remove(os.path.join(remote, old))
-    print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos)")
+    print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos in use)")
     import time as _t
     files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
     files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
     files += [(f"phash-{i}.json.gz", os.path.getsize(os.path.join(remote, f"phash-{i}.json.gz"))) for i in range(PARTS)]
     json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
               open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
-    print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
+    print(f"phone: {len(local)} cards bundled, {n_sets} sets + {n_shards} name shards downloadable")
 
 
 def build_borders():
