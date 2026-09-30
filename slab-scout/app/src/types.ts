@@ -10,4 +10,6 @@ export interface Settings {
   supabaseKey: string;
   /** Private vault code; the same code shows the same vault in the Streamlit app. */
   vaultCode: string;
+  /** Which price the lists show: raw (ungraded), PSA 9, or PSA 10 Gem Mint. */
+  priceMode?: 'raw' | 'psa9' | 'psa10';
 }

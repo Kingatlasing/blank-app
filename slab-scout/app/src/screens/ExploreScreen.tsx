@@ -3,7 +3,7 @@ import { FlatList, Pressable, Text, TextInput, View } from 'react-native';
 import { C, S } from '../theme';
 import { ChipRow, Grid, RarityChip, Tile } from '../components/cards';
 import { useApp } from '../appContext';
-import { Card, imageUrl, printRunLabel, search, searchRemote, sets, value } from '../core/catalog';
+import { Card, imageUrl, priceIn, printRunLabel, search, searchRemote, sets } from '../core/catalog';
 import { money } from '../theme';
 
 export default function ExploreScreen() {
@@ -58,8 +58,7 @@ export default function ExploreScreen() {
           <Text style={S.muted}>{hits.length} card match{hits.length === 1 ? '' : 'es'}{hits.length === 45 ? ' (top 45)' : ''}{searching ? ' · searching all sets…' : ''}</Text>
           <Grid>
             {hits.map((c) => {
-              const [v, est] = value(c);
-              return <Tile key={c.key} title={c.name} sub={`${all[c.setId]?.name || ''} · ${c.variant || 'Base'} · #${c.number}`} price={v ? `${est ? '~' : ''}${money(v)}` : '—'} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />;
+              return <Tile key={c.key} title={c.name} sub={`${all[c.setId]?.name || ''} · ${c.variant || 'Base'} · #${c.number}`} price={priceIn(c, app.settings.priceMode).text} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />;
             })}
           </Grid>
         </>

@@ -4,7 +4,7 @@ import { C, S, money } from '../theme';
 import { Btn } from '../components/ui';
 import { Grid, Tile, ValueChart } from '../components/cards';
 import { useApp } from '../appContext';
-import { cards, imageUrl, sets, value } from '../core/catalog';
+import { cards, imageUrl, priceIn, sets, value } from '../core/catalog';
 import { currentValue, inCollection, recordImage, today } from '../core/portfolio';
 
 export default function HomeScreen() {
@@ -35,7 +35,8 @@ export default function HomeScreen() {
   const pct = prev && prev.value ? (change / prev.value) * 100 : 0;
   const top = [...items].sort((a, b) => currentValue(b) - currentValue(a)).slice(0, 6);
   const recent = [...items].sort((a, b) => (b.added_at || '').localeCompare(a.added_at || '')).slice(0, 6);
-  const chase = useMemo(() => cards().filter((c) => c.raw).sort((a, b) => (b.raw || 0) - (a.raw || 0)).slice(0, 6), []);
+  const mode = app.settings.priceMode;
+  const chase = useMemo(() => cards().filter((c) => priceIn(c, mode).v).sort((a, b) => (priceIn(b, mode).v || 0) - (priceIn(a, mode).v || 0)).slice(0, 6), [mode]);
   const allSets = sets();
 
   return (
@@ -91,7 +92,7 @@ export default function HomeScreen() {
       <Text style={S.h2}>Top chase cards right now</Text>
       <Grid>
         {chase.map((c) => (
-          <Tile key={c.key} title={c.name} sub={`${allSets[c.setId]?.name || ''} · ${c.variant || 'Base'}`} price={money(value(c)[0] ?? undefined)} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />
+          <Tile key={c.key} title={c.name} sub={`${allSets[c.setId]?.name || ''} · ${c.variant || 'Base'}`} price={priceIn(c, app.settings.priceMode).text} printRun={c.printRun} uri={imageUrl(c)[0]} onPress={() => app.openCard(c.key)} />
         ))}
       </Grid>
     </ScrollView>

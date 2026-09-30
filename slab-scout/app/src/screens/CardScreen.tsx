@@ -84,7 +84,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
       </View>
 
       <View style={S.row}>
-        {([[est ? 'Raw (typical)' : 'Raw', v], ['PSA 9', c.psa9], ['PSA 10', c.psa10]] as [string, number | null][]).map(([l, x], i) => (
+        {([[est ? 'Raw (typical)' : 'Raw', v], ['PSA 9', c.psa9], ['PSA 10 Gem', c.psa10]] as [string, number | null][]).map(([l, x], i) => (
           <View key={l} style={[st.metric, i === 0 && { backgroundColor: C.goldSoft }]}>
             <Text style={S.eyebrow}>{l}</Text>
             <Text style={[st.big, i === 0 && { color: C.gold }]} numberOfLines={1} adjustsFontSizeToFit>{money(x ?? undefined)}</Text>

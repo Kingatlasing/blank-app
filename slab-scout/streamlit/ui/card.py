@@ -39,7 +39,7 @@ def page():
     _v, _est = catalog.value(c)
     m[0].metric("Raw" + (" (typical)" if _est else ""), money(_v), help="No sale of this exact card yet, so this is the typical sold price for its parallel." if _est else None)
     m[1].metric("PSA 9", money(c.psa9))
-    m[2].metric("PSA 10", money(c.psa10))
+    m[2].metric("PSA 10 (Gem Mint)", money(c.psa10))
     odds = catalog.odds_text(t, s)
     facts = []
     if c.print_run:

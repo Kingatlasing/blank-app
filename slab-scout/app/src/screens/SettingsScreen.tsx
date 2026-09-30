@@ -92,6 +92,19 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
         </View>
       ) : null}
 
+      <Text style={[S.h2, { marginTop: 8 }]}>Show prices as</Text>
+      <View style={[S.row, { gap: 6, flexWrap: 'wrap' }]}>
+        {([['raw', 'Raw'], ['psa9', 'PSA 9'], ['psa10', 'PSA 10 (Gem Mint)']] as const).map(([id, label]) => {
+          const on = (settings.priceMode || 'raw') === id;
+          return (
+            <Pressable key={id} onPress={() => onChange({ ...settings, priceMode: id })} style={[S.chip, { paddingVertical: 8, paddingHorizontal: 12 }, on && { backgroundColor: C.accent }]}>
+              <Text style={[S.chipText, on && { color: C.accentInk }]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={S.muted}>Graded views show the PSA price when the card has graded sales, otherwise its raw price marked "raw".</Text>
+
       <OfflineCatalog />
 
       <Text style={[S.h2, { marginTop: 8 }]}>Vault & community</Text>

@@ -4,7 +4,7 @@ import { C, S, money } from '../theme';
 import { Btn } from '../components/ui';
 import { ChipRow, Header, RarityChip, Segmented } from '../components/cards';
 import { useApp } from '../appContext';
-import { loadSet, oddsText, printRunLabel, setCards, sets, useCatalogVersion, value } from '../core/catalog';
+import { loadSet, priceIn, oddsText, printRunLabel, setCards, sets, useCatalogVersion, value } from '../core/catalog';
 
 type Show = 'all' | 'owned' | 'missing' | 'value';
 
@@ -36,9 +36,9 @@ export default function SetScreen({ setId, onBack }: { setId: string; onBack: ()
     if (tierSel !== 'All') v = v.filter((c) => (c.variant || 'Base') === tierSel);
     if (show === 'owned') v = v.filter((c) => owned.has(c.key));
     if (show === 'missing') v = v.filter((c) => !owned.has(c.key));
-    if (show === 'value') v = [...v].sort((a, b) => (value(b)[0] || 0) - (value(a)[0] || 0));
+    if (show === 'value') v = [...v].sort((a, b) => (priceIn(b, app.settings.priceMode).v || 0) - (priceIn(a, app.settings.priceMode).v || 0));
     return v;
-  }, [all, q, tierSel, show, owned]);
+  }, [all, q, tierSel, show, owned, app.settings.priceMode]);
 
   if (!s) return <View style={[S.screen, S.pad]}><Header onBack={onBack} /><Text style={S.body}>Set not found.</Text></View>;
 
@@ -107,7 +107,7 @@ export default function SetScreen({ setId, onBack }: { setId: string; onBack: ()
       keyboardShouldPersistTaps="handled"
       ListFooterComponent={<Btn label="Full price guide ↗" onPress={() => Linking.openURL(s.source_url).catch(() => {})} />}
       renderItem={({ item: c }) => {
-        const [v, est] = value(c);
+        const p = priceIn(c, app.settings.priceMode);
         const mine = owned.has(c.key);
         return (
           <Pressable onPress={() => app.openCard(c.key)} style={({ pressed }) => [st.row, pressed && { opacity: 0.7 }]}>
@@ -116,7 +116,7 @@ export default function SetScreen({ setId, onBack }: { setId: string; onBack: ()
               <Text style={[S.body, { fontWeight: '700' }]} numberOfLines={1}>{c.name}</Text>
               <Text style={S.muted} numberOfLines={1}>#{c.number} · {c.variant || 'Base'} {printRunLabel(c.printRun)}</Text>
             </View>
-            <Text style={[S.body, S.mono, { fontWeight: '700', color: est ? C.ink2 : C.ink }]}>{v ? `${est ? '~' : ''}${money(v)}` : '—'}</Text>
+            <Text style={[S.body, S.mono, { fontWeight: '700', color: p.graded ? C.gold : p.text.startsWith('~') ? C.ink2 : C.ink }]}>{p.text}</Text>
           </Pressable>
         );
       }}

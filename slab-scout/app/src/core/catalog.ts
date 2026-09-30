@@ -407,6 +407,18 @@ export function tier(card: Card): Tier | null {
   return s?.tiers.find((t) => t.name === (card.variant || 'Base')) || null;
 }
 
+export type PriceMode = 'raw' | 'psa9' | 'psa10';
+
+/** Price label in the chosen view. Graded views fall back to the raw price (marked 'raw') when the card
+ * has no graded sales; '~' = the parallel's typical raw price. */
+export function priceIn(card: Card, mode: PriceMode = 'raw'): { v: number | null; text: string; graded: boolean } {
+  if (mode === 'psa10' && card.psa10) return { v: card.psa10, text: `PSA 10 $${card.psa10.toFixed(2)}`, graded: true };
+  if (mode === 'psa9' && card.psa9) return { v: card.psa9, text: `PSA 9 $${card.psa9.toFixed(2)}`, graded: true };
+  const [v, est] = value(card);
+  if (!v) return { v: null, text: '—', graded: false };
+  return { v, text: `${est ? '~' : ''}$${v.toFixed(2)}${mode !== 'raw' ? ' raw' : ''}`, graded: false };
+}
+
 /** [price, isEstimate]: the card's own sold price, else the typical sold price of its parallel. */
 export function value(card: Card): [number | null, boolean] {
   if (card.raw) return [card.raw, false];

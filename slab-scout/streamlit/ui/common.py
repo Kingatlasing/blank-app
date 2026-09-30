@@ -106,6 +106,9 @@ def settings_sidebar():
         if code and len(code) < 6:
             st.warning("Use at least 6 characters.")
         st.divider()
+        s.price_mode = st.radio("Show prices as", PRICE_MODES, index=PRICE_MODES.index(s.get("price_mode", "Raw")),
+                                help="Raw = ungraded. PSA 10 = Gem Mint graded copy. Cards with no graded sales show their raw price, marked 'raw'.")
+        st.divider()
         prov_name = st.selectbox("AI boost", list(ai.PROVIDERS), index=list(ai.PROVIDERS).index(s.get("prov_name", "Off (free, no key)")),
                                  help="Off is free. A free Google Gemini key adds photo ID for any card, an authenticity check and AI grading.")
         s.prov_name = prov_name
@@ -245,10 +248,33 @@ def record_image(rec: dict, size: int = 240) -> str:
     return card_image(catalog_card((rec.get("match") or {}).get("catalog_key", "")), size) or (rec.get("match") or {}).get("image_url", "")
 
 
-def price_label(c) -> str:
-    """Catalog card price for tiles; '~' marks the parallel's typical price when the exact card hasn't sold."""
+PRICE_MODES = ["Raw", "PSA 9", "PSA 10 (Gem Mint)"]
+
+
+def price_mode() -> str:
+    return st.session_state.get("price_mode", "Raw")
+
+
+def card_price(c) -> tuple[float | None, str]:
+    """(price, label) in the chosen price view. Graded views fall back to the raw price when the card has
+    no graded sales. label: '' raw, 'PSA 10' / 'PSA 9', '~' parallel's typical raw price, 'raw' fallback."""
+    m = price_mode()
+    if m.startswith("PSA 10") and c.psa10:
+        return c.psa10, "PSA 10"
+    if m == "PSA 9" and c.psa9:
+        return c.psa9, "PSA 9"
     v, est = catalog.value(c)
-    return ("~" if est else "") + money(v) if v else "—"
+    return v, ("~" if est else "") if m == "Raw" else "raw"
+
+
+def price_label(c) -> str:
+    """Catalog card price for tiles, in the chosen view ('~' = the parallel's typical price)."""
+    v, lab = card_price(c)
+    if not v:
+        return "—"
+    if lab == "~":
+        return "~" + money(v)
+    return f"{lab} {money(v)}" if lab else money(v)
 
 
 def rarity_pill(print_run) -> str:

@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from core import catalog
-from ui.common import card_image, price_label, collection, esc, money, need_code, open_card, open_set, rarity_pill, tile
+from ui.common import card_image, card_price, price_label, price_mode, collection, esc, money, need_code, open_card, open_set, rarity_pill, tile
 
 
 def page():
@@ -156,13 +156,17 @@ def set_page():
     elif show == "Missing":
         view = [c for c in view if c.key not in owned]
     elif show == "Most valuable":
-        view = sorted(view, key=lambda c: -(c.raw or 0))
+        view = sorted(view, key=lambda c: -(card_price(c)[0] or 0))
     st.caption(f"{len(view):,} cards")
     df = pd.DataFrame([{"✓": "✓" if c.key in owned else "", "Card": c.name, "Parallel": c.variant or "Base", "Raw": c.raw,
-                        "#": c.number, "Print run": (f"/{c.print_run}" if c.print_run else ""), "PSA 10": c.psa10} for c in view[:500]])
+                        "#": c.number, "Print run": (f"/{c.print_run}" if c.print_run else ""), "PSA 9": c.psa9, "PSA 10": c.psa10} for c in view[:500]])
+    if len(df) and price_mode() != "Raw":  # graded view: graded price first
+        col = "PSA 10" if price_mode().startswith("PSA 10") else "PSA 9"
+        df = df[["✓", "Card", "Parallel", col] + [k for k in df.columns if k not in ("✓", "Card", "Parallel", col)]]
     if len(df):
         ev = st.dataframe(df, hide_index=True, width="stretch", on_select="rerun", selection_mode="single-row",
-                          column_config={"Raw": st.column_config.NumberColumn(format="$%.2f"), "PSA 10": st.column_config.NumberColumn(format="$%.2f")})
+                          column_config={"Raw": st.column_config.NumberColumn(format="$%.2f"), "PSA 9": st.column_config.NumberColumn(format="$%.2f"),
+                                         "PSA 10": st.column_config.NumberColumn("PSA 10 (Gem)", format="$%.2f")})
         sel = (ev.selection.rows if ev and ev.selection else [])
         if sel:
             open_card(view[sel[0]].key)

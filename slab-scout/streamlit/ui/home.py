@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from core import catalog
-from ui.common import card_image, record_image, collection, current_value, esc, money, need_code, open_card, portfolio_history, rarity_pill, tile
+from ui.common import card_image, record_image, collection, current_value, esc, money, need_code, open_card, portfolio_history, rarity_pill, tile, card_price, price_label
 
 
 def page():
@@ -64,15 +64,15 @@ def _grid(recs: list[dict], tag: str):
 
 
 def _discover():
-    cards = [c for c in catalog.cards() if c.raw]
+    cards = [c for c in catalog.cards() if card_price(c)[0]]
     if not cards:
         return
     st.markdown("#### Top chase cards right now")
-    top = sorted(cards, key=lambda c: c.raw, reverse=True)[:6]
+    top = sorted(cards, key=lambda c: card_price(c)[0] or 0, reverse=True)[:6]
     cols = st.columns(3)
     sets = catalog.sets()
     for i, c in enumerate(top):
         with cols[i % 3]:
-            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'}", money(c.raw), None, rarity_pill(c.print_run), card_image(c)), unsafe_allow_html=True)
+            st.markdown(tile(c.name, f"{sets.get(c.set_id, {}).get('name','')} · {c.variant or 'Base'}", price_label(c), None, rarity_pill(c.print_run), card_image(c)), unsafe_allow_html=True)
             if st.button("View", key=f"d_{i}", width="stretch"):
                 open_card(c.key)
