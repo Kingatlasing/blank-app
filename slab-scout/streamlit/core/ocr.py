@@ -1,6 +1,7 @@
 """Read the printed text on a card and pull out the useful bits (name, number, year, brand, game)."""
 from __future__ import annotations
 
+import os
 import re
 from functools import lru_cache
 
@@ -32,6 +33,33 @@ def _engine():
     from rapidocr_onnxruntime import RapidOCR
 
     return RapidOCR()
+
+
+_MODELS = os.path.join(os.path.dirname(__file__), "..", "models")
+CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]")
+
+
+@lru_cache(maxsize=1)
+def _engine_cjk():
+    """PP-OCRv5 reader: English + Japanese (kana and kanji) + Chinese. Used for Asian-language cards."""
+    from rapidocr_onnxruntime import RapidOCR
+
+    return RapidOCR(rec_model_path=os.path.join(_MODELS, "ppocrv5_rec.onnx"), rec_keys_path=os.path.join(_MODELS, "ppocrv5_dict.txt"))
+
+
+def has_cjk(lines) -> bool:
+    return any(CJK.search(t) for t, *_ in lines)
+
+
+def read_text_cjk(img: Image.Image) -> list[tuple[str, float, float]]:
+    arr = np.array(img.convert("RGB"))
+    try:
+        result, _ = _engine_cjk()(arr)
+    except Exception:
+        return []
+    h = arr.shape[0]
+    lines = [(text.strip(), float(conf), float(np.mean([p[1] for p in box])) / h) for box, text, conf in result or []]
+    return sorted(lines, key=lambda t: t[2])
 
 
 def read_text(img: Image.Image) -> list[tuple[str, float, float]]:

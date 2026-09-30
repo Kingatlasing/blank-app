@@ -14,7 +14,9 @@ it picked a card ("name ✓ · number 006/165 ✓ · HP 330 ✓ · attack Burnin
 from __future__ import annotations
 
 import difflib
+import os
 import re
+from functools import lru_cache
 import time
 import unicodedata
 from typing import Any
@@ -404,3 +406,38 @@ def identify(lines, parsed: dict, game: str = "") -> list[dict]:
         pass
     out.sort(key=lambda c: -c.get("score", 0))
     return out
+
+
+
+# ---------------- Japanese / Korean Pokémon ----------------
+@lru_cache(maxsize=1)
+def _cjk_names() -> dict:
+    """Japanese / Korean Pokémon species name -> English (from PokeAPI)."""
+    import json as _json
+    p = os.path.join(os.path.dirname(__file__), "pokemon_cjk_names.json")
+    return _json.load(open(p, encoding="utf8")) if os.path.exists(p) else {}
+
+
+_CJK_SUFFIX = [("VMAX", "VMAX"), ("VSTAR", "VSTAR"), ("GX", "GX"), ("ex", "ex"), ("EX", "EX"), ("V", "V"), ("ＧＸ", "GX"), ("ｅｘ", "ex")]
+
+
+def cjk_pokemon(lines) -> dict | None:
+    """Read a Japanese / Korean Pokémon card: English species name (+ ex / V / GX...), card number."""
+    names = _cjk_names()
+    best = None
+    for text, conf, y in lines:
+        t = text.replace(" ", "")
+        for i in range(len(t)):
+            for j in range(min(len(t), i + 8), i, -1):  # longest name starting at i
+                en = names.get(t[i:j])
+                if en and (best is None or (j - i, -y) > (best[0], -best[3])):
+                    rest = t[j:j + 6]
+                    suf = next((v for k, v in _CJK_SUFFIX if rest.startswith(k)), "")
+                    best = (j - i, en, suf, y)
+                    break
+    if not best:
+        return None
+    blob = " ".join(t for t, *_ in lines)
+    m = re.search(r"(\d{1,3})\s*/\s*(\d{2,3})", blob)
+    return {"name": f"{best[1]} {best[2]}".strip(), "species": best[1], "number": m.group(1).lstrip("0") if m else "",
+            "set_total": m.group(2) if m else ""}

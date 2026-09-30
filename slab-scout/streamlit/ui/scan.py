@@ -36,6 +36,21 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     cands: list[dict] = []
 
     g = "" if game == "Auto" else game
+    # Japanese / Korean cards: read the Asian text with the multilingual reader, map the Pokémon name to English
+    if g in ("", "Pokémon", "Pokémon Japanese / Korean") and (g == "Pokémon Japanese / Korean" or ocr.has_cjk(f["lines"])):
+        jl = ocr.read_text_cjk(f["card"])
+        jp = identify.cjk_pokemon(jl)
+        if jp:
+            g = "Pokémon Japanese / Korean"
+            parsed = {**parsed, "name": jp["name"], "number": jp["number"], "game": g,
+                      "raw_text": parsed["raw_text"] + "\n" + "\n".join(t for t, *_ in jl)}
+            for c in catalog.search(f"{jp['species']} {jp['number']}".strip(), limit=40) or catalog.search(jp["species"], limit=40):
+                if catalog.sets().get(c.set_id, {}).get("category") != "Pokémon":
+                    continue
+                num_ok = jp["number"] and re.sub(r"^0+", "", c.number) == jp["number"]
+                sc = 58 + (18 if num_ok else 0) + (8 if jp["name"].lower() == c.name.lower() else 0)
+                cands.append({"kind": "catalog", "card": c, "score": sc,
+                              "why": [f"reads {jp['name']} (Japanese / Korean)"] + ([f"number {jp['number']} ✓"] if num_ok else [])})
     # 1. Kakawow-style card codes pin the exact card + parallel in the built-in database
     code_hit = bool(catalog.CODE_RE.search(parsed["raw_text"].upper()))
     text_n = " " + identify.norm(parsed["raw_text"]) + " "
