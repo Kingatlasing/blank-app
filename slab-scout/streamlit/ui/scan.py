@@ -13,7 +13,7 @@ from ui import centering
 from ui.common import (card_image, VERDICTS, add_to_collection, esc, get_store, grade_color, money, need_code, open_card, rarity_pill,
                        record_from_catalog)
 
-GAMES = ["Auto", "Graded slab", "Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana", "One Piece", "Sports", "Kakawow / Disney / Marvel",
+GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana", "One Piece", "Sports", "Kakawow / Disney / Marvel",
          "Non-sport (history, music…)", "Other"]
 
 
@@ -30,7 +30,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     f["inspect"] = condition.inspect_card(vision.tight_card(f["card"], f["edges"]))
     if b:
         b["inspect"] = condition.inspect_card(vision.tight_card(b["card"], b["edges"]), is_back=True)
-    parsed = ocr.parse(f["lines"], "" if game in ("Auto", "Sports", "Kakawow / Disney / Marvel", "Non-sport (history, music…)", "Other") else game)
+    parsed = ocr.parse(f["lines"], "" if game in ("Auto", "Sports", "Kakawow / Disney / Marvel", "Non-sport (history, music…)", "Other", "Pokémon Japanese / Korean") else game)
     store = get_store()
     comm = pipeline.community_matches(store, f["phash"])
     cands: list[dict] = []

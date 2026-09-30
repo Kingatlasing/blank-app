@@ -101,6 +101,8 @@ def slug_meta(slug: str, title: str) -> dict:
     brand = "Kakawow" if "kakawow" in s else "Keepsake" if "keepsake" in s else "Upper Deck" if "upper-deck" in s else "Wild Card" if "wild-card" in s else "Historic Autographs" if "historic" in s else "Other"
     if s.startswith(("hockey", "football", "baseball", "basketball", "soccer", "golf", "tennis", "boxing")):
         category = s.split("-")[0].title()
+    elif s.startswith("pokemon"):
+        category = "Pokémon"
     elif "marvel" in s:
         category = "Marvel"
     elif "star-wars" in s:
@@ -114,6 +116,8 @@ def slug_meta(slug: str, title: str) -> dict:
     else:
         category = "Non-sport"
     name = re.sub(r"\s*(Checklist|Prices).*$", "", title).strip() or slug
+    if s.startswith("pokemon-") and not name.lower().startswith("pokemon"):
+        name = " ".join(w.replace("%27", "'").capitalize() for w in s.split("-")).replace("Pokemon", "Pokémon")
     if not re.search(r"(19|20)\d\d", name) and re.match(r"^[a-z]+-cards-(19|20)\d\d-", s):
         # SportsCardsPro brand-page labels are short ("'91 Upper Deck"): rebuild the name from the slug
         rest = s.split("-cards-", 1)[1]
@@ -149,7 +153,7 @@ def build():
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
-                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini")):
+                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     for slug, s in merged.items():

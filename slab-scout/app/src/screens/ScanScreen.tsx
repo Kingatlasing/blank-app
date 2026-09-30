@@ -21,7 +21,7 @@ import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
 
-export const GAMES = ['Auto', 'Pokémon', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
+export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
 const TYPES = ['Base', 'Holo', 'Reverse Holo', 'Full Art', 'Secret Rare', 'Rookie', 'Parallel', 'Insert', 'Autograph', 'Relic', 'Promo', 'Custom', 'Other'];
 const MATCH_STRONG = 10;
 const MATCH_WEAK = 16;
