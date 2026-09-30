@@ -26,6 +26,7 @@ RAW = os.path.join(HERE, "raw")
 OUT = os.path.join(HERE, "catalog")
 os.makedirs(OUT, exist_ok=True)
 
+YGO_CODE = re.compile(r"\s+([A-Z0-9]{2,5}-[A-Z]{0,2}\d{2,3}[A-Z]?)$")
 TITLE_RE = re.compile(r"^(?P<name>.*?)(?:\s*\[(?P<variant>[^\]]+)\])?\s*(?:#(?P<num>\S+))?$")
 
 # Pack odds collected from product checklists (breakninja / manufacturer sheets).
@@ -103,6 +104,10 @@ def slug_meta(slug: str, title: str) -> dict:
         category = s.split("-")[0].title()
     elif s.startswith("pokemon"):
         category = "Pokémon"
+    elif s.startswith("yugioh"):
+        category, brand = "Yu-Gi-Oh!", "Konami"
+    elif s.startswith("magic-"):
+        category, brand = "Magic: The Gathering", "Wizards of the Coast"
     elif "marvel" in s:
         category = "Marvel"
     elif "star-wars" in s:
@@ -139,7 +144,7 @@ def num(v):
 def build():
     sets: dict[str, dict] = {}
     cards: list[list] = []
-    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*")))
+    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*")))
     merged: dict[str, dict] = {}
     fetched = {}
     inline_imgs: dict[str, str] = {}
@@ -155,7 +160,7 @@ def build():
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
-                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon")):
+                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     for slug, s in merged.items():
@@ -176,6 +181,8 @@ def build():
                 t, pr, raw, g9, p10, u = r["t"], r.get("pr", ""), r.get("raw"), r.get("g9"), r.get("psa10"), r.get("u", "")
                 if r.get("img"):
                     inline_imgs[u.replace("/game/", "")] = r["img"]
+            if "#" not in t:  # Yu-Gi-Oh! set codes come without '#': 'Dark Magician LOB-005' -> 'Dark Magician #LOB-005'
+                t = YGO_CODE.sub(r" #\1", t.strip())
             m = TITLE_RE.match(t.strip())
             name = (m.group("name") or t).strip() if m else t
             variant = (m.group("variant") or "").strip() if m else ""
