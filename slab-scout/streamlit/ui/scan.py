@@ -13,7 +13,8 @@ from ui import centering
 from ui.common import (card_image, VERDICTS, add_to_collection, esc, get_store, grade_color, money, need_code, open_card, rarity_pill,
                        record_from_catalog)
 
-GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana", "One Piece", "Sports", "Kakawow / Disney / Marvel",
+GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana", "One Piece",
+         "Dragon Ball", "Digimon", "Star Wars", "Marvel", "Gundam", "Riftbound", "Harry Potter", "Garbage Pail Kids", "Sports", "Kakawow / Disney / Marvel",
          "Non-sport (history, music…)", "Other"]
 
 

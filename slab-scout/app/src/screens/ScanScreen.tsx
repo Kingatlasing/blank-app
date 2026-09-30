@@ -23,7 +23,7 @@ import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
-export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
+export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Dragon Ball', 'Digimon', 'Star Wars', 'Marvel', 'Gundam', 'Riftbound', 'Harry Potter', 'Garbage Pail Kids', 'Kakawow', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
 const TYPES = ['Base', 'Holo', 'Reverse Holo', 'Full Art', 'Secret Rare', 'Rookie', 'Parallel', 'Insert', 'Autograph', 'Relic', 'Promo', 'Custom', 'Other'];
 const MATCH_STRONG = 10;
 const MATCH_WEAK = 16;

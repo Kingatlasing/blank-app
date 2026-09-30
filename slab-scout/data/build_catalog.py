@@ -160,7 +160,7 @@ def build():
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
-                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic")):
+                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic", "-tcg")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     for slug, s in merged.items():
@@ -172,6 +172,8 @@ def build():
         meta = slug_meta(slug, s.get("title", slug))
         if s.get("brand") and meta["brand"] == "Other":
             meta["brand"] = s["brand"]
+        if s.get("category"):
+            meta["category"] = s["category"]
         tiers: dict[str, dict] = {}
         for r in rows:
             if isinstance(r, list):  # compact format
