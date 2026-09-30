@@ -423,7 +423,8 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     ph = {}
     for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")) + glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
         # colour files hold [phash, colour signature] per photo
-        ph.update((k, v[0] if isinstance(v, list) else v) for k, v in load_json(f).items() if k in wanted)  # only photos a card uses
+        ph.update((k, v[0] if isinstance(v, list) else v) for k, v in load_json(f).items()
+                  if k in wanted and re.fullmatch(r"[0-9a-f]{16}", v[0] if isinstance(v, list) else (v or "")))  # only photos a card uses
         gc.collect()
     del wanted
     seen, prows = set(), []
@@ -495,7 +496,8 @@ def build_colours():
     {set: {parallel: signature}} for sets with more than one parallel (the only place colour helps)."""
     col = {}
     for f in glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
-        col.update((k, v[1]) for k, v in load_json(f).items() if isinstance(v, list) and len(v) > 1 and v[1])
+        col.update((k, v[1]) for k, v in load_json(f).items()
+                   if isinstance(v, list) and len(v) > 1 and re.fullmatch(r"[0-9a-f]{26}", v[1] or ""))  # skip broken photos
     if not col:
         return
     import gzip
