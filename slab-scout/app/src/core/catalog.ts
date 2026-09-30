@@ -275,7 +275,16 @@ const popcnt = (v: number) => {
 export async function photoLookup(hash: string, maxDistance = 12, limit = 8): Promise<{ card: Card; distance: number }[]> {
   if (!hash || hash.length !== 16) return [];
   if (!_ph) {
-    const rows: [string, string, string][] = await cachedJson('phash.json.gz');
+    // fingerprints come in parts (phash-0.json.gz, phash-1...) so no file passes GitHub's size limit
+    let rows: [string, string, string][] = [];
+    for (let i = 0; i < 16; i++) {
+      try {
+        rows = rows.concat(await cachedJson(`phash-${i}.json.gz`));
+      } catch {
+        break;
+      }
+    }
+    if (!rows.length) rows = await cachedJson('phash.json.gz');
     const hi = new Uint32Array(rows.length);
     const lo = new Uint32Array(rows.length);
     rows.forEach(([h], i) => {

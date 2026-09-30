@@ -141,7 +141,13 @@ def _ensure_shards(query: str) -> None:
 def _phash_table():
     """Photo fingerprints of every catalog photo: (uint64 array, [(photo id, set id)])."""
     import numpy as np
-    rows = _read_remote("phash.json")
+    rows = []
+    for i in range(16):
+        part = _read_remote(f"phash-{i}.json")
+        if part is None:
+            break
+        rows += part
+    rows = rows or _read_remote("phash.json")  # older single-file builds
     if not rows:
         return np.zeros(0, dtype=np.uint64), []
     return np.array([int(h, 16) for h, _, _ in rows], dtype=np.uint64), [(im, sid) for _, im, sid in rows]

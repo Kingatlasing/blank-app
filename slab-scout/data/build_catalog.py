@@ -411,14 +411,18 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
         if h and (im, r[0]) not in seen:
             seen.add((im, r[0]))
             prows.append([h, im, r[0]])
-    write_gz(os.path.join(remote, "phash.json.gz"), prows)
-    if os.path.exists(os.path.join(remote, "phash.json")):
-        os.remove(os.path.join(remote, "phash.json"))
+    # split in 4 parts: one file would pass GitHub's 100 MB limit as the catalog grows
+    PARTS = 4
+    for i in range(PARTS):
+        write_gz(os.path.join(remote, f"phash-{i}.json.gz"), prows[i::PARTS])
+    for old in ("phash.json", "phash.json.gz"):
+        if os.path.exists(os.path.join(remote, old)):
+            os.remove(os.path.join(remote, old))
     print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos)")
     import time as _t
     files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
     files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
-    files += [("phash.json.gz", os.path.getsize(os.path.join(remote, "phash.json.gz")))]
+    files += [(f"phash-{i}.json.gz", os.path.getsize(os.path.join(remote, f"phash-{i}.json.gz"))) for i in range(PARTS)]
     json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
               open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
     print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
