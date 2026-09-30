@@ -37,6 +37,45 @@ TAG_CENTER = [(10.5, 51), (10, 55), (9, 60), (8.5, 62.5), (8, 65), (7.5, 67.5), 
               (5.5, 77.5), (5, 80), (4.5, 82.5), (4, 85), (3.5, 87.5), (3, 90), (2, 95), (1.5, 98.33)]
 
 
+# Centering limits per grading company: (grade label, front max %, back max %). Larger side of the split,
+# so 55 means 55/45. Sources: PSA grading standards; CGC cgccards.com/card-grading/grading-scale; TAG
+# taggrading.com/pages/rubric (separate TCG / sports back limits); BGS and SGC from published secondary guides
+# (Beckett's own page was unavailable). None = the company publishes no back figure for that grade.
+GRADERS: dict[str, list[tuple[str, float, float | None]]] = {
+    "PSA": [("10", 55, 75), ("9", 60, 90), ("8", 65, 90), ("7", 70, 90), ("6", 80, 90), ("5", 85, 90), ("4", 85, 90), ("3", 90, 90), ("2", 95, 95)],
+    "BGS": [("10 Pristine", 50, 55), ("9.5", 55, 60), ("9", 55, 70), ("8", 60, 80), ("7", 65, 90), ("6", 70, 95)],
+    "SGC": [("10 Pristine", 50, None), ("10", 55, None), ("9", 60, None), ("8", 65, None), ("7", 70, None), ("6", 75, None)],
+    "CGC": [("10 Pristine", 50, None), ("10", 55, 75), ("9", 60, 90), ("8", 65, None), ("7.5", 65, None), ("7", 70, None), ("6", 75, None), ("4.5", 85, None)],
+    "TAG": [("10 Pristine", 51, None), ("10", 55, None), ("9", 60, None), ("8.5", 62.5, None), ("8", 65, None), ("7", 70, None), ("6", 75, None), ("5", 80, None)],
+}
+TAG_BACK = {"tcg": {"10 Pristine": 52, "10": 65, "9": 75, "8.5": 85}, "sports": {"10 Pristine": 54.5, "10": 70, "9": 90, "8.5": 95}}
+
+# Card styles: how centering / corners are judged. No grader publishes a die-cut or full-art centering rule;
+# the approach below is the common practice (measure to the printed frame; don't penalise the cut shape).
+CARD_STYLES = {
+    "Standard (bordered)": "Centering = the printed border on each side, card edge to the inner frame.",
+    "Full art / borderless": "No border to measure: centering is judged by the design (text box, frame lines) or not at all. Graders are more forgiving here since there is no border contrast to show a shift.",
+    "Die-cut": "The outline is cut to a shape, so centering is measured from the printed design to the cut edge where the design has a frame; the shaped edges and points are held to the same corner/edge standard (a die-cut has received BGS Pristine 10). No grader publishes a separate die-cut rule.",
+    "Vintage / square corners": "Some vintage and tobacco cards are cut square or to a different size: square corners are not a flaw on those sets.",
+    "Slabbed (graded)": "Already graded: the label grade is read; the card is measured through the case.",
+}
+
+
+def grader_caps(front_worst: float | None, back_worst: float | None, tcg: bool = True) -> dict[str, str]:
+    """Best grade each company allows for this centering alone (larger-side % front / back)."""
+    out = {}
+    for comp, rows in GRADERS.items():
+        best = "below scale"
+        for label, f, b in rows:
+            if comp == "TAG":
+                b = TAG_BACK["tcg" if tcg else "sports"].get(label, 100)
+            if (front_worst is None or front_worst <= f) and (back_worst is None or b is None or back_worst <= b):
+                best = label
+                break
+        out[comp] = best
+    return out
+
+
 def psa_centering_cap(front_worst: int | None, back_worst: int | None) -> int:
     if front_worst is None:
         return 10
@@ -97,3 +136,37 @@ def estimate(front_worst: int | None, back_worst: int | None, corners, edges, su
         "tag_label": tag_label,
         "centering_cap": cap,
     }
+
+
+GUIDE = """
+**How the graders judge a card**
+
+- **Centering**: the border on opposite sides is compared, e.g. 55/45 means one side is 55% of the pair. Front and
+  back have separate limits (the back is judged much more loosely). The best grade each company allows:
+
+| Grade | PSA front / back | BGS | SGC | CGC | TAG front |
+|---|---|---|---|---|---|
+| 10 (Pristine) | — | 50/50 · back 55 | 50 | 50 | 51 |
+| 10 Gem Mint | 55/45 · 75/25 | 9.5: 55 · back 60 | 55 | 55 · back 75 | 55 |
+| 9 | 60/40 · 90/10 | 55 · back 70 | 60 | 60 · back 90 | 60 |
+| 8 | 65/35 · 90/10 | 60 · back 80 | 65 | 65 | 65 |
+| 7 | 70/30 · 90/10 | 65 · back 90 | 70 | 70 | 70 |
+
+  TAG judges the back differently for TCG and sports cards (TCG 10: 65, sports 10: 70).
+- **Corners**: PSA 10 = four perfectly sharp corners; 9 = one very minor flaw; 8 = slightest fraying at one or
+  two corners; 7 = slight fraying on some; 5 = minor rounding.
+- **Edges / surface**: 10 = no chipping, full original gloss, no staining; 9 allows one minor print imperfection
+  or a very slight wax stain on the back.
+- **Overall**: the weakest area decides (BGS: the overall tracks the lowest subgrade, a half grade above at most).
+- **Full art / borderless**: graded like any card, but centering is judged on the thin frame / design, and
+  graders are more forgiving because a shift is hard to see.
+- **Die-cut**: no grader publishes a special rule; the shaped edges and points are held to the normal corner /
+  edge standard, centering is judged on the printed design.
+- **Vintage**: many old cards are cut square or to other sizes; that is not a flaw.
+- **Autographs**: an authenticator (PSA/DNA, JSA, Beckett) compares the signature with known examples, checks
+  the ink and flow. PSA auto grade 10 = bold, no skips; 9 = a very light skip; 8 = more noticeable skip or slight
+  fading. Maker-certified autos (on-card or sticker) are guaranteed by the maker.
+
+Sources: psacard.com grading standards · cgccards.com grading scale · taggrading.com rubric · Beckett / SGC
+published scales (via collector guides) · psacard.com autograph grading standards.
+"""

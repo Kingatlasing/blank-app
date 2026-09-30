@@ -8,7 +8,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from core import ai, catalog, condition, databases, grading, identify, ocr, pipeline, slab, vision
+from core import ai, autograph, catalog, condition, databases, grading, identify, ocr, pipeline, slab, vision
 from ui import centering
 from ui.common import (card_image, VERDICTS, add_to_collection, esc, get_store, grade_color, money, need_code, open_card, rarity_pill,
                        record_from_catalog)
@@ -440,12 +440,14 @@ def _inspection(scan: dict, x: dict):
     f = scan["front"]
     L = _user_lines(scan)
     off = (x.get("c") or {}).get("_official") if x["kind"] == "tcgdb" else None
-    ck = "_insp_" + str((x.get("c") or {}).get("ref_id") if off is not None else "") + "_" + "_".join(str(round(L[k])) for k in ("ol", "ot", "or", "ob"))
+    rad = condition.corner_radius_px(game_of(scan), scan.get("_style", ""))
+    foil = scan.get("_style") == "full_art"
+    ck = "_insp_" + str((x.get("c") or {}).get("ref_id") if off is not None else "") + f"_{rad}_{foil}_" + "_".join(str(round(L[k])) for k in ("ol", "ot", "or", "ob"))
     if ck not in scan:
-        if off is None and L is f["edges"]:
+        if off is None and L is f.get("_edges0", f["edges"]) and rad == 30 and not foil:
             scan[ck] = f["inspect"]
         else:
-            scan[ck] = condition.inspect_card(vision.tight_card(f["card"], L), official=off)
+            scan[ck] = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=foil)
     return scan[ck]
 
 
@@ -486,6 +488,45 @@ def _manual_search(scan: dict, game: str, expanded: bool = False):
                 st.info("No card found with that name. Check the spelling, or pick the game.")
 
 
+STYLE_LABELS = {"standard": "Standard (bordered)", "full_art": "Full art / borderless", "die_cut": "Die-cut", "vintage": "Vintage / square corners"}
+
+
+def _card_facts(x: dict) -> tuple[str, str, str, str, str]:
+    """(set id, variant / rarity, name, year, number) of the picked match."""
+    if x["kind"] == "catalog":
+        c = x["card"]
+        return c.set_id, c.variant or "Base", c.name, str(catalog.sets().get(c.set_id, {}).get("year", "")), c.number
+    c = x.get("c") or {}
+    return "", f"{c.get('rarity', '')} {c.get('variant', '')}".strip(), c.get("name", ""), str(c.get("year", "")), c.get("number", "")
+
+
+def _apply_style(scan: dict, x: dict) -> str:
+    """Card layout (full art, die-cut...) and this set's measured border widths steer where the inner
+    centering lines are looked for. Re-places the lines when the picked card or the chosen style changes."""
+    f = scan["front"]
+    sid, variant, name, year, number = _card_facts(x)
+    printed = scan["parsed"].get("number", "") or ""
+    auto = vision.card_style(variant, name, year, printed if "/" in printed else number)
+    if auto == "standard" and vision.looks_full_art(f["card"], f.get("_edges0", f["edges"])):
+        auto = "full_art"
+    pick = st.session_state.get(f"style_{scan['id']}")
+    style = next((k for k, v in STYLE_LABELS.items() if v == pick), auto) if pick and pick != "Auto" else auto
+    prof = catalog.border_profile(sid, variant) if sid else None
+    expect = {k: prof[k] for k in ("l", "r", "t", "b")} if prof and prof.get("n", 0) >= 2 and (prof.get("borderless") or 0) < 0.5 else None
+    sig = (style, tuple(expect.values()) if expect else None)
+    if scan.get("_style_sig") != sig:
+        if "_edges0" not in f:
+            f["_edges0"] = f["edges"]
+        f["edges"] = f["_edges0"] if style == "standard" and not expect else vision.find_lines(f["card"], f["found"], expect=expect, style=style)
+        L = f["edges"]
+        f["centering"] = vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])
+        for k in (f"_cenlines_cen_{scan['id']}", f"_cenimg_cen_{scan['id']}"):
+            st.session_state.pop(k, None)
+        scan["_style_sig"] = sig
+    scan["_style"], scan["_profile"] = style, prof
+    return style
+
+
 def _grade_auth(scan: dict, x: dict):
     sl = scan.get("slab")
     if sl:
@@ -500,6 +541,7 @@ def _grade_auth(scan: dict, x: dict):
         if auth["verdict"] == "not_checked":
             auth["verdict"] = "unsure" if not sl.get("cert") else "not_checked"
         return grade, auth
+    _apply_style(scan, x)
     f = scan["front"]
     key = scan["id"]
     front_c = centering.current(f["card"], f["centering"], f"cen_{key}", f.get("edges"))
@@ -551,10 +593,25 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         if (scan.get("ai") or {}).get("psa"):
             st.toggle("Use the AI's grade", value=True, key=f"useai_{key}")
         st.markdown(f"**Centering** {esc(grade['centering']['front'])}" + (f" · back {esc(grade['centering']['back'])}" if grade['centering'].get('back') else ""))
+        style = scan.get("_style", "standard")
+        sc = st.columns([1, 2])
+        sc[0].selectbox("Card style", ["Auto"] + list(STYLE_LABELS.values()), key=f"style_{key}",
+                        help="Auto reads it from the card's rarity / parallel. Full art: thin frame, art runs to it. Die-cut: shaped outline.")
+        note = grading.CARD_STYLES.get(STYLE_LABELS.get(style, ""), "")
+        prof = scan.get("_profile")
+        sc[1].caption(f"**{STYLE_LABELS.get(style)}** · {note}" + (
+            f"  \nThis set's printed border (from {prof['n']} photos): left+right ≈ {100 * (prof['l'] + prof['r']):.1f}% of the width, "
+            f"top+bottom ≈ {100 * (prof['t'] + prof['b']):.1f}% of the height; the inner lines are looked for there." if prof else ""))
+        caps = grading.grader_caps(_worst_of(grade["centering"]["front"]), _worst_of(grade["centering"].get("back", "")),
+                                   tcg=game_of(scan) not in ("Sports", "Baseball", "Basketball", "Football", "Soccer", "Hockey"))
+        st.caption("Best grade the centering allows · " + " · ".join(f"**{k}** {v}" for k, v in caps.items()))
+        with st.popover("How grading works"):
+            st.markdown(grading.GUIDE)
         if (f.get("skew") or {}).get("applied"):
             st.caption("📐 The photo was taken at a slight angle, so the card was straightened (all four edges made square) before measuring centering and checking corners and edges.")
         centering.centering_tool(f["card"], f["centering"], f"cen_{key}", f.get("edges"))
         _inspection_panel(scan, x, key)
+        _autograph_panel(scan, x)
         reasons = "".join(f"<li>{esc(r)}</li>" for r in auth["reasons"]) or "<li>Pick a database match or use the AI boost to compare against the real card.</li>"
         st.markdown(f"<div class='verdict' style='background:{bg};border:1px solid {fg}'><b style='color:{fg}'>{label}</b><ul style='margin:6px 0 0 0'>{reasons}</ul></div>", unsafe_allow_html=True)
         st.caption("Every card is scanned and graded, fakes and customs included. These are warning signs, not proof.")
@@ -571,6 +628,35 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
                 st.toast("Reported. Look-alikes will be flagged.")
         if scan["parsed"]["raw_text"]:
             st.caption("Text read: " + scan["parsed"]["raw_text"].replace("\n", " · ")[:300])
+
+
+def _autograph_panel(scan: dict, x: dict):
+    _, variant, name, _, _ = _card_facts(x)
+    signed = bool(re.search(r"\bauto(graph)?s?\b|signature|signed", f"{variant} {name}", re.I))
+    ck = f"_auto_{signed}"
+    if ck not in scan:
+        back = scan.get("back") or {}
+        back_text = " ".join(t for t, *_ in back.get("lines", [])) if back else ""
+        scan[ck] = autograph.check(scan["front"]["card"], scan["parsed"].get("raw_text", ""), back_text, "Autograph" if signed else "")
+    a = scan[ck]
+    if not (a["found"] or a["certified"] or signed):
+        return
+    st.markdown("**Autograph**" + (f" · {a['kind']}" if a["kind"] else "") + (f" · signature grade estimate **{a['auto_grade']}**" if a["auto_grade"] else ""))
+    if a["box"]:
+        from PIL import ImageDraw
+        im = scan["front"]["card"].copy()
+        bx, by, bw, bh = a["box"]
+        ImageDraw.Draw(im).rectangle([bx - 6, by - 6, bx + bw + 6, by + bh + 6], outline=(255, 106, 51), width=4)
+        st.image(im.crop((0, max(0, by - 80), im.width, min(im.height, by + bh + 80))), width="stretch")
+    for n in a["notes"]:
+        st.caption(n)
+    st.info(a["verify"])
+
+
+def _worst_of(text: str) -> float | None:
+    """'52/48 · 55/45' -> 55 (the larger side of the worse split)."""
+    nums = [int(n) for n in re.findall(r"(\d+)\s*/\s*\d+", text or "")]
+    return float(max(nums)) if nums else None
 
 
 def _inspection_panel(scan: dict, x: dict, key: str):

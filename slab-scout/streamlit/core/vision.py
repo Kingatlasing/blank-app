@@ -7,6 +7,8 @@ from dataclasses import dataclass
 
 import cv2
 import imagehash
+import re
+
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 
@@ -114,6 +116,108 @@ def _line_quads(gray: np.ndarray, max_quads: int = 80) -> list:
     return res[:max_quads]
 
 
+def _persp_quads(gray: np.ndarray, max_quads: int = 60, rgb: np.ndarray | None = None) -> list:
+    """Card outlines photographed at an angle: the four sides are straight lines that are neither upright nor
+    parallel (perspective). Long straight edges are found as full lines, two 'side' lines and two 'end' lines
+    are intersected, and the resulting four-sided shapes are kept when they look like a card seen at an angle.
+    Fingers covering part of a side are fine: each side only needs part of its length on a real edge.
+    Returns [(side support list, quad)], best first."""
+    h, w = gray.shape[:2]
+    if rgb is not None:  # colour edges too: a dark blue border on a black desk barely differs in brightness
+        lab = cv2.GaussianBlur(cv2.cvtColor(rgb, cv2.COLOR_RGB2LAB), (5, 5), 0)
+        edges = cv2.Canny(lab[:, :, 0], 30, 100) | cv2.Canny(lab[:, :, 1], 12, 36) | cv2.Canny(lab[:, :, 2], 12, 36)
+    else:
+        edges = cv2.Canny(gray, 30, 100)
+    lines = cv2.HoughLines(edges, 1, np.pi / 180, int(min(h, w) * 0.18))
+    if lines is None:
+        return []
+    picked: list[tuple[float, float]] = []
+    for rho, th in np.asarray(lines).reshape(-1, 2):
+        if rho < 0:
+            rho, th = -rho, th - np.pi
+        if any(abs(rho - r) < 10 and abs(np.sin(th - t)) < 0.06 for r, t in picked):
+            continue  # same line again
+        picked.append((float(rho), float(th)))
+        if len(picked) >= 400:
+            break
+    vert = [l for l in picked if abs(np.cos(l[1])) > np.cos(np.radians(35))]  # side lines (x ~ const)
+    horiz = [l for l in picked if abs(np.sin(l[1])) > np.cos(np.radians(35))]  # end lines (y ~ const)
+    emap = cv2.dilate(edges, np.ones((3, 3), np.uint8), iterations=1)
+    ts = np.linspace(0.1, 0.9, 40)
+
+    def inter(a, b):
+        (r1, t1), (r2, t2) = a, b
+        A = np.array([[np.cos(t1), np.sin(t1)], [np.cos(t2), np.sin(t2)]])
+        if abs(np.linalg.det(A)) < 1e-6:
+            return None
+        return np.linalg.solve(A, np.array([r1, r2]))
+
+    def support(a, b) -> float:
+        """Share of points along segment a-b that sit on an edge (outside the photo counts as missing)."""
+        p = a[None, :] + (b - a)[None, :] * ts[:, None]
+        x, y = p[:, 0].astype(int), p[:, 1].astype(int)
+        ok = (x >= 0) & (x < w) & (y >= 0) & (y < h)
+        return float(emap[y[ok], x[ok]].astype(bool).sum()) / len(ts)
+
+    def xmid(l):  # where a side line crosses the middle row
+        r, t = l
+        return (r - h / 2 * np.sin(t)) / (np.cos(t) + 1e-9)
+
+    vert = sorted(vert[:24], key=xmid)
+    horiz = horiz[:60]
+    out = []
+    for i in range(len(vert)):
+        for j in range(i + 1, len(vert)):
+            if xmid(vert[j]) - xmid(vert[i]) < 0.2 * w:
+                continue
+            # end lines ranked by how well they run along an edge BETWEEN these two side lines
+            # (long background lines - a monitor, a desk - run elsewhere)
+            ends = []
+            for hl in horiz:
+                a, b = inter(vert[i], hl), inter(vert[j], hl)
+                if a is None or b is None:
+                    continue
+                sp = support(a, b)
+                if sp >= 0.35:
+                    ends.append((a[1] + b[1], sp, hl, a, b))
+            ends.sort(key=lambda e: -e[1])
+            ends = sorted(ends[:10], key=lambda e: e[0])
+            for k in range(len(ends)):
+                for m in range(k + 1, len(ends)):
+                    _, s_top, _, p0, p1 = ends[k]
+                    _, s_bot, _, p3, p2 = ends[m]
+                    q = np.array([p0, p1, p2, p3], dtype="float32")
+                    if (q[:, 0] < -0.03 * w).any() or (q[:, 0] > 1.03 * w).any() or (q[:, 1] < -0.03 * h).any() or (q[:, 1] > 1.03 * h).any():
+                        continue
+                    if not cv2.isContourConvex(q.reshape(-1, 1, 2)) or cv2.contourArea(q) < 0.1 * h * w:
+                        continue
+                    top, bot = np.linalg.norm(q[1] - q[0]), np.linalg.norm(q[2] - q[3])
+                    lef, rig = np.linalg.norm(q[3] - q[0]), np.linalg.norm(q[2] - q[1])
+                    if min(top, bot) / max(top, bot) < 0.7 or min(lef, rig) / max(lef, rig) < 0.7:
+                        continue  # stronger foreshortening than a hand-held photo gives
+                    ratio = ((top + bot) / 2) / ((lef + rig) / 2)
+                    if abs(min(ratio, 1 / ratio) - CARD_W / CARD_H) > 0.12:
+                        continue
+                    # a hand-held card seen at an angle still has near-square corners (within ~10 degrees);
+                    # a slanted background line joined to the card's sides does not
+                    ang_ok = True
+                    for c in range(4):
+                        u, v = q[c - 1] - q[c], q[(c + 1) % 4] - q[c]
+                        cosang = abs(float(np.dot(u, v))) / (np.linalg.norm(u) * np.linalg.norm(v) + 1e-9)
+                        if cosang > np.sin(np.radians(10)):
+                            ang_ok = False
+                            break
+                    if not ang_ok:
+                        continue
+                    sides = [s_top, support(q[1], q[2]), s_bot, support(q[3], q[0])]
+                    srt = sorted(sides)
+                    if srt[0] < 0.25 or srt[1] < 0.5:
+                        continue  # at most one side may be mostly hidden (fingers)
+                    out.append((sides, q))
+    out.sort(key=lambda t: -(sum(t[0]) + min(t[0])))
+    return out[:max_quads]
+
+
 def _segment_quads(small: np.ndarray) -> list:
     """Card outlines from colour: everything that differs from the photo's border colour (the table / mat),
     closed up into blobs; the biggest blobs' rotated rectangles."""
@@ -137,8 +241,9 @@ def _segment_quads(small: np.ndarray) -> list:
     return out
 
 
-def _side_support(emap: np.ndarray, quad, n: int = 40) -> float:
-    """Weakest side's share of points lying on an edge (1.0 = all four sides follow real edges)."""
+def _side_support(emap: np.ndarray, quad, n: int = 40, allow_hidden: bool = False) -> float:
+    """Weakest side's share of points lying on an edge (1.0 = all four sides follow real edges).
+    allow_hidden: judge by the second-weakest side (one side may be partly covered by fingers)."""
     o = _order(np.array(quad))
     h, w = emap.shape
     fr = []
@@ -149,7 +254,7 @@ def _side_support(emap: np.ndarray, quad, n: int = 40) -> float:
             if 0 <= x < w and 0 <= y < h and emap[y, x]:
                 hits += 1
         fr.append(hits / n)
-    return min(fr)
+    return sorted(fr)[1] if allow_hidden else min(fr)
 
 
 def _side_contrast(rgb: np.ndarray, quad, n: int = 30, off: int = 5) -> float | None:
@@ -214,11 +319,110 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
     if abs(min(w, h) / max(w, h) - CARD_W / CARD_H) < 0.025 and _rounded_corner_score(small, frame) >= 100:
         # a scan / cut-out image where the card fills the whole frame (background only in the rounded corner
         # tips): the photo's own border IS the card edge
-        return _refine(img.resize((CARD_W, CARD_H)) if w <= h else img.rotate(90, expand=True).resize((CARD_W, CARD_H))), True
+        return (img.resize((CARD_W, CARD_H)) if w <= h else img.rotate(90, expand=True).resize((CARD_W, CARD_H))), True
     best = _best_quad(small)
     if best is None:
         return _center_crop(img), False
-    return _refine(_warp(rgb, _order(best) / s)), True
+    pts = _order(best) / s
+    tight = _warp(rgb, pts)
+    refined = _refine(tight)
+    if refined is not tight:
+        return refined, True  # card cut out of a slab / holder
+    o = _order(np.array(best, dtype="float32"))
+    tilt = max(abs(np.degrees(np.arctan2(o[1][1] - o[0][1], o[1][0] - o[0][0]))),
+               abs(np.degrees(np.arctan2(o[3][0] - o[0][0], o[3][1] - o[0][1]))))
+    if getattr(_best_quad, "src", "") == "persp" and tilt >= 1.0:
+        # photographed at an angle: find the exact edges around the first outline and flatten to them
+        snapped = _snap_edges(rgb, pts)
+        if snapped is not None:
+            return _refine(snapped), True
+    return tight, True
+
+
+def _expand(pts: np.ndarray, f: float) -> np.ndarray:
+    c = pts.mean(axis=0)
+    return (c + (pts - c) * (1 + 2 * f)).astype("float32")
+
+
+def _steps(prof: np.ndarray) -> list[tuple[int, float]]:
+    """Colour steps along a profile (outside -> inside): [(position, strength)] for every clear local peak."""
+    g = np.abs(np.diff(prof, axis=0)).sum(axis=1)
+    g = np.convolve(g, np.ones(3) / 3, mode="same")
+    out = []
+    for i in range(1, len(g) - 1):
+        if g[i] >= 30 and g[i] >= g[i - 1] and g[i] > g[i + 1]:
+            out.append((i, float(g[i])))
+    return out
+
+
+def _snap_edges(rgb: np.ndarray, pts: np.ndarray, margin: float = 0.05) -> Image.Image | None:
+    """Precise card edges for a photo taken at an angle / held in a hand / in a sleeve. The first outline can
+    sit a little off the real edge (on the printed border's inner line, or cut by a finger). Cut the card out
+    with a margin all round, then on every side find straight lines of colour change in the margin band and
+    take the outermost one that runs cleanly along most of the side and is a strong change (a card edge, not
+    a faint sleeve edge or table texture). The four lines are intersected and the card is flattened to them."""
+    loose = np.array(_warp(rgb, _expand(pts, margin), replicate=True)).astype("float32")
+    h, w = loose.shape[:2]
+    fits = {}
+    for side in ("left", "right", "top", "bottom"):
+        along = h if side in ("left", "right") else w
+        across = w if side in ("left", "right") else h
+        band = int(across * margin * 2.6)
+        per_line = []
+        for t in np.linspace(0.15, 0.85, 31):
+            i = int(t * (along - 1))
+            if side == "left":
+                prof = loose[max(0, i - 1): i + 2, :band].mean(axis=0)
+            elif side == "right":
+                prof = loose[max(0, i - 1): i + 2, ::-1][:, :band].mean(axis=0)
+            elif side == "top":
+                prof = loose[:band, max(0, i - 1): i + 2].mean(axis=1)
+            else:
+                prof = loose[::-1][:band, max(0, i - 1): i + 2].mean(axis=1)
+            per_line.append((i, _steps(prof)))
+        # candidate edge depths: cluster all step positions, fit a line to each cluster
+        allpos = sorted(p for _, st in per_line for p, _ in st)
+        cands = []
+        for d0 in sorted(set(int(p / 4) for p in allpos)):
+            pts_, strg = [], []
+            for i, st in per_line:
+                near = [(p, g) for p, g in st if abs(p - (d0 * 4 + 2)) <= 5]
+                if near:
+                    p, g = max(near, key=lambda x: x[1])
+                    pts_.append((float(i), p + 0.5))
+                    strg.append(g)
+            f = _fit_edge(pts_) if len(pts_) >= 0.6 * len(per_line) else None
+            if f and f[2] <= 2.0:
+                cands.append((f[1] + f[0] * along / 2, float(np.median(strg)), f))
+        if not cands:
+            return None
+        top_g = max(c[1] for c in cands)
+        good = [c for c in cands if c[1] >= 0.35 * top_g]
+        good.sort(key=lambda c: c[0])
+        # merge duplicates (the same edge seen from neighbouring clusters)
+        fits[side] = good[0][2]
+    (ml, cl, _), (mr, cr, _), (mt, ct, _), (mb, cb, _) = (fits[s_] for s_ in ("left", "right", "top", "bottom"))
+    L = lambda y: ml * y + cl
+    R = lambda y: w - 1 - (mr * y + cr)
+    T = lambda x: mt * x + ct
+    B = lambda x: h - 1 - (mb * x + cb)
+
+    def corner(x_of_y, y_of_x):
+        y = h / 2
+        for _ in range(20):
+            x = x_of_y(y)
+            y = y_of_x(x)
+        return x, y
+
+    src = np.array([corner(L, T), corner(R, T), corner(R, B), corner(L, B)], dtype="float32")
+    wd = (np.linalg.norm(src[1] - src[0]) + np.linalg.norm(src[2] - src[3])) / 2
+    ht = (np.linalg.norm(src[3] - src[0]) + np.linalg.norm(src[2] - src[1])) / 2
+    if not wd or abs(wd / ht - CARD_W / CARD_H) > 0.05 or wd < w * 0.78 or ht < h * 0.78:
+        return None  # the lines found aren't a card outline: keep the first crop
+    dst = np.array([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]], dtype="float32")
+    M = cv2.getPerspectiveTransform(src, dst)
+    out = cv2.warpPerspective(loose.astype("uint8"), M, (CARD_W, CARD_H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    return Image.fromarray(out)
 
 
 def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = None):
@@ -265,7 +469,11 @@ def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = Non
         a, e = shape(quad)
         if e < 0.09:
             tagged.append((a, e, quad, "colour"))
+    for _, quad in _persp_quads(gray, rgb=small):
+        a, e = shape(quad)
+        tagged.append((cv2.contourArea(quad.reshape(-1, 1, 2)), min(e, 0.089), quad, "persp"))
     best = None
+    _best_quad.src = ""
     if tagged:
         # Candidates: the slab window / toploader, the card itself, the card's inner frame, and rectangles
         # formed by text or artwork. Keep outlines whose sides follow real edges (or colour blobs), then
@@ -273,8 +481,8 @@ def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = Non
         emap = cv2.dilate(cv2.Canny(gray, 30, 110), np.ones((3, 3), np.uint8), iterations=2)
         scored, srcs = [], []
         for area, err, quad, src in tagged:
-            sup = _side_support(emap, quad)
-            if src == "contour" and sup < 0.55 or src == "lines" and sup < 0.7:
+            sup = _side_support(emap, quad, allow_hidden=src == "persp")
+            if src == "contour" and sup < 0.55 or src == "lines" and sup < 0.7 or src == "persp" and sup < 0.6:
                 continue
             if area < 0.12 * img_area:
                 continue
@@ -282,7 +490,7 @@ def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = Non
             upright = np.linalg.norm(o[3] - o[0]) >= np.linalg.norm(o[1] - o[0])
             if not upright and src != "contour":
                 continue  # sideways blobs are almost always overlays / background; landscape cards need a clear outline
-            scored.append((area, _rounded_corner_score(small, quad), sup, err, quad, _side_contrast(small, quad)))
+            scored.append((area, _rounded_corner_score(small, quad), sup, err, quad, _side_contrast(small, quad), src))
             srcs.append(src)
         # a real card edge separates card from table (strong colour change on every side); outlines traced along
         # table texture or artwork don't. Keep outlines at least half as contrasty as the best one.
@@ -292,7 +500,7 @@ def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = Non
             if debug is not None:
                 debug += [(src_, c) for src_, c in zip(srcs, scored)]
             # drop outlines with far less contrast than the best; the rest carry their contrast share into the score
-            scored = [c[:5] + (1.0 if c[5] is None or not best_c else c[5] / best_c,) for c in scored
+            scored = [c[:5] + (1.0 if c[5] is None or not best_c else c[5] / best_c, c[6]) for c in scored
                       if c[5] is None or c[5] >= 0.25 * best_c]
         rounded = [c for c in scored if c[1] >= 45]
         pool = rounded or scored
@@ -302,7 +510,9 @@ def _best_quad(small: np.ndarray, nested: bool = False, debug: list | None = Non
             top = max(c[0] for c in pool)
             # sides on real edges + size + how clearly the corners are rounded - how far from card proportions
             # + how sharply card and background differ
-            best = max(pool, key=lambda c: (c[0] >= 0.8 * top, c[2] + c[0] / top + min(c[1], 300) / 300 - 5 * c[3] + 1.5 * c[5]))[4]
+            win = max(pool, key=lambda c: (c[0] >= 0.8 * top, c[2] + c[0] / top + min(c[1], 300) / 300 - 5 * c[3] + 1.5 * c[5]))
+            best = win[4]
+            _best_quad.src = win[6]  # which finder produced it ('persp' = seen at an angle)
 
     return best
 
@@ -320,19 +530,20 @@ def _refine(card: Image.Image) -> Image.Image:
     mask = np.zeros(a.shape[:2], np.uint8)
     cv2.fillConvexPoly(mask, o.astype(np.int32), 1)
     ring = cv2.cvtColor(a, cv2.COLOR_RGB2HSV)[mask == 0]
-    if not len(ring) or ring[:, 1].mean() >= 60 or ring[:, 2].mean() >= 190:
+    # (near-black is a card's own dark border - black-bordered Magic, dark full-art frames - not a slab)
+    if not len(ring) or ring[:, 1].mean() >= 60 or not 65 <= ring[:, 2].mean() < 110:
         return card
     return _warp(a, o)
 
 
-def _warp(rgb: np.ndarray, pts: np.ndarray) -> Image.Image:
+def _warp(rgb: np.ndarray, pts: np.ndarray, replicate: bool = False) -> Image.Image:
     tl, tr, br, bl = pts
     wide = max(np.linalg.norm(tr - tl), np.linalg.norm(br - bl))
     tall = max(np.linalg.norm(bl - tl), np.linalg.norm(br - tr))
     dst_w, dst_h = (CARD_W, CARD_H) if tall >= wide else (CARD_H, CARD_W)
     dst = np.array([[0, 0], [dst_w - 1, 0], [dst_w - 1, dst_h - 1], [0, dst_h - 1]], dtype="float32")
     M = cv2.getPerspectiveTransform(pts, dst)
-    warped = cv2.warpPerspective(rgb, M, (dst_w, dst_h))
+    warped = cv2.warpPerspective(rgb, M, (dst_w, dst_h), borderMode=cv2.BORDER_REPLICATE if replicate else cv2.BORDER_CONSTANT)
     out = Image.fromarray(warped)
     if dst_w > dst_h:  # landscape card (some Yu-Gi-Oh!/sports inserts): rotate to portrait for consistency
         out = out.rotate(90, expand=True)
@@ -405,7 +616,43 @@ def _outer_depth(hsv_v: np.ndarray, limit: int) -> int:
     return run if run < limit else 0
 
 
-def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
+# rarities printed with a thin border and art running to it (the inner line is that thin frame, not the art box)
+FULL_ART = re.compile(r"full art|illustration rare|special illustration|\balt(?:ernate)? art|secret|rainbow|gold(?:en)? rare|hyper rare|"
+                      r"character (?:super )?rare|art rare|\b(?:sar|ar|sr|ur|hr|chr|csr|sir|ir|sfa|ssr)\b|trainer gallery|galarian gallery|shiny vault|\bsv\d|\bsir\b|\bir\b|\bfa\b|borderless|showcase|full[- ]bleed", re.I)
+DIE_CUT = re.compile(r"die[- ]?cut", re.I)
+
+
+def card_style(variant: str = "", name: str = "", year: str = "", number: str = "") -> str:
+    """Printed layout of a card from its rarity / parallel name: 'die_cut', 'full_art', 'vintage' or 'standard'."""
+    t = f"{variant} {name}"
+    if DIE_CUT.search(t):
+        return "die_cut"
+    m = re.match(r"^\D*(\d+)\s*/\s*\D*(\d+)$", number or "")
+    secret = bool(m) and int(m.group(1)) > int(m.group(2)) > 0  # numbered past the set total (201/198)
+    if FULL_ART.search(t) or secret or re.match(r"^(?:SV|TG|GG)\d", number or "", re.I):
+        return "full_art"
+    if year and year.isdigit() and int(year) < 1957:
+        return "vintage"
+    return "standard"
+
+
+def looks_full_art(card: Image.Image, lines: dict) -> bool:
+    """A thin, colourless (silver / grey / foil) frame with the artwork running to it: full art, illustration
+    rares, SAR/SIR. Standard cards have a wider, coloured border (yellow Pokémon, black Magic, white sports)."""
+    w, h = card.size
+    bx = ((lines["il"] - lines["ol"]) + (lines["or"] - lines["ir"])) / 2 / w
+    by = ((lines["it"] - lines["ot"]) + (lines["ob"] - lines["ib"])) / 2 / h
+    a = np.array(card.convert("RGB"))
+    band = np.concatenate([a[int(h * 0.3):int(h * 0.7), max(0, lines["ol"] + 3):max(1, lines["il"] - 2)].reshape(-1, 3),
+                           a[int(h * 0.3):int(h * 0.7), min(w - 1, lines["ir"] + 2):max(lines["ir"] + 3, lines["or"] - 3)].reshape(-1, 3)])
+    if not len(band):
+        return False
+    hsv = cv2.cvtColor(band.reshape(-1, 1, 3), cv2.COLOR_RGB2HSV).reshape(-1, 3)
+    grey = float(np.median(hsv[:, 1])) < 55 and 70 < float(np.median(hsv[:, 2])) < 235
+    return bx < 0.042 and by < 0.036 and grey
+
+
+def find_lines(card: Image.Image, outline_found: bool = True, expect: dict | None = None, style: str = "standard") -> dict:
     """All eight centering lines in card-image pixels: outer card edge (ol, ot, or, ob) and inner border
     (il, it, ir, ib). `found` says which inner lines were detected (False = guessed default).
     When the card outline was found in the photo the crop is tight, so only a thin sliver of table is
@@ -424,6 +671,8 @@ def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
 
     lim_x, lim_y = int(w * 0.2), int(h * 0.2)
     near_x, near_y = max(6, int(w * 0.025)), max(6, int(h * 0.025))
+
+    exp_px = None
 
     def side(profiles, vals, lim_o, lim_i, near):
         """Per scan line: table run -> first edge. An edge within `near` px of where the card starts is the
@@ -447,21 +696,39 @@ def find_lines(card: Image.Image, outline_found: bool = True) -> dict:
             cb = _border_by_colour(prof[outer + 2:], lim_i)
             if cb is not None and (inner is None or outer + 2 + cb < inner):
                 inner = outer + 2 + cb
+            if exp_px is not None:
+                # known layout for this set / rarity: take the colour step closest to where its frame should be
+                seg = prof[outer: outer + int(exp_px * 2.2) + 6].astype("float32")
+                if len(seg) > 6:
+                    g = np.abs(np.diff(seg, axis=0)).sum(axis=1)
+                    g = np.convolve(g, np.ones(3) / 3, mode="same")
+                    lo, hi = max(2, int(exp_px * 0.45)), min(len(g) - 1, int(exp_px * 1.8) + 3)
+                    if hi > lo:
+                        k = lo + int(np.argmax(g[lo:hi] - 0.6 * np.abs(np.arange(lo, hi) - exp_px)))
+                        inner = outer + k + 1 if g[k] >= 18 else None
             outs.append(outer)
             ins.append(inner)
         return (med(outs) or 0), med(ins)
 
-    ol, il = side([a[r, :, :] for r in rows], [v[r, :] for r in rows], lim_ox, lim_x, near_x)
-    orr, ir = side([a[r, ::-1, :] for r in rows], [v[r, ::-1] for r in rows], lim_ox, lim_x, near_x)
-    ot, it = side([a[:, c, :] for c in cols], [v[:, c] for c in cols], lim_oy, lim_y, near_y)
-    ob, ib = side([a[::-1, c, :] for c in cols], [v[::-1, c] for c in cols], lim_oy, lim_y, near_y)
+    ex = dict(expect or {})
+    if style == "full_art" and not ex:
+        ex = {"l": 0.035, "r": 0.035, "t": 0.028, "b": 0.028}  # thin frame around full-art / illustration rares
+    res = {}
+    for key, profs, vals, lo, li, nr, size in (
+            ("l", [a[r, :, :] for r in rows], [v[r, :] for r in rows], lim_ox, lim_x, near_x, w),
+            ("r", [a[r, ::-1, :] for r in rows], [v[r, ::-1] for r in rows], lim_ox, lim_x, near_x, w),
+            ("t", [a[:, c, :] for c in cols], [v[:, c] for c in cols], lim_oy, lim_y, near_y, h),
+            ("b", [a[::-1, c, :] for c in cols], [v[::-1, c] for c in cols], lim_oy, lim_y, near_y, h)):
+        exp_px = ex[key] * size if ex.get(key) else None
+        res[key] = side(profs, vals, lo, li, nr)
+    (ol, il), (orr, ir), (ot, it), (ob, ib) = res["l"], res["r"], res["t"], res["b"]
     found = {"left": il is not None, "right": ir is not None, "top": it is not None, "bottom": ib is not None}
     # where no border line was found, use the border of a perfectly centred card: measured on PSA 10 50/50
     # reference cards (fronts and backs), the border is ~4.6% of the width and ~3.8% of the height
-    il = il if il is not None else ol + round(w * BORDER_X)
-    ir = ir if ir is not None else orr + round(w * BORDER_X)
-    it = it if it is not None else ot + round(h * BORDER_Y)
-    ib = ib if ib is not None else ob + round(h * BORDER_Y)
+    il = il if il is not None else ol + round(w * ex.get("l", BORDER_X))
+    ir = ir if ir is not None else orr + round(w * ex.get("r", BORDER_X))
+    it = it if it is not None else ot + round(h * ex.get("t", BORDER_Y))
+    ib = ib if ib is not None else ob + round(h * ex.get("b", BORDER_Y))
     return {"ol": ol, "ot": ot, "or": w - orr, "ob": h - ob, "il": il, "it": it, "ir": w - ir, "ib": h - ib, "found": found}
 
 

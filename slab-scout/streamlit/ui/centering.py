@@ -20,6 +20,7 @@ _HTML = """
   <div class="bar">
     <button data-mode="drag" class="on">Drag lines</button>
     <button data-mode="tap">Tap corners</button>
+    <button data-act="grid" class="on">Grid</button>
     <button data-act="reset" class="ghost">Re-detect</button>
   </div>
   <div class="status"></div>
@@ -124,6 +125,31 @@ export default function (component) {
     shade.setAttribute('fill', 'rgba(255,106,51,.12)');
     shade.setAttribute('fill-rule', 'evenodd');
     svg.appendChild(shade);
+    if (st.grid !== false) {
+      // alignment mesh: a 6 x 8 grid spanning the card edge, plus the centre lines of the card (blue) and of the
+      // inner frame (orange). On a perfectly centred card the two centre lines sit on top of each other.
+      const mk = (x1, y1, x2, y2, col, w, dash) => {
+        const l = document.createElementNS(NS, 'line');
+        Object.entries({ x1, y1, x2, y2 }).forEach(([a, b]) => l.setAttribute(a, b));
+        l.setAttribute('stroke', col); l.setAttribute('stroke-width', w);
+        if (dash) l.setAttribute('stroke-dasharray', dash);
+        l.style.pointerEvents = 'none';
+        svg.appendChild(l);
+      };
+      const gw = (v.or - v.ol) / 6, gh = (v.ob - v.ot) / 8;
+      for (let i = 1; i < 6; i++) mk(v.ol + gw * i, v.ot, v.ol + gw * i, v.ob, 'rgba(255,255,255,.28)', sw * 0.6);
+      for (let i = 1; i < 8; i++) mk(v.ol, v.ot + gh * i, v.or, v.ot + gh * i, 'rgba(255,255,255,.28)', sw * 0.6);
+      const cxo = (v.ol + v.or) / 2, cyo = (v.ot + v.ob) / 2, cxi = (v.il + v.ir) / 2, cyi = (v.it + v.ib) / 2;
+      mk(cxo, v.ot, cxo, v.ob, '#4FA8FF', sw * 0.9, `${sw * 2} ${sw * 2}`);
+      mk(v.ol, cyo, v.or, cyo, '#4FA8FF', sw * 0.9, `${sw * 2} ${sw * 2}`);
+      mk(cxi, v.it, cxi, v.ib, '#FF6A33', sw * 0.9);
+      mk(v.il, cyi, v.ir, cyi, '#FF6A33', sw * 0.9);
+      // corner brackets on the card edge (where each corner should sit)
+      const b = Math.min(gw, gh) * 0.6;
+      [[v.ol, v.ot, 1, 1], [v.or, v.ot, -1, 1], [v.ol, v.ob, 1, -1], [v.or, v.ob, -1, -1]].forEach(([x, y, dx, dy]) => {
+        mk(x, y, x + dx * b, y, '#FFFFFF', sw * 1.4); mk(x, y, x, y + dy * b, '#FFFFFF', sw * 1.4);
+      });
+    }
     for (const [k, [axis, kind]] of Object.entries(LINES)) {
       const pos = v[k];
       const [x1, y1, x2, y2] = axis === 'x' ? [pos, 0, pos, H] : [0, pos, W, pos];
@@ -171,7 +197,7 @@ export default function (component) {
   function setHint() {
     hint.textContent = st.mode === 'tap'
       ? `Step ${st.tapStep + 1} of 4: ${TAP_STEPS[st.tapStep]}`
-      : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue dashed = card edge.';
+      : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue dashed = card edge. Grid: when the orange and blue centre lines overlap, the card is perfectly centred.';
   }
 
   // one-time listeners (the component function re-runs on every Streamlit rerun)
@@ -212,6 +238,9 @@ export default function (component) {
     root.querySelectorAll('.bar [data-mode]').forEach((b) => b.addEventListener('click', () => {
       st.mode = b.dataset.mode; st.tapStep = 0; st.taps = []; syncButtons(); setHint(); draw();
     }));
+    root.querySelector('[data-act=grid]').addEventListener('click', (e) => {
+      st.grid = st.grid === false; e.currentTarget.classList.toggle('on', st.grid !== false); draw();
+    });
     root.querySelector('[data-act=reset]').addEventListener('click', () => {
       Object.assign(v, data.auto); st.sel = null; st.tapStep = 0; st.taps = []; draw(); commit();
     });

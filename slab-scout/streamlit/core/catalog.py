@@ -198,6 +198,26 @@ def sales() -> dict:
 
 
 @lru_cache(maxsize=1)
+def _borders() -> dict:
+    d = _dir()
+    p = os.path.join(d, "border_profiles.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else {}
+
+
+def border_profile(set_id: str, variant: str = "") -> dict | None:
+    """Printed border layout measured on this set's photos: {'l','r','t','b'} border width as a share of card
+    width / height (typical, from price-guide scans), 'n' photos, 'borderless' share with no border line.
+    Per rarity / parallel when it differs from the set's base cards, else the set's."""
+    s = _borders().get(set_id)
+    if not s:
+        return None
+    p = s.get(variant or "Base") or s.get("*")
+    if not p:
+        return None
+    return {"l": p[0], "r": p[1], "t": p[2], "b": p[3], "n": p[4], "borderless": p[5]}
+
+
+@lru_cache(maxsize=1)
 def set_index() -> list[dict]:
     """Every product the checklist sites list (Topps, Upper Deck, Checklist Insider, BaseballCardPedia):
     name, year, sport, brand, source, url, img. Card-level data only exists for sets in sets()."""

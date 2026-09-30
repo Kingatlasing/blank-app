@@ -70,14 +70,18 @@ def _lab(a: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.int16)
 
 
-def _whitening_mask(a: np.ndarray, border_rgb: np.ndarray) -> np.ndarray:
+def _whitening_mask(a: np.ndarray, border_rgb: np.ndarray, strict: bool = False) -> np.ndarray:
     """Pixels that are much lighter and greyer than the border colour: whitening, fraying, chipping."""
     lab = _lab(a)
     b_lab = _lab(border_rgb.reshape(1, 1, 3).astype(np.uint8))[0, 0]
     b_hsv = cv2.cvtColor(border_rgb.reshape(1, 1, 3).astype(np.uint8), cv2.COLOR_RGB2HSV)[0, 0]
     hsv = cv2.cvtColor(a, cv2.COLOR_RGB2HSV)
-    if b_hsv[1] < 50 and b_hsv[2] > 190:  # white / silver border: whitening can't be seen by colour
+    if b_hsv[1] < 50 and b_hsv[2] > 190:  # white border: whitening can't be seen by colour
         return np.zeros(a.shape[:2], bool)
+    if strict or (b_hsv[1] < 60 and b_hsv[2] > 135):
+        # silver / foil frame (full art, illustration rares) or a shaded light border: reflections look like
+        # whitening, so only bare white card stock (much lighter, colourless, near-white) counts
+        return ((lab[..., 0] - b_lab[0]) > 45) & (hsv[..., 1] < 35) & (hsv[..., 2] > 238)
     lighter = (lab[..., 0] - b_lab[0]) > 22
     greyish = hsv[..., 1] < max(55, int(b_hsv[1]) - 70)
     bright = hsv[..., 2] > 185
@@ -95,9 +99,22 @@ def _corner_boxes(w: int, h: int):
     return {"top-left": (0, 0, c, c), "top-right": (w - c, 0, w, c), "bottom-left": (0, h - c, c, h), "bottom-right": (w - c, h - c, w, h)}
 
 
-def _rounding_expected(c: int) -> np.ndarray:
-    """Mask of the area outside a standard rounded corner (radius ≈ 3.2 mm ≈ 32 px), for the top-left box."""
-    r = 38  # standard 3.2 mm corner radius (~32 px) plus a little slack for an imperfect crop
+# Factory corner radius (mm) and card width (mm) per game. Pokémon / Magic ~3 mm on a 63 mm card (secondary
+# sources; no official spec published), sports 1/8 in on 2.5 in, Yu-Gi-Oh! 59 mm wide (radius not published:
+# ~2.5 mm assumed). Square-cut vintage / tobacco cards have no rounding, so a square corner is not damage.
+CORNER_SPEC = {"Pokémon": (3.0, 63.0), "Magic: The Gathering": (3.0, 63.0), "Yu-Gi-Oh!": (2.5, 59.0), "Lorcana": (3.0, 63.0),
+               "One Piece": (3.0, 63.0), "sports": (3.175, 63.5), "vintage": (0.0, 63.5)}
+
+
+def corner_radius_px(game: str = "", style: str = "", width_px: int = 630) -> int:
+    key = "vintage" if style == "vintage" else game if game in CORNER_SPEC else "sports"
+    mm, wmm = CORNER_SPEC[key]
+    return int(round(mm / wmm * width_px))
+
+
+def _rounding_expected(c: int, radius_px: int = 32) -> np.ndarray:
+    """Mask of the area outside the factory rounded corner, for the top-left box (plus slack for the crop)."""
+    r = radius_px + 6 if radius_px else 0
     yy, xx = np.mgrid[0:c, 0:c]
     outside = ((xx < r) & (yy < r) & ((xx - r) ** 2 + (yy - r) ** 2 > r * r))
     return outside
@@ -111,7 +128,8 @@ def _sev_to_grade(sev: float) -> float:
     return 3.0
 
 
-def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back: bool = False) -> Inspection:
+def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back: bool = False, corner_radius: int = 30,
+                 foil_border: bool = False) -> Inspection:
     a = _arr(card)
     h, w = a.shape[:2]
     res = Inspection()
@@ -130,12 +148,13 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
         res.photo_notes.append("Glare on the card; tilt it slightly away from the light so reflections don't hide the surface.")
 
     border = _border_color(a)
-    white_m = _whitening_mask(a, border)
+    white_m = _whitening_mask(a, border, strict=foil_border)
     bg_m = _background_mask(a)
 
     # ---------- corners ----------
     corner_sev = {}
-    exp_tl = _rounding_expected(CORNER)
+    exp_tl = _rounding_expected(CORNER, corner_radius)
+    res.metrics["corner_radius_px"] = corner_radius
     for name, (x0, y0, x1, y1) in _corner_boxes(w, h).items():
         wm = white_m[y0:y1, x0:x1]
         bm = bg_m[y0:y1, x0:x1].copy()
@@ -154,6 +173,14 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
             band = band[::-1, :]
         band &= ~exp
         white_frac = float((wm & band).sum()) / max(1, band.sum())
+        # the same whitening all along the neighbouring straight edges is a strip of sleeve / table left by the
+        # crop, not wear at the corner: only the excess at the corner counts
+        ex = slice(x1, min(w, x1 + 2 * CORNER)) if x0 == 0 else slice(max(0, x0 - 2 * CORNER), x0)
+        ey = slice(y1, min(h, y1 + 2 * CORNER)) if y0 == 0 else slice(max(0, y0 - 2 * CORNER), y0)
+        eh = white_m[(slice(MARGIN, MARGIN + 14) if y0 == 0 else slice(h - MARGIN - 14, h - MARGIN)), ex]
+        ev_ = white_m[ey, (slice(MARGIN, MARGIN + 14) if x0 == 0 else slice(w - MARGIN - 14, w - MARGIN))]
+        base = max(float(eh.mean()) if eh.size else 0.0, float(ev_.mean()) if ev_.size else 0.0)
+        white_frac = max(0.0, white_frac - 1.2 * base)
         # background showing in the corner, measured separately in the horizontal and vertical strips and
         # compared with the same strip along the straight edge next to it (an imperfect / slightly rotated
         # crop shows a little background there too): only the excess counts as a missing / dinged corner
@@ -195,7 +222,15 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
     for name, (x0, y0, x1, y1) in edge_boxes.items():
         wm = white_m[y0:y1, x0:x1].astype(np.uint8)  # whitening / chipping (background along an edge is crop wobble)
         n, _, stats, _ = cv2.connectedComponentsWithStats(wm, 8)
-        chips = [s for s in stats[1:] if s[cv2.CC_STAT_AREA] >= 4]
+        run = (x1 - x0) if name in ("top", "bottom") else (y1 - y0)
+        along = cv2.CC_STAT_WIDTH if name in ("top", "bottom") else cv2.CC_STAT_HEIGHT
+        # a mark running along much of the edge is a strip of background left by the crop, not a chip
+        chips = [s for s in stats[1:] if s[cv2.CC_STAT_AREA] >= 4 and s[along] < 0.2 * run]
+        strip = [s for s in stats[1:] if s[along] >= 0.2 * run]
+        if strip:
+            wm = wm.copy()
+            for s_ in strip:
+                wm[s_[cv2.CC_STAT_TOP]:s_[cv2.CC_STAT_TOP] + s_[cv2.CC_STAT_HEIGHT], s_[cv2.CC_STAT_LEFT]:s_[cv2.CC_STAT_LEFT] + s_[cv2.CC_STAT_WIDTH]] = 0
         frac = float(wm.mean())
         edge_sev[name] = min(1.0, frac * 8 + len(chips) * 0.04)
         chips_total += len(chips)

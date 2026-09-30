@@ -20,6 +20,8 @@ import { Card as CatCard, imageUrl, matchText, photoLookup, printRunLabel, searc
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
+import { quickIdentify, recordFromScan } from '../core/quickScan';
+import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
 export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
 const TYPES = ['Base', 'Holo', 'Reverse Holo', 'Full Art', 'Secret Rare', 'Rookie', 'Parallel', 'Insert', 'Autograph', 'Relic', 'Promo', 'Custom', 'Other'];
@@ -88,6 +90,19 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [catHits, setCatHits] = useState<CatCard[]>([]);
   const [catPick, setCatPick] = useState<CatCard | null>(null);
   const aiOn = settings.provider !== 'off' && !!apiKey;
+  // live scanner (tap anywhere to scan) vs. the step-by-step front + back grading capture
+  const [mode, setMode] = useState<'live' | 'grade'>('live');
+  const [scanning, setScanning] = useState(false);
+  const [last, setLast] = useState<ScanItem | null>(null);
+  const [history, setHistory] = useState<ScanItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const shots = useRef(new Map<string, Shot>());
+  const curItem = useRef<string | null>(null); // history entry being graded
+  useEffect(() => {
+    loadHistory().then(setHistory);
+    const off = onHistory(setHistory);
+    return () => { off(); };
+  }, []);
 
   /* ---------- capture ---------- */
   function guideRect(w: number, h: number) {
@@ -135,6 +150,63 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     } finally {
       setBusy(false);
     }
+  }
+
+  /* ---------- live scanner ---------- */
+  async function liveIdentify(shot: Shot) {
+    const it = await quickIdentify(shot.uri, game);
+    shots.current.set(it.id, shot);
+    await addHistory(it);
+    setLast(it);
+  }
+  async function tapScan() {
+    if (!cam.current || scanning) return;
+    setScanning(true);
+    setError('');
+    try {
+      const pic = await cam.current.takePictureAsync({ quality: 0.92, shutterSound: false });
+      await liveIdentify({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true });
+    } catch (e: any) {
+      setError(`Couldn't scan that: ${e?.message || e}. Try again.`);
+    } finally {
+      setScanning(false);
+    }
+  }
+  async function pickLive() {
+    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
+    if (res.canceled || !res.assets?.[0]) return;
+    const a = res.assets[0];
+    setScanning(true);
+    try {
+      await liveIdentify({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false });
+    } catch (e: any) {
+      setError(`Couldn't scan that photo: ${e?.message || e}`);
+    } finally {
+      setScanning(false);
+    }
+  }
+  async function addItem(it: ScanItem, list: 'collection' | 'wishlist' = 'collection') {
+    if (app.needsCode) return setError('Set a vault code (6+ characters) in Settings first.');
+    const rec = recordFromScan(it, list);
+    if (!rec) return setError('This card wasn’t identified yet. Tap Grade to fill in its details, then add it.');
+    try {
+      await app.addRecord(rec, list);
+      const patch = list === 'wishlist' ? { wish: true } : { added: true };
+      await updateHistory(it.id, patch);
+      if (last?.id === it.id) setLast({ ...it, ...patch });
+      onSaved();
+    } catch (e: any) {
+      setError(String(e?.message || e));
+    }
+  }
+  function gradeItem(it: ScanItem) {
+    const shot = shots.current.get(it.id) || { uri: it.uri, base64: '', tight: true };
+    curItem.current = it.id;
+    setShowHistory(false);
+    setFront(shot);
+    setBack(null);
+    setSide('front');
+    analyze(shot);
   }
 
   /* ---------- analysis ---------- */
@@ -371,6 +443,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
   function reset() {
     abort.current?.abort();
+    curItem.current = null;
     setFront(null);
     setBack(null);
     setSide('front');
@@ -386,6 +459,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setChosen(null);
     setError('');
     setPhase('capture');
+    setLast(null);
   }
 
   /* ---------- derived ---------- */
@@ -465,6 +539,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       return;
     }
     setSaved((s) => ({ ...s, vault: true }));
+    if (curItem.current) updateHistory(curItem.current, { added: true }).catch(() => {});
     setTally((t) => ({ n: t.n + 1, value: t.value + (Number(raw.mid) || 0) }));
     onSaved();
     if (bulk) reset();
@@ -482,6 +557,57 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <Btn label="Choose from photos instead" onPress={pick} />
         </View>
       );
+    if (showHistory) return <HistoryView items={history} onClose={() => setShowHistory(false)} onAdd={addItem} onGrade={gradeItem} error={error} />;
+    if (mode === 'live')
+      return (
+        <View style={S.screen} onLayout={(e) => setCamBox(e.nativeEvent.layout)}>
+          <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" />
+          <Pressable style={StyleSheet.absoluteFill} onPress={tapScan} accessibilityLabel="Tap to scan the card" />
+          <View style={st.overlay} pointerEvents="box-none">
+            <View style={st.topBar}>
+              <View style={[S.row, { justifyContent: 'space-between' }]}>
+                <Text style={st.stepText}>{scanning ? 'SCANNING…' : 'TAP ANYWHERE TO SCAN'}</Text>
+                <Pressable onPress={() => setShowHistory(true)} style={st.histBtn}>
+                  <Text style={st.histText}>History{history.length ? ` · ${history.length}` : ''}</Text>
+                </Pressable>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {GAMES.map((g) => (
+                  <Pressable key={g} onPress={() => setGame(g)} style={[st.gchip, game === g && { backgroundColor: C.accent }]}>
+                    <Text style={[st.gchipText, game === g && { color: C.accentInk }]}>{g}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+              <Text style={st.tip}>Best: card laid flat on a plain, dark surface, filling the frame. Holding it or tilting it works too; it gets straightened.</Text>
+            </View>
+            <View style={st.guide} pointerEvents="none" onLayout={(e) => setGuideBox(e.nativeEvent.layout)}>
+              {[st.tl, st.tr, st.bl, st.br].map((p, i) => (
+                <View key={i} style={[st.corner, p]} />
+              ))}
+            </View>
+            <View pointerEvents="box-none">
+              {error ? <View style={[st.sheet, { paddingVertical: 10 }]}><Text style={{ color: C.warn }}>{error}</Text></View> : null}
+              {scanning ? (
+                <View style={[st.sheet, S.row]}>
+                  <ActivityIndicator color={C.accent} />
+                  <Text style={S.body}>Identifying…</Text>
+                </View>
+              ) : last ? (
+                <ResultSheet it={last} onAdd={() => addItem(last)} onWish={() => addItem(last, 'wishlist')} onGrade={() => gradeItem(last)} onClose={() => setLast(null)} />
+              ) : (
+                <View style={st.bottomBar}>
+                  <Pressable style={st.side} onPress={pickLive}>
+                    <Text style={st.sideText}>Photos</Text>
+                  </Pressable>
+                  <Pressable style={[st.side, { width: 170 }]} onPress={() => { setMode('grade'); setSide('front'); }}>
+                    <Text style={st.sideText}>Front + back grading ›</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      );
     return (
       <View style={S.screen} onLayout={(e) => setCamBox(e.nativeEvent.layout)}>
         <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" />
@@ -489,12 +615,11 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <View style={st.topBar}>
             <View style={[S.row, { justifyContent: 'space-between' }]}>
               <Text style={st.stepText}>{bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'FRONT · step 1 of 2' : 'BACK · step 2 of 2'}</Text>
-              <View style={[S.row, { gap: 6 }]}>
-                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>Bulk</Text>
-                <Switch value={bulk} onValueChange={(b) => { setBulk(b); setSide('front'); }} trackColor={{ true: C.accent, false: C.surface2 }} />
-              </View>
+              <Pressable onPress={() => setMode('live')} style={st.histBtn}>
+                <Text style={st.histText}>‹ Live scanner</Text>
+              </Pressable>
             </View>
-            <Text style={st.tip}>{bulk ? 'Snap each card; it scans right away (front only). Tap Add to collection and the camera is ready for the next one.' : 'Card out of its sleeve, flat on a dark surface. Line its edges up with the corners.'}</Text>
+            <Text style={st.tip}>{'For grading: card out of its sleeve, laid flat on a plain dark surface, edges lined up with the corners. A held or tilted card still works; it gets straightened.'}</Text>
           </View>
           <View style={st.guide} pointerEvents="none" onLayout={(e) => setGuideBox(e.nativeEvent.layout)}>
             {[st.tl, st.tr, st.bl, st.br].map((p, i) => (
@@ -856,8 +981,89 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   );
 }
 
+function priceText(it: ScanItem) {
+  if (it.price == null) return '—';
+  return it.currency === 'EUR' ? `€${it.price.toFixed(2)}` : money(it.price);
+}
+
+function ResultSheet({ it, onAdd, onWish, onGrade, onClose }: { it: ScanItem; onAdd: () => void; onWish: () => void; onGrade: () => void; onClose: () => void }) {
+  return (
+    <View style={st.sheet}>
+      <View style={[S.row, { alignItems: 'flex-start' }]}>
+        {it.thumb ? <Image source={{ uri: `data:image/jpeg;base64,${it.thumb}` }} style={st.sheetImg} /> : null}
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={S.h3} numberOfLines={2}>{it.name || (it.note ? 'Not identified' : 'Unknown card')}</Text>
+          <Text style={S.muted} numberOfLines={2}>{[it.set, it.number && `#${it.number}`, it.rarity].filter(Boolean).join(' · ') || it.note || ''}</Text>
+          {it.name ? <Text style={{ color: C.gold, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] }}>{priceText(it)}</Text> : null}
+          {it.name && it.note ? <Text style={[S.muted, { color: C.warn }]}>{it.note}</Text> : null}
+          {it.source ? <Text style={[S.muted, { fontSize: 11 }]}>{it.source}</Text> : null}
+        </View>
+        <Pressable onPress={onClose} hitSlop={12}><Text style={{ color: C.ink2, fontSize: 20 }}>✕</Text></Pressable>
+      </View>
+      <View style={S.row}>
+        <Pressable style={[st.plus, it.added && { backgroundColor: C.good }]} disabled={it.added || !it.name} onPress={onAdd}>
+          <Text style={st.plusText}>{it.added ? '✓' : '+'}</Text>
+        </Pressable>
+        <Btn label={it.wish ? '♡ Saved' : '♡'} style={{ flex: 0.6 }} disabled={it.wish || !it.name} onPress={onWish} />
+        <Btn primary label="Grade ›" style={{ flex: 1 }} onPress={onGrade} />
+      </View>
+      <Text style={[S.muted, { fontSize: 11, textAlign: 'center' }]}>Tap the camera again for the next card · every scan is kept in History</Text>
+    </View>
+  );
+}
+
+function HistoryView({ items, onClose, onAdd, onGrade, error }: { items: ScanItem[]; onClose: () => void; onAdd: (it: ScanItem) => void; onGrade: (it: ScanItem) => void; error: string }) {
+  const [filter, setFilter] = useState<'all' | 'not added'>('not added');
+  const list = filter === 'all' ? items : items.filter((x) => !x.added);
+  const total = list.reduce((a, x) => a + (x.price || 0), 0);
+  return (
+    <ScrollView style={S.screen} contentContainerStyle={[S.pad, { paddingBottom: 60, gap: 10 }]}>
+      <View style={[S.row, { justifyContent: 'space-between' }]}>
+        <Text style={S.h2}>Scan history</Text>
+        <Btn label="Back to camera" onPress={onClose} />
+      </View>
+      <View style={S.row}>
+        {(['not added', 'all'] as const).map((f) => (
+          <Pressable key={f} onPress={() => setFilter(f)} style={[S.chip, filter === f && { backgroundColor: C.accent }]}>
+            <Text style={[S.chipText, filter === f && { color: C.accentInk }]}>{f === 'all' ? `All (${items.length})` : `Not in collection (${items.filter((x) => !x.added).length})`}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <Text style={S.muted}>{list.length} card{list.length === 1 ? '' : 's'} · {money(total)} raw</Text>
+      {error ? <View style={S.banner}><Text style={[S.body, { color: C.warn }]}>{error}</Text></View> : null}
+      {list.map((it) => (
+        <View key={it.id} style={st.histRow}>
+          {it.thumb ? <Image source={{ uri: `data:image/jpeg;base64,${it.thumb}` }} style={{ width: 44, height: 62, borderRadius: 4 }} /> : null}
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[S.body, { fontWeight: '700' }]} numberOfLines={1}>{it.name || 'Not identified'}</Text>
+            <Text style={S.muted} numberOfLines={1}>{[it.set, it.number && `#${it.number}`].filter(Boolean).join(' · ') || it.note || ''}</Text>
+            <Text style={[S.muted, { fontSize: 11 }]}>{new Date(it.at).toLocaleString()} · {priceText(it)}</Text>
+          </View>
+          <Pressable onPress={() => onGrade(it)} hitSlop={6}><Text style={{ color: C.accent, fontWeight: '800' }}>Grade</Text></Pressable>
+          <Pressable style={[st.plusSm, it.added && { backgroundColor: C.good }]} disabled={it.added || !it.name} onPress={() => onAdd(it)}>
+            <Text style={st.plusText}>{it.added ? '✓' : '+'}</Text>
+          </Pressable>
+          <Pressable onPress={() => removeHistory(it.id)} hitSlop={8}><Text style={{ color: C.ink2 }}>✕</Text></Pressable>
+        </View>
+      ))}
+      {!list.length ? <Text style={S.muted}>Nothing here yet. Cards you scan show up here, so you can add them to your collection later.</Text> : null}
+      {items.length ? <Btn label="Clear history (keeps nothing in your collection affected)" onPress={() => clearHistory()} /> : null}
+    </ScrollView>
+  );
+}
+
 const CARD_W = 250;
 const st = StyleSheet.create({
+  sheet: { backgroundColor: C.surface, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 14, gap: 10 },
+  sheetImg: { width: 64, height: 89, borderRadius: 6 },
+  plus: { width: 54, height: 46, borderRadius: 12, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  plusSm: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center' },
+  plusText: { color: C.accentInk, fontSize: 26, fontWeight: '900', marginTop: -2 },
+  histBtn: { backgroundColor: 'rgba(255,255,255,.14)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  histText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  histRow: { flexDirection: 'row', gap: 10, alignItems: 'center', backgroundColor: C.surface, borderRadius: 12, padding: 8 },
+  gchip: { backgroundColor: 'rgba(255,255,255,.14)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  gchipText: { color: '#fff', fontWeight: '700', fontSize: 12 },
   overlay: { flex: 1, justifyContent: 'space-between' },
   topBar: { backgroundColor: 'rgba(8,10,14,.65)', padding: 16, paddingTop: 12, gap: 4 },
   stepText: { color: C.accent, fontWeight: '800', letterSpacing: 1.2, fontSize: 13 },
