@@ -422,5 +422,44 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
 
 
+def build_borders():
+    """Printed border layout per set and rarity, from border widths measured on price-guide photos
+    (raw/slabscout-borders*.json: {photo id: [set id, parallel, left, right, top, bottom, w, h]}, each side a share
+    of the card width / height, None = no border line found). Writes catalog/border_profiles.json:
+    {set: {"*": [l, r, t, b, n, borderless share], parallel: [...] only where that parallel's layout differs}}."""
+    import statistics as st_
+    rows: dict = {}
+    for f in glob.glob(os.path.join(RAW, "slabscout-borders*.json*")):
+        for _, r in load_json(f).items():
+            sid, v, l, rr, t, b = r[:6]
+            rows.setdefault(sid, {}).setdefault(v or "Base", []).append((l, rr, t, b))
+    out = {}
+
+    def prof(ms):
+        ok = [m for m in ms if None not in m and 0.005 < m[0] + m[1] < 0.3 and 0.005 < m[2] + m[3] < 0.3]
+        if not ok:
+            return [None, None, None, None, len(ms), 1.0]
+        # typical border per side; centering varies card to card, so the pair totals are the stable part
+        lr = st_.median(m[0] + m[1] for m in ok) / 2
+        tb = st_.median(m[2] + m[3] for m in ok) / 2
+        return [round(lr, 4), round(lr, 4), round(tb, 4), round(tb, 4), len(ms), round(1 - len(ok) / len(ms), 2)]
+
+    for sid, by in rows.items():
+        base = prof(by.get("Base") or [m for ms in by.values() for m in ms])
+        entry = {"*": base}
+        for v, ms in by.items():
+            p = prof(ms)
+            if v == "Base":
+                continue
+            differs = (p[0] is None) != (base[0] is None) or (p[0] is not None and base[0] is not None and
+                       (abs(p[0] - base[0]) > 0.15 * base[0] + 0.004 or abs(p[2] - base[2]) > 0.15 * base[2] + 0.004))
+            if differs:
+                entry[v] = p
+        out[sid] = entry
+    json.dump(out, open(os.path.join(OUT, "border_profiles.json"), "w"), separators=(",", ":"))
+    print(f"border layouts: {len(out)} sets, {sum(len(e) - 1 for e in out.values())} rarities with their own layout")
+
+
 if __name__ == "__main__":
     build()
+    build_borders()

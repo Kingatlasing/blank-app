@@ -601,7 +601,8 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         prof = scan.get("_profile")
         sc[1].caption(f"**{STYLE_LABELS.get(style)}** · {note}" + (
             f"  \nThis set's printed border (from {prof['n']} photos): left+right ≈ {100 * (prof['l'] + prof['r']):.1f}% of the width, "
-            f"top+bottom ≈ {100 * (prof['t'] + prof['b']):.1f}% of the height; the inner lines are looked for there." if prof else ""))
+            f"top+bottom ≈ {100 * (prof['t'] + prof['b']):.1f}% of the height; the inner lines are looked for there." if prof and prof.get("l") is not None else
+            f"  \nThis set / rarity is printed without a border line (measured on {prof['n']} photos)." if prof else ""))
         caps = grading.grader_caps(_worst_of(grade["centering"]["front"]), _worst_of(grade["centering"].get("back", "")),
                                    tcg=game_of(scan) not in ("Sports", "Baseball", "Basketball", "Football", "Soccer", "Hockey"))
         st.caption("Best grade the centering allows · " + " · ".join(f"**{k}** {v}" for k, v in caps.items()))
