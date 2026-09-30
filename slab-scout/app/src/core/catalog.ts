@@ -6,6 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import { Directory, File, Paths } from 'expo-file-system';
+import { ungzip } from 'pako';
 
 export interface Tier {
   name: string;
@@ -152,22 +153,36 @@ function cacheDir(): Directory {
 }
 const cacheFile = (rel: string) => new File(cacheDir(), rel.replace(/\//g, '__'));
 
+const parseGz = (buf: ArrayBuffer) => JSON.parse(ungzip(new Uint8Array(buf), { to: 'string' }));
+
+/** Remote catalog files are gzip-compressed JSON: read the saved copy, else download (and save) it. */
 async function cachedJson(rel: string) {
   try {
     const f = cacheFile(rel);
-    if (f.exists) return JSON.parse(await f.text());
+    if (f.exists) return parseGz(await f.arrayBuffer());
   } catch {
     /* corrupt / missing: download again */
   }
-  const data = await fetchJson(`${REMOTE}/${rel}`);
+  const url = `${REMOTE}/${rel}`;
+  if (_pending.has(url)) return _pending.get(url);
+  const p = fetch(url).then(async (r) => {
+    if (!r.ok) throw new Error(`Couldn't download card list (${r.status})`);
+    const buf = await r.arrayBuffer();
+    try {
+      const f = cacheFile(rel);
+      if (!f.exists) f.create();
+      f.write(new Uint8Array(buf));
+    } catch {
+      /* no space: still usable this session */
+    }
+    return parseGz(buf);
+  });
+  _pending.set(url, p);
   try {
-    const f = cacheFile(rel);
-    if (!f.exists) f.create();
-    f.write(JSON.stringify(data));
-  } catch {
-    /* no space: still usable this session */
+    return await p;
+  } finally {
+    _pending.delete(url);
   }
-  return data;
 }
 
 export interface OfflineStatus { files: number; total: number; bytes: number; totalBytes: number; version: string }
@@ -260,7 +275,7 @@ const popcnt = (v: number) => {
 export async function photoLookup(hash: string, maxDistance = 12, limit = 8): Promise<{ card: Card; distance: number }[]> {
   if (!hash || hash.length !== 16) return [];
   if (!_ph) {
-    const rows: [string, string, string][] = await cachedJson('phash.json');
+    const rows: [string, string, string][] = await cachedJson('phash.json.gz');
     const hi = new Uint32Array(rows.length);
     const lo = new Uint32Array(rows.length);
     rows.forEach(([h], i) => {
@@ -294,7 +309,7 @@ export async function loadSet(setId: string): Promise<Card[]> {
   load();
   const s = _sets![setId];
   if (s?.remote && !_loadedSets.has(setId)) {
-    const rows = await cachedJson(`sets/${setId.replace(/[^\w.-]/g, '_')}.json`);
+    const rows = await cachedJson(`sets/${setId.replace(/[^\w.-]/g, '_')}.json.gz`);
     addRows(rows);
     _loadedSets.add(setId);
   }
@@ -309,12 +324,12 @@ export async function loadKeys(keys: (string | null | undefined)[]) {
 
 /** Search the downloadable sets by card name: fetches the shards for the query's words. */
 export async function searchRemote(query: string, limit = 60): Promise<Card[]> {
-  const toks = tokens(query).filter((t) => t.length >= 2 && !/^\d+$/.test(t));
+  const toks = (query.toLowerCase().match(/[a-z]+/g) || []).filter((t) => t.length >= 3);
   const keys = [...new Set(toks.map((t) => t.slice(0, 2)))].filter((k) => !_loadedShards.has(k)).slice(0, 3);
   await Promise.all(
     keys.map(async (k) => {
       try {
-        addRows(await cachedJson(`names/${k}.json`));
+        addRows(await cachedJson(`names/${k}.json.gz`));
       } catch {
         /* no shard for these letters */
       }

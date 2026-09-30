@@ -95,6 +95,16 @@ def _cat() -> _Cat:
     return cat
 
 
+def _read_remote(*parts: str):
+    """Remote catalog file: gzip-compressed JSON (older builds wrote plain .json)."""
+    import gzip
+    p = _remote_file(*parts)
+    if os.path.exists(p + ".gz"):
+        with gzip.open(p + ".gz", "rt") as fh:
+            return json.load(fh)
+    return json.load(open(p)) if os.path.exists(p) else None
+
+
 def _remote_file(*parts: str) -> str:
     d = _cat().dir or ""
     return os.path.join(d, "remote", *parts)
@@ -108,22 +118,22 @@ def ensure_set(set_id: str) -> None:
     with _lock:
         if set_id in cat.loaded_sets:
             return
-        p = _remote_file("sets", re.sub(r"[^\w.-]", "_", set_id) + ".json")
-        if os.path.exists(p):
-            cat.add(json.load(open(p)))
+        rows = _read_remote("sets", re.sub(r"[^\w.-]", "_", set_id) + ".json")
+        if rows:
+            cat.add(rows)
         cat.loaded_sets.add(set_id)
 
 
 def _ensure_shards(query: str) -> None:
     cat = _cat()
-    toks = [t for t in re.findall(r"[a-z0-9]+", query.lower()) if len(t) >= 2 and not t.isdigit()]
+    toks = [t for t in re.findall(r"[a-z]+", query.lower()) if len(t) >= 3]
     for k in {t[:2] for t in toks}:
         if k in cat.loaded_shards:
             continue
         with _lock:
-            p = _remote_file("names", k + ".json")
-            if os.path.exists(p) and k not in cat.loaded_shards:
-                cat.add(json.load(open(p)))
+            rows = _read_remote("names", k + ".json") if k not in cat.loaded_shards else None
+            if rows:
+                cat.add(rows)
             cat.loaded_shards.add(k)
 
 
@@ -131,10 +141,9 @@ def _ensure_shards(query: str) -> None:
 def _phash_table():
     """Photo fingerprints of every catalog photo: (uint64 array, [(photo id, set id)])."""
     import numpy as np
-    p = _remote_file("phash.json")
-    if not os.path.exists(p):
+    rows = _read_remote("phash.json")
+    if not rows:
         return np.zeros(0, dtype=np.uint64), []
-    rows = json.load(open(p))
     return np.array([int(h, 16) for h, _, _ in rows], dtype=np.uint64), [(im, sid) for _, im, sid in rows]
 
 

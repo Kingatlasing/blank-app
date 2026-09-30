@@ -5,6 +5,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.2.0",
+    "@types/pako": "^2.0.4",
     "expo": "~57.0.25",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
@@ -15,6 +16,7 @@
     "expo-status-bar": "~57.0.1",
     "expo-text-extractor": "^2.0.0",
     "jpeg-js": "^0.4.4",
+    "pako": "^2.2.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0"

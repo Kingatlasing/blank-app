@@ -350,6 +350,20 @@ def build():
         print(" ", s["name"], s["cards"], [ (t["name"], t["print_run"], t["median_raw"]) for t in s["tiers"][:4]])
 
 
+def write_gz(path: str, obj) -> None:
+    import gzip
+    with gzip.open(path, "wt", compresslevel=9) as fh:
+        json.dump(obj, fh, separators=(",", ":"))
+
+
+def shard_key(name: str) -> str:
+    """Name-search shard: first two letters of the longest word in the card name (the surname / species,
+    not 'Jr.' or 'ex'). Search looks in the shard of every word typed."""
+    words = [w for w in re.findall(r"[a-z]+", name.lower()) if len(w) >= 3] or re.findall(r"[a-z0-9]+", name.lower()) or ["0"]
+    w = max(words, key=len)
+    return w[:2] if w[0].isalpha() else "0"
+
+
 def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     """Phone app: bundle only the smaller sets; the big brand pulls are split into per-set files and
     name-search shards (catalog/remote/...) that the app downloads from GitHub when needed."""
@@ -358,7 +372,7 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     for sub in ("sets", "names"):
         d = os.path.join(remote, sub)
         os.makedirs(d, exist_ok=True)
-        for f in glob.glob(os.path.join(d, "*.json")):
+        for f in glob.glob(os.path.join(d, "*.json*")):
             os.remove(f)
     local, by_set, shards = [], {}, {}
     for r in cards:
@@ -366,13 +380,11 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
             local.append(r)
             continue
         by_set.setdefault(r[0], []).append(r)
-        words = re.findall(r"[a-z0-9]+", r[1].lower())
-        for k in {(w[:2] if w[0].isalpha() else "0") for w in (words[:1] + words[-1:])}:
-            shards.setdefault(k, []).append(r)
+        shards.setdefault(shard_key(r[1]), []).append(r)
     for sid, rows in by_set.items():
-        json.dump(rows, open(os.path.join(remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json"), "w"), separators=(",", ":"))
+        write_gz(os.path.join(remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json.gz"), rows)
     for k, rows in shards.items():
-        json.dump(rows, open(os.path.join(remote, "names", k + ".json"), "w"), separators=(",", ":"))
+        write_gz(os.path.join(remote, "names", k + ".json.gz"), rows)
     if os.path.isdir(app_dir):
         json.dump({"fields": fields, "rows": local}, open(os.path.join(app_dir, "cards.json"), "w"), separators=(",", ":"))
         for f in ("sets.json", "sales.json"):
@@ -390,12 +402,14 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
         if h and (im, r[0]) not in seen:
             seen.add((im, r[0]))
             prows.append([h, im, r[0]])
-    json.dump(prows, open(os.path.join(remote, "phash.json"), "w"), separators=(",", ":"))
+    write_gz(os.path.join(remote, "phash.json.gz"), prows)
+    if os.path.exists(os.path.join(remote, "phash.json")):
+        os.remove(os.path.join(remote, "phash.json"))
     print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos)")
     import time as _t
     files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
     files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
-    files += [("phash.json", os.path.getsize(os.path.join(remote, "phash.json")))]
+    files += [("phash.json.gz", os.path.getsize(os.path.join(remote, "phash.json.gz")))]
     json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
               open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
     print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")
