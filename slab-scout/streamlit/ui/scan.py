@@ -72,7 +72,15 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     # 1c. Picture alone: the scan's fingerprint against every price-guide photo (works with no readable text)
     if not code_hit:
         have = {x["card"].key for x in cands if x["kind"] == "catalog"}
-        for c, dist in catalog.photo_lookup(f["phash"]):
+        pics = catalog.photo_lookup(f["phash"])
+        if len(pics) > 1 and pics[1][1] - pics[0][1] <= 4:
+            # same artwork, several parallels: let the colours decide (compares with the actual photos)
+            try:
+                col = {r["card"].key: r["colour"] for r in pipeline.catalog_photo_match(vision.tight_card(f["card"], f["edges"]), [c for c, _ in pics])}
+                pics.sort(key=lambda t: (t[1] - col.get(t[0].key, 0) * 8))
+            except Exception:
+                pass
+        for c, dist in pics:
             why = f"picture matches the price-guide photo ({dist}/64)"
             if c.key in have:
                 for x in cands:
