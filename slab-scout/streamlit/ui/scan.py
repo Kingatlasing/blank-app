@@ -41,11 +41,12 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                                                            or len(re.findall(r"[A-Za-z]{4,}", parsed["raw_text"])) < 5):
         jl = ocr.read_text_cjk(f["card"])
         jp = identify.cjk_pokemon(jl)
-        if not jp:  # Korean card: the Korean reader knows Hangul
+        lang = "Japanese"
+        if not jp or not any(re.search(r"[\u3040-\u30ff]", t) for t, *_ in jl):  # no kana: try the Korean reader
             kl = ocr.read_text_ko(f["card"])
-            jp = identify.cjk_pokemon(kl)
-            if jp:
-                jl = kl
+            jk = identify.cjk_pokemon(kl)
+            if jk and any(re.search(r"[\uac00-\ud7a3]", t) for t, *_ in kl):
+                jp, jl, lang = jk, kl, "Korean"
         if jp:
             g = "Pokémon Japanese / Korean"
             parsed = {**parsed, "name": jp["name"], "number": jp["number"], "game": g,
@@ -54,9 +55,10 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                 if catalog.sets().get(c.set_id, {}).get("category") != "Pokémon":
                     continue
                 num_ok = jp["number"] and re.sub(r"^0+", "", c.number) == jp["number"]
-                sc = 58 + (18 if num_ok else 0) + (8 if jp["name"].lower() == c.name.lower() else 0)
+                sc = 58 + (18 if num_ok else 0) + (8 if jp["name"].lower() == c.name.lower() else 0) + \
+                    (6 if lang in catalog.sets().get(c.set_id, {}).get("name", "") else 0)
                 cands.append({"kind": "catalog", "card": c, "score": sc,
-                              "why": [f"reads {jp['name']} (Japanese / Korean)"] + ([f"number {jp['number']} ✓"] if num_ok else [])})
+                              "why": [f"reads {jp['name']} ({lang} text)"] + ([f"number {jp['number']} ✓"] if num_ok else [])})
     # 1. Kakawow-style card codes pin the exact card + parallel in the built-in database
     code_hit = bool(catalog.CODE_RE.search(parsed["raw_text"].upper()))
     text_n = " " + identify.norm(parsed["raw_text"]) + " "

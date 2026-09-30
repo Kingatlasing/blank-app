@@ -116,8 +116,10 @@ def slug_meta(slug: str, title: str) -> dict:
     else:
         category = "Non-sport"
     name = re.sub(r"\s*(Checklist|Prices).*$", "", title).strip() or slug
-    if s.startswith("pokemon-") and not name.lower().startswith("pokemon"):
-        name = " ".join(w.replace("%27", "'").capitalize() for w in s.split("-")).replace("Pokemon", "Pokémon")
+    if s.startswith("pokemon-"):
+        if not name.lower().startswith(("pokemon", "pokémon")):
+            name = " ".join(w.replace("%27", "'").capitalize() for w in s.split("-"))
+        name = name.replace("Pokemon", "Pokémon")
     if not re.search(r"(19|20)\d\d", name) and re.match(r"^[a-z]+-cards-(19|20)\d\d-", s):
         # SportsCardsPro brand-page labels are short ("'91 Upper Deck"): rebuild the name from the slug
         rest = s.split("-cards-", 1)[1]
