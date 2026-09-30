@@ -16,7 +16,7 @@ import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import CenteringTool from '../components/CenteringTool';
-import { Card as CatCard, imageUrl, matchText, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
+import { Card as CatCard, imageUrl, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
@@ -249,6 +249,21 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       // Built-in card database first: a card code like CDT-BBG-199 pins the exact parallel.
       const cm = matchText(parsed.rawText, parsed.name, parsed.number);
+      let byPicture = false;
+      // picture alone: this scan's fingerprint against every price-guide photo (no readable text needed)
+      if (!cm.byCode) {
+        try {
+          setProgress('Matching the picture…');
+          const pm = await photoLookup(await fingerprintCard(front.uri));
+          if (pm.length && pm[0].distance <= 8) {
+            const byPic = pm.map((m) => m.card);
+            cm.cards = [...byPic, ...cm.cards.filter((c) => !byPic.some((b) => b.key === c.key))];
+            byPicture = true;
+          }
+        } catch {
+          /* fingerprints not downloaded yet and offline */
+        }
+      }
       if (!cm.byCode && parsed.name && !DB_GAMES.includes(g)) {
         // also look in the downloadable sets (every Upper Deck / Topps baseball card...)
         try {
@@ -287,7 +302,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       if (cm.cards.length && (cm.byCode || !strong)) {
         const top = cm.cards[0];
         const nameOk = !parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w));
-        if (cm.byCode || nameOk) {
+        if (cm.byCode || byPicture || nameOk) {
           cat = top;
           f = recordFromCatalog(top).card;
           src = 'card database';

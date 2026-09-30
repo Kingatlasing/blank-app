@@ -69,6 +69,19 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                     by_key[r["card"].key]["why"].append(why)
                 else:
                     cands.append({"kind": "catalog", "card": r["card"], "score": 50 + bonus, "why": [why]})
+    # 1c. Picture alone: the scan's fingerprint against every price-guide photo (works with no readable text)
+    if not code_hit:
+        have = {x["card"].key for x in cands if x["kind"] == "catalog"}
+        for c, dist in catalog.photo_lookup(f["phash"]):
+            why = f"picture matches the price-guide photo ({dist}/64)"
+            if c.key in have:
+                for x in cands:
+                    if x["kind"] == "catalog" and x["card"].key == c.key:
+                        x["score"] += 20 if dist <= 8 else 10
+                        x["why"].append(why)
+            else:
+                cands.append({"kind": "catalog", "card": c, "score": 78 - dist * 2, "why": [why]})
+                have.add(c.key)
     # 2. Community fingerprint matches (cards people confirmed before)
     for m in comm:
         if not m.get("is_fake"):

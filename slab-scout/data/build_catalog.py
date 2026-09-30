@@ -89,6 +89,12 @@ def clean_name(name: str, variant: str, pr):
     return n or name, re.sub(r"\s+", " ", variant).strip(), pr
 
 
+def load_json(path: str):
+    import gzip
+    with (gzip.open(path, "rt") if path.endswith(".gz") else open(path)) as fh:
+        return json.load(fh)
+
+
 def slug_meta(slug: str, title: str) -> dict:
     s = slug.lower()
     year = (re.search(r"(19|20)\d\d", s) or [""])[0]
@@ -127,20 +133,23 @@ def num(v):
 def build():
     sets: dict[str, dict] = {}
     cards: list[list] = []
-    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json")))
+    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*")))
     merged: dict[str, dict] = {}
     fetched = {}
     inline_imgs: dict[str, str] = {}
     remote_ids: set[str] = set()
     for f in raw_files:
-        d = json.load(open(f))
+        d = load_json(f)
         for slug, s in d["sets"].items():
+            if "c" in s and "rows" not in s:  # compact browser export: [t, uri, pr, raw, g9, psa10, img]
+                s["rows"] = [{"t": t, "u": f"/game/{slug}/{u}", "pr": pr, "raw": rw, "g9": g9, "psa10": p10, "img": im}
+                             for t, u, pr, rw, g9, p10, im in s.pop("c")]
             if not s.get("rows") and not isinstance(s.get("rows"), list):
                 continue
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
-                if "-baseball" in os.path.basename(f) or "-brands" in os.path.basename(f):
+                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     for slug, s in merged.items():
@@ -363,9 +372,24 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
         for f in ("sets.json", "sales.json"):
             with open(os.path.join(OUT, f)) as a, open(os.path.join(app_dir, f), "w") as b:
                 b.write(a.read())
+    # photo fingerprints (perceptual hash of each price-guide photo): [hash, photo id, set] so a scan can be
+    # matched by picture alone, even with no readable text
+    ph = {}
+    for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")):
+        ph.update(load_json(f))
+    seen, prows = set(), []
+    for r in cards:
+        im = (r[9] or "").lstrip("~")
+        h = ph.get(im)
+        if h and (im, r[0]) not in seen:
+            seen.add((im, r[0]))
+            prows.append([h, im, r[0]])
+    json.dump(prows, open(os.path.join(remote, "phash.json"), "w"), separators=(",", ":"))
+    print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos)")
     import time as _t
     files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
     files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
+    files += [("phash.json", os.path.getsize(os.path.join(remote, "phash.json")))]
     json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
               open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
     print(f"phone: {len(local)} cards bundled, {len(by_set)} sets + {len(shards)} name shards downloadable")

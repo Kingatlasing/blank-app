@@ -127,6 +127,38 @@ def _ensure_shards(query: str) -> None:
             cat.loaded_shards.add(k)
 
 
+@lru_cache(maxsize=1)
+def _phash_table():
+    """Photo fingerprints of every catalog photo: (uint64 array, [(photo id, set id)])."""
+    import numpy as np
+    p = _remote_file("phash.json")
+    if not os.path.exists(p):
+        return np.zeros(0, dtype=np.uint64), []
+    rows = json.load(open(p))
+    return np.array([int(h, 16) for h, _, _ in rows], dtype=np.uint64), [(im, sid) for _, im, sid in rows]
+
+
+def photo_lookup(phash_hex: str, max_distance: int = 12, limit: int = 8) -> list[tuple[Card, int]]:
+    """Catalog cards whose price-guide photo looks like this scan (by perceptual hash), closest first."""
+    import numpy as np
+    hashes, meta = _phash_table()
+    if not len(hashes) or not phash_hex:
+        return []
+    x = np.bitwise_xor(hashes, np.uint64(int(phash_hex, 16)))
+    d = np.unpackbits(x.view(np.uint8).reshape(-1, 8), axis=1).sum(axis=1)
+    out: list[tuple[Card, int]] = []
+    for i in np.argsort(d)[: limit * 3]:
+        if d[i] > max_distance:
+            break
+        im, sid = meta[i]
+        for c in set_cards(sid):
+            if c.img.lstrip("~") == im and not c.img.startswith("~"):
+                out.append((c, int(d[i])))
+        if len(out) >= limit:
+            break
+    return out[:limit]
+
+
 def load() -> tuple[dict, list[Card], dict]:
     cat = _cat()
     return cat.sets, cat.cards, cat.sales

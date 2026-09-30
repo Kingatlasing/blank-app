@@ -248,6 +248,45 @@ export function clearOffline() {
   _dir = null;
 }
 
+/* ---------- picture matching ---------- */
+let _ph: { hi: Uint32Array; lo: Uint32Array; meta: [string, string][] } | null = null;
+const popcnt = (v: number) => {
+  v = v - ((v >>> 1) & 0x55555555);
+  v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
+  return (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
+};
+
+/** Cards whose price-guide photo looks like this scan (perceptual hash), closest first. Works offline once saved. */
+export async function photoLookup(hash: string, maxDistance = 12, limit = 8): Promise<{ card: Card; distance: number }[]> {
+  if (!hash || hash.length !== 16) return [];
+  if (!_ph) {
+    const rows: [string, string, string][] = await cachedJson('phash.json');
+    const hi = new Uint32Array(rows.length);
+    const lo = new Uint32Array(rows.length);
+    rows.forEach(([h], i) => {
+      hi[i] = parseInt(h.slice(0, 8), 16) >>> 0;
+      lo[i] = parseInt(h.slice(8), 16) >>> 0;
+    });
+    _ph = { hi, lo, meta: rows.map(([, im, sid]) => [im, sid]) };
+  }
+  const qh = parseInt(hash.slice(0, 8), 16) >>> 0;
+  const ql = parseInt(hash.slice(8), 16) >>> 0;
+  const best: [number, number][] = [];
+  for (let i = 0; i < _ph.hi.length; i++) {
+    const d = popcnt((_ph.hi[i] ^ qh) >>> 0) + popcnt((_ph.lo[i] ^ ql) >>> 0);
+    if (d <= maxDistance) best.push([d, i]);
+  }
+  best.sort((a, b) => a[0] - b[0]);
+  const out: { card: Card; distance: number }[] = [];
+  for (const [d, i] of best.slice(0, limit * 3)) {
+    const [im, sid] = _ph.meta[i];
+    const cs = await loadSet(sid).catch(() => setCards(sid));
+    cs.filter((c) => c.img === im).forEach((card) => out.push({ card, distance: d }));
+    if (out.length >= limit) break;
+  }
+  return out.slice(0, limit);
+}
+
 export const isLoaded = (setId: string) => !sets()[setId]?.remote || _loadedSets.has(setId);
 
 /** Make sure a set's cards are in memory (downloads remote sets once per app session). */
