@@ -68,8 +68,17 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             continue
         # Without a code, only accept a database card whose full name is actually printed on the card
         words = [w for w in identify.norm(c.name).split() if len(w) >= 3]
-        if words and all(f" {w} " in text_n for w in words) and (parsed.get("game") or "") not in identify.TCG_GAMES:
-            cands.append({"kind": "catalog", "card": c, "score": 62, "why": [f"name {c.name} ✓"]})
+        tcg = (parsed.get("game") or "") in identify.TCG_GAMES
+        if words and all(f" {w} " in text_n for w in words):
+            cands.append({"kind": "catalog", "card": c, "score": 55 if tcg else 62, "why": [f"name {c.name} ✓"]})
+        elif parsed.get("name"):
+            # misread letters ('Charizrd'): the closest card name to what was read still counts, a bit lower
+            import difflib
+            sim = difflib.SequenceMatcher(None, c.name.lower(), parsed["name"].lower()).ratio()
+            if sim >= 0.8:
+                num_ok = bool(parsed.get("number")) and c.number.lower().lstrip("0").endswith(parsed["number"].split("/")[0].lstrip("#0").lower())
+                cands.append({"kind": "catalog", "card": c, "score": (52 if tcg else 58) + (10 if num_ok else 0),
+                              "why": [f"closest name to the text read ({parsed['name']} → {c.name})"] + (["number ✓"] if num_ok else [])})
     # 1b. Photo match against the price-guide photos (sports / non-sport cards): picks the exact card and
     #     parallel among the name matches, or among the player's cards when only the name was read
     if not code_hit and (parsed.get("game") or "") not in identify.TCG_GAMES and g not in identify.TCG_GAMES:

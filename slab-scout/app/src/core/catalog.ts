@@ -550,3 +550,66 @@ export function oddsText(t: Tier | null, s?: SetInfo): string {
 }
 
 export const printRunLabel = (n?: number | null) => (!n ? '' : n === 1 ? '1 of 1' : `/${n}`);
+
+/* ---------- closest match for text read off a photo (misread letters, missing words) ---------- */
+function editDistance(a: string, b: string): number {
+  const m = a.length, n = b.length;
+  if (!m || !n) return m + n;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) {
+    const cur = [i];
+    for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[n];
+}
+const similar = (a: string, b: string) => 1 - editDistance(a, b) / Math.max(a.length, b.length, 1);
+const OCR_FIX: Record<string, string> = { '0': 'o', '1': 'l', '5': 's', '8': 'b', '7': 't', '4': 'a' };
+
+/** Closest catalog cards to text read off a card, tolerating misread letters ('Charizrd', 'Tr0ut'): each word is
+ * matched to the nearest known word, then cards are ranked by how alike their name is to the text, plus the
+ * card number when it was read. Loads the name lists it needs (downloaded or cached). */
+export async function closestRemote(text: string, nameHint = '', numberHint = '', limit = 20): Promise<Card[]> {
+  const lines = [nameHint, ...(text || '').split('\n')].map((l) => l.trim()).filter(Boolean).slice(0, 8);
+  const fix = (w: string) => (/[a-z]/.test(w) && /\d/.test(w) ? w.replace(/[015874]/g, (d) => OCR_FIX[d]) : w);
+  const words = [...new Set(lines.flatMap((l) => (l.toLowerCase().match(/[a-z0-9]+/g) || []).map(fix)).filter((w) => w.length >= 4 && /^[a-z]+$/.test(w)))];
+  if (!words.length) return [];
+  await searchRemote(words.join(' '), 1).catch(() => []); // loads the name lists for these words
+  const idx = index();
+  const vocab = new Map<string, string[]>();
+  idx.forEach((_, k) => {
+    if (k.length >= 4 && /^[a-z]+$/.test(k)) {
+      const a = vocab.get(k[0]);
+      if (a) a.push(k);
+      else vocab.set(k[0], [k]);
+    }
+  });
+  const fixed: string[] = [];
+  for (const w of words) {
+    if (idx.has(w)) { fixed.push(w); continue; }
+    let best = '', bs = 0.75;
+    for (const k of vocab.get(w[0]) || []) {
+      if (Math.abs(k.length - w.length) > 2) continue;
+      const s = similar(w, k);
+      if (s > bs) { bs = s; best = k; }
+    }
+    if (best) fixed.push(best);
+  }
+  const pool = new Map<number, number>();
+  for (const w of fixed) for (const i of (idx.get(w) || []).slice(0, 4000)) pool.set(i, (pool.get(i) || 0) + 1);
+  const all = cards();
+  const num = (numberHint || '').split('/')[0].replace(/^#/, '').replace(/^0+/, '').toLowerCase();
+  const target = fix((nameHint || lines[0] || '').toLowerCase());
+  return [...pool.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3000)
+    .map(([i, n]) => {
+      const c = all[i];
+      const bonus = num && c.number.toLowerCase().replace(/^0+/, '').endsWith(num) ? 0.35 : 0;
+      return { c, s: similar(c.name.toLowerCase(), target) + 0.1 * n + bonus };
+    })
+    .sort((a, b) => b.s - a.s)
+    .filter((x) => x.s >= 0.55)
+    .slice(0, limit)
+    .map((x) => x.c);
+}

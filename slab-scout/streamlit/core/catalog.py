@@ -271,7 +271,67 @@ def match_text(text: str, name_hint: str = "", number_hint: str = "") -> list[Ca
     if out:
         return _dedupe(out)
     q = " ".join(x for x in [name_hint, number_hint.split("/")[0] if number_hint else ""] if x)
-    return search(q, limit=20) if q.strip() else []
+    hits = search(q, limit=20) if q.strip() else []
+    if hits:
+        return hits
+    return closest(text, name_hint, number_hint)
+
+
+def _fix_word(tok: str, vocab: list[str]) -> str | None:
+    """Closest known word for a misread one ('Charizrd' -> 'charizard')."""
+    import difflib
+    m = difflib.get_close_matches(tok, vocab, n=1, cutoff=0.75)
+    return m[0] if m else None
+
+
+def closest(text: str, name_hint: str = "", number_hint: str = "", limit: int = 20) -> list[Card]:
+    """Closest catalog cards to text read off a photo, tolerating misread letters and missing words: each
+    word is matched to the nearest known word, then cards are ranked by how alike their name is to the text
+    (plus the card number when it was read)."""
+    import difflib
+    lines = [l.strip() for l in ([name_hint] if name_hint else []) + text.splitlines() if l.strip()]
+    ocr_fix = str.maketrans("015874", "olsbta")  # digits misread for letters inside a word ('Tr0ut')
+    words = []
+    for l in lines[:8]:
+        for w in re.findall(r"[a-z0-9]+", l.lower()):
+            if re.search(r"[a-z]", w) and re.search(r"\d", w):
+                w = w.translate(ocr_fix)
+            if len(w) >= 4 and w.isalpha():
+                words.append(w)
+    lines = [l.lower().translate(ocr_fix) if re.search(r"[a-z]\d|\d[a-z]", l.lower()) else l for l in lines]
+    if not words:
+        return []
+    for w in dict.fromkeys(words):
+        _ensure_shards(w)
+    cat = _cat()
+    vocab_by = {}
+    for k in cat.index:
+        if k.isalpha() and len(k) >= 4:
+            vocab_by.setdefault(k[:1], []).append(k)
+    fixed = []
+    for w in dict.fromkeys(words):
+        if w in cat.index:
+            fixed.append(w)
+        else:
+            f = _fix_word(w, vocab_by.get(w[:1], []))
+            if f:
+                fixed.append(f)
+    if not fixed:
+        return []
+    pool: dict[int, int] = {}
+    for w in fixed:
+        for i in cat.index.get(w, [])[:4000]:
+            pool[i] = pool.get(i, 0) + 1
+    num = (number_hint or "").split("/")[0].lstrip("#").lstrip("0").lower()
+    target = (name_hint or lines[0]).lower()
+    scored = []
+    for i, hitsn in sorted(pool.items(), key=lambda kv: -kv[1])[:3000]:
+        c = cat.cards[i]
+        sim = difflib.SequenceMatcher(None, c.name.lower(), target).ratio()
+        bonus = 0.35 if num and c.number.lower().lstrip("0").endswith(num) else 0.0
+        scored.append((sim + 0.1 * hitsn + bonus, c))
+    scored.sort(key=lambda t: -t[0])
+    return [c for sc, c in scored[:limit] if sc >= 0.55]
 
 
 def _dedupe(cs: list[Card]) -> list[Card]:

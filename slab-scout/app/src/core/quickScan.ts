@@ -7,7 +7,7 @@ import { cardBack, identify } from './identify';
 import { fingerprintCard, thumbnail } from './imageTools';
 import { parseText, readText } from './ocr';
 import { nameGuess, readLabel } from './slab';
-import { Card, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
+import { Card, closestRemote, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
 import { recordFromCatalog } from './portfolio';
 import type { ScanItem } from './scanHistory';
 
@@ -46,9 +46,17 @@ export async function quickIdentify(uri: string, game: string): Promise<ScanItem
       cm.cards = [...cm.cards, ...more.filter((m) => !cm.cards.some((c) => c.key === m.key))];
     } catch {}
   }
+  let byClosest = false;
+  if (!cm.byCode && !cm.cards.length && (parsed.name || parsed.rawText)) {
+    // nothing matched word for word: the closest names (misread letters, missing words)
+    try {
+      cm.cards = await closestRemote(parsed.rawText, parsed.name, parsed.number);
+      byClosest = cm.cards.length > 0;
+    } catch {}
+  }
   const top = cm.cards[0];
-  const nameOk = top && (!parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w)));
-  if (top && (cm.byCode || byPicture || nameOk)) return { ...fromCatalog(top), id: base.id, at: base.at, uri, thumb, phash, source: byPicture ? 'picture match' : 'card database' };
+  const nameOk = top && (!parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w)) || byClosest);
+  if (top && (cm.byCode || byPicture || nameOk)) return { ...fromCatalog(top), id: base.id, at: base.at, uri, thumb, phash, source: byPicture ? 'picture match' : byClosest ? 'closest match to the text read' : 'card database' };
   if ((!gg || DB_GAMES.includes(gg)) && (parsed.name || parsed.number)) {
     const list = await identify(lines, parsed.rawText, parsed.name, parsed.number, parsed.setCode, gg).catch(() => []);
     const best = list[0];

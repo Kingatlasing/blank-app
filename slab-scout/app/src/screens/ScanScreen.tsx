@@ -16,7 +16,7 @@ import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import CenteringTool from '../components/CenteringTool';
-import { Card as CatCard, imageUrl, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
+import { Card as CatCard, closestRemote, imageUrl, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
@@ -323,6 +323,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       // Built-in card database first: a card code like CDT-BBG-199 pins the exact parallel.
       const cm = matchText(parsed.rawText, parsed.name, parsed.number);
       let byPicture = false;
+      let closestHit = false;
       // picture alone: this scan's fingerprint against every price-guide photo (no readable text needed)
       if (!cm.byCode) {
         try {
@@ -347,6 +348,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         } catch {
           /* offline: bundled cards only */
         }
+      }
+      if (!cm.byCode && !cm.cards.length && (parsed.name || parsed.rawText)) {
+        // no word-for-word match: the closest card names (misread letters, missing words)
+        try {
+          setProgress('Finding the closest match…');
+          cm.cards = await closestRemote(parsed.rawText, parsed.name, parsed.number);
+          closestHit = cm.cards.length > 0;
+        } catch {}
       }
       // photo match against the price-guide pictures picks the exact card and parallel
       if (!cm.byCode && cm.cards.length) {
@@ -376,7 +385,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       if (cm.cards.length && (cm.byCode || !strong)) {
         const top = cm.cards[0];
         const nameOk = !parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w));
-        if (cm.byCode || byPicture || nameOk) {
+        if (cm.byCode || byPicture || nameOk || closestHit) {
           cat = top;
           f = recordFromCatalog(top).card;
           src = 'card database';
