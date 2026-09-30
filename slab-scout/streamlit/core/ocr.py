@@ -47,6 +47,31 @@ def _engine_cjk():
     return RapidOCR(rec_model_path=os.path.join(_MODELS, "ppocrv5_rec.onnx"), rec_keys_path=os.path.join(_MODELS, "ppocrv5_dict.txt"))
 
 
+@lru_cache(maxsize=1)
+def _engine_ko():
+    """PP-OCRv5 Korean reader (Hangul + English + digits)."""
+    from rapidocr_onnxruntime import RapidOCR
+
+    m = os.path.join(_MODELS, "korean_ppocrv5_rec.onnx")
+    if not os.path.exists(m):
+        return None
+    return RapidOCR(rec_model_path=m, rec_keys_path=os.path.join(_MODELS, "ppocrv5_korean_dict.txt"))
+
+
+def read_text_ko(img: Image.Image) -> list[tuple[str, float, float]]:
+    eng = _engine_ko()
+    if eng is None:
+        return []
+    arr = np.array(img.convert("RGB"))
+    try:
+        result, _ = eng(arr)
+    except Exception:
+        return []
+    h = arr.shape[0]
+    lines = [(text.strip(), float(conf), float(np.mean([p[1] for p in box])) / h) for box, text, conf in result or []]
+    return sorted(lines, key=lambda t: t[2])
+
+
 def has_cjk(lines) -> bool:
     return any(CJK.search(t) for t, *_ in lines)
 
