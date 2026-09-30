@@ -60,3 +60,57 @@ export function estimate(front: number | null, back: number | null, corners: str
     tag_score: score, tag_grade: band[1], tag_label: band[2], centering_cap: cap,
   };
 }
+
+/** Centering limits per company: [grade, front max %, back max % | null]. PSA / CGC / TAG from their published
+ * scales; BGS and SGC from published collector guides. Same table as the web app (core/grading.py). */
+export const GRADERS: Record<string, [string, number, number | null][]> = {
+  PSA: [['10', 55, 75], ['9', 60, 90], ['8', 65, 90], ['7', 70, 90], ['6', 80, 90], ['5', 85, 90], ['4', 85, 90], ['3', 90, 90], ['2', 95, 95]],
+  BGS: [['10 Pristine', 50, 55], ['9.5', 55, 60], ['9', 55, 70], ['8', 60, 80], ['7', 65, 90], ['6', 70, 95]],
+  SGC: [['10 Pristine', 50, null], ['10', 55, null], ['9', 60, null], ['8', 65, null], ['7', 70, null], ['6', 75, null]],
+  CGC: [['10 Pristine', 50, null], ['10', 55, 75], ['9', 60, 90], ['8', 65, null], ['7.5', 65, null], ['7', 70, null], ['6', 75, null], ['4.5', 85, null]],
+  TAG: [['10 Pristine', 51, null], ['10', 55, null], ['9', 60, null], ['8.5', 62.5, null], ['8', 65, null], ['7', 70, null], ['6', 75, null], ['5', 80, null]],
+};
+const TAG_BACK: Record<'tcg' | 'sports', Record<string, number>> = { tcg: { '10 Pristine': 52, '10': 65, '9': 75, '8.5': 85 }, sports: { '10 Pristine': 54.5, '10': 70, '9': 90, '8.5': 95 } };
+
+/** Best grade each company allows for this centering alone (larger-side % front / back). */
+export function graderCaps(front: number | null, back: number | null, tcg = true): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [comp, rows] of Object.entries(GRADERS)) {
+    let best = 'below scale';
+    for (const [label, f, b0] of rows) {
+      const b = comp === 'TAG' ? TAG_BACK[tcg ? 'tcg' : 'sports'][label] ?? 100 : b0;
+      if ((front == null || front <= f) && (back == null || b == null || back <= b)) { best = label; break; }
+    }
+    out[comp] = best;
+  }
+  return out;
+}
+
+export const CARD_STYLES: Record<string, string> = {
+  standard: 'Standard (bordered): centering is the printed border on each side, card edge to the inner frame.',
+  full_art: 'Full art / SIR / SAR: a thin frame with the art running to it; centering is judged on that frame, and graders are more forgiving since a shift is hard to see.',
+  die_cut: 'Die-cut: shaped outline. Centering is judged on the printed design; the shaped edges and points are held to the normal corner / edge standard. No grader publishes a separate die-cut rule.',
+  vintage: 'Vintage: many old cards are cut square or to other sizes; square corners are not a flaw.',
+};
+
+const FULL_ART = /full art|illustration rare|special illustration|\balt(?:ernate)? art|secret|rainbow|gold(?:en)? rare|hyper rare|character (?:super )?rare|art rare|\b(?:sar|ar|sr|ur|hr|chr|csr|sir|ir|sfa|ssr|fa)\b|trainer gallery|galarian gallery|shiny vault|borderless|showcase|full[- ]bleed/i;
+
+/** Printed layout from the rarity / parallel and number (same rules as the web app). */
+export function cardStyle(variant = '', name = '', year = '', number = ''): 'standard' | 'full_art' | 'die_cut' | 'vintage' {
+  const t = `${variant} ${name}`;
+  if (/die[- ]?cut/i.test(t)) return 'die_cut';
+  const m = /^\D*(\d+)\s*\/\s*\D*(\d+)$/.exec(number || '');
+  const secret = !!m && +m[1] > +m[2] && +m[2] > 0;
+  if (FULL_ART.test(t) || secret || /^(?:SV|TG|GG)\d/i.test(number || '')) return 'full_art';
+  if (/^\d{4}$/.test(year) && +year < 1957) return 'vintage';
+  return 'standard';
+}
+
+export const GUIDE: [string, string][] = [
+  ['Centering', 'Opposite borders are compared (55/45 = one side is 55% of the pair); the back is judged much more loosely. PSA 10: 55/45 front, 75/25 back. BGS 9.5: 55 both ways (Pristine 10: 50/50). SGC 10: 55. CGC 10: 55 front, 75 back. TAG 10: 55 front; TAG backs differ for TCG (65) and sports (70).'],
+  ['Corners', 'PSA 10: four perfectly sharp corners. 9: one very minor flaw. 8: slightest fraying at one or two corners. 7: slight fraying on some. 5: minor rounding.'],
+  ['Edges & surface', '10: no chipping, full original gloss, no staining. 9 allows one minor print imperfection or a very slight wax stain on the back.'],
+  ['Overall', 'The weakest area decides the grade (BGS: at most a half grade above the lowest subgrade).'],
+  ['Full art / die-cut / vintage', 'Full art: judged on the thin frame, more forgiving. Die-cut: no special rule; shaped edges held to the normal standard. Vintage: square-cut corners are not a flaw.'],
+  ['Autographs', 'Authenticators (PSA/DNA, JSA, Beckett) compare with known examples of the signature, ink and flow. PSA auto 10 = bold, no skips; 9 = a very light skip; 8 = more noticeable skip or slight fading. Maker-certified autos are guaranteed by the maker.'],
+];

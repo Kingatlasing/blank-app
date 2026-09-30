@@ -10,7 +10,7 @@ import { Candidate, DB_GAMES, soldLinks } from '../core/databases';
 import { cardBack, identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
-import { CONDITION_HELP, CONDITION_OPTIONS, GradeResult, estimate, subgradeToOption } from '../core/grading';
+import { CARD_STYLES, CONDITION_HELP, CONDITION_OPTIONS, GUIDE, GradeResult, cardStyle, estimate, graderCaps, subgradeToOption } from '../core/grading';
 import { Centering, centeringText, centeringWorst, cropAndTrim, findLines, fingerprintCard, fingerprintRemote, hashDistance, Lines, measureCentering, thumbnail } from '../core/imageTools';
 import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
@@ -96,6 +96,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [last, setLast] = useState<ScanItem | null>(null);
   const [history, setHistory] = useState<ScanItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const shots = useRef(new Map<string, Shot>());
   const curItem = useRef<string | null>(null); // history entry being graded
   useEffect(() => {
@@ -811,6 +812,27 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
             <Text style={[S.h3, S.mono]}>Front {centeringText(cen)}{backCen ? `  ·  Back ${centeringText(backCen)}` : ''}</Text>
             {!autoCen ? <Text style={S.muted}>No clear border found (full-art card?). Set the lines yourself.</Text> : null}
             <CenteringTool key={front!.uri + (autoLines ? 'L' : '')} uri={front!.uri} auto={autoCen || cen} lines={autoLines} status={lineStatus} onChange={setCen} />
+            {(() => {
+              const printed = /\d+\s*\/\s*\d+/.exec(rawText)?.[0] || fields.number;
+              const style = cardStyle(`${fields.rarity} ${fields.variant}`, fields.name, fields.year, printed);
+              const caps = graderCaps(centeringWorst(cen), backCen ? centeringWorst(backCen) : null, !['Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey'].includes(fields.game));
+              return (
+                <View style={{ gap: 6 }}>
+                  <Text style={S.muted}>{CARD_STYLES[style]}</Text>
+                  <Text style={S.eyebrow}>Best grade the centering allows</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {Object.entries(caps).map(([k, v]) => <Chip key={k} label={`${k} ${v}`} />)}
+                  </View>
+                  <Pressable onPress={() => setShowGuide((g) => !g)}><Text style={{ color: C.accent, fontWeight: '700' }}>{showGuide ? 'Hide' : 'How grading works ›'}</Text></Pressable>
+                  {showGuide ? GUIDE.map(([t, b]) => (
+                    <View key={t} style={{ gap: 2 }}>
+                      <Text style={[S.body, { fontWeight: '700' }]}>{t}</Text>
+                      <Text style={S.muted}>{b}</Text>
+                    </View>
+                  )) : null}
+                </View>
+              );
+            })()}
           </Section>
 
           <Section n={4} title="Condition & grade">

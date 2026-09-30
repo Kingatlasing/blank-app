@@ -41,6 +41,7 @@ export default function CenteringTool({ uri, auto, lines, status, onChange }: { 
   const [step, setStep] = useState(0);
   const [sel, setSel] = useState<Key | null>(null);
   const [box, setBox] = useState({ w: 1, h: 1 });
+  const [grid, setGrid] = useState(true);
   const live = useRef({ v, mode, step, sel, box, dragging: null as Key | null, onChange });
   if (!live.current.dragging) live.current = { ...live.current, v, mode, step, sel, box, onChange };
 
@@ -149,16 +150,20 @@ export default function CenteringTool({ uri, auto, lines, status, onChange }: { 
             <Text style={[S.chipText, mode === m && { color: C.accentInk }]}>{m === 'drag' ? 'Drag lines' : 'Tap corners'}</Text>
           </Pressable>
         ))}
+        <Pressable onPress={() => setGrid((g) => !g)} style={[S.chip, { paddingVertical: 7, paddingHorizontal: 12 }, grid && { backgroundColor: C.accent }]}>
+          <Text style={[S.chipText, grid && { color: C.accentInk }]}>Grid</Text>
+        </Pressable>
         <Pressable onPress={() => { setSel(null); setStep(0); commit(autoLines); }} style={[S.chip, { paddingVertical: 7, paddingHorizontal: 12, marginLeft: 'auto' }]}>
           <Text style={S.chipText}>Re-detect</Text>
         </Pressable>
       </View>
       {status ? <Text style={[S.muted, { fontSize: 12 }]}>{status}</Text> : null}
       <Text style={[S.muted, { minHeight: 36 }]}>
-        {mode === 'tap' ? `Step ${step + 1} of 4: ${TAP_STEPS[step]}` : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue = card edge.'}
+        {mode === 'tap' ? `Step ${step + 1} of 4: ${TAP_STEPS[step]}` : 'Lines were placed automatically. Drag any line (or tap it and use the slider) to adjust: orange = inner border, blue = card edge. Grid: when the orange and blue centre lines overlap, the card is centred.'}
       </Text>
       <View style={{ alignSelf: 'center', width: '88%', aspectRatio: CARD_W / CARD_H }} onLayout={(e: LayoutChangeEvent) => setBox({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })} {...pan.panHandlers}>
         <Image source={{ uri }} style={StyleSheet.absoluteFill} />
+        {grid ? <Mesh v={v} sx={sx} sy={sy} /> : null}
         {(Object.keys(v) as Key[]).map(line)}
       </View>
       <View style={[S.row, { justifyContent: 'center' }]}>
@@ -192,4 +197,27 @@ export default function CenteringTool({ uri, auto, lines, status, onChange }: { 
       </View>
     </View>
   );
+}
+
+/** Alignment mesh: a 6 x 8 grid over the card edge, the card's centre lines (blue) and the inner frame's centre
+ * lines (orange); on a perfectly centred card they sit on top of each other. Corner brackets mark the edges. */
+function Mesh({ v, sx, sy }: { v: Lines; sx: (x: number) => number; sy: (y: number) => number }) {
+  const out: React.ReactNode[] = [];
+  const vl = (x: number, y0: number, y1: number, color: string, w: number, key: string) =>
+    out.push(<View key={key} pointerEvents="none" style={{ position: 'absolute', left: sx(x) - w / 2, top: sy(y0), height: sy(y1) - sy(y0), width: w, backgroundColor: color }} />);
+  const hl = (y: number, x0: number, x1: number, color: string, w: number, key: string) =>
+    out.push(<View key={key} pointerEvents="none" style={{ position: 'absolute', top: sy(y) - w / 2, left: sx(x0), width: sx(x1) - sx(x0), height: w, backgroundColor: color }} />);
+  const gw = (v.or - v.ol) / 6, gh = (v.ob - v.ot) / 8;
+  for (let i = 1; i < 6; i++) vl(v.ol + gw * i, v.ot, v.ob, 'rgba(255,255,255,.3)', 1, `gx${i}`);
+  for (let i = 1; i < 8; i++) hl(v.ot + gh * i, v.ol, v.or, 'rgba(255,255,255,.3)', 1, `gy${i}`);
+  vl((v.ol + v.or) / 2, v.ot, v.ob, '#4FA8FF', 1.5, 'cxo');
+  hl((v.ot + v.ob) / 2, v.ol, v.or, '#4FA8FF', 1.5, 'cyo');
+  vl((v.il + v.ir) / 2, v.it, v.ib, C.accent, 1.5, 'cxi');
+  hl((v.it + v.ib) / 2, v.il, v.ir, C.accent, 1.5, 'cyi');
+  const b = Math.min(gw, gh) * 0.6;
+  ([[v.ol, v.ot, 1, 1], [v.or, v.ot, -1, 1], [v.ol, v.ob, 1, -1], [v.or, v.ob, -1, -1]] as const).forEach(([x, y, dx, dy], i) => {
+    hl(y, Math.min(x, x + dx * b), Math.max(x, x + dx * b), '#FFFFFF', 2.5, `bh${i}`);
+    vl(x, Math.min(y, y + dy * b), Math.max(y, y + dy * b), '#FFFFFF', 2.5, `bv${i}`);
+  });
+  return <>{out}</>;
 }
