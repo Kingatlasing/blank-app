@@ -9,6 +9,7 @@ import { parseText, readText } from './ocr';
 import { nameGuess, readLabel } from './slab';
 import { Card, closestRemote, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
 import { recordFromCatalog } from './portfolio';
+import { colourSignature, describeColours, rankParallels } from './colour';
 import type { ScanItem } from './scanHistory';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -54,9 +55,31 @@ export async function quickIdentify(uri: string, game: string): Promise<ScanItem
       byClosest = cm.cards.length > 0;
     } catch {}
   }
-  const top = cm.cards[0];
+  let top = cm.cards[0];
   const nameOk = top && (!parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w)) || byClosest);
-  if (top && (cm.byCode || byPicture || nameOk)) return { ...fromCatalog(top), id: base.id, at: base.at, uri, thumb, phash, source: byPicture ? 'picture match' : byClosest ? 'closest match to the text read' : 'card database' };
+  if (top && (cm.byCode || byPicture || nameOk)) {
+    // same card, several parallels (Silver / Blue / Gold Prizm...): let the colours pick the parallel,
+    // unless a printed card code already named the exact one
+    let note: string | undefined;
+    if (!cm.byCode) {
+      try {
+        const sig = await colourSignature(uri);
+        const ranked = await rankParallels(top, sig);
+        const cur = ranked.find((r) => r.card.key === top!.key);
+        const best = ranked[0];
+        const clear = best && (ranked.length === 1 || ranked[1].fit - best.fit >= 0.15); // gold vs bronze can tie
+        if (best && clear && best.card.key !== top.key && best.fit <= 0.3 && (!cur || cur.fit - best.fit >= 0.25)) {
+          note = `Parallel picked by colour: ${best.card.variant || 'Base'} (${describeColours(sig)}). Check the back or serial number.`;
+          top = best.card;
+        } else if (cur && cur.fit >= 0.65) {
+          note = `Colours don't look like ${top.variant || 'Base'} (${describeColours(sig)}): check which parallel this is.`;
+        }
+      } catch {
+        /* colour check is optional */
+      }
+    }
+    return { ...fromCatalog(top), id: base.id, at: base.at, uri, thumb, phash, note, source: byPicture ? 'picture match' : byClosest ? 'closest match to the text read' : 'card database' };
+  }
   if ((!gg || DB_GAMES.includes(gg)) && (parsed.name || parsed.number)) {
     const list = await identify(lines, parsed.rawText, parsed.name, parsed.number, parsed.setCode, gg).catch(() => []);
     const best = list[0];

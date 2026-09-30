@@ -8,7 +8,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from core import ai, autograph, catalog, condition, databases, grading, identify, ocr, pipeline, slab, vision
+from core import ai, autograph, catalog, colour, condition, databases, grading, identify, ocr, pipeline, slab, vision
 from ui import centering
 from ui.common import (card_image, VERDICTS, add_to_collection, esc, get_store, grade_color, money, need_code, open_card, rarity_pill,
                        record_from_catalog)
@@ -157,8 +157,50 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                 sc -= 12
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
     cands.sort(key=lambda x: -x["score"])
+    try:
+        _colour_check(cands, vision.tight_card(f["card"], f["edges"]))
+    except Exception:
+        pass
     return {"front": f, "back": b, "parsed": parsed, "cands": cands, "fakes": [c for c in comm if c.get("is_fake") and c["distance"] <= pipeline.MATCH_STRONG],
             "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": g}
+
+
+def _colour_check(cands: list[dict], card) -> None:
+    """Parallels / rarities of the top card compared by colour: each parallel's learned colours (from its
+    price-guide photos) and the colour its name says (Gold, Blue Prizm, Black 1/1). Moves the parallel whose
+    colours fit best up, and says so; it only reorders parallels of the same card, never picks the card."""
+    top = next((x for x in cands if x["kind"] == "catalog"), None)
+    if not top:
+        return
+    sib = catalog.siblings(top["card"])
+    if len(sib) < 2:
+        return
+    sig = colour.signature(card)
+    ranked = colour.rank_parallels(sig, [{"set": c.set_id, "variant": c.variant or "Base", "card": c} for c in sib],
+                                   catalog.colour_profiles())
+    known = [r for r in ranked if r["colour_fit"] is not None]
+    if not known:
+        return
+    by_key = {x["card"].key: x for x in cands if x["kind"] == "catalog"}
+    looks = colour.describe(sig)
+    # only a clear winner counts (gold vs bronze vs orange can tie on colour alone)
+    best = known[0] if len(known) == 1 or known[1]["colour_fit"] - known[0]["colour_fit"] >= 0.15 else None
+    for r in known:
+        fit, c = r["colour_fit"], r["card"]
+        clear = best is not None and r is best
+        adj = round((0.45 - fit) * 20) if (clear or fit >= 0.65) else 0  # +9 clear fit .. -11 clearly the wrong colour
+        label = c.variant or "Base"
+        why = f"colours fit {label} ✓ ({r['colour_why']})" if clear and fit <= 0.3 else \
+              f"colours don't look like {label} (card looks: {looks})" if fit >= 0.65 else ""
+        x = by_key.get(c.key)
+        if x:
+            x["score"] += adj
+            if why:
+                x["why"].append(why)
+        elif r is best and fit <= 0.25 and x is None:
+            # the best-fitting parallel wasn't among the matches yet: offer it next to the top card
+            cands.append({"kind": "catalog", "card": c, "score": top["score"] - 4 + adj, "why": [f"same card as {top['card'].name}, {why}"]})
+    cands.sort(key=lambda x: -x["score"])
 
 
 def _read_slab(f: dict, game: str) -> dict | None:

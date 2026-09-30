@@ -224,6 +224,15 @@ def border_profile(set_id: str, variant: str = "") -> dict | None:
 
 
 @lru_cache(maxsize=1)
+def colour_profiles() -> dict:
+    """{set: {parallel: colour signature}} learned from the price-guide photos of each parallel
+    (see core/colour.py)."""
+    d = _dir()
+    p = os.path.join(d, "colour_profiles.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else {}
+
+
+@lru_cache(maxsize=1)
 def set_index() -> list[dict]:
     """Every product the checklist sites list (Topps, Upper Deck, Checklist Insider, BaseballCardPedia):
     name, year, sport, brand, source, url, img. Card-level data only exists for sets in sets()."""

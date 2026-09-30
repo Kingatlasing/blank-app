@@ -100,8 +100,10 @@ def slug_meta(slug: str, title: str) -> dict:
     s = slug.lower()
     year = (re.search(r"(19|20)\d\d", s) or [""])[0]
     brand = "Kakawow" if "kakawow" in s else "Keepsake" if "keepsake" in s else "Upper Deck" if "upper-deck" in s else "Wild Card" if "wild-card" in s else "Historic Autographs" if "historic" in s else "Other"
-    if s.startswith(("hockey", "football", "baseball", "basketball", "soccer", "golf", "tennis", "boxing")):
+    if s.startswith(("hockey", "football", "baseball", "basketball", "soccer", "golf", "tennis", "boxing", "racing", "wrestling")):
         category = s.split("-")[0].title()
+    elif s.startswith("ufc-"):
+        category = "UFC"
     elif s.startswith("pokemon"):
         category = "Pokémon"
     elif s.startswith("yugioh"):
@@ -130,7 +132,7 @@ def slug_meta(slug: str, title: str) -> dict:
         rest = s.split("-cards-", 1)[1]
         name = " ".join(w if w.isdigit() else w.replace("%27", "'").title() for w in rest.split("-"))
         name = re.sub(r"\bUd\b", "UD", re.sub(r"\bSp\b", "SP", name))
-    name = re.sub(r"\s+(Hockey|Football|Baseball|Basketball|Other)\s+Cards?$", "", name)
+    name = re.sub(r"\s+(Hockey|Football|Baseball|Basketball|Soccer|Racing|Wrestling|UFC|Golf|Tennis|Boxing|Other)\s+Cards?$", "", name)
     return {"year": year, "brand": brand, "category": category, "name": name}
 
 
@@ -160,7 +162,7 @@ def build():
             if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
                 merged[slug] = s
                 fetched[slug] = d.get("fetched_at", "")
-                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic", "-tcg")):
+                if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic", "-tcg", "-sports")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
 
     # video-game menu entries that came along with one card-category page (not cards)
@@ -419,8 +421,9 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
     gc.collect()
     wanted = {(r[9] or "").lstrip("~") for r in cards if r[9]}
     ph = {}
-    for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")):
-        ph.update((k, v) for k, v in load_json(f).items() if k in wanted)  # only photos a card uses
+    for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")) + glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
+        # colour files hold [phash, colour signature] per photo
+        ph.update((k, v[0] if isinstance(v, list) else v) for k, v in load_json(f).items() if k in wanted)  # only photos a card uses
         gc.collect()
     del wanted
     seen, prows = set(), []
@@ -485,6 +488,51 @@ def build_borders():
     print(f"border layouts: {len(out)} sets, {sum(len(e) - 1 for e in out.values())} rarities with their own layout")
 
 
+def build_colours():
+    """Typical colours of every parallel / rarity (Prizm Silver vs Blue vs Gold, a Refractor's rainbow, a
+    black 1/1), from the colour signatures of its price-guide photos (raw/slabscout-colour*.json: {photo id:
+    [phash, colour signature]}, see streamlit/core/colour.py). Writes catalog/colour_profiles.json:
+    {set: {parallel: signature}} for sets with more than one parallel (the only place colour helps)."""
+    col = {}
+    for f in glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
+        col.update((k, v[1]) for k, v in load_json(f).items() if isinstance(v, list) and len(v) > 1 and v[1])
+    if not col:
+        return
+    import gzip
+    rows = json.load(open(os.path.join(OUT, "cards.json")))["rows"]
+    for f in glob.glob(os.path.join(OUT, "remote", "sets", "*.json.gz")):
+        with gzip.open(f, "rt") as fh:
+            rows += json.load(fh)
+    by: dict = {}
+    for r in rows:
+        im = r[9] or ""
+        if im and not im.startswith("~") and im in col:
+            by.setdefault(r[0], {}).setdefault(r[3] or "Base", []).append(col[im])
+    del rows
+
+    def med(sigs):
+        # median of each byte / nibble across the photos (robust to one odd photo)
+        b = [sorted(int(s[i:i + 2], 16) for s in sigs) for i in range(0, 12, 2)]
+        h = [sorted(int(s[12 + i], 16) for s in sigs) for i in range(12)]
+        rb = sorted(int(s[24:26], 16) for s in sigs)
+        m = lambda v: v[len(v) // 2]
+        return "".join("%02x" % m(v) for v in b) + "".join("%x" % m(v) for v in h) + "%02x" % m(rb)
+
+    out = {sid: {v: med(s) for v, s in vs.items()} for sid, vs in by.items() if len(vs) > 1}
+    json.dump(out, open(os.path.join(OUT, "colour_profiles.json"), "w"), separators=(",", ":"))
+    remote = os.path.join(OUT, "remote")
+    if os.path.isdir(remote):
+        write_gz(os.path.join(remote, "colours.json.gz"), out)
+        ip = os.path.join(remote, "index.json")
+        if os.path.exists(ip):
+            idx = json.load(open(ip))
+            idx["files"] = [f for f in idx["files"] if f[0] != "colours.json.gz"] + [["colours.json.gz", os.path.getsize(os.path.join(remote, "colours.json.gz"))]]
+            idx["bytes"] = sum(b for _, b in idx["files"])
+            json.dump(idx, open(ip, "w"), separators=(",", ":"))
+    print(f"colour profiles: {len(out)} sets, {sum(len(v) for v in out.values())} parallels")
+
+
 if __name__ == "__main__":
     build()
     build_borders()
+    build_colours()

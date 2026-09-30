@@ -311,6 +311,18 @@ export async function photoLookup(hash: string, maxDistance = 12, limit = 8): Pr
   return out.slice(0, limit);
 }
 
+/* ---------- colours of each parallel (learned from price-guide photos, see core/colour.ts) ---------- */
+let _colours: Record<string, Record<string, string>> | null = null;
+export async function colourProfiles(): Promise<Record<string, Record<string, string>>> {
+  if (_colours) return _colours;
+  try {
+    _colours = await cachedJson('colours.json.gz');
+  } catch {
+    return {}; // not published yet or offline without a saved copy: name colours still work
+  }
+  return _colours || {};
+}
+
 export const isLoaded = (setId: string) => !sets()[setId]?.remote || _loadedSets.has(setId);
 
 /** Make sure a set's cards are in memory (downloads remote sets once per app session). */
