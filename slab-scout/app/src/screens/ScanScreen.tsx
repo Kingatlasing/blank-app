@@ -22,6 +22,7 @@ import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
+import { refineMatches } from '../core/verify';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
 export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Dragon Ball', 'Digimon', 'Star Wars', 'Marvel', 'Gundam', 'Riftbound', 'Harry Potter', 'Garbage Pail Kids', 'Kakawow', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
@@ -74,6 +75,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [backCen, setBackCen] = useState<Centering | null>(null);
   const [autoLines, setAutoLines] = useState<Lines | null>(null);
   const [lineStatus, setLineStatus] = useState('');
+  const [refineNote, setRefineNote] = useState(''); // serial / back / correction that picked the match
   const [corners, setCorners] = useState('');
   const [edges, setEdges] = useState('');
   const [surface, setSurface] = useState('');
@@ -166,7 +168,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
   /* ---------- live scanner ---------- */
   async function liveIdentify(shot: Shot) {
-    const it = await quickIdentify(shot.uri, game);
+    const it = await quickIdentify(shot.uri, game, store);
     shots.current.set(it.id, shot);
     await addHistory(it);
     setLast(it);
@@ -203,6 +205,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     if (!rec) return setError('This card wasn’t identified yet. Tap Grade to fill in its details, then add it.');
     try {
       await app.addRecord(rec, list);
+      if (it.catalog_key && it.phash) store.addCorrection(it.phash, it.catalog_key).catch(() => {});
       const patch = list === 'wishlist' ? { wish: true } : { added: true };
       await updateHistory(it.id, patch);
       if (last?.id === it.id) setLast({ ...it, ...patch });
@@ -266,6 +269,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setStylePick('auto');
     setOffUrl('');
     setAutoRes(null);
+    setRefineNote('');
     abort.current = new AbortController();
     try {
       setProgress('Fingerprinting and measuring centering…');
@@ -402,6 +406,17 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
             cm.cards = [dists[0].c, ...cm.cards.filter((c) => c.key !== dists[0].c.key)];
           }
         }
+      }
+      // corrections people made before, the card back (number, © year) and a serial number on the card
+      if (!cm.byCode) {
+        try {
+          setProgress('Checking serial number and back…');
+          const backLines = back ? await readText(back.uri).catch(() => [] as string[]) : [];
+          const r = await refineMatches(cm.cards, { phash: ph, text: parsed.rawText, backLines, tcg: !!g && DB_GAMES.includes(g), store });
+          cm.cards = r.cards;
+          if (r.notes.length) closestHit = true; // a correction or serial is enough to take the top card
+          setRefineNote(r.notes[0] || '');
+        } catch {}
       }
       setCatHits(cm.cards.slice(0, 6));
       let cat: CatCard | null = null;
@@ -633,6 +648,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       match: { source, ref_id: chosen?.ref_id || '', image_url: chosen?.image_url || '', url: base?.match.url || chosen?.url || '', catalog_key: catPick?.key },
       thumb, phash, print_run: catPick?.printRun ?? null, odds: base?.odds || '',
     }, list);
+    if (catPick && phash) store.addCorrection(phash, catPick.key).catch(() => {});
     if (list === 'wishlist') {
       setSaved((s) => ({ ...s, wish: true }));
       return;
@@ -822,6 +838,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           </View>
 
           <Section n={1} title="Identify">
+            {refineNote ? <Text style={[S.muted, { color: C.accent }]}>{refineNote}</Text> : null}
             {catHits.map((c) => {
               const [v, est] = catValue(c);
               const on = catPick?.key === c.key;

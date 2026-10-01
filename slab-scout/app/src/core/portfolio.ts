@@ -44,3 +44,16 @@ export function recordFromCatalog(c: Card, extra: Partial<VaultRecord> = {}): Om
 }
 
 export const today = () => new Date().toISOString().slice(0, 10);
+
+/** Cards whose value moved a lot since they were added (20%+ and at least $5), biggest move first. */
+export function priceMoves(recs: VaultRecord[], minPct = 20, minAbs = 5): { rec: VaultRecord; was: number; now: number; pct: number }[] {
+  const out: { rec: VaultRecord; was: number; now: number; pct: number }[] = [];
+  for (const r of recs) {
+    const was = Number(r.pricing?.raw?.mid) || 0;
+    const now = currentValue(r);
+    if (was > 0 && now > 0 && Math.abs(now - was) >= minAbs && (Math.abs(now - was) / was) * 100 >= minPct) {
+      out.push({ rec: r, was, now, pct: ((now - was) / was) * 100 });
+    }
+  }
+  return out.sort((a, b) => Math.abs(b.now - b.was) - Math.abs(a.now - a.was));
+}

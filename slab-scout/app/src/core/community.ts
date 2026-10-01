@@ -68,6 +68,7 @@ const L_CATALOG = 'slabscout.local.catalog';
 const L_SALES = 'slabscout.local.sales';
 const L_VAULT = 'slabscout.local.vault';
 const L_HISTORY = 'slabscout.local.history';
+const L_CORR = 'slabscout.local.corrections';
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 const loadL = async <T,>(k: string): Promise<T[]> => {
   try {
@@ -145,6 +146,34 @@ export class Store {
     }
     const cat = await loadL<CatalogRow>(L_CATALOG);
     return { cards: cat.filter((c) => !c.is_fake).length, fakes: cat.filter((c) => c.is_fake).length, sales: (await loadL(L_SALES)).length };
+  }
+
+  /* ---------- corrections: the card a person settled on for a scan (fingerprint -> catalog card) ---------- */
+  private corrCache: { at: number; rows: { phash: string; catalog_key: string }[] } | null = null;
+  async addCorrection(phash: string, catalogKey: string) {
+    if (!phash || !catalogKey) return;
+    const row = { phash: phash.slice(0, 64), catalog_key: catalogKey.slice(0, 500) };
+    // always kept on the phone too, so it works offline and with an older shared database
+    const all = await loadL<typeof row>(L_CORR);
+    if (!all.some((r) => r.phash === row.phash && r.catalog_key === row.catalog_key)) {
+      all.unshift(row);
+      await saveL(L_CORR, all.slice(0, 5000));
+    }
+    if (this.shared) await this.rest('POST', 'scan_corrections', row, { Prefer: 'return=minimal' }).catch(() => null);
+    this.corrCache = null;
+  }
+  async corrections(): Promise<{ phash: string; catalog_key: string }[]> {
+    if (this.corrCache && Date.now() - this.corrCache.at < 5 * 60e3) return this.corrCache.rows;
+    let rows = await loadL<{ phash: string; catalog_key: string }>(L_CORR);
+    if (this.shared) {
+      try {
+        rows = rows.concat((await this.rest('GET', 'scan_corrections?select=phash,catalog_key&order=created_at.desc&limit=20000')) || []);
+      } catch {
+        /* table not set up: phone-only corrections */
+      }
+    }
+    this.corrCache = { at: Date.now(), rows };
+    return rows;
   }
 
   /* ---------- sales ---------- */

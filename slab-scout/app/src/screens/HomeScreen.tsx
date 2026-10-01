@@ -5,7 +5,7 @@ import { Btn } from '../components/ui';
 import { Grid, Tile, ValueChart } from '../components/cards';
 import { useApp } from '../appContext';
 import { cards, imageUrl, priceIn, sets, value } from '../core/catalog';
-import { currentValue, inCollection, recordImage, today } from '../core/portfolio';
+import { currentValue, inCollection, priceMoves, recordImage, today } from '../core/portfolio';
 
 export default function HomeScreen() {
   const app = useApp();
@@ -38,6 +38,7 @@ export default function HomeScreen() {
   const mode = app.settings.priceMode;
   const chase = useMemo(() => cards().filter((c) => priceIn(c, mode).v).sort((a, b) => (priceIn(b, mode).v || 0) - (priceIn(a, mode).v || 0)).slice(0, 6), [mode]);
   const allSets = sets();
+  const moves = useMemo(() => priceMoves(items).slice(0, 8), [items]);
 
   return (
     <ScrollView style={S.screen} contentContainerStyle={[S.pad, { paddingBottom: 40 }]} refreshControl={<RefreshControl refreshing={app.vaultLoading} onRefresh={app.refreshVault} tintColor={C.accent} />}>
@@ -64,6 +65,18 @@ export default function HomeScreen() {
             <Btn primary label="Scan a card" style={{ flex: 1 }} onPress={() => app.goTab('scan')} />
             <Btn label="Explore sets" style={{ flex: 1 }} onPress={() => app.goTab('explore')} />
           </View>
+          {moves.length ? (
+            <View style={[S.card, { gap: 6 }]}>
+              <Text style={S.h2}>Price alerts</Text>
+              <Text style={S.muted}>Moved 20%+ (and at least $5) since you added them.</Text>
+              {moves.map((m) => (
+                <Text key={m.rec.id} style={S.body} onPress={m.rec.match?.catalog_key ? () => app.openCard(m.rec.match.catalog_key!) : undefined}>
+                  <Text style={{ color: m.now >= m.was ? C.good : C.crit, fontWeight: '700' }}>{m.now >= m.was ? '▲' : '▼'} {m.pct >= 0 ? '+' : ''}{m.pct.toFixed(0)}%</Text>
+                  {`  ${m.rec.card?.name || ''} · ${m.rec.card?.set || ''}  ${money(m.was)} → ${money(m.now)}`}
+                </Text>
+              ))}
+            </View>
+          ) : null}
           {items.length ? (
             <>
               <Text style={S.h2}>Most valuable</Text>

@@ -10,11 +10,13 @@ import { nameGuess, readLabel } from './slab';
 import { Card, closestRemote, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
 import { recordFromCatalog } from './portfolio';
 import { colourSignature, describeColours, rankParallels } from './colour';
+import { refineMatches } from './verify';
+import type { Store } from './community';
 import type { ScanItem } from './scanHistory';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-export async function quickIdentify(uri: string, game: string): Promise<ScanItem> {
+export async function quickIdentify(uri: string, game: string, store?: Store | null): Promise<ScanItem> {
   const [phash, thumb, lines] = await Promise.all([fingerprintCard(uri), thumbnail(uri, 160), readText(uri).catch(() => [] as string[])]);
   const base: ScanItem = { id: uid(), at: new Date().toISOString(), uri, thumb, phash, game: '', name: '', set: '', number: '', rarity: '', price: null, currency: 'USD', source: '' };
   const back = cardBack(lines);
@@ -55,13 +57,24 @@ export async function quickIdentify(uri: string, game: string): Promise<ScanItem
       byClosest = cm.cards.length > 0;
     } catch {}
   }
+  let refineNote = '';
+  let refined = false;
+  if (!cm.byCode) {
+    // corrections people made before + a serial number on the card (see verify.ts)
+    try {
+      const r = await refineMatches(cm.cards, { phash, text: parsed.rawText, tcg: DB_GAMES.includes(gg) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(gg), store });
+      refined = !!r.notes.length;
+      cm.cards = r.cards;
+      refineNote = r.notes[0] || '';
+    } catch {}
+  }
   let top = cm.cards[0];
   const nameOk = top && (!parsed.name || top.name.toLowerCase().split(/\s+/).some((w) => w.length > 2 && parsed.rawText.toLowerCase().includes(w)) || byClosest);
-  if (top && (cm.byCode || byPicture || nameOk)) {
+  if (top && (cm.byCode || byPicture || nameOk || refined)) {
     // same card, several parallels (Silver / Blue / Gold Prizm...): let the colours pick the parallel,
     // unless a printed card code already named the exact one
-    let note: string | undefined;
-    if (!cm.byCode) {
+    let note: string | undefined = refineNote || undefined;
+    if (!cm.byCode && !/serial/i.test(refineNote)) {
       try {
         const sig = await colourSignature(uri);
         const ranked = await rankParallels(top, sig);
