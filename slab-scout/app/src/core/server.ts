@@ -1,8 +1,9 @@
 /**
- * Slab Scout scan service (the web app's full engine, hosted free on Hugging Face): text reading in English,
+ * Slab Scout scan service (the web app's full engine, hosted free on Streamlit Community Cloud): text reading in English,
  * Japanese and Korean, fingerprint, colours, serial / back checks, slab labels and the grade estimate.
  * The phone uses it whenever a server address is set in Settings and there's signal; otherwise everything
- * runs on the phone as before. Code: streamlit/service.py, set-up steps: scan-service/README.md.
+ * runs on the phone as before. Code: streamlit/api_app.py (Streamlit) and
+ * streamlit/service.py (Docker hosts), set-up steps: scan-service/README.md.
  */
 import { Platform } from 'react-native';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
@@ -87,11 +88,45 @@ export interface ServerScan {
 }
 
 let base = '';
-/** Called when settings load or change. Accepts 'name-space.hf.space' or a full https:// address. */
+/** Called when settings load or change. Accepts 'my-app.streamlit.app' or a full https:// address. */
 export function setScanServer(url: string | undefined) {
   let u = (url || '').trim().replace(/\/+$/, '');
   if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
+  if (u !== base) api = null;
   base = u;
+}
+// Where the API sits under that address: '/api' on a Streamlit app (Streamlit Cloud may add '/~/+'),
+// nothing on a Docker host. Found once by asking each for /health.
+let api: string | null = null;
+let probing: Promise<string | null> | null = null;
+async function apiRoot(timeoutMs = 90000): Promise<string | null> {
+  if (!base) return null;
+  if (api !== null) return api;
+  if (!probing) {
+    probing = (async () => {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        for (const pre of ['/api', '/~/+/api', '']) {
+          const ac = new AbortController();
+          const t = setTimeout(() => ac.abort(), 20000);
+          try {
+            const r = await fetch(`${base}${pre}/health`, { signal: ac.signal });
+            const j = r.ok ? await r.json().catch(() => null) : null;
+            if (j?.ok) return (api = pre);
+          } catch {
+            /* try the next one */
+          } finally {
+            clearTimeout(t);
+          }
+        }
+        await new Promise((r) => setTimeout(r, 5000)); // waking up
+      }
+      return null;
+    })().finally(() => {
+      probing = null;
+    });
+  }
+  return probing;
 }
 export const scanServer = () => base;
 export const serverOn = () => !!base;
@@ -119,7 +154,9 @@ async function post<T>(path: string, form: FormData, timeoutMs: number): Promise
   const ac = new AbortController();
   const t = setTimeout(() => ac.abort(), timeoutMs);
   try {
-    const r = await fetch(`${base}${path}`, { method: 'POST', body: form, signal: ac.signal });
+    const pre = await apiRoot();
+    if (pre === null) throw new Error('scan server unreachable');
+    const r = await fetch(`${base}${pre}${path}`, { method: 'POST', body: form, signal: ac.signal });
     if (!r.ok) throw new Error(`scan server ${r.status}`);
     return (await r.json()) as T;
   } finally {
@@ -130,16 +167,8 @@ async function post<T>(path: string, form: FormData, timeoutMs: number): Promise
 /** Is the server awake? A free Space sleeps when unused and takes up to a minute or two to wake. */
 export async function wakeServer(timeoutMs = 90000): Promise<boolean> {
   if (!base) return false;
-  const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), timeoutMs);
-  try {
-    const r = await fetch(`${base}/health`, { signal: ac.signal });
-    return r.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(t);
-  }
+  api = null;
+  return (await apiRoot(timeoutMs)) !== null;
 }
 
 // One request per photo: the text reader (readText) and the scan screen share the same answer.

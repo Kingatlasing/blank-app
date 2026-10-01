@@ -12,6 +12,6 @@ export interface Settings {
   vaultCode: string;
   /** Which price the lists show: raw (ungraded), PSA 9, or PSA 10 Gem Mint. */
   priceMode?: 'raw' | 'psa9' | 'psa10';
-  /** Scan server address (free Hugging Face Space running the web app's engine); empty = phone only. */
+  /** Scan server address (free Streamlit app running the web app's engine (streamlit/api_app.py)); empty = phone only. */
   scanServer?: string;
 }

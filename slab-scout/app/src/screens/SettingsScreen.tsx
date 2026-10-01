@@ -146,12 +146,12 @@ function ScanServerBox({ settings, onChange }: { settings: Settings; onChange: (
       <View style={S.card}>
         <Text style={S.eyebrow}>Address</Text>
         <TextInput style={S.input} value={settings.scanServer || ''} onChangeText={(v) => { setState(''); onChange({ ...settings, scanServer: v.trim() }); }}
-          placeholder="yourname-slab-scout-scan.hf.space" placeholderTextColor={C.ink2} autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+          placeholder="your-scan-app.streamlit.app" placeholderTextColor={C.ink2} autoCapitalize="none" autoCorrect={false} keyboardType="url" />
         <Btn label={state === 'checking' ? 'Waking it up… (up to a minute)' : 'Test connection'} onPress={test} disabled={!settings.scanServer || state === 'checking'} />
         <Text style={S.muted}>
           {state === 'ok' ? 'Connected. Scans now read text (English, Japanese, Korean) and grade with the full engine.'
-            : state === 'down' ? "Couldn't reach it. Check the address, and that the Space shows Running on Hugging Face."
-            : 'Your free Hugging Face Space. With it, scans read the words on the card in English, Japanese and Korean and use the same grading as the web app. Without it, scanning runs on the phone only.'}
+            : state === 'down' ? "Couldn't reach it. Check the address. If the app is asleep, open the address in your browser, tap the button to wake it, then test again."
+            : 'Your free Streamlit scan app. With it, scans read the words on the card in English, Japanese and Korean and use the same grading as the web app. Without it, scanning runs on the phone only.'}
         </Text>
       </View>
     </>

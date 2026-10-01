@@ -24,6 +24,7 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 os.environ.setdefault("STREAMLIT_SERVER_HEADLESS", "true")
+_WARM = os.environ.get("SLABSCOUT_WARM", "1") == "1"
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
@@ -168,11 +169,8 @@ def root():
     return {"service": "Slab Scout scan service", "endpoints": ["/scan", "/ocr", "/health"]}
 
 
-@app.post("/ocr")
-def read(photo: UploadFile = File(...), lang: str = Form("auto")):
-    data = _read_file(photo)
-    if not data:
-        raise HTTPException(400, "No photo")
+def do_ocr(data: bytes, lang: str = "auto") -> dict:
+    """Text lines on the card in a photo (English, plus Japanese / Korean when it sees them)."""
     with _lock:
         img = vision.load_image(data)
         card, found = vision.detect_and_crop(img)
@@ -191,11 +189,8 @@ def read(photo: UploadFile = File(...), lang: str = Form("auto")):
             "found": found, "langs": langs}
 
 
-@app.post("/scan")
-def scan_card(front: UploadFile = File(...), back: UploadFile | None = File(None), game: str = Form("Auto"), grade: bool = Form(True)):
-    fdata, bdata = _read_file(front), _read_file(back)
-    if not fdata:
-        raise HTTPException(400, "No photo of the front")
+def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade: bool = True) -> dict:
+    """Everything the Scan page works out for a photo, as plain JSON."""
     t = time.time()
     with _lock:
         res = scan._analyze(fdata, bdata, game or "Auto")
@@ -244,6 +239,22 @@ def scan_card(front: UploadFile = File(...), back: UploadFile | None = File(None
     return out
 
 
+@app.post("/ocr")
+def read(photo: UploadFile = File(...), lang: str = Form("auto")):
+    data = _read_file(photo)
+    if not data:
+        raise HTTPException(400, "No photo")
+    return do_ocr(data, lang)
+
+
+@app.post("/scan")
+def scan_card(front: UploadFile = File(...), back: UploadFile | None = File(None), game: str = Form("Auto"), grade: bool = Form(True)):
+    fdata, bdata = _read_file(front), _read_file(back)
+    if not fdata:
+        raise HTTPException(400, "No photo of the front")
+    return do_scan(fdata, bdata, game or "Auto", grade)
+
+
 def _warm():
     """Load the reading models and the card index in the background so the first scan is quicker."""
     try:
@@ -257,4 +268,5 @@ def _warm():
         pass
 
 
-threading.Thread(target=_warm, daemon=True).start()
+if _WARM:
+    threading.Thread(target=_warm, daemon=True).start()
