@@ -1,0 +1,2 @@
+# 1.64+ serves the app's JavaScript from static/ with the right file type
+streamlit>=1.64.0
