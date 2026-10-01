@@ -11,10 +11,11 @@ import { cardBack, identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
 import { CARD_STYLES, CONDITION_HELP, CONDITION_OPTIONS, GUIDE, GradeResult, cardStyle, estimate, graderCaps, subgradeToOption } from '../core/grading';
-import { Centering, centeringText, centeringWorst, cropAndTrim, findLines, fingerprintCard, fingerprintRemote, hashDistance, Lines, measureCentering, thumbnail } from '../core/imageTools';
+import { CardStyle, Centering, centeringText, centeringWorst, cropAndTrim, findLines, fingerprintCard, fingerprintRemote, hashDistance, Lines, measureCentering, pixels, thumbnail } from '../core/imageTools';
 import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
+import { AutographResult, checkAutograph, SIGNED } from '../core/autograph';
 import CenteringTool from '../components/CenteringTool';
 import { Card as CatCard, closestRemote, imageUrl, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
@@ -24,6 +25,7 @@ import { quickIdentify, recordFromScan } from '../core/quickScan';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
 export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Dragon Ball', 'Digimon', 'Star Wars', 'Marvel', 'Gundam', 'Riftbound', 'Harry Potter', 'Garbage Pail Kids', 'Kakawow', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
+const STYLE_LABELS: Record<CardStyle, string> = { standard: 'Standard (bordered)', full_art: 'Full art / borderless', die_cut: 'Die-cut', vintage: 'Vintage / square corners' };
 const TYPES = ['Base', 'Holo', 'Reverse Holo', 'Full Art', 'Secret Rare', 'Rookie', 'Parallel', 'Insert', 'Autograph', 'Relic', 'Promo', 'Custom', 'Other'];
 const MATCH_STRONG = 10;
 const MATCH_WEAK = 16;
@@ -78,6 +80,15 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [insp, setInsp] = useState<Inspection | null>(null);
   const [inspBack, setInspBack] = useState<Inspection | null>(null);
   const [view, setView] = useState('Defect map');
+  // card layout (full art, die-cut, vintage) steers the centering lines and the condition check
+  const [stylePick, setStylePick] = useState<'auto' | CardStyle>('auto');
+  const [lookFull, setLookFull] = useState(false);
+  const [offUrl, setOffUrl] = useState('');
+  const first = useRef<{ lines: Lines | null; status: string; cen: Centering; insp: Inspection | null } | null>(null);
+  const styleSig = useRef('');
+  const styleReq = useRef(0); // only the latest re-check may update the screen
+  const [autoRes, setAutoRes] = useState<AutographResult | null>(null);
+  const backText = useRef<{ uri: string; text: string } | null>(null);
   const [sales, setSales] = useState<Sale[]>([]);
   const [saved, setSaved] = useState<{ vault?: boolean; wish?: boolean; comm?: boolean; fake?: boolean }>({});
   const [fakeWhy, setFakeWhy] = useState('');
@@ -251,6 +262,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     const back = shot ? null : backState;
     setError('');
     setPhase('working');
+    styleReq.current++; // drop any re-check still running for the previous card
+    setStylePick('auto');
+    setOffUrl('');
+    setAutoRes(null);
     abort.current = new AbortController();
     try {
       setProgress('Fingerprinting and measuring centering…');
@@ -258,14 +273,18 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       setPhash(ph);
       setThumb(th);
       setAutoCen(ac);
+      let fl0: Awaited<ReturnType<typeof findLines>> | null = null;
       try {
         const fl = await findLines(front.uri, front.tight !== false);
+        fl0 = fl;
+        setLookFull(fl.looksFullArt);
         setAutoLines(fl.lines);
         const miss = Object.entries(fl.found).filter(([, ok]) => !ok).map(([k]) => k);
         setLineStatus(miss.length ? `Auto-placed, but no clear border on the ${miss.join(', ')} (full-art card?). Set those lines yourself.` : 'Auto-placed: card edges and inner border found on all four sides.');
         const L = fl.lines;
         if (!miss.length) setCen({ left: Math.round(L.il - L.ol), right: Math.round(L.or - L.ir), top: Math.round(L.it - L.ot), bottom: Math.round(L.ob - L.ib) });
       } catch {
+        setLookFull(false);
         setAutoLines(null);
         setLineStatus('');
       }
@@ -278,6 +297,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       setSurface('');
       setCen(ac || { left: 40, right: 40, top: 40, bottom: 40 });
       setBackCen(bc);
+      // what the standard layout gave, to go back to if the card style is switched back
+      const miss0 = fl0 ? Object.values(fl0.found).filter((ok) => !ok).length : 0;
+      first.current = { lines: fl0?.lines ?? null, status: fl0 ? (miss0 ? 'Auto-placed, but no clear border on some sides (full-art card?). Set those lines yourself.' : 'Auto-placed: card edges and inner border found on all four sides.') : '', cen: ac || { left: 40, right: 40, top: 40, bottom: 40 }, insp: fi };
+      styleSig.current = `${front.uri}|standard|`;
 
       setProgress('Reading the text on the card…');
       const lines = await readText(front.uri);
@@ -426,8 +449,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       }
       setAiRes(ai);
       setUseAiGrade(!!ai?.psa);
-      const offUrl = pick?.image_url || '';
-      if (offUrl) inspectCard(front.uri, offUrl).then((r) => r && setInsp(r)).catch(() => {});
+      setOffUrl(pick?.image_url || ''); // fading / error check against it runs with the card style (below)
       if (cat) pickCatalog(cat);
       else if (pick) pickCandidate(pick);
       else {
@@ -461,6 +483,9 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setSlab(null);
     setInsp(null);
     setInspBack(null);
+    setStylePick('auto');
+    setOffUrl('');
+    setAutoRes(null);
     setCommunity([]);
     setCatHits([]);
     setCatPick(null);
@@ -501,6 +526,70 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     (a?.reasons || []).forEach((r: string) => reasons.push(`AI: ${r}`));
     return { verdict: v, reasons };
   })();
+
+  // card layout: picked by the person, else from the rarity / parallel, else a thin grey frame seen in the photo
+  const printedNo = /\d+\s*\/\s*\d+/.exec(rawText)?.[0] || fields.number;
+  const autoStyle0: CardStyle = cardStyle(`${fields.rarity} ${fields.variant}`, fields.name, fields.year, printedNo);
+  const autoStyle: CardStyle = autoStyle0 === 'standard' && lookFull ? 'full_art' : autoStyle0;
+  const style: CardStyle = stylePick !== 'auto' ? stylePick : autoStyle;
+  const frontUri = front?.uri;
+  const frontTight = front?.tight !== false;
+  // Re-place the centering lines for the layout and re-run the condition check (strict whitening on a silver /
+  // foil full-art frame, square corners on vintage, fading / error check against the official image).
+  useEffect(() => {
+    if (phase !== 'result' || !frontUri || !first.current) return;
+    const sig = `${frontUri}|${style}|${offUrl}`;
+    if (styleSig.current === sig) return;
+    const [pu, ps] = styleSig.current.split('|');
+    styleSig.current = sig;
+    const req = ++styleReq.current;
+    const live = () => styleReq.current === req;
+    const f0 = first.current;
+    if (pu !== frontUri || ps !== style) {
+      if (style === 'standard') {
+        setAutoLines(f0.lines);
+        setLineStatus(f0.status);
+        setCen(f0.cen);
+      } else {
+        findLines(frontUri, frontTight, style)
+          .then((fl) => {
+            if (!live()) return;
+            setAutoLines(fl.lines);
+            const miss = Object.entries(fl.found).filter(([, ok]) => !ok).map(([k]) => k);
+            const L = fl.lines;
+            setLineStatus(`${STYLE_LABELS[style]}: ${style === 'full_art' ? 'inner lines looked for on the thin printed frame' : 'card edges and printed border'}${miss.length ? `; no clear line on the ${miss.join(', ')}. Set those yourself.` : '.'}`);
+            if (!miss.length) setCen({ left: Math.round(L.il - L.ol), right: Math.round(L.or - L.ir), top: Math.round(L.it - L.ot), bottom: Math.round(L.ob - L.ib) });
+          })
+          .catch(() => {});
+      }
+    }
+    if (style === 'standard' && !offUrl) setInsp(f0.insp);
+    else
+      inspectCard(frontUri, offUrl || null, false, { foilBorder: style === 'full_art', cornerRadius: style === 'vintage' ? 0 : undefined })
+        .then((r) => live() && setInsp(r))
+        .catch(() => {});
+  }, [phase, frontUri, frontTight, style, offUrl]);
+
+  // Autograph check: only shown when the card is marked signed or a likely signature is found
+  const signedByType = fields.card_type === 'Autograph' || SIGNED.test(`${fields.rarity} ${fields.variant} ${fields.name}`);
+  const backUri = back?.uri;
+  useEffect(() => {
+    if (phase !== 'result' || !frontUri) return;
+    let live = true;
+    (async () => {
+      let bt = '';
+      if (backUri) {
+        if (backText.current?.uri !== backUri) backText.current = { uri: backUri, text: (await readText(backUri)).join('\n') };
+        bt = backText.current.text;
+      }
+      const p = await pixels(frontUri, 630, 880);
+      const r = checkAutograph(p.data, p.width, p.height, rawText, bt, signedByType ? 'Autograph' : '');
+      if (live) setAutoRes(r);
+    })().catch(() => live && setAutoRes(null));
+    return () => {
+      live = false;
+    };
+  }, [phase, frontUri, backUri, rawText, signedByType]);
 
   const autoSub = {
     corners: Math.min(insp?.subgrades.corners ?? 9, inspBack?.subgrades.corners ?? 10),
@@ -820,13 +909,19 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <Section n={3} title="Centering">
             <Text style={[S.h3, S.mono]}>Front {centeringText(cen)}{backCen ? `  ·  Back ${centeringText(backCen)}` : ''}</Text>
             {!autoCen ? <Text style={S.muted}>No clear border found (full-art card?). Set the lines yourself.</Text> : null}
-            <CenteringTool key={front!.uri + (autoLines ? 'L' : '')} uri={front!.uri} auto={autoCen || cen} lines={autoLines} status={lineStatus} onChange={setCen} />
+            <CenteringTool key={front!.uri + (autoLines ? `L${autoLines.il.toFixed(1)},${autoLines.it.toFixed(1)},${autoLines.ir.toFixed(1)},${autoLines.ib.toFixed(1)}` : '')} uri={front!.uri} auto={autoCen || cen} lines={autoLines} status={lineStatus} onChange={setCen} />
             {(() => {
-              const printed = /\d+\s*\/\s*\d+/.exec(rawText)?.[0] || fields.number;
-              const style = cardStyle(`${fields.rarity} ${fields.variant}`, fields.name, fields.year, printed);
               const caps = graderCaps(centeringWorst(cen), backCen ? centeringWorst(backCen) : null, !['Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey'].includes(fields.game));
               return (
                 <View style={{ gap: 6 }}>
+                  <Text style={S.eyebrow}>Card style</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {(['auto', 'standard', 'full_art', 'die_cut', 'vintage'] as const).map((k) => (
+                      <Pressable key={k} onPress={() => setStylePick(k)} style={[S.chip, { paddingVertical: 6 }, stylePick === k && { backgroundColor: C.accent }]}>
+                        <Text style={[S.chipText, stylePick === k && { color: C.accentInk }]}>{k === 'auto' ? `Auto · ${STYLE_LABELS[autoStyle]}` : STYLE_LABELS[k]}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
                   <Text style={S.muted}>{CARD_STYLES[style]}</Text>
                   <Text style={S.eyebrow}>Best grade the centering allows</Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -928,6 +1023,19 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               {est.centering_cap && est.centering_cap < 10 ? ` · centering alone caps PSA at ${est.centering_cap}` : ''}
             </Text>
             {grade.notes ? <Text style={S.muted}>AI noted: {grade.notes}</Text> : null}
+            {autoRes && (autoRes.found || autoRes.certified || signedByType) ? (
+              <View style={{ gap: 6, backgroundColor: C.surface2, borderRadius: 10, padding: 10 }}>
+                <Text style={S.eyebrow}>Autograph{autoRes.kind ? ` · ${autoRes.kind}` : ''}</Text>
+                {autoRes.autoGrade ? (
+                  <Text style={S.body}>
+                    Signature grade estimate <Text style={{ fontWeight: '800', color: autoRes.autoGrade >= 9 ? C.good : C.warn }}>{autoRes.autoGrade}</Text>
+                  </Text>
+                ) : null}
+                {autoRes.box ? <SignatureCrop uri={front!.uri} box={autoRes.box} /> : null}
+                {autoRes.notes.map((n) => <Text key={n} style={S.muted}>{n}</Text>)}
+                <View style={S.banner}><Text style={S.muted}>{autoRes.verify}</Text></View>
+              </View>
+            ) : null}
           </Section>
 
           <Section n={5} title="Value">
@@ -1009,6 +1117,24 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         </>
       )}
     </ScrollView>
+  );
+}
+
+/** The strip of the card around the signature, with the signature boxed (box in 630x880 card px). */
+function SignatureCrop({ uri, box }: { uri: string; box: [number, number, number, number] }) {
+  const [bx, by, bw, bh] = box;
+  const y0 = Math.max(0, by - 80);
+  const sh = Math.min(880, by + bh + 80) - y0;
+  return (
+    <View style={{ width: '100%', aspectRatio: 630 / sh, overflow: 'hidden', borderRadius: 6 }}>
+      <Image source={{ uri }} style={{ position: 'absolute', left: 0, width: '100%', top: `${(-y0 / sh) * 100}%`, height: `${(880 / sh) * 100}%` }} />
+      <View
+        style={{
+          position: 'absolute', borderWidth: 3, borderColor: C.accent, borderRadius: 4,
+          left: `${((bx - 6) / 630) * 100}%`, top: `${((by - 6 - y0) / sh) * 100}%`, width: `${((bw + 12) / 630) * 100}%`, height: `${((bh + 12) / sh) * 100}%`,
+        }}
+      />
+    </View>
   );
 }
 

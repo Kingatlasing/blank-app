@@ -93,7 +93,9 @@ def check(card: Image.Image, text: str = "", back_text: str = "", card_type: str
         pad = int(0.04 * w)
         x0, y0, x1, y1 = max(0, x - pad), max(0, y - pad), min(w, x + bw + pad), min(h, y + bh + pad)
         patch = g[y0:y1, x0:x1].astype("float32")
-        bg = patch[cv2.dilate(comp, np.ones((9, 9), np.uint8))[: y1 - y0, : x1 - x0] == 0] if comp.shape == patch.shape else patch.ravel()
+        ink_near = np.zeros(patch.shape, np.uint8)  # the signature's strokes placed in the padded patch
+        ink_near[y - y0:y - y0 + bh, x - x0:x - x0 + bw] = comp[: bh, : bw]
+        bg = patch[cv2.dilate(ink_near, np.ones((9, 9), np.uint8)) == 0]
         even = float(np.std(bg)) < 22 and float(np.mean(bg)) > 170
         edges = cv2.Canny(g[max(0, y0 - pad):min(h, y1 + pad), max(0, x0 - pad):min(w, x1 + pad)], 40, 120)
         lines = cv2.HoughLinesP(edges, 1, np.pi / 180, 40, minLineLength=int(bw * 0.8), maxLineGap=6)

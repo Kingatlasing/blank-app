@@ -6,6 +6,7 @@
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { File, Paths } from 'expo-file-system';
 import * as jpeg from 'jpeg-js';
+import { findCardQuad, Quad, quadTilt, snapQuad, warpQuad } from './straighten';
 
 export const CARD_W = 630;
 export const CARD_H = 880;
@@ -224,7 +225,18 @@ export type Lines = { ol: number; ot: number; or: number; ob: number; il: number
  * stops) and inner border (il/it/ir/ib). Same rules as the web app's vision.find_lines.
  * `tight` = the photo was trimmed to the card (camera guide), so only a thin sliver of table can show.
  */
-export async function findLines(cardUri: string, tight = true): Promise<{ lines: Lines; found: Record<'left' | 'right' | 'top' | 'bottom', boolean> }> {
+export type CardStyle = 'standard' | 'full_art' | 'die_cut' | 'vintage';
+/** Expected inner-border widths as a share of card width (l, r) / height (t, b). */
+export type BorderExpect = { l: number; r: number; t: number; b: number };
+/** Thin frame around full-art / illustration rares (same values as the web app). */
+export const FULL_ART_BORDER: BorderExpect = { l: 0.035, r: 0.035, t: 0.028, b: 0.028 };
+
+export async function findLines(
+  cardUri: string,
+  tight = true,
+  style: CardStyle = 'standard',
+  expect?: BorderExpect | null,
+): Promise<{ lines: Lines; found: Record<'left' | 'right' | 'top' | 'bottom', boolean>; looksFullArt: boolean }> {
   const img = await pixels(cardUri, 315, 440);
   const { data } = img;
   const W = img.width, H = img.height, sx = CARD_W / W, sy = CARD_H / H;
@@ -282,8 +294,9 @@ export async function findLines(cardUri: string, tight = true): Promise<{ lines:
     }
     return null;
   };
-  /** Per scan line: table -> thin bands at the edge (slab rim, background) -> card edge -> border edge. */
-  const side = (lines: number[][][], limO: number, limI: number, near: number): [number, number | null] => {
+  /** Per scan line: table -> thin bands at the edge (slab rim, background) -> card edge -> border edge.
+   * `exp` = where this card's frame should be (px from the card edge) for a known layout, e.g. full art. */
+  const side = (lines: number[][][], limO: number, limI: number, near: number, exp: number | null = null): [number, number | null] => {
     const outs: number[] = [], ins: (number | null)[] = [];
     const skip = Math.max(3, Math.round(lines[0].length * 0.012));
     for (const l of lines) {
@@ -302,21 +315,66 @@ export async function findLines(cardUri: string, tight = true): Promise<{ lines:
       }
       const cb = byColour(l, out + 1, limI);
       if (cb != null && (inner == null || cb < inner)) inner = cb;
+      if (exp != null) {
+        // known layout: take the colour step closest to where its frame should be
+        const seg = l.slice(out, out + Math.round(exp * 2.2) + 6);
+        if (seg.length > 6) {
+          const g: number[] = [];
+          for (let i = 1; i < seg.length; i++) g.push(Math.abs(seg[i][0] - seg[i - 1][0]) + Math.abs(seg[i][1] - seg[i - 1][1]) + Math.abs(seg[i][2] - seg[i - 1][2]));
+          const k3 = g.map((_, i) => ((g[i - 1] ?? g[i]) + g[i] + (g[i + 1] ?? g[i])) / 3);
+          const lo = Math.max(2, Math.floor(exp * 0.45)), hi = Math.min(k3.length - 1, Math.floor(exp * 1.8) + 3);
+          if (hi > lo) {
+            let k = lo;
+            for (let i = lo; i < hi; i++) if (k3[i] - 0.6 * Math.abs(i - exp) > k3[k] - 0.6 * Math.abs(k - exp)) k = i;
+            inner = k3[k] >= 18 ? out + k + 1 : null;
+          }
+        }
+      }
       outs.push(out);
       ins.push(inner);
     }
     return [med(outs) ?? 0, med(ins)];
   };
-  const [ol, il] = side(R, limOX, limX, nearX);
-  const [or, ir] = side(Rr, limOX, limX, nearX);
-  const [ot, it] = side(Cc, limOY, limY, nearY);
-  const [ob, ib] = side(Cr, limOY, limY, nearY);
+  // full art: look for the thin frame where it's printed. Die-cut and vintage cards use the normal search
+  // (die-cut centering is judged on the printed design; vintage only changes the corner check).
+  const ex = expect || (style === 'full_art' ? FULL_ART_BORDER : null);
+  const [ol, il] = side(R, limOX, limX, nearX, ex ? ex.l * W : null);
+  const [or, ir] = side(Rr, limOX, limX, nearX, ex ? ex.r * W : null);
+  const [ot, it] = side(Cc, limOY, limY, nearY, ex ? ex.t * H : null);
+  const [ob, ib] = side(Cr, limOY, limY, nearY, ex ? ex.b * H : null);
   const found = { left: il != null, right: ir != null, top: it != null, bottom: ib != null };
-  const L = (il ?? ol + W * 0.055) * sx, Rt = (ir ?? or + W * 0.055) * sx, T = (it ?? ot + H * 0.045) * sy, B = (ib ?? ob + H * 0.045) * sy;
-  return {
-    lines: { ol: ol * sx, ot: ot * sy, or: CARD_W - or * sx, ob: CARD_H - ob * sy, il: L, it: T, ir: CARD_W - Rt, ib: CARD_H - B },
-    found,
+  // no border line found: the border of a perfectly centred card of this layout
+  const L = (il ?? ol + W * (ex?.l ?? 0.055)) * sx, Rt = (ir ?? or + W * (ex?.r ?? 0.055)) * sx;
+  const T = (it ?? ot + H * (ex?.t ?? 0.045)) * sy, B = (ib ?? ob + H * (ex?.b ?? 0.045)) * sy;
+  const lines = { ol: ol * sx, ot: ot * sy, or: CARD_W - or * sx, ob: CARD_H - ob * sy, il: L, it: T, ir: CARD_W - Rt, ib: CARD_H - B };
+  return { lines, found, looksFullArt: fullArtLook(data, W, H, lines) };
+}
+
+/**
+ * A thin, colourless (silver / grey / foil) frame with the artwork running to it: full art, illustration
+ * rares, SAR / SIR. Standard cards have a wider, coloured border (yellow Pokémon, black Magic, white sports).
+ * Port of the web app's vision.looks_full_art; `lines` in 630x880 units, `data` a W x H RGB copy of the card.
+ */
+function fullArtLook(data: Uint8Array, W: number, H: number, l: Lines) {
+  const bx = ((l.il - l.ol) + (l.or - l.ir)) / 2 / CARD_W;
+  const by = ((l.it - l.ot) + (l.ob - l.ib)) / 2 / CARD_H;
+  const kx = W / CARD_W;
+  const sats: number[] = [], vals: number[] = [];
+  const take = (x0: number, x1: number) => {
+    for (let y = Math.floor(H * 0.3); y < Math.floor(H * 0.7); y += 2)
+      for (let x = Math.max(0, Math.floor(x0)); x < Math.min(W, Math.floor(x1)); x++) {
+        const i = (y * W + x) * 3;
+        const mx = Math.max(data[i], data[i + 1], data[i + 2]), mn = Math.min(data[i], data[i + 1], data[i + 2]);
+        vals.push(mx);
+        sats.push(mx ? ((mx - mn) * 255) / mx : 0);
+      }
   };
+  take((l.ol + 3) * kx, (l.il - 2) * kx);
+  take((l.ir + 2) * kx, (l.or - 3) * kx);
+  if (!vals.length) return false;
+  const med = (v: number[]) => [...v].sort((a, b) => a - b)[v.length >> 1];
+  const v = med(vals);
+  return bx < 0.042 && by < 0.036 && med(sats) < 55 && v > 70 && v < 235;
 }
 
 export async function measureCentering(cardUri: string): Promise<Centering | null> {
@@ -326,11 +384,108 @@ export async function measureCentering(cardUri: string): Promise<Centering | nul
 }
 
 /**
- * Photo -> straight card image. Crops the camera frame with a small margin, then trims
+ * Photo -> straight card image. A card held or photographed at an angle is flattened first
+ * (straightenPhoto). Otherwise: crops the camera frame with a small margin, then trims
  * to the card's outer edge (first strong change from the background). If an edge
  * can't be found, that side keeps the frame position.
  */
-export async function cropAndTrim(uri: string, photoW: number, photoH: number, guide?: Rect) {
+const B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+export function bytesToB64(b: Uint8Array) {
+  const out: string[] = [];
+  for (let i = 0; i < b.length; i += 3) {
+    const n = (b[i] << 16) | ((b[i + 1] ?? 0) << 8) | (b[i + 2] ?? 0);
+    out.push(B64C[(n >> 18) & 63] + B64C[(n >> 12) & 63] + (i + 1 < b.length ? B64C[(n >> 6) & 63] : '=') + (i + 2 < b.length ? B64C[n & 63] : '='));
+  }
+  return out.join('');
+}
+
+/** RGB pixels -> JPEG bytes with jpeg-js. Its encoder hands the bytes to Node's Buffer, which React Native
+ * doesn't have, so a tiny stand-in is lent for the call. */
+export function encodeJpeg(rgb: Uint8Array, w: number, h: number, quality = 92): Uint8Array {
+  const g = globalThis as any;
+  const lend = typeof g.Buffer === 'undefined';
+  if (lend) g.Buffer = { from: (a: ArrayLike<number>) => Uint8Array.from(a) };
+  try {
+    const rgba = new Uint8Array(w * h * 4);
+    for (let i = 0, j = 0; i < w * h; i++, j += 3) {
+      rgba[i * 4] = rgb[j];
+      rgba[i * 4 + 1] = rgb[j + 1];
+      rgba[i * 4 + 2] = rgb[j + 2];
+      rgba[i * 4 + 3] = 255;
+    }
+    return new Uint8Array(jpeg.encode({ data: rgba, width: w, height: h }, quality).data as unknown as ArrayLike<number>);
+  } finally {
+    if (lend) delete g.Buffer;
+  }
+}
+
+/** Part of a photo (photo pixels) as w x h RGB pixels. */
+async function regionPixels(uri: string, r: Rect, w: number, h: number) {
+  const ref = await ImageManipulator.manipulate(uri)
+    .crop({ originX: Math.round(r.x), originY: Math.round(r.y), width: Math.round(r.w), height: Math.round(r.h) })
+    .resize({ width: w, height: h })
+    .renderAsync();
+  const out = await ref.saveAsync({ base64: true, compress: 1, format: SaveFormat.JPEG });
+  const img = jpeg.decode(b64ToBytes(out.base64 || ''), { useTArray: true, formatAsRGBA: false });
+  return { w: img.width, h: img.height, rgb: img.data as Uint8Array };
+}
+
+function clampRect(r: Rect, W: number, H: number): Rect {
+  const x = Math.max(0, Math.floor(r.x)), y = Math.max(0, Math.floor(r.y));
+  return { x, y, w: Math.max(1, Math.min(W, Math.ceil(r.x + r.w)) - x), h: Math.max(1, Math.min(H, Math.ceil(r.y + r.h)) - y) };
+}
+
+/**
+ * A card photographed at an angle or held in a hand, flattened to a straight 630x880 card (see
+ * straighten.ts). Looks in the camera frame (plus room for a tilted card) or the whole photo, finds the
+ * card's four sides in a ~400 px copy, snaps them to the exact edges in a sharper copy and warps.
+ * Returns null when no clear card outline is found or the card is already square to the camera
+ * (under 1 degree): the normal crop is used then.
+ */
+export async function straightenPhoto(uri: string, photoW: number, photoH: number, guide?: Rect): Promise<{ uri: string; base64: string; tilt: number } | null> {
+  try {
+    const area = guide
+      ? clampRect({ x: guide.x - guide.w * 0.18, y: guide.y - guide.h * 0.12, w: guide.w * 1.36, h: guide.h * 1.24 }, photoW, photoH)
+      : { x: 0, y: 0, w: photoW, h: photoH };
+    const k = 400 / Math.max(area.w, area.h);
+    const small = await regionPixels(uri, area, Math.max(16, Math.round(area.w * k)), Math.max(16, Math.round(area.h * k)));
+    const hit = findCardQuad(small);
+    if (!hit || hit.tilt < 0.5) return null;
+    const q = hit.quad.map(([x, y]) => [area.x + (x * area.w) / small.w, area.y + (y * area.h) / small.h]) as Quad;
+    const tall = (Math.hypot(q[3][0] - q[0][0], q[3][1] - q[0][1]) + Math.hypot(q[2][0] - q[1][0], q[2][1] - q[1][1])) / 2;
+    if (guide) {
+      // the card should be the thing in the camera frame, not something next to it
+      const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+      if (cx < guide.x || cx > guide.x + guide.w || cy < guide.y || cy > guide.y + guide.h || tall < guide.h * 0.6) return null;
+    }
+    // sharper copy around the card (about card size), with room for the edge snap to look outside
+    const xs = q.map((p) => p[0]), ys = q.map((p) => p[1]);
+    const pad = tall * 0.08;
+    const box = clampRect({ x: Math.min(...xs) - pad, y: Math.min(...ys) - pad, w: Math.max(...xs) - Math.min(...xs) + 2 * pad, h: Math.max(...ys) - Math.min(...ys) + 2 * pad }, photoW, photoH);
+    const s2 = Math.min(1, 1000 / tall);
+    const big = await regionPixels(uri, box, Math.max(16, Math.round(box.w * s2)), Math.max(16, Math.round(box.h * s2)));
+    const bq = q.map(([x, y]) => [((x - box.x) * big.w) / box.w, ((y - box.y) * big.h) / box.h]) as Quad;
+    const { quad: sq, snapped } = snapQuad(big, bq);
+    // a real card edge is found again on at least three sides (one may be under a finger)
+    if (snapped < 3) return null;
+    const tilt = quadTilt(sq);
+    if (tilt < 1) return null; // square to the camera: the normal crop is as good
+    const bytes = encodeJpeg(warpQuad(big, sq, CARD_W, CARD_H), CARD_W, CARD_H, 92);
+    const f = new File(Paths.cache, `straight-${Date.now()}-${Math.round(Math.random() * 1e6)}.jpg`);
+    if (!f.exists) f.create();
+    f.write(bytes);
+    return { uri: f.uri, base64: bytesToB64(bytes), tilt };
+  } catch {
+    return null;
+  }
+}
+
+export async function cropAndTrim(uri: string, photoW: number, photoH: number, guide?: Rect, straighten = true) {
+  if (straighten) {
+    // held or tilted card: flatten it first (falls back to the plain crop below)
+    const s = await straightenPhoto(uri, photoW, photoH, guide);
+    if (s) return { uri: s.uri, base64: s.base64 };
+  }
   let r = guide;
   if (r) {
     const mx = r.w * 0.06;

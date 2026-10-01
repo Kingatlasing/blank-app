@@ -3,6 +3,7 @@
  *
  * Checks the straightened 630x880 card photo the way graders do:
  *  - corners: zoomed crops + whitening / fraying and missing material (table showing through)
+ *    (silver / foil full-art frames use a strict whitening test, so foil reflections don't count)
  *  - edges:   whitening and chips along all four edges
  *  - surface: scratches (thin bright lines, top-hat filter), specks / dents (small dark spots in flat
  *             areas), stains (patches off the border colour, surrounded by clean border)
@@ -211,7 +212,14 @@ async function officialPixels(url: string, w: number, h: number): Promise<Img | 
 }
 
 /* ---------- the inspection ---------- */
-export async function inspectCard(uri: string, officialUrl?: string | null, isBack = false): Promise<Inspection> {
+export interface InspectOptions {
+  /** silver / foil frame (full art, SIR / SAR): only bare white card stock counts as whitening */
+  foilBorder?: boolean;
+  /** factory corner radius in card px (0 = square-cut vintage card); default ~3.2 mm */
+  cornerRadius?: number;
+}
+
+export async function inspectCard(uri: string, officialUrl?: string | null, isBack = false, opts: InspectOptions = {}): Promise<Inspection> {
   const side = isBack ? 'back' : 'front';
   const full = await pixels(uri, CARD_W, CARD_H);
   const im: Img = { w: full.width, h: full.height, rgb: full.data };
@@ -247,17 +255,24 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
   const br = median(bandIdx.map((i) => im.rgb[i * 3])), bg = median(bandIdx.map((i) => im.rgb[i * 3 + 1])), bb = median(bandIdx.map((i) => im.rgb[i * 3 + 2]));
   const bLum = (br * 299 + bg * 587 + bb * 114) / 1000;
   const bMax = Math.max(br, bg, bb), bSat = bMax ? ((bMax - Math.min(br, bg, bb)) * 255) / bMax : 0;
-  const whiteBorder = bSat < 50 && bMax > 190;
+  const whiteBorder = bSat < 50 && bMax > 190; // whitening can't be seen by colour on a white border
+  // silver / foil frame (full art, illustration rares) or a shaded light border: reflections look like
+  // whitening, so only bare white card stock (much lighter, colourless, near-white) counts
+  const strict = !!opts.foilBorder || (bSat < 60 && bMax > 135);
+  metrics.strictWhitening = strict ? 1 : 0;
 
   const white = new Uint8Array(w * h);
   const dark = new Uint8Array(w * h);
   for (let i = 0; i < w * h; i++) {
-    if (!whiteBorder && gray[i] - bLum > 22 && sat[i] < Math.max(55, bSat - 70) && val[i] > 185) white[i] = 1;
+    if (!whiteBorder) {
+      if (strict ? gray[i] - bLum > 45 && sat[i] < 35 && val[i] > 238 : gray[i] - bLum > 22 && sat[i] < Math.max(55, bSat - 70) && val[i] > 185) white[i] = 1;
+    }
     if (val[i] < 45) dark[i] = 1;
   }
 
   // ----- corners -----
-  const R = 38; // standard 3.2 mm corner radius (~32 px) plus slack for an imperfect crop
+  const radius = opts.cornerRadius ?? 32; // factory rounding: standard 3.2 mm ~32 px, 0 for square-cut vintage
+  const R = radius ? radius + 6 : 0; // plus slack for an imperfect crop
   const cornerSev: Record<string, number> = {};
   const corners: [string, number, number, boolean, boolean][] = [
     ['top-left', 0, 0, false, false], ['top-right', w - CORNER, 0, true, false], ['bottom-left', 0, h - CORNER, false, true], ['bottom-right', w - CORNER, h - CORNER, true, true],
@@ -285,7 +300,17 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
         bOn += dark[hy * w + hx] + dark[vy * w + vx];
       }
     const base = bOn / Math.max(1, bTot);
-    const wf = wh / Math.max(1, band);
+    // the same whitening all along the neighbouring straight edges is a strip of sleeve / table / foil glare
+    // left by the crop, not wear at the corner: only the excess at the corner counts
+    let eh = 0, ev = 0, eTot = 0;
+    for (let k = CORNER; k < CORNER * 3; k++)
+      for (let j = MARGIN; j < MARGIN + 14; j++) {
+        eh += white[(fy ? h - 1 - j : j) * w + (fx ? w - 1 - k : k)];
+        ev += white[(fy ? h - 1 - k : k) * w + (fx ? w - 1 - j : j)];
+        eTot++;
+      }
+    const wBase = Math.max(eh, ev) / Math.max(1, eTot);
+    const wf = Math.max(0, wh / Math.max(1, band) - 1.2 * wBase);
     const mf = Math.max(0, miss / Math.max(1, band) - base * 1.2 - 0.2) / 0.8; // only a clearly missing chunk counts
     cornerSev[name] = Math.min(1, wf * 6 + mf * 4);
     if (wf > 0.01) findings.push({ area: 'corners', where: `${name} corner (${side})`, what: `Whitening / fraying (${(wf * 100).toFixed(1)}% of the corner edge)`, severity: Math.min(1, wf * 6), sure: 'likely' });
@@ -303,9 +328,14 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
   const edgeSev: number[] = [];
   let chipsTotal = 0;
   for (const [name, x0, y0, x1, y1] of edgeBoxes) {
-    const comps = components(edgeMask, w, h, x0, y0, x1, y1).filter((c) => c.area >= 4);
+    const horiz = name === 'top' || name === 'bottom';
+    const run = horiz ? x1 - x0 : y1 - y0;
+    const all = components(edgeMask, w, h, x0, y0, x1, y1);
+    // a mark running along much of the edge is a strip of background / foil glare left by the crop, not a chip
+    const comps = all.filter((c) => c.area >= 4 && (horiz ? c.bw : c.bh) < 0.2 * run);
     let on = 0;
     for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) on += edgeMask[y * w + x];
+    for (const c of all) if ((horiz ? c.bw : c.bh) >= 0.2 * run) on -= c.area;
     const frac = on / ((x1 - x0) * (y1 - y0));
     edgeSev.push(Math.min(1, frac * 8 + comps.length * 0.04));
     chipsTotal += comps.length;
