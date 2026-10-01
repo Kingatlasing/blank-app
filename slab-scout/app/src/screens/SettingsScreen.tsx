@@ -130,10 +130,10 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
 }
 
 const st = StyleSheet.create({
-  opt: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 14 },
-  optOn: { borderColor: C.accent },
+  opt: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.surface, borderWidth: 1, borderColor: C.line, borderRadius: 16, padding: 14 },
+  optOn: { borderColor: C.blue },
   radio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: C.ink2 },
-  radioOn: { borderColor: C.accent, backgroundColor: C.accent },
+  radioOn: { borderColor: C.blue, backgroundColor: C.blue },
 });
 
 
