@@ -7,18 +7,32 @@ import { cardBack, identify } from './identify';
 import { fingerprintCard, thumbnail } from './imageTools';
 import { parseText, readText } from './ocr';
 import { nameGuess, readLabel } from './slab';
-import { Card, closestRemote, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
+import { Card, closestRemote, getCard, loadSet, matchText, photoLookup, searchRemote, sets, value } from './catalog';
 import { recordFromCatalog } from './portfolio';
 import { colourSignature, describeColours, rankParallels } from './colour';
 import { playerName, refineMatches } from './verify';
 import type { Store } from './community';
 import type { ScanItem } from './scanHistory';
+import { serverOn, serverScan, type ServerMatch } from './server';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-export async function quickIdentify(uri: string, game: string, store?: Store | null): Promise<ScanItem> {
+export async function quickIdentify(uri: string, game: string, store?: Store | null, orig?: string): Promise<ScanItem> {
+  // scan server first (full engine: text in English / Japanese / Korean, fingerprint, colours, serials);
+  // the text reader below reuses its answer, and the phone's own checks run if it's unreachable
+  const srv = serverOn() ? serverScan(orig || uri, { game, grade: false, key: uri, timeoutMs: 60000 }) : null;
   const [phash, thumb, lines] = await Promise.all([fingerprintCard(uri), thumbnail(uri, 160), readText(uri).catch(() => [] as string[])]);
   const base: ScanItem = { id: uid(), at: new Date().toISOString(), uri, thumb, phash, game: '', name: '', set: '', number: '', rarity: '', price: null, currency: 'USD', source: '' };
+  const s = srv ? await srv : null;
+  if (s) {
+    if (s.is_back) return { ...base, game: s.is_back, note: `Back of a ${s.is_back} card: scan the front to identify it (the back is used when grading).` };
+    const top = s.matches[0];
+    if (top && top.score >= 55) {
+      const item = await fromServer(top, base);
+      const note = s.slab ? `${s.slab.grade_text} slab${s.slab.cert ? ` · cert ${s.slab.cert}` : ''}` : top.why[0];
+      return { ...item, uri, thumb, phash, note: note || item.note, source: 'scan server' };
+    }
+  }
   const back = cardBack(lines, phash);
   if (back) return { ...base, game: back, note: `Back of a ${back} card: scan the front to identify it (the back is used when grading).` };
   const g = game === 'Auto' ? '' : game;
@@ -107,6 +121,17 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
     }
   }
   return { ...base, game: gg, name: parsed.name, number: parsed.number, source: parsed.name ? 'text read' : '', note: parsed.name ? 'Not sure about this one: tap Grade to check the details.' : 'Could not read this card. Move closer, fill the frame and tap again.' };
+}
+
+/** A server match as a scan result: the phone's own catalog card when it has it (prices, parallels, add to collection). */
+async function fromServer(m: ServerMatch, base: ScanItem): Promise<ScanItem> {
+  if (m.kind === 'catalog' && m.key && m.set_id) {
+    await loadSet(m.set_id).catch(() => null);
+    const c = getCard(m.key);
+    if (c) return { ...fromCatalog(c), id: base.id, at: base.at };
+  }
+  const rarity = [m.rarity, m.variant && m.variant !== 'Base' ? m.variant : ''].filter(Boolean).join(' ') + (m.print_run ? ` /${m.print_run}` : '');
+  return { ...base, game: m.game, name: m.name, set: m.set, number: m.number, rarity, price: m.price ?? null, currency: 'USD', source: 'scan server' };
 }
 
 function stripCand(c: Candidate): Candidate {

@@ -636,6 +636,20 @@ def card_style(variant: str = "", name: str = "", year: str = "", number: str = 
     return "standard"
 
 
+PRINTED_NO = re.compile(r"(?<![\d/])(\d{1,3})\s*/\s*(\d{1,3})(?![\d/])(?:\s+([A-Z]{1,4}))?")
+
+
+def printed_rarity(raw_text: str) -> tuple[str, str]:
+    """('110/080', 'SAR') from the collector line printed on the card ('110/080 SAR'): a number past the set
+    total or a rarity code like SAR / SR / UR means a full-art card, even when the database calls it 'Base'."""
+    best = ("", "")
+    for m in PRINTED_NO.finditer(raw_text or ""):
+        a, b, r = int(m.group(1)), int(m.group(2)), m.group(3) or ""
+        if 0 < a <= 999 and 0 < b <= 999 and b >= 10:
+            best = (f"{m.group(1)}/{m.group(2)}", r if r and FULL_ART.search(r) else best[1])
+    return best
+
+
 def looks_full_art(card: Image.Image, lines: dict) -> bool:
     """A thin, colourless (silver / grey / foil) frame with the artwork running to it: full art, illustration
     rares, SAR/SIR. Standard cards have a wider, coloured border (yellow Pokémon, black Magic, white sports)."""

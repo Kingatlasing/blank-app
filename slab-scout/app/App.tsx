@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { setScanServer } from './src/core/server';
 import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -64,6 +65,7 @@ function Main() {
   const [vaultLoading, setVaultLoading] = useState(false);
   const [vaultErr, setVaultErr] = useState('');
   useCatalogVersion(); // re-render screens when downloaded card lists arrive
+  setScanServer(settings.scanServer); // full scanning engine online (core/server.ts)
 
   const store = useMemo(() => new Store(settings.supabaseUrl, settings.supabaseKey), [settings.supabaseUrl, settings.supabaseKey]);
   const needsCode = store.shared && settings.vaultCode.length < 6;

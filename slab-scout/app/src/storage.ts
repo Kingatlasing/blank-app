@@ -6,7 +6,7 @@ import { PROVIDERS } from './providers';
 import type { ProviderId, Settings } from './types';
 
 const SETTINGS_KEY = 'slabscout.settings.v2';
-const extra = (Constants.expoConfig?.extra || {}) as { supabaseUrl?: string; supabaseAnonKey?: string };
+const extra = (Constants.expoConfig?.extra || {}) as { supabaseUrl?: string; supabaseAnonKey?: string; scanServer?: string };
 
 export const DEFAULT_SETTINGS: Settings = {
   provider: 'off',
@@ -15,6 +15,7 @@ export const DEFAULT_SETTINGS: Settings = {
   supabaseUrl: extra.supabaseUrl || '',
   supabaseKey: extra.supabaseAnonKey || '',
   vaultCode: '',
+  scanServer: extra.scanServer || '',
 };
 
 export async function loadSettings(): Promise<Settings> {
@@ -28,6 +29,7 @@ export async function loadSettings(): Promise<Settings> {
       models: { ...DEFAULT_SETTINGS.models, ...(s.models || {}) },
       supabaseUrl: s.supabaseUrl || DEFAULT_SETTINGS.supabaseUrl,
       supabaseKey: s.supabaseKey || DEFAULT_SETTINGS.supabaseKey,
+      scanServer: s.scanServer || DEFAULT_SETTINGS.scanServer,
     };
   } catch {
     return DEFAULT_SETTINGS;

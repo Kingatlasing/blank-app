@@ -28,7 +28,7 @@ export function psaCenteringCap(front?: number | null, back?: number | null) {
 }
 
 export interface GradeResult {
-  method: 'checklist' | 'ai' | 'automatic inspection' | 'inspection + your checklist';
+  method: 'checklist' | 'ai' | 'automatic inspection' | 'inspection + your checklist' | 'scan server';
   sub: { centering?: number; corners?: number; edges?: number; surface?: number };
   psa?: number;
   psa_label?: string;

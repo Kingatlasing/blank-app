@@ -6,6 +6,7 @@ import { C, S } from '../theme';
 import type { ProviderId, Settings } from '../types';
 import { Btn } from '../components/ui';
 import { ocrAvailable } from '../core/ocr';
+import { serverOn, setScanServer, wakeServer } from '../core/server';
 import { clearOffline, downloadAll, offlineStatus, OfflineStatus } from '../core/catalog';
 
 export default function SettingsScreen({ settings, onChange, onKeyChange }: { settings: Settings; onChange: (s: Settings) => void; onKeyChange: () => void }) {
@@ -123,9 +124,37 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
         </Text>
       </View>
 
-      <Text style={S.muted}>Text reading on this device: {ocrAvailable() ? 'available' : 'not available in Expo Go. Install the app build to enable it.'}</Text>
+      <ScanServerBox settings={settings} onChange={onChange} />
+
+      <Text style={S.muted}>Text reading: {ocrAvailable() ? (serverOn() ? 'on (scan server: English, Japanese, Korean)' : 'on (this phone)') : 'off in Expo Go and the browser. Add a scan server above to turn it on.'}</Text>
       <Text style={S.muted}>Grades are estimates from photos. PSA and TAG inspect cards under magnification, so use these to decide what's worth submitting.</Text>
     </ScrollView>
+  );
+}
+
+/** The scan server: the web app's full engine (text in English / Japanese / Korean, grading) for this phone. */
+function ScanServerBox({ settings, onChange }: { settings: Settings; onChange: (s: Settings) => void }) {
+  const [state, setState] = useState<'' | 'checking' | 'ok' | 'down'>('');
+  const test = async () => {
+    setScanServer(settings.scanServer);
+    setState('checking');
+    setState((await wakeServer()) ? 'ok' : 'down');
+  };
+  return (
+    <>
+      <Text style={[S.h2, { marginTop: 8 }]}>Scan server</Text>
+      <View style={S.card}>
+        <Text style={S.eyebrow}>Address</Text>
+        <TextInput style={S.input} value={settings.scanServer || ''} onChangeText={(v) => { setState(''); onChange({ ...settings, scanServer: v.trim() }); }}
+          placeholder="yourname-slab-scout-scan.hf.space" placeholderTextColor={C.ink2} autoCapitalize="none" autoCorrect={false} keyboardType="url" />
+        <Btn label={state === 'checking' ? 'Waking it up… (up to a minute)' : 'Test connection'} onPress={test} disabled={!settings.scanServer || state === 'checking'} />
+        <Text style={S.muted}>
+          {state === 'ok' ? 'Connected. Scans now read text (English, Japanese, Korean) and grade with the full engine.'
+            : state === 'down' ? "Couldn't reach it. Check the address, and that the Space shows Running on Hugging Face."
+            : 'Your free Hugging Face Space. With it, scans read the words on the card in English, Japanese and Korean and use the same grading as the web app. Without it, scanning runs on the phone only.'}
+        </Text>
+      </View>
+    </>
   );
 }
 

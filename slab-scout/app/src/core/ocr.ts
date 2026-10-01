@@ -1,3 +1,5 @@
+import { serverOn, serverText } from './server';
+
 /** On-device text reading (free, no network) + parsing. Needs the installed app build; in Expo Go it's unavailable and the user types details instead. */
 
 let extractor: { isSupported: boolean; extractTextFromImage: (uri: string) => Promise<string[]> } | null = null;
@@ -8,16 +10,28 @@ try {
   extractor = null;
 }
 
-export const ocrAvailable = () => !!extractor?.isSupported;
+export const ocrAvailable = () => !!extractor?.isSupported || serverOn();
 
+/** Text on the card: Apple's reader in the installed app; in Expo Go and the browser, the scan server
+ * (English, Japanese and Korean) when one is set in Settings. Japanese / Korean cards also go to the server
+ * in the installed app when it's set, since its reader knows the Pokémon names in those languages. */
 export async function readText(uri: string): Promise<string[]> {
-  if (!extractor?.isSupported) return [];
-  try {
-    return (await extractor.extractTextFromImage(uri)).map((t) => t.trim()).filter(Boolean);
-  } catch {
-    return [];
+  let lines: string[] = [];
+  if (extractor?.isSupported) {
+    try {
+      lines = (await extractor.extractTextFromImage(uri)).map((t) => t.trim()).filter(Boolean);
+    } catch {
+      lines = [];
+    }
   }
+  const latin = lines.join(' ').match(/[A-Za-z]{4,}/g)?.length || 0;
+  if (serverOn() && (!extractor?.isSupported || CJK.test(lines.join(' ')) || latin < 5)) {
+    const s = await serverText(uri).catch(() => null);
+    if (s && s.length) return s;
+  }
+  return lines;
 }
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]/;
 
 export const BRANDS = [
   'Topps', 'Bowman', 'Panini', 'Prizm', 'Donruss', 'Optic', 'Select', 'Mosaic', 'Upper Deck', 'Fleer', 'Score', 'Leaf', 'Skybox',

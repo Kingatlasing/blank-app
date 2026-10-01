@@ -699,7 +699,9 @@ def _apply_style(scan: dict, x: dict) -> str:
     f = scan["front"]
     sid, variant, name, year, number = _card_facts(x)
     printed = scan["parsed"].get("number", "") or ""
-    auto = vision.card_style(variant, name, year, printed if "/" in printed else number)
+    pno, prar = vision.printed_rarity(scan["parsed"].get("raw_text", ""))
+    printed = printed if "/" in printed else pno
+    auto = vision.card_style(f"{variant} {prar}".strip(), name, year, printed or number)
     if auto == "standard" and vision.looks_full_art(f["card"], f.get("_edges0", f["edges"])):
         auto = "full_art"
     pick = st.session_state.get(f"style_{scan['id']}")

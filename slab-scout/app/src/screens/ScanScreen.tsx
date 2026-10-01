@@ -17,13 +17,14 @@ import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import { AutographResult, checkAutograph, SIGNED } from '../core/autograph';
 import CenteringTool from '../components/CenteringTool';
-import { Card as CatCard, closestRemote, getCard, imageUrl, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
+import { Card as CatCard, closestRemote, getCard, imageUrl, loadSet, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip, Sheet, SheetOption } from '../components/cards';
 import { Icon } from '../components/visual';
 import { useLayout } from '../layout';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
+import { serverOn, serverScan, type ServerScan } from '../core/server';
 import { playerName, refineMatches } from '../core/verify';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
@@ -41,6 +42,8 @@ interface Shot {
   base64: string;
   /** trimmed to the card with the camera guide (vs. a loose photo from the library) */
   tight?: boolean;
+  /** the original photo (full camera resolution), sent to the scan server for grading */
+  orig?: string;
 }
 type Phase = 'capture' | 'review' | 'working' | 'result';
 
@@ -93,6 +96,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [autoLines, setAutoLines] = useState<Lines | null>(null);
   const [lineStatus, setLineStatus] = useState('');
   const [refineNote, setRefineNote] = useState(''); // serial / back / correction that picked the match
+  const [srv, setSrv] = useState<ServerScan | null>(null); // the scan server's answer (full engine)
+  const [useSrvGrade, setUseSrvGrade] = useState(true);
   const [corners, setCorners] = useState('');
   const [edges, setEdges] = useState('');
   const [surface, setSurface] = useState('');
@@ -184,7 +189,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setBusy(true);
     try {
       const pic = await cam.current.takePictureAsync({ quality: 0.95, shutterSound: false });
-      store2({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true });
+      store2({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true, orig: pic.uri });
     } catch {
       setError("Couldn't take the photo. Try again.");
     } finally {
@@ -197,7 +202,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     const a = res.assets[0];
     setBusy(true);
     try {
-      store2({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false });
+      store2({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false, orig: a.uri });
     } finally {
       setBusy(false);
     }
@@ -205,7 +210,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
   /* ---------- live scanner ---------- */
   async function liveIdentify(shot: Shot, quiet = false) {
-    const it = await quickIdentify(shot.uri, game, store);
+    const it = await quickIdentify(shot.uri, game, store, shot.orig);
     // auto-scan: ignore frames with no card and the card that is already showing
     if (quiet && (!it.name || sameCard(it, lastRef.current))) return;
     shots.current.set(it.id, shot);
@@ -219,7 +224,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     if (!quiet) setError('');
     try {
       const pic = await cam.current.takePictureAsync({ quality: 0.92, shutterSound: false });
-      await liveIdentify({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true }, quiet);
+      await liveIdentify({ ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true, orig: pic.uri }, quiet);
     } catch (e: any) {
       if (!quiet) setError(`Couldn't scan that: ${e?.message || e}. Try again.`);
     } finally {
@@ -246,7 +251,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     const a = res.assets[0];
     setScanning(true);
     try {
-      await liveIdentify({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false });
+      await liveIdentify({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false, orig: a.uri });
     } catch (e: any) {
       setError(`Couldn't scan that photo: ${e?.message || e}`);
     } finally {
@@ -334,8 +339,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setAutoRes(null);
     setRefineNote('');
     abort.current = new AbortController();
+    setSrv(null);
+    setUseSrvGrade(true);
+    // full engine on the scan server, in parallel with the phone's own checks (text reading waits for it)
+    const srvP = serverOn() ? serverScan(front.orig || front.uri, { back: back ? back.orig || back.uri : null, game, key: front.uri }) : null;
     try {
-      setProgress('Fingerprinting and measuring centering…');
+      setProgress(srvP ? 'Sending to the scan server and measuring…' : 'Fingerprinting and measuring centering…');
       const [ph, th, ac, bc] = await Promise.all([fingerprintCard(front.uri), thumbnail(front.uri, 180), measureCentering(front.uri), back ? measureCentering(back.uri) : Promise.resolve(null)]);
       setPhash(ph);
       setThumb(th);
@@ -371,7 +380,9 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       setProgress('Reading the text on the card…');
       const lines = await readText(front.uri);
-      const backOf = cardBack(lines, ph);
+      const sr = srvP ? await srvP : null;
+      setSrv(sr);
+      const backOf = sr?.is_back || cardBack(lines, ph);
       if (backOf) {
         setPhase('review');
         setError(`That's the back of a ${backOf} card. Take the front photo first (step 1), then the back (step 2); the back is used for grading.`);
@@ -482,7 +493,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       if (!cm.byCode) {
         try {
           setProgress('Checking serial number and back…');
-          const backLines = back ? await readText(back.uri).catch(() => [] as string[]) : [];
+          const backLines = sr?.back_lines?.length ? sr.back_lines : back ? await readText(back.uri).catch(() => [] as string[]) : [];
           const r = await refineMatches(cm.cards, { phash: ph, text: parsed.rawText, number: parsed.number, backLines, tcg: !!g && DB_GAMES.includes(g), store });
           cm.cards = r.cards;
           if (r.notes.length) closestHit = true; // a correction or serial is enough to take the top card
@@ -498,6 +509,26 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           cat = top;
           f = recordFromCatalog(top).card;
           src = 'card database';
+        }
+      }
+
+      // the scan server's pick wins when it's confident (same engine as the web app, tested on real photos)
+      const st0 = sr?.matches?.[0];
+      if (st0 && st0.score >= 60 && !cm.byCode) {
+        if (st0.kind === 'catalog' && st0.key && st0.set_id) {
+          await loadSet(st0.set_id).catch(() => null);
+          const c = getCard(st0.key);
+          if (c) {
+            cat = c;
+            f = recordFromCatalog(c).card;
+            src = 'scan server';
+            setCatHits([c, ...cm.cards.filter((x) => x.key !== c.key)].slice(0, 6));
+            if (st0.why.length) setRefineNote(st0.why.join(' · '));
+          }
+        } else if (!cat && src !== 'community') {
+          f = { ...f, game: st0.game || f.game, name: st0.name, set: st0.set, number: st0.number, year: st0.year || f.year, rarity: st0.rarity || '', variant: st0.variant || f.variant };
+          src = 'scan server';
+          if (st0.why.length) setRefineNote(st0.why.join(' · '));
         }
       }
 
@@ -576,6 +607,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setCatHits([]);
     setCatPick(null);
     setAiRes(null);
+    setSrv(null);
     setFields(EMPTY);
     setChosen(null);
     setError('');
@@ -687,6 +719,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const est = estimate(centeringWorst(cen), backCen ? centeringWorst(backCen) : null, pickedSub(corners, autoSub.corners), pickedSub(edges, autoSub.edges), pickedSub(surface, autoSub.surface));
   est.method = insp ? (overridden ? 'inspection + your checklist' : 'automatic inspection') : 'checklist';
   let grade: GradeResult = { ...est, centering: { front: centeringText(cen), back: backCen ? centeringText(backCen) : '' } };
+  const sg = srv?.grade && !srv.grade.error ? srv.grade : null;
+  if (sg && useSrvGrade && !(useAiGrade && aiRes?.psa)) {
+    grade = {
+      ...grade, method: 'scan server', psa: sg.psa, psa_label: sg.psa_label, psa_range: sg.psa_range,
+      tag_score: sg.tag_score, tag_grade: sg.tag_grade, tag_label: sg.tag_label, sub: sg.sub, centering_cap: undefined,
+      centering: { front: sg.centering.front?.text || grade.centering?.front, back: sg.centering.back?.text || grade.centering?.back },
+    };
+  }
   if (useAiGrade && aiRes?.psa) {
     const cnd = aiRes.condition || {};
     grade = {
@@ -1197,6 +1237,24 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               {est.centering_cap && est.centering_cap < 10 ? ` · centering alone caps PSA at ${est.centering_cap}` : ''}
             </Text>
             {grade.notes ? <Text style={S.muted}>AI noted: {grade.notes}</Text> : null}
+            {sg && !(useAiGrade && aiRes?.psa) ? (
+              <View style={{ gap: 6, backgroundColor: C.surface2, borderRadius: 10, padding: 10 }}>
+                <View style={[S.row, { justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <Text style={S.eyebrow}>Scan server grade · {sg.confidence} confidence</Text>
+                  <Pressable onPress={() => setUseSrvGrade(!useSrvGrade)} style={[S.chip, { paddingVertical: 4 }, useSrvGrade && { backgroundColor: C.accent }]}>
+                    <Text style={[S.chipText, useSrvGrade && { color: C.accentInk }]}>{useSrvGrade ? 'Using it' : 'Use it'}</Text>
+                  </Pressable>
+                </View>
+                <Text style={S.muted}>
+                  {useSrvGrade ? 'Graded by the full engine (straightened, card style and this set\'s border widths). Turn off to use the lines and checklist above.' : 'Showing the grade from the lines and checklist above.'}
+                  {sg.straightened ? ' The photo was at an angle, so the card was squared up first.' : ''}
+                </Text>
+                {[...(sg.front?.findings || []), ...(sg.back?.findings || [])].filter((x) => x.severity >= 0.25).slice(0, 5).map((x, i) => (
+                  <Text key={i} style={S.muted}>• {x.where}: {x.what}</Text>
+                ))}
+                {sg.tips.map((t) => <Text key={t} style={[S.muted, { color: C.warn }]}>{t}</Text>)}
+              </View>
+            ) : null}
             {autoRes && (autoRes.found || autoRes.certified || signedByType) ? (
               <View style={{ gap: 6, backgroundColor: C.surface2, borderRadius: 10, padding: 10 }}>
                 <Text style={S.eyebrow}>Autograph{autoRes.kind ? ` · ${autoRes.kind}` : ''}</Text>

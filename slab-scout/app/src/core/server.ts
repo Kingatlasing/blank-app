@@ -1,0 +1,185 @@
+/**
+ * Slab Scout scan service (the web app's full engine, hosted free on Hugging Face): text reading in English,
+ * Japanese and Korean, fingerprint, colours, serial / back checks, slab labels and the grade estimate.
+ * The phone uses it whenever a server address is set in Settings and there's signal; otherwise everything
+ * runs on the phone as before. Code: streamlit/service.py, set-up steps: scan-service/README.md.
+ */
+import { Platform } from 'react-native';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+
+export interface ServerMatch {
+  kind: 'catalog' | 'tcgdb' | 'community' | 'ai';
+  score: number;
+  why: string[];
+  key?: string;
+  set_id?: string;
+  name: string;
+  number: string;
+  variant?: string;
+  rarity?: string;
+  print_run?: number | null;
+  set: string;
+  year: string;
+  game: string;
+  price: number | null;
+  psa9?: number | null;
+  psa10?: number | null;
+  image_url?: string;
+  ref_id?: string;
+  url?: string;
+  official_distance?: number | null;
+  label?: string;
+}
+
+export interface ServerSide {
+  subgrades: { corners: number; edges: number; surface: number };
+  findings: { area: string; where: string; what: string; severity: number; sure: string }[];
+  photo_ok: boolean;
+  photo_notes: string[];
+}
+
+export interface ServerCentering {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  text: string;
+  worst: number;
+}
+
+export interface ServerGrade {
+  error?: string;
+  method: string;
+  sub: { centering: number; corners: number; edges: number; surface: number };
+  psa: number;
+  psa_label: string;
+  psa_range: string;
+  tag_score: number;
+  tag_grade: string;
+  tag_label: string;
+  style: string;
+  centering: { front: ServerCentering | null; back: ServerCentering | null };
+  caps: Record<string, string>;
+  front: ServerSide | null;
+  back: ServerSide | null;
+  straightened: boolean;
+  tips: string[];
+  confidence: 'high' | 'medium' | 'low';
+}
+
+export interface ServerScan {
+  is_back: string;
+  game: string;
+  parsed: { name?: string; number?: string; raw_text?: string; game?: string; set_code?: string; year?: string };
+  lines: string[];
+  back_lines: string[];
+  phash: string;
+  found: boolean;
+  matches: ServerMatch[];
+  fakes: { name: string; reasons: string; distance: number }[];
+  colours: string;
+  card_jpeg: string;
+  slab?: { company: string; grade: number | string; label: string; cert: string; grade_text: string; price_at_grade?: number | null; lookup?: string };
+  grade?: ServerGrade;
+  autograph?: { found: boolean; kind: string; certified: boolean; auto_grade: string; notes: string[]; verify: string };
+  authenticity?: { verdict: string; reasons: string[] };
+  seconds: number;
+}
+
+let base = '';
+/** Called when settings load or change. Accepts 'name-space.hf.space' or a full https:// address. */
+export function setScanServer(url: string | undefined) {
+  let u = (url || '').trim().replace(/\/+$/, '');
+  if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
+  base = u;
+}
+export const scanServer = () => base;
+export const serverOn = () => !!base;
+
+/** A photo as an upload: big camera shots shrunk to 2000 px on the long side (plenty for grading, quick to send). */
+async function upload(uri: string, field: string, form: FormData) {
+  let u = uri;
+  try {
+    const ref = await ImageManipulator.manipulate(uri).renderAsync();
+    const long = Math.max(ref.width, ref.height);
+    const out = long > 2000 ? await ImageManipulator.manipulate(uri).resize(ref.width >= ref.height ? { width: 2000 } : { height: 2000 }).renderAsync() : ref;
+    u = (await out.saveAsync({ compress: 0.9, format: SaveFormat.JPEG })).uri;
+  } catch {
+    /* send as is */
+  }
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(u)).blob();
+    form.append(field, blob, `${field}.jpg`);
+  } else {
+    form.append(field, { uri: u, name: `${field}.jpg`, type: 'image/jpeg' } as any);
+  }
+}
+
+async function post<T>(path: string, form: FormData, timeoutMs: number): Promise<T> {
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base}${path}`, { method: 'POST', body: form, signal: ac.signal });
+    if (!r.ok) throw new Error(`scan server ${r.status}`);
+    return (await r.json()) as T;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Is the server awake? A free Space sleeps when unused and takes up to a minute or two to wake. */
+export async function wakeServer(timeoutMs = 90000): Promise<boolean> {
+  if (!base) return false;
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), timeoutMs);
+  try {
+    const r = await fetch(`${base}/health`, { signal: ac.signal });
+    return r.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+// One request per photo: the text reader (readText) and the scan screen share the same answer.
+const cache = new Map<string, Promise<ServerScan | null>>();
+
+/** Full scan on the server. `photo` is the best photo of the front (the original camera shot when there is one);
+ * `key` is the card crop's address, so readText(crop) reuses this answer instead of sending the photo again. */
+export function serverScan(photo: string, opts: { back?: string | null; game?: string; grade?: boolean; key?: string; timeoutMs?: number } = {}): Promise<ServerScan | null> {
+  if (!base) return Promise.resolve(null);
+  const k = `${opts.key || photo}|${opts.back || ''}|${opts.grade !== false}`;
+  const hit = cache.get(k);
+  if (hit) return hit;
+  const p = (async () => {
+    const form = new FormData();
+    await upload(photo, 'front', form);
+    if (opts.back) await upload(opts.back, 'back', form);
+    form.append('game', opts.game || 'Auto');
+    form.append('grade', opts.grade === false ? 'false' : 'true');
+    return post<ServerScan>('/scan', form, opts.timeoutMs ?? 120000);
+  })().catch(() => null);
+  cache.set(k, p);
+  if (cache.size > 12) cache.delete(cache.keys().next().value as string);
+  return p;
+}
+
+/** Text lines on a card (English, plus Japanese / Korean when it sees them), from a scan already sent or a new request. */
+export async function serverText(uri: string): Promise<string[] | null> {
+  if (!base) return null;
+  for (const [k, p] of cache) {
+    if (k.startsWith(`${uri}|`)) {
+      const r = await p;
+      if (r) return r.lines;
+    }
+  }
+  try {
+    const form = new FormData();
+    await upload(uri, 'photo', form);
+    const r = await post<{ lines: string[] }>('/ocr', form, 90000);
+    return r.lines;
+  } catch {
+    return null;
+  }
+}
