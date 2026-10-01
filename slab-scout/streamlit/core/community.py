@@ -59,6 +59,7 @@ class Store:
               url text, created_at real);
             create table if not exists vault_cards (id text primary key, vault_code text, data text, created_at real);
             create table if not exists vault_history (vault_code text, day text, value real, primary key (vault_code, day));
+            create table if not exists scan_corrections (id text primary key, phash text, catalog_key text, created_at real);
             """
         )
         self.db.commit()
@@ -98,6 +99,30 @@ class Store:
                 [str(uuid.uuid4()), time.time()] + [int(v) if isinstance(v, bool) else v for v in row.values()],
             )
         self.db.commit()
+
+    # ---------- corrections: the card a person picked for a scan (so the next look-alike scan gets it right) ----------
+    def add_correction(self, phash: str, catalog_key: str) -> None:
+        if not phash or not catalog_key:
+            return
+        if self.shared:
+            try:
+                self._rest("POST", "scan_corrections", data=json.dumps({"phash": phash[:64], "catalog_key": catalog_key[:500]}),
+                           headers={"Prefer": "return=minimal"})
+            except Exception:
+                pass  # older database without the table: corrections stay off
+            return
+        self.db.execute("insert into scan_corrections (id, phash, catalog_key, created_at) values (?,?,?,?)",
+                        (str(uuid.uuid4()), phash, catalog_key, time.time()))
+        self.db.commit()
+
+    def corrections(self, limit: int = 20000) -> list[dict]:
+        if self.shared:
+            try:
+                return self._rest("GET", f"scan_corrections?select=phash,catalog_key&order=created_at.desc&limit={limit}") or []
+            except Exception:
+                return []
+        cur = self.db.execute("select phash, catalog_key from scan_corrections order by created_at desc limit ?", (limit,))
+        return [{"phash": a, "catalog_key": b} for a, b in cur.fetchall()]
 
     def search_catalog(self, text: str, limit: int = 30) -> list[dict]:
         text = text.strip()

@@ -8,7 +8,7 @@ from datetime import datetime
 
 import streamlit as st
 
-from core import ai, autograph, catalog, colour, condition, databases, grading, identify, ocr, pipeline, slab, vision
+from core import ai, autograph, catalog, colour, condition, databases, grading, identify, ocr, pipeline, slab, verify, vision
 from ui import centering
 from ui.common import (card_image, VERDICTS, add_to_collection, esc, get_store, grade_color, money, need_code, open_card, rarity_pill,
                        record_from_catalog)
@@ -158,11 +158,102 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
     cands.sort(key=lambda x: -x["score"])
     try:
+        _verify(cands, f, b, parsed, store)
+    except Exception:
+        pass
+    cands.sort(key=lambda x: -x["score"])
+    try:
         _colour_check(cands, vision.tight_card(f["card"], f["edges"]))
     except Exception:
         pass
     return {"front": f, "back": b, "parsed": parsed, "cands": cands, "fakes": [c for c in comm if c.get("is_fake") and c["distance"] <= pipeline.MATCH_STRONG],
             "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": g}
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _corrections() -> list[tuple[int, str]]:
+    out = []
+    for r in get_store().corrections():
+        try:
+            out.append((int(r["phash"], 16), r["catalog_key"]))
+        except (TypeError, ValueError):
+            pass
+    return out
+
+
+def _verify(cands: list[dict], f: dict, b: dict | None, parsed: dict, store) -> None:
+    """Corrections people made before, the serial number, and the card back (see core/verify.py)."""
+    by_key = {x["card"].key: x for x in cands if x["kind"] == "catalog"}
+
+    def bump(card, pts: int, why: str, base: int = 50):
+        x = by_key.get(card.key)
+        if x:
+            x["score"] += pts
+            x["why"].append(why)
+        else:
+            x = {"kind": "catalog", "card": card, "score": base + pts, "why": [why]}
+            cands.append(x)
+            by_key[card.key] = x
+
+    # 1. a scan that looks like this one was corrected to a card before: trust that choice
+    try:
+        q = int(f["phash"], 16)
+        seen = {}
+        for h, key in _corrections():
+            d = bin(q ^ h).count("1")
+            if d <= 8 and (key not in seen or d < seen[key]):
+                seen[key] = d
+        for key, d in sorted(seen.items(), key=lambda kv: kv[1])[:3]:
+            c = catalog.get(key)
+            if c:
+                bump(c, 40 - d * 2, f"picked by a person for a scan that looked like this ({d}/64)", base=45)
+    except (TypeError, ValueError, KeyError):
+        pass
+
+    back_lines = (b or {}).get("lines", []) if b else []
+    back = verify.back_facts(back_lines) if back_lines else None
+    text = parsed.get("raw_text", "") + "\n" + (back["text"] if back else "")
+    tcg = (parsed.get("game") or "") in identify.TCG_GAMES
+
+    # 2. card back: number, © year (sports cards; TCG backs are all the same)
+    if back and not tcg:
+        top = next((x for x in sorted(cands, key=lambda z: -z["score"]) if x["kind"] == "catalog"), None)
+        if not top or top["score"] < 70:
+            # front gave little: the back usually has the player's name and the card number too
+            bp = ocr.parse(back_lines, "")
+            for c in catalog.match_text(back["text"], bp.get("name", ""), back["number"] or bp.get("number", ""))[:6]:
+                if c.key not in by_key:
+                    bump(c, 0, f"name on the back ({c.name})", base=50)
+        for x in [x for x in cands if x["kind"] == "catalog"]:
+            c = x["card"]
+            if back["number"] and verify.number_matches(c.number, back["number"]):
+                x["score"] += 12
+                x["why"].append(f"number {back['number']} on the back ✓")
+            elif back["number"] and c.number:
+                x["score"] -= 8
+            ym = verify.year_matches(catalog.sets().get(c.set_id, {}).get("year"), back["year"])
+            if ym:
+                x["score"] += 6
+                x["why"].append(f"© {back['year']} on the back ✓")
+            elif ym is False:
+                x["score"] -= 10
+                x["why"].append(f"© {back['year']} on the back doesn't fit this set's year")
+
+    # 3. serial number: names the parallel exactly (sports / non-sport numbered parallels)
+    if not tcg and verify.serials(text):
+        top = next((x for x in sorted(cands, key=lambda z: -z["score"]) if x["kind"] == "catalog"), None)
+        if top:
+            sib = catalog.siblings(top["card"])
+            run = verify.serial_fit(text, {c.print_run for c in sib if c.print_run})
+            if run:
+                top_score = top["score"]
+                for c in sib:
+                    if c.print_run == run:
+                        bump(c, 30, f"serial numbered /{run} on the card ✓ ({c.variant or 'Base'} is /{run})", base=top_score - 22)
+                    elif c.key in by_key:
+                        # unnumbered base, or a parallel numbered to a different run
+                        by_key[c.key]["score"] -= 15
+                        by_key[c.key]["why"].append(f"the card is numbered /{run}, this one isn't" if not c.print_run else f"this one is /{c.print_run}, the card says /{run}")
 
 
 def _colour_check(cands: list[dict], card) -> None:
@@ -438,6 +529,7 @@ def _result(scan: dict):
         disabled = bool(need_code()) if get_store().shared else False
         if b[0].button("Add to collection", type="primary", width="stretch", disabled=disabled):
             add_to_collection(_record(x, scan, grade, auth))
+            _remember(scan, x)
             s.setdefault("tray", []).append({"title": title, "price": raw})
             st.toast(f"Added {title}")
             if s.get("bulk"):
@@ -446,6 +538,7 @@ def _result(scan: dict):
                 st.rerun()
         if b[1].button("♡ Wishlist", width="stretch", disabled=disabled):
             add_to_collection(_record(x, scan, grade, auth), wishlist=True)
+            _remember(scan, x)
             st.toast("Added to wishlist")
         if x["kind"] == "catalog" and st.button("Open card page", width="stretch"):
             open_card(x["card"].key)
@@ -459,6 +552,19 @@ def _result(scan: dict):
                 st.rerun()
         _manual_search(scan, game_of(scan))
     _details(scan, x, grade, auth)
+
+
+def _remember(scan: dict, x: dict) -> None:
+    """The person settled on this card: save it against the scan's fingerprint, so the next scan that looks
+    the same (same card, same parallel) gets it straight away."""
+    if x["kind"] != "catalog" or scan.get("_remembered") == x["card"].key:
+        return
+    try:
+        get_store().add_correction(scan["front"]["phash"], x["card"].key)
+        scan["_remembered"] = x["card"].key
+        _corrections.clear()
+    except Exception:
+        pass
 
 
 def _slab_header(sl: dict):
@@ -672,6 +778,7 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         if a.button("Confirm for community", help="Teaches the app this card so everyone's next scan is recognised", key=f"cf_{key}"):
             card = _record(x, scan, grade, auth)["card"]
             get_store().add_card(card, f["phash"], vision.thumbnail_b64(f["card"], 140), x["kind"])
+            _remember(scan, x)
             st.toast("Added to the community catalog")
         with b.popover("Report as fake"):
             why = st.text_area("What gives it away?", key=f"why_{key}")

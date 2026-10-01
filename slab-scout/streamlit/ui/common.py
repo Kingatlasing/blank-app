@@ -187,6 +187,20 @@ def current_value(rec: dict) -> float:
         return 0.0
 
 
+def price_moves(recs: list[dict], min_pct: float = 20, min_abs: float = 5) -> list[dict]:
+    """Cards whose value moved a lot since they were added: [{'rec', 'was', 'now', 'pct'}], biggest move first."""
+    out = []
+    for r in recs:
+        try:
+            was = float(((r.get("pricing") or {}).get("raw") or {}).get("mid") or 0)
+        except (TypeError, ValueError):
+            continue
+        now = current_value(r)
+        if was > 0 and now > 0 and abs(now - was) >= min_abs and abs(now - was) / was * 100 >= min_pct:
+            out.append({"rec": r, "was": was, "now": now, "pct": (now - was) / was * 100})
+    return sorted(out, key=lambda m: -abs(m["now"] - m["was"]))
+
+
 def catalog_card(key: str):
     return catalog.get(key)
 

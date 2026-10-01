@@ -5,7 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from core import catalog
-from ui.common import card_image, record_image, collection, current_value, esc, money, need_code, open_card, portfolio_history, rarity_pill, tile, card_price, price_label
+from ui.common import card_image, record_image, collection, current_value, esc, money, need_code, open_card, portfolio_history, price_moves, rarity_pill, tile, card_price, price_label
 
 
 def page():
@@ -39,6 +39,16 @@ def page():
     if c2.button("Explore sets", width="stretch"):
         st.switch_page(st.session_state.pages["explore"])
 
+    moves = price_moves(items)
+    if moves:
+        st.markdown("#### Price alerts")
+        st.caption("Cards whose value moved 20%+ (and at least $5) since you added them.")
+        for m in moves[:8]:
+            k = m["rec"].get("card", {})
+            up = m["now"] >= m["was"]
+            st.markdown(f"<span class='{'up' if up else 'down'}'>{'▲' if up else '▼'} {m['pct']:+.0f}%</span> "
+                        f"**{esc(k.get('name', ''))}** · {esc(k.get('set', ''))} {esc(k.get('rarity') or '')} · "
+                        f"{money(m['was'])} → **{money(m['now'])}**", unsafe_allow_html=True)
     if items:
         st.markdown("#### Most valuable")
         top = sorted(items, key=current_value, reverse=True)[:6]

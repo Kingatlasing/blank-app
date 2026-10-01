@@ -116,3 +116,17 @@ $$;
 grant execute on function vault_history_add(text, date, numeric), vault_history_list(text) to anon;
 
 grant execute on function add_catalog_card(jsonb), vault_list(text), vault_add(text, jsonb), vault_update(text, uuid, jsonb), vault_delete(text, uuid) to anon;
+
+-- Corrections: the card a person picked for a scan (photo fingerprint -> built-in catalog card), so the next scan
+-- that looks the same gets the right card straight away.
+create table if not exists scan_corrections (
+  id uuid primary key default gen_random_uuid(),
+  phash text not null check (char_length(phash) <= 64),
+  catalog_key text not null check (char_length(catalog_key) <= 500),
+  created_at timestamptz default now()
+);
+alter table scan_corrections enable row level security;
+drop policy if exists "read corrections" on scan_corrections;
+create policy "read corrections" on scan_corrections for select using (true);
+drop policy if exists "add corrections" on scan_corrections;
+create policy "add corrections" on scan_corrections for insert with check (true);
