@@ -42,7 +42,8 @@
     ],
     "extra": {
       "supabaseUrl": "",
-      "supabaseAnonKey": ""
+      "supabaseAnonKey": "",
+      "scanServer": "mobilecards.streamlit.app"
     }
   }
 }

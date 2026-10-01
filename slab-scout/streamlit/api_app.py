@@ -6,6 +6,7 @@ Docker hosts) served from a Streamlit app, with the API under /api.
 POST /api/scan  form: front (photo), back (optional photo), game, grade -> identification + grade (JSON)
 POST /api/ocr   form: photo, lang (auto | ja | ko)                    -> text lines on the card
 GET  /api/health
+GET  /web/index.html  the phone app in a browser (mobile-web build), already pointed at this server
 """
 from __future__ import annotations
 
@@ -20,10 +21,45 @@ from starlette.middleware import Middleware  # noqa: E402
 from starlette.middleware.cors import CORSMiddleware  # noqa: E402
 from starlette.requests import Request  # noqa: E402
 from starlette.responses import JSONResponse  # noqa: E402
-from starlette.routing import Route  # noqa: E402
+from starlette.routing import Mount, Route  # noqa: E402
+from starlette.staticfiles import StaticFiles  # noqa: E402
 
 MAX_BYTES = 15 * 1024 * 1024
 _engine = None
+
+# The phone app's browser build (mobile-web branch), served from here too at /web/index.html: a browser only
+# lets a page call the scan API when both come from the same address.
+WEB_DIR = os.path.join(os.environ.get("TMPDIR", "/tmp"), "slabscout-web")
+WEB_ZIP = "https://codeload.github.com/Kingatlasing/blank-app/zip/refs/heads/mobile-web"
+
+
+def _fetch_web():
+    import io
+    import shutil
+    import zipfile
+
+    import requests
+    try:
+        z = zipfile.ZipFile(io.BytesIO(requests.get(WEB_ZIP, timeout=120).content))
+        tmp = WEB_DIR + ".new"
+        shutil.rmtree(tmp, ignore_errors=True)
+        for n in z.namelist():
+            part = n.split("/", 1)[1] if "/" in n else ""
+            if part.startswith("static/") and not n.endswith("/"):
+                dest = os.path.join(tmp, part[len("static/"):])
+                os.makedirs(os.path.dirname(dest), exist_ok=True)
+                with open(dest, "wb") as fh:
+                    fh.write(z.read(n))
+        shutil.rmtree(WEB_DIR, ignore_errors=True)
+        os.replace(tmp, WEB_DIR)
+    except Exception:
+        pass
+
+
+os.makedirs(WEB_DIR, exist_ok=True)
+import threading  # noqa: E402
+
+threading.Thread(target=_fetch_web, daemon=True).start()
 
 
 def engine():
@@ -84,6 +120,7 @@ async def read(request: Request):
 
 app = st.App(
     "scan_page.py",
-    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/ocr", read, methods=["POST"])],
+    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/ocr", read, methods=["POST"]),
+            Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],
     middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
 )

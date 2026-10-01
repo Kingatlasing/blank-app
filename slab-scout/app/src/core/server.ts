@@ -92,6 +92,12 @@ let base = '';
 export function setScanServer(url: string | undefined) {
   let u = (url || '').trim().replace(/\/+$/, '');
   if (u && !/^https?:\/\//i.test(u)) u = `https://${u}`;
+  // the browser build served by the scan app itself (/web/index.html): use that same address, since a
+  // browser won't let a page call another site's API
+  if (Platform.OS === 'web' && typeof location !== 'undefined') {
+    const i = location.pathname.indexOf('/web/');
+    if (i >= 0) u = location.origin + location.pathname.slice(0, i);
+  }
   if (u !== base) api = null;
   base = u;
 }
