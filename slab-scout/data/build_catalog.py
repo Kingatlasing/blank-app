@@ -145,34 +145,48 @@ def num(v):
 
 def build():
     sets: dict[str, dict] = {}
-    cards: list[list] = []
     raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*")))
-    merged: dict[str, dict] = {}
+    # Two passes so only one raw file is in memory at a time: first find which file has the fullest copy of each
+    # set (later files win ties), then process each set from that file.
+    winner: dict[str, tuple[int, int]] = {}  # slug -> (file index, row count)
     fetched = {}
-    inline_imgs: dict[str, str] = {}
     remote_ids: set[str] = set()
-    for f in raw_files:
+    for fi, f in enumerate(raw_files):
         d = load_json(f)
         for slug, s in d["sets"].items():
-            if "c" in s and "rows" not in s:  # compact browser export: [t, uri, pr, raw, g9, psa10, img]
-                s["rows"] = [{"t": t, "u": f"/game/{slug}/{u}", "pr": pr, "raw": rw, "g9": g9, "psa10": p10, "img": im}
-                             for t, u, pr, rw, g9, p10, im in s.pop("c")]
-            if not s.get("rows") and not isinstance(s.get("rows"), list):
+            rows = s.get("c") if "c" in s and "rows" not in s else s.get("rows")
+            if not rows and not isinstance(rows, list):
                 continue
-            if slug not in merged or len(s["rows"]) >= len(merged[slug]["rows"]):
-                merged[slug] = s
+            if slug not in winner or len(rows) >= winner[slug][1]:
+                winner[slug] = (fi, len(rows))
                 fetched[slug] = d.get("fetched_at", "")
                 if any(k in os.path.basename(f) for k in ("-baseball", "-brands", "-football", "-soccer", "-topps", "-panini", "-pokemon", "-yugioh", "-magic", "-tcg", "-sports")):
                     remote_ids.add(slug)  # big brand pulls: phone downloads these per set
+        del d
+    import gc
+    gc.collect()
 
     # video-game menu entries that came along with one card-category page (not cards)
     NOT_CARDS = {"amiibo", "amiibo-cards", "disney-infinity", "game-&-watch", "starlink", "super-famicom", "famicom",
                  "skylanders", "strategy-guide"}
-    for slug, s in merged.items():
-        if slug in NOT_CARDS:
-            continue
-        rows = s["rows"]
-        if not rows:
+
+    def raw_sets():
+        for fi, f in enumerate(raw_files):
+            d = load_json(f)
+            for slug, s in d["sets"].items():
+                if winner.get(slug, (None,))[0] == fi and slug not in NOT_CARDS:
+                    yield slug, s
+            del d
+            gc.collect()
+
+    sink = CardSink()
+    for slug, s in raw_sets():
+        if "c" in s and "rows" not in s:  # compact browser export: [t, uri, pr, raw, g9, psa10, img]
+            rows = ({"t": t, "u": f"/game/{slug}/{u}", "pr": pr, "raw": rw, "g9": g9, "psa10": p10, "img": im}
+                    for t, u, pr, rw, g9, p10, im in s["c"])
+        else:
+            rows = s.get("rows") or []
+        if not (s.get("c") or s.get("rows")):
             continue
         host = s.get("host", "pricecharting")
         base_url = "https://www.sportscardspro.com" if host == "sportscardspro" else "https://www.pricecharting.com"
@@ -184,14 +198,13 @@ def build():
         if "kakawow" in slug.lower():  # Kakawow Disney / Marvel / Star Wars / Harry Potter: one Kakawow shelf
             meta["category"], meta["brand"] = "Kakawow", "Kakawow"
         tiers: dict[str, dict] = {}
+        set_rows: list[list] = []
         for r in rows:
             if isinstance(r, list):  # compact format
                 t, pr, raw, g9, p10, u = r
                 u = "/game/" + u
             else:
                 t, pr, raw, g9, p10, u = r["t"], r.get("pr", ""), r.get("raw"), r.get("g9"), r.get("psa10"), r.get("u", "")
-                if r.get("img"):
-                    inline_imgs[u.replace("/game/", "")] = r["img"]
             if "#" not in t:  # Yu-Gi-Oh! set codes come without '#': 'Dark Magician LOB-005' -> 'Dark Magician #LOB-005'
                 t = YGO_CODE.sub(r" #\1", t.strip())
             m = TITLE_RE.match(t.strip())
@@ -203,14 +216,14 @@ def build():
                 continue  # sealed product rows
             prun = int(pr) if str(pr).isdigit() else None
             rawp, g9p, p10p = num(raw), num(g9), num(p10)
-            cards.append([slug, name, number, variant, prun, rawp, g9p, p10p, u.replace("/game/", "")])
+            set_rows.append([slug, name, number, variant, prun, rawp, g9p, p10p, u.replace("/game/", ""),
+                             (r.get("img") or "") if isinstance(r, dict) else ""])
             tv = tiers.setdefault(variant or "Base", {"name": variant or "Base", "print_run": prun, "count": 0, "prices": []})
             tv["count"] += 1
             if prun and not tv["print_run"]:
                 tv["print_run"] = prun
             if rawp:
                 tv["prices"].append(rawp)
-        s["rows"] = None  # free the raw rows as we go (the build runs close to the memory limit)
         tier_list = []
         odds = ODDS.get(slug, {})
         for t in tiers.values():
@@ -223,22 +236,22 @@ def build():
                 t["odds"] = o
             tier_list.append(t)
         tier_list.sort(key=lambda t: (t["print_run"] or 10**6), reverse=True)
+        sink.add(slug, set_rows, slug in remote_ids, meta["category"])
         sets[slug] = {
             "id": slug, **meta, "cards": sum(t["count"] for t in tier_list), "tiers": tier_list,
             "box": BOX.get(slug), "notes": SET_NOTES.get(slug, ""),
             "source": host, "source_url": f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
         }
 
-    merged.clear()
-    import gc
     gc.collect()
 
     # Hand-built checklists (no price site coverage yet)
     for f in glob.glob(os.path.join(HERE, "checklists", "*.json")):
         c = json.load(open(f))
         tiers: dict[str, dict] = {}
+        sink.add(c["id"], [[c["id"], card["name"], card["number"], card["type"] if card["type"] != "Base" else "", card.get("print_run"), None, None, None, "", ""]
+                           for card in c["cards"]], False, c["category"])
         for card in c["cards"]:
-            cards.append([c["id"], card["name"], card["number"], card["type"] if card["type"] != "Base" else "", card.get("print_run"), None, None, None, ""])
             t = tiers.setdefault(card["type"], {"name": card["type"], "print_run": card.get("print_run"), "count": 0, "priced": 0, "median_raw": None, "top_raw": None})
             t["count"] += 1
         est = c.get("estimates", {})
@@ -269,8 +282,7 @@ def build():
                 continue
             sid = "ba-" + code
             remote_ids.add(sid)
-            for r in b["rows"]:
-                cards.append([sid, r["name"], r["n"], "", None, None, None, None, ""])
+            sink.add(sid, [[sid, r["name"], r["n"], "", None, None, None, None, "", ""] for r in b["rows"]], True, "Baseball")
             sets[sid] = {
                 "id": sid, "name": name, "year": b["year"], "brand": "Topps", "category": "Baseball", "cards": len(b["rows"]),
                 "tiers": [{"name": "Base", "print_run": None, "count": len(b["rows"]), "priced": 0, "median_raw": None, "top_raw": None}],
@@ -340,35 +352,13 @@ def build():
     json.dump(sorted(sets.values(), key=lambda s: (s["brand"], s["category"], s["name"])), open(os.path.join(OUT, "sets.json"), "w"), separators=(",", ":"))
     # Card photos: raw/slabscout-images*.json maps price-guide path -> image id. Parallels without their own
     # photo borrow a sibling's (same subject + card number in the same set), flagged with a leading "~".
-    imgs = dict(inline_imgs)
-    for f in glob.glob(os.path.join(HERE, "raw", "slabscout-images*.json")):
-        imgs.update({k: v for k, v in json.load(open(f)).items() if v})
-    by_sib = {}
-    for r in cards:
-        h = imgs.get(r[8])
-        if h:
-            base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
-            by_sib.setdefault((r[0], r[1], base), h)
-            by_sib.setdefault((r[0], r[1], ""), h)
-    n_own = n_sib = 0
-    for r in cards:
-        h = imgs.get(r[8], "")
-        if h:
-            n_own += 1
-        else:
-            base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
-            sib = by_sib.get((r[0], r[1], base)) or by_sib.get((r[0], r[1], ""))
-            if sib:
-                h, n_sib = "~" + sib, n_sib + 1
-        r.append(h)
-    print(f"photos: {n_own} own, {n_sib} from another parallel, {len(cards) - n_own - n_sib} none")
     fields = ["set", "name", "number", "variant", "print_run", "raw", "psa9", "psa10", "path", "img"]
     # cards.json holds the bundled (smaller) sets; the big brand pulls live in catalog/remote and both
     # apps load them per set / per name shard when needed
-    write_phone(sets, cards, fields, remote_ids)
-    json.dump({"fields": fields, "rows": [r for r in cards if r[0] not in remote_ids]}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
+    sink.finish(fields)
+    json.dump({"fields": fields, "rows": sink.local}, open(os.path.join(OUT, "cards.json"), "w"), separators=(",", ":"))
     json.dump(sales_out, open(os.path.join(OUT, "sales.json"), "w"), separators=(",", ":"))
-    print(f"{len(sets)} sets, {len(cards)} cards, {len(sales_out)} eBay searches")
+    print(f"{len(sets)} sets, {sink.n} cards, {len(sales_out)} eBay searches")
     for s in sorted(sets.values(), key=lambda s: -s["cards"])[:8]:
         print(" ", s["name"], s["cards"], [ (t["name"], t["print_run"], t["median_raw"]) for t in s["tiers"][:4]])
 
@@ -402,75 +392,117 @@ def shard_key(name: str) -> str:
     return w[:2] if w[0].isalpha() else "0"
 
 
-def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
-    """Phone app: bundle only the smaller sets; the big brand pulls are split into per-set files and
-    name-search shards (catalog/remote/...) that the app downloads from GitHub when needed."""
-    app_dir = os.path.join(HERE, "..", "app", "assets", "catalog")
-    remote = os.path.join(OUT, "remote")
-    for sub in ("sets", "names"):
-        d = os.path.join(remote, sub)
-        os.makedirs(d, exist_ok=True)
-        for f in glob.glob(os.path.join(d, "*.json*")):
-            os.remove(f)
-    local, by_set, shards = [], {}, {}
-    for r in cards:
-        if r[0] not in remote_ids:
-            local.append(r)
-            continue
-        by_set.setdefault(r[0], []).append(r)
-        shards.setdefault(shard_key(r[1]), []).append(r)
-    for sid, rows in by_set.items():
-        write_gz(os.path.join(remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json.gz"), rows)
-    for k, rows in shards.items():
-        write_gz(os.path.join(remote, "names", k + ".json.gz"), rows)
-    n_sets, n_shards = len(by_set), len(shards)
-    del by_set, shards
-    if os.path.isdir(app_dir):
-        json.dump({"fields": fields, "rows": local}, open(os.path.join(app_dir, "cards.json"), "w"), separators=(",", ":"))
-        for f in ("sets.json", "sales.json"):
-            with open(os.path.join(OUT, f)) as a, open(os.path.join(app_dir, f), "w") as b:
-                b.write(a.read())
-    # photo fingerprints (perceptual hash of each price-guide photo): [hash, photo id, set] so a scan can be
-    # matched by picture alone, even with no readable text
-    import gc
-    gc.collect()
-    wanted = {(r[9] or "").lstrip("~") for r in cards if r[9]}
-    ph = {}
-    for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")) + glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
-        # colour files hold [phash, colour signature] per photo
-        ph.update((k, v[0] if isinstance(v, list) else v) for k, v in load_json(f).items()
-                  if k in wanted and re.fullmatch(r"[0-9a-f]{16}", v[0] if isinstance(v, list) else (v or "")))  # only photos a card uses
-        gc.collect()
-    del wanted
-    seen, groups = set(), {}
-    cat_of = {sid: s.get("category", "") for sid, s in sets.items()}
-    for r in cards:
-        im = (r[9] or "").lstrip("~")
-        h = ph.get(im)
-        if h and (im, r[0]) not in seen:
-            seen.add((im, r[0]))
-            groups.setdefault(phash_group(cat_of.get(r[0], "")), []).append([h, im, r[0]])
-    # one set of files per game group, so the phone only loads the games being scanned; each part stays well
-    # under GitHub's file size limit
-    for old in glob.glob(os.path.join(remote, "phash*.json*")):
-        os.remove(old)
-    PART = 400_000
-    phash_files = {}
-    for g, rows in sorted(groups.items()):
-        n = max(1, -(-len(rows) // PART))
-        for i in range(n):
-            name = f"phash-{g}-{i}.json.gz"
-            write_gz(os.path.join(remote, name), rows[i::n])
-            phash_files.setdefault(g, []).append(name)
-    print(f"photo fingerprints: {sum(len(v) for v in groups.values())} (of {len(ph)} hashed photos in use) in "
-          + ", ".join(f"{g} {len(v)}" for g, v in sorted(groups.items())))
-    import time as _t
-    files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
-    files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
-    files += [(f, os.path.getsize(os.path.join(remote, f))) for fs in phash_files.values() for f in fs]
-    json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files), "phash": phash_files},
-              open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
-    print(f"phone: {len(local)} cards bundled, {n_sets} sets + {n_shards} name shards downloadable")
+class CardSink:
+    """Takes the cards one set at a time and writes them out straight away, so the whole catalog (millions of
+    cards) is never in memory at once:
+    - photos: each card's price-guide photo id; parallels without their own photo borrow a sibling's (same
+      subject + card number in the same set), flagged with a leading "~"
+    - remote sets (the big brand pulls): catalog/remote/sets/<set>.json.gz, plus name-search shards
+      (catalog/remote/names/<2 letters>.json.gz) that both apps download when needed
+    - bundled (smaller) sets: kept for cards.json / the phone app's bundled copy
+    - photo fingerprints: [hash, photo id, set] per game group (catalog/remote/phash-<group>-<n>.json.gz)"""
+
+    def __init__(self):
+        import gc
+        import tempfile
+        self.remote = os.path.join(OUT, "remote")
+        for sub in ("sets", "names"):
+            d = os.path.join(self.remote, sub)
+            os.makedirs(d, exist_ok=True)
+            for f in glob.glob(os.path.join(d, "*.json*")):
+                os.remove(f)
+        self.imgs = {}  # older image maps: price-guide path -> photo id
+        for f in glob.glob(os.path.join(RAW, "slabscout-images*.json")):
+            self.imgs.update({k: v for k, v in json.load(open(f)).items() if v})
+        self.ph = {}  # photo id -> fingerprint (colour files hold [phash, colour])
+        for f in glob.glob(os.path.join(RAW, "slabscout-phash*.json*")) + glob.glob(os.path.join(RAW, "slabscout-colour*.json*")):
+            self.ph.update((k, v[0] if isinstance(v, list) else v) for k, v in load_json(f).items()
+                           if re.fullmatch(r"[0-9a-f]{16}", v[0] if isinstance(v, list) else (v or "")))
+            gc.collect()
+        self.tmp = tempfile.mkdtemp(prefix="shards-")
+        self.shard_files: dict = {}
+        self.groups: dict[str, list] = {}
+        self.local: list[list] = []
+        self.n = self.n_own = self.n_sib = self.n_sets = 0
+
+    def add(self, sid: str, rows: list[list], remote: bool, category: str) -> None:
+        if not rows:
+            return
+        by_sib = {}
+        for r in rows:
+            if not r[9]:
+                r[9] = self.imgs.get(r[8], "")
+            if r[9]:
+                base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
+                by_sib.setdefault((r[1], base), r[9])
+                by_sib.setdefault((r[1], ""), r[9])
+        seen = set()
+        group = phash_group(category)
+        for r in rows:
+            if r[9]:
+                self.n_own += 1
+            else:
+                base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
+                sib = by_sib.get((r[1], base)) or by_sib.get((r[1], ""))
+                if sib:
+                    r[9] = "~" + sib
+                    self.n_sib += 1
+            im = r[9].lstrip("~")
+            h = self.ph.get(im) if im else None
+            if h and im not in seen:
+                seen.add(im)
+                self.groups.setdefault(group, []).append([h, im, sid])
+        self.n += len(rows)
+        if not remote:
+            self.local.extend(rows)
+            return
+        self.n_sets += 1
+        write_gz(os.path.join(self.remote, "sets", re.sub(r"[^\w.-]", "_", sid) + ".json.gz"), rows)
+        for r in rows:
+            k = shard_key(r[1])
+            fh = self.shard_files.get(k)
+            if fh is None:
+                fh = self.shard_files[k] = open(os.path.join(self.tmp, k + ".jsonl"), "w")
+            fh.write(json.dumps(r, separators=(",", ":")) + "\n")
+
+    def finish(self, fields: list) -> None:
+        import shutil
+        import time as _t
+        remote = self.remote
+        print(f"photos: {self.n_own} own, {self.n_sib} from another parallel, {self.n - self.n_own - self.n_sib} none")
+        for k, fh in self.shard_files.items():
+            fh.close()
+            with open(os.path.join(self.tmp, k + ".jsonl")) as src:
+                write_gz(os.path.join(remote, "names", k + ".json.gz"), [json.loads(line) for line in src])
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        app_dir = os.path.join(HERE, "..", "app", "assets", "catalog")
+        if os.path.isdir(app_dir):
+            json.dump({"fields": fields, "rows": self.local}, open(os.path.join(app_dir, "cards.json"), "w"), separators=(",", ":"))
+            for f in ("sets.json", "sales.json"):
+                p = os.path.join(OUT, f)
+                if os.path.exists(p):
+                    with open(p) as a, open(os.path.join(app_dir, f), "w") as b:
+                        b.write(a.read())
+        # photo fingerprints: one set of files per game group (the phone only loads the games being scanned);
+        # each part stays well under GitHub's file size limit
+        for old in glob.glob(os.path.join(remote, "phash*.json*")):
+            os.remove(old)
+        PART = 400_000
+        phash_files = {}
+        for g, rows in sorted(self.groups.items()):
+            n = max(1, -(-len(rows) // PART))
+            for i in range(n):
+                name = f"phash-{g}-{i}.json.gz"
+                write_gz(os.path.join(remote, name), rows[i::n])
+                phash_files.setdefault(g, []).append(name)
+        print(f"photo fingerprints: {sum(len(v) for v in self.groups.values())} (of {len(self.ph)} hashed photos) in "
+              + ", ".join(f"{g} {len(v)}" for g, v in sorted(self.groups.items())))
+        files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
+        files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
+        files += [(f, os.path.getsize(os.path.join(remote, f))) for fs in phash_files.values() for f in fs]
+        json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files), "phash": phash_files},
+                  open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
+        print(f"phone: {len(self.local)} cards bundled, {self.n_sets} sets + {len(self.shard_files)} name shards downloadable")
 
 
 def build_borders():
@@ -523,16 +555,18 @@ def build_colours():
     if not col:
         return
     import gzip
-    rows = json.load(open(os.path.join(OUT, "cards.json")))["rows"]
-    for f in glob.glob(os.path.join(OUT, "remote", "sets", "*.json.gz")):
-        with gzip.open(f, "rt") as fh:
-            rows += json.load(fh)
     by: dict = {}
-    for r in rows:
-        im = r[9] or ""
-        if im and not im.startswith("~") and im in col:
-            by.setdefault(r[0], {}).setdefault(r[3] or "Base", []).append(col[im])
-    del rows
+
+    def take(rows):
+        for r in rows:
+            im = r[9] or ""
+            if im and not im.startswith("~") and im in col:
+                by.setdefault(r[0], {}).setdefault(r[3] or "Base", []).append(col[im])
+
+    take(json.load(open(os.path.join(OUT, "cards.json")))["rows"])
+    for f in glob.glob(os.path.join(OUT, "remote", "sets", "*.json.gz")):  # one set at a time
+        with gzip.open(f, "rt") as fh:
+            take(json.load(fh))
 
     def med(sigs):
         # median of each byte / nibble across the photos (robust to one odd photo)
