@@ -1,3 +1,4 @@
+import { hashDistance } from './imageTools';
 /**
  * Identify the exact card from what's printed on it (same logic as the web app's core/identify.py):
  * real card names found in the text, card number, printed set size, HP, attacks, illustrator.
@@ -197,14 +198,21 @@ export async function identify(lines: string[], rawText: string, name: string, n
 }
 
 /** The game's name if this photo is the BACK of a card (just the logo, no card name), else ''. */
-export function cardBack(lines: string[]): string {
+// fingerprint of the standard Pokémon back (swirl + Poké Ball): spots backs the text reader can't read
+// (angled, sleeved, 'PeKOMoN'). Clean backs come out ~4 away, card fronts 28+. Same as the web app.
+const BACK_PHASH: Record<string, string[]> = { 'Pokémon': ['d1226e9ef171468b'] };
+
+export function cardBack(lines: string[], phash = ''): string {
+  const dist: Record<string, number> = {};
+  if (phash) for (const [g, hs] of Object.entries(BACK_PHASH)) dist[g] = Math.min(...hs.map((h) => hashDistance(phash, h)));
+  for (const [g, d] of Object.entries(dist)) if (d <= 12) return g;
   const words = lines.map((t) => norm(t)).filter((t) => t.length >= 4);
   if (words.length > 8) return '';
   const toks = words.flatMap((w) => w.split(' '));
   const poke = toks.filter((t) => similarity(t, 'pokemon') >= 0.55).length;
   const texty = lines.some((t) => t.trim().split(/\s+/).length >= 3 || /\d{2,}/.test(t)); // rules text, HP, numbers = a front
   const other = toks.filter((t) => t.length >= 4 && similarity(t, 'pokemon') < 0.55).length; // e.g. a card name
-  if (poke >= 2 && !texty && other <= 1) return 'Pokémon';
+  if ((poke >= 2 || (poke >= 1 && (dist['Pokémon'] ?? 64) <= 26)) && !texty && other <= 1) return 'Pokémon';
   const blob = words.join(' ');
   if (blob.includes('deckmaster') || (blob.includes('magic') && blob.includes('gathering'))) return 'Magic: The Gathering';
   if (blob.includes('konami') && words.length <= 3) return 'Yu-Gi-Oh!';

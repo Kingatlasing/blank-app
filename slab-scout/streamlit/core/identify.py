@@ -361,8 +361,18 @@ def identify_lorcana(lines, parsed: dict, limit: int = 6) -> list[dict]:
 TCG_GAMES = ("Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana")
 
 
-def card_back(lines, card_img=None) -> str:
+# Fingerprint of the standard Pokémon card back (the swirl + Poké Ball), to spot backs the text reader can't read
+# (held at an angle, in a sleeve, a mangled "PeKOMoN"). Clean backs come out ~4 away, card fronts 28+.
+BACK_PHASH = {"Pokémon": ["d1226e9ef171468b"]}
+
+
+def card_back(lines, card_img=None, phash: str = "") -> str:
     """Name of the game if this photo is the BACK of a card (no name, just the logo), else ''."""
+    from core import vision
+    dist = {g: min(vision.hash_distance(phash, h) for h in hs) for g, hs in BACK_PHASH.items()} if phash else {}
+    for g, d in dist.items():
+        if d <= 12:
+            return g
     words = [norm(t) for t, c, y in lines if len(t.strip()) >= 4]
     if len(words) > 8:
         return ""
@@ -379,7 +389,7 @@ def card_back(lines, card_img=None) -> str:
     texty = any(len(t.split()) >= 3 or re.search(r"\d{2,}", t) for t, c, y in lines)  # rules text / HP / numbers = a front
     toks = [tok for w_ in words for tok in w_.split()]
     other = sum(1 for tok in toks if len(tok) >= 4 and sim(tok, "pokemon") < 0.55)  # e.g. a card name
-    if not texty and other <= 1 and (poke >= 2 or poke >= 1 and blue_border):
+    if not texty and other <= 1 and (poke >= 2 or poke >= 1 and (blue_border or dist.get("Pokémon", 64) <= 26)):
         return "Pokémon"
     blob = " ".join(words)
     if "deckmaster" in blob or ("magic" in blob and "gathering" in blob):

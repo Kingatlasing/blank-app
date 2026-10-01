@@ -134,8 +134,10 @@ def parse(lines: list[tuple[str, float, float]], game_hint: str = "Auto") -> dic
 
     # Name: the most prominent line near the top that isn't a stat/number line.
     name = ""
+    # near the top of the card's text (the card may sit low in the photo: a slab on a stand, a held card)
+    top = min((y for t, c, y in lines if c > 0.6 and len(t.strip()) >= 2), default=0.0)
     for t, c, y in lines:
-        if y > 0.35:
+        if y > max(0.35, top + 0.3):
             break
         clean = t.strip()
         if len(clean) < 3 or c < 0.6:
@@ -144,6 +146,9 @@ def parse(lines: list[tuple[str, float, float]], game_hint: str = "Auto") -> dic
             continue
         if re.fullmatch(r"[\d\s/\-HPhp:.]+", clean) or clean.lower() in ("basic", "stage 1", "stage 2", "trainer", "pokémon", "pokemon"):
             continue
+        letters = len(re.findall(r"[A-Za-zÀ-ÿ]", clean))
+        if letters < 3 or letters < 0.6 * len(clean.replace(" ", "")) or re.match(r"^s?tage\s*\d", clean, re.I):
+            continue  # '#70@' (HP misread), 'TAGE2' (Stage 2 cut off)
         clean = re.sub(r"(HP|hp)\s*\d+", "", clean).strip(" -·")
         clean = re.sub(r"(?<=[a-z])(?=(ex|EX|GX|V|VMAX|VSTAR)\b)", " ", clean)
         if len(clean) >= 3:

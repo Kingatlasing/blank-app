@@ -22,7 +22,7 @@ import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip } from '../components/cards';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
-import { refineMatches } from '../core/verify';
+import { playerName, refineMatches } from '../core/verify';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
 export const GAMES = ['Auto', 'Pokémon', 'Pokémon Japanese / Korean', 'Yu-Gi-Oh!', 'Magic: The Gathering', 'Lorcana', 'One Piece', 'Dragon Ball', 'Digimon', 'Star Wars', 'Marvel', 'Gundam', 'Riftbound', 'Harry Potter', 'Garbage Pail Kids', 'Kakawow', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Non-sport', 'Other TCG'];
@@ -308,7 +308,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
 
       setProgress('Reading the text on the card…');
       const lines = await readText(front.uri);
-      const backOf = cardBack(lines);
+      const backOf = cardBack(lines, ph);
       if (backOf) {
         setPhase('review');
         setError(`That's the back of a ${backOf} card. Take the front photo first (step 1), then the back (step 2); the back is used for grading.`);
@@ -348,6 +348,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       }
 
       // Built-in card database first: a card code like CDT-BBG-199 pins the exact parallel.
+      if (!(DB_GAMES.includes(g) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(g))) {
+        // 'MIKE' / 'TROUT' on separate lines -> 'Mike Trout' (not the team name)
+        const pn = await playerName(lines).catch(() => '');
+        if (pn && !pn.toLowerCase().split(' ').every((w) => (parsed.name || '').toLowerCase().includes(w))) {
+          parsed.name = pn;
+          f = { ...f, name: f.name && src === 'community' ? f.name : pn };
+        }
+      }
       const cm = matchText(parsed.rawText, parsed.name, parsed.number);
       let byPicture = false;
       let closestHit = false;
@@ -412,7 +420,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         try {
           setProgress('Checking serial number and back…');
           const backLines = back ? await readText(back.uri).catch(() => [] as string[]) : [];
-          const r = await refineMatches(cm.cards, { phash: ph, text: parsed.rawText, backLines, tcg: !!g && DB_GAMES.includes(g), store });
+          const r = await refineMatches(cm.cards, { phash: ph, text: parsed.rawText, number: parsed.number, backLines, tcg: !!g && DB_GAMES.includes(g), store });
           cm.cards = r.cards;
           if (r.notes.length) closestHit = true; // a correction or serial is enough to take the top card
           setRefineNote(r.notes[0] || '');

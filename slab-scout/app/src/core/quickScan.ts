@@ -10,7 +10,7 @@ import { nameGuess, readLabel } from './slab';
 import { Card, closestRemote, getCard, matchText, photoLookup, searchRemote, sets, value } from './catalog';
 import { recordFromCatalog } from './portfolio';
 import { colourSignature, describeColours, rankParallels } from './colour';
-import { refineMatches } from './verify';
+import { playerName, refineMatches } from './verify';
 import type { Store } from './community';
 import type { ScanItem } from './scanHistory';
 
@@ -19,7 +19,7 @@ const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(
 export async function quickIdentify(uri: string, game: string, store?: Store | null): Promise<ScanItem> {
   const [phash, thumb, lines] = await Promise.all([fingerprintCard(uri), thumbnail(uri, 160), readText(uri).catch(() => [] as string[])]);
   const base: ScanItem = { id: uid(), at: new Date().toISOString(), uri, thumb, phash, game: '', name: '', set: '', number: '', rarity: '', price: null, currency: 'USD', source: '' };
-  const back = cardBack(lines);
+  const back = cardBack(lines, phash);
   if (back) return { ...base, game: back, note: `Back of a ${back} card: scan the front to identify it (the back is used when grading).` };
   const g = game === 'Auto' ? '' : game;
   const parsed = parseText(lines, g);
@@ -27,6 +27,12 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
   if (sl) {
     parsed.name = nameGuess(sl) || parsed.name;
     parsed.number = sl.number || parsed.number;
+  }
+  const tcgGame = DB_GAMES.includes(g || parsed.game) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(g || parsed.game);
+  if (!tcgGame) {
+    // 'MIKE' / 'TROUT' on separate lines -> 'Mike Trout' (not the team name)
+    const pn = await playerName(lines).catch(() => '');
+    if (pn && !pn.toLowerCase().split(' ').every((w) => (parsed.name || '').toLowerCase().includes(w))) parsed.name = pn;
   }
   const cm = matchText(parsed.rawText, parsed.name, parsed.number);
   let byPicture = false;
@@ -62,7 +68,7 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
   if (!cm.byCode) {
     // corrections people made before + a serial number on the card (see verify.ts)
     try {
-      const r = await refineMatches(cm.cards, { phash, text: parsed.rawText, tcg: DB_GAMES.includes(gg) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(gg), store });
+      const r = await refineMatches(cm.cards, { phash, text: parsed.rawText, number: parsed.number, tcg: DB_GAMES.includes(gg) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(gg), store });
       refined = !!r.notes.length;
       cm.cards = r.cards;
       refineNote = r.notes[0] || '';

@@ -24,7 +24,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     sl = _read_slab(f, game)
     if sl:
         return _analyze_slab(front, f, b, sl, game)
-    back_of = identify.card_back(f["lines"], f["card"])
+    back_of = identify.card_back(f["lines"], f["card"], f.get("phash", ""))
     if back_of:
         return {"front": f, "back": b, "parsed": ocr.parse(f["lines"], "Auto"), "cands": [], "fakes": [], "is_back": back_of,
                 "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": back_of}
@@ -32,6 +32,10 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     if b:
         b["inspect"] = condition.inspect_card(vision.tight_card(b["card"], b["edges"]), is_back=True)
     parsed = ocr.parse(f["lines"], "" if game in ("Auto", "Sports", "Kakawow / Disney / Marvel", "Non-sport (history, music…)", "Other", "Pokémon Japanese / Korean") else game)
+    if (parsed.get("game") or g0(game)) not in identify.TCG_GAMES:
+        pn = _player_name(f["lines"])
+        if pn and not all(w.lower() in (parsed.get("name") or "").lower() for w in pn.split()):
+            parsed = {**parsed, "name": pn}
     store = get_store()
     comm = pipeline.community_matches(store, f["phash"])
     cands: list[dict] = []
@@ -181,6 +185,26 @@ def _corrections() -> list[tuple[int, str]]:
     return out
 
 
+def g0(game: str) -> str:
+    return "" if game in ("Auto", "Sports") else game
+
+
+def _player_name(lines) -> str:
+    """Sports cards often print the first and last name on separate lines ('MIKE' / 'TROUT') with the team
+    name nearby ('ANGELS'). Try neighbouring one-word lines as a full name and keep the pair the card database
+    knows as a card name."""
+    words = [(t.strip(), y) for t, c, y in lines if c > 0.5 and re.fullmatch(r"[A-Za-z.'\-]{2,}", t.strip())]
+    best, best_n = "", 0
+    for (a, ya), (b, yb) in zip(words, words[1:]):
+        if abs(ya - yb) > 0.12 or a.lower() == b.lower():
+            continue
+        name = f"{a} {b}".title()
+        hits = [c for c in catalog.search(name, limit=30) if a.lower() in c.name.lower() and b.lower() in c.name.lower()]
+        if len(hits) > best_n:
+            best, best_n = name, len(hits)
+    return best
+
+
 def _verify(cands: list[dict], f: dict, b: dict | None, parsed: dict, store) -> None:
     """Corrections people made before, the serial number, and the card back (see core/verify.py)."""
     by_key = {x["card"].key: x for x in cands if x["kind"] == "catalog"}
@@ -209,6 +233,17 @@ def _verify(cands: list[dict], f: dict, b: dict | None, parsed: dict, store) -> 
                 bump(c, 40 - d * 2, f"picked by a person for a scan that looked like this ({d}/64)", base=45)
     except (TypeError, ValueError, KeyError):
         pass
+
+    # the card number printed on the front ('4/102', '#325'): breaks ties between look-alike cards
+    front_no = (parsed.get("number") or "").split("/")[0].lstrip("#").lstrip("0").lower()
+    if front_no:
+        for x in [x for x in cands if x["kind"] == "catalog"]:
+            cn = (x["card"].number or "").split("/")[0].lstrip("#").lstrip("0").lower()
+            if cn and cn == front_no:
+                x["score"] += 8
+                x["why"].append(f"number {parsed['number']} ✓")
+            elif cn and not cn.endswith(front_no):
+                x["score"] -= 6
 
     back_lines = (b or {}).get("lines", []) if b else []
     back = verify.back_facts(back_lines) if back_lines else None

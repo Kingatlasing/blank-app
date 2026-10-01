@@ -83,6 +83,8 @@ export function parseText(lines: string[], gameHint = ''): Parsed {
     const lc = c.toLowerCase();
     if (BRANDS.some((b) => lc.includes(b.toLowerCase())) || /(19[3-9]\d|20[0-3]\d)/.test(c)) continue;
     if (c.length < 3 || /^[\d\s/\-HPhp:.]+$/.test(c) || ['basic', 'stage 1', 'stage 2', 'trainer', 'pokémon', 'pokemon'].includes(c.toLowerCase())) continue;
+    const letters = (c.match(/[A-Za-zÀ-ÿ]/g) || []).length;
+    if (letters < 3 || letters < 0.6 * c.replace(/\s/g, '').length || /^s?tage\s*\d/i.test(c)) continue; // '#70@', 'TAGE2'
     c = c.replace(/(HP|hp)\s*\d+/g, '').replace(/([a-z])(ex|EX|GX|VMAX|VSTAR|V)\b/g, '$1 $2').trim();
     if (c.length >= 3) {
       name = c;

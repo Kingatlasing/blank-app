@@ -5,7 +5,7 @@
  * - card back (sports): card number and © year printed on the back
  * They only reorder the matches (and add the right parallel of the top card), never name a card on their own.
  */
-import { getCard, loadSet, sets, siblings, type Card } from './catalog';
+import { getCard, loadSet, searchRemote, sets, siblings, type Card } from './catalog';
 import { hashDistance } from './imageTools';
 import type { Store } from './community';
 
@@ -55,6 +55,29 @@ export function yearMatches(setYear: string | number | undefined, printed: numbe
   return printed === sy || printed === sy + 1;
 }
 
+/** Sports cards often print first and last name on separate lines ('MIKE' / 'TROUT'): try neighbouring
+ * one-word lines as a full name and keep the pair the card database knows. */
+export async function playerName(lines: string[]): Promise<string> {
+  const words = lines.map((t) => t.trim()).filter((t) => /^[A-Za-z.'\-]{2,}$/.test(t));
+  let best = '';
+  let bestN = 0;
+  for (let i = 0; i + 1 < words.length && i < 12; i++) {
+    const [a, b] = [words[i], words[i + 1]];
+    if (a.toLowerCase() === b.toLowerCase()) continue;
+    const name = `${a} ${b}`.toLowerCase().replace(/\b\w/g, (m) => m.toUpperCase());
+    try {
+      const hits = (await searchRemote(name, 30)).filter((c) => c.name.toLowerCase().includes(a.toLowerCase()) && c.name.toLowerCase().includes(b.toLowerCase()));
+      if (hits.length > bestN) {
+        best = name;
+        bestN = hits.length;
+      }
+    } catch {
+      /* offline */
+    }
+  }
+  return best;
+}
+
 export interface Refined {
   cards: Card[];
   notes: string[];
@@ -63,7 +86,7 @@ export interface Refined {
 /** Reorder the catalog matches using corrections, the card back and a serial number. */
 export async function refineMatches(
   cards: Card[],
-  opts: { phash?: string; text: string; backLines?: string[]; tcg?: boolean; store?: Store | null },
+  opts: { phash?: string; text: string; number?: string; backLines?: string[]; tcg?: boolean; store?: Store | null },
 ): Promise<Refined> {
   const score = new Map<string, number>();
   const why = new Map<string, string>();
@@ -101,6 +124,16 @@ export async function refineMatches(
     }
   }
   const order = () => [...byKey.values()].sort((a, b) => (score.get(b.key) || 0) - (score.get(a.key) || 0));
+
+  // the number printed on the front ('4/102', '#325') breaks ties between look-alike cards
+  const fno = (opts.number || '').split('/')[0].replace(/^#/, '').replace(/^0+/, '').toLowerCase();
+  if (fno) {
+    for (const c of [...byKey.values()]) {
+      const cn = (c.number || '').split('/')[0].replace(/^#/, '').replace(/^0+/, '').toLowerCase();
+      if (cn && cn === fno) bump(c, 8, '');
+      else if (cn && !cn.endsWith(fno)) bump(c, -6, '');
+    }
+  }
 
   // 2. the card back: number + © year (sports)
   const back = opts.backLines?.length ? backFacts(opts.backLines) : null;
