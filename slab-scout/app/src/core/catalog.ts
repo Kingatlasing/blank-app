@@ -77,7 +77,8 @@ export const cardKeyOf = (setId: string, number: string, variant: string, name: 
 
 /** Big brand pulls (every Upper Deck / Topps baseball set...) live on GitHub, one file per set plus
  * name-search shards, and are downloaded when a set is opened or a search needs them. */
-export const REMOTE = 'https://raw.githubusercontent.com/Kingatlasing/blank-app/slab-scout/slab-scout/data/catalog/remote';
+// big catalog files live on the repo's catalog-data branch (replaced on each publish, keeps the code history small)
+export const REMOTE = 'https://raw.githubusercontent.com/Kingatlasing/blank-app/catalog-data/remote';
 const _loadedSets = new Set<string>();
 const _loadedShards = new Set<string>();
 const _pending = new Map<string, Promise<any>>();
@@ -264,46 +265,84 @@ export function clearOffline() {
 }
 
 /* ---------- picture matching ---------- */
-let _ph: { hi: Uint32Array; lo: Uint32Array; meta: [string, string][] } | null = null;
+type PhTable = { hi: Uint32Array; lo: Uint32Array; meta: [string, string][] };
+const _ph = new Map<string, PhTable>(); // per fingerprint group (pokemon, football, ...)
 const popcnt = (v: number) => {
   v = v - ((v >>> 1) & 0x55555555);
   v = (v & 0x33333333) + ((v >>> 2) & 0x33333333);
   return (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24;
 };
 
-/** Cards whose price-guide photo looks like this scan (perceptual hash), closest first. Works offline once saved. */
-export async function photoLookup(hash: string, maxDistance = 12, limit = 8): Promise<{ card: Card; distance: number }[]> {
-  if (!hash || hash.length !== 16) return [];
-  if (!_ph) {
-    // fingerprints come in parts (phash-0.json.gz, phash-1...) so no file passes GitHub's size limit
-    let rows: [string, string, string][] = [];
-    for (let i = 0; i < 16; i++) {
-      try {
-        rows = rows.concat(await cachedJson(`phash-${i}.json.gz`));
-      } catch {
-        break;
-      }
+// which fingerprint group(s) a game's cards are in (same groups as data/build_catalog.py phash_group)
+const PH_GROUP: Record<string, string[]> = {
+  'Pokémon': ['pokemon'], 'Pokémon Japanese / Korean': ['pokemon'], 'Yu-Gi-Oh!': ['yugioh'], 'Magic: The Gathering': ['magic'],
+  Lorcana: ['tcg'], 'One Piece': ['tcg'], 'Dragon Ball': ['tcg'], Digimon: ['tcg'], Gundam: ['tcg'], Riftbound: ['tcg'], 'Other TCG': ['tcg'],
+  Baseball: ['baseball'], Basketball: ['basketball'], Football: ['football'], Soccer: ['soccer'], Hockey: ['hockey'],
+  Sports: ['baseball', 'basketball', 'football', 'soccer', 'hockey', 'othersports'],
+  'Star Wars': ['nonsport'], Marvel: ['nonsport'], 'Harry Potter': ['nonsport'], 'Garbage Pail Kids': ['nonsport'], Kakawow: ['nonsport'], 'Non-sport': ['nonsport'],
+};
+
+let _idx: { version: string; files: [string, number][]; phash?: Record<string, string[]> } | null = null;
+async function remoteIndex() {
+  if (_idx) return _idx;
+  try {
+    _idx = await fetchJson(`${REMOTE}/index.json`);
+  } catch {
+    const f = cacheFile('index.json');
+    _idx = f.exists ? JSON.parse(await f.text()) : { version: '', files: [] };
+  }
+  return _idx!;
+}
+
+async function phTable(group: string, files: string[]): Promise<PhTable> {
+  const have = _ph.get(group);
+  if (have) return have;
+  let rows: [string, string, string][] = [];
+  for (const f of files) {
+    try {
+      rows = rows.concat(await cachedJson(f));
+    } catch {
+      /* missing part: use the rest */
     }
-    if (!rows.length) rows = await cachedJson('phash.json.gz');
-    const hi = new Uint32Array(rows.length);
-    const lo = new Uint32Array(rows.length);
-    rows.forEach(([h], i) => {
-      hi[i] = parseInt(h.slice(0, 8), 16) >>> 0;
-      lo[i] = parseInt(h.slice(8), 16) >>> 0;
-    });
-    _ph = { hi, lo, meta: rows.map(([, im, sid]) => [im, sid]) };
+  }
+  const hi = new Uint32Array(rows.length);
+  const lo = new Uint32Array(rows.length);
+  rows.forEach(([h], i) => {
+    hi[i] = parseInt(h.slice(0, 8), 16) >>> 0;
+    lo[i] = parseInt(h.slice(8), 16) >>> 0;
+  });
+  const t: PhTable = { hi, lo, meta: rows.map(([, im, sid]) => [im, sid]) };
+  _ph.set(group, t);
+  return t;
+}
+
+/** Cards whose price-guide photo looks like this scan (perceptual hash), closest first. Works offline once
+ * saved. With a game picked, only that game's fingerprints are loaded (much less memory than all of them). */
+export async function photoLookup(hash: string, maxDistance = 12, limit = 8, game = ''): Promise<{ card: Card; distance: number }[]> {
+  if (!hash || hash.length !== 16) return [];
+  const idx = await remoteIndex();
+  const tables: PhTable[] = [];
+  if (idx.phash) {
+    const want = PH_GROUP[game] || Object.keys(idx.phash);
+    for (const g of want) if (idx.phash[g]) tables.push(await phTable(g, idx.phash[g]));
+  } else {
+    // older publish: phash-0..n holds every game
+    const parts: string[] = [];
+    for (let i = 0; i < 16; i++) parts.push(`phash-${i}.json.gz`);
+    tables.push(await phTable('all', parts.filter((p) => idx.files.some(([f]) => f === p))));
   }
   const qh = parseInt(hash.slice(0, 8), 16) >>> 0;
   const ql = parseInt(hash.slice(8), 16) >>> 0;
-  const best: [number, number][] = [];
-  for (let i = 0; i < _ph.hi.length; i++) {
-    const d = popcnt((_ph.hi[i] ^ qh) >>> 0) + popcnt((_ph.lo[i] ^ ql) >>> 0);
-    if (d <= maxDistance) best.push([d, i]);
-  }
+  const best: [number, PhTable, number][] = [];
+  for (const t of tables)
+    for (let i = 0; i < t.hi.length; i++) {
+      const d = popcnt((t.hi[i] ^ qh) >>> 0) + popcnt((t.lo[i] ^ ql) >>> 0);
+      if (d <= maxDistance) best.push([d, t, i]);
+    }
   best.sort((a, b) => a[0] - b[0]);
   const out: { card: Card; distance: number }[] = [];
-  for (const [d, i] of best.slice(0, limit * 3)) {
-    const [im, sid] = _ph.meta[i];
+  for (const [d, t, i] of best.slice(0, limit * 3)) {
+    const [im, sid] = t.meta[i];
     const cs = await loadSet(sid).catch(() => setCards(sid));
     cs.filter((c) => c.img === im).forEach((card) => out.push({ card, distance: d }));
     if (out.length >= limit) break;

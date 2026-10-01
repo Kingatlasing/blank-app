@@ -355,7 +355,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       if (!cm.byCode) {
         try {
           setProgress('Matching the picture…');
-          const pm = await photoLookup(await fingerprintCard(front.uri));
+          const pm = await photoLookup(await fingerprintCard(front.uri), 12, 8, game === "Auto" ? "" : game);
           // unrelated cards often sit ~12 apart: only a close picture match counts on its own
           if (pm.length && pm[0].distance <= 6) {
             const byPic = pm.map((m) => m.card);

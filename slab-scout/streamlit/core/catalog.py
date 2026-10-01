@@ -95,6 +95,13 @@ def _cat() -> _Cat:
     return cat
 
 
+# The big catalog files (per-set card lists, name shards, photo fingerprints) live on the repo's
+# "catalog-data" branch (one commit, replaced on each publish) so the code history stays small. They are
+# downloaded when first needed and kept in a cache folder; a local data/catalog/remote copy wins when present.
+DATA_URL = os.environ.get("SLABSCOUT_DATA_URL", "https://raw.githubusercontent.com/Kingatlasing/blank-app/catalog-data/remote")
+CACHE = os.environ.get("SLABSCOUT_CACHE", os.path.join(os.path.expanduser("~"), ".cache", "slabscout"))
+
+
 def _read_remote(*parts: str):
     """Remote catalog file: gzip-compressed JSON (older builds wrote plain .json)."""
     import gzip
@@ -102,7 +109,54 @@ def _read_remote(*parts: str):
     if os.path.exists(p + ".gz"):
         with gzip.open(p + ".gz", "rt") as fh:
             return json.load(fh)
-    return json.load(open(p)) if os.path.exists(p) else None
+    if os.path.exists(p):
+        return json.load(open(p))
+    data = _download("/".join(parts) + ".gz")
+    if data is None:
+        return None
+    return json.loads(gzip.decompress(data))
+
+
+def _download(rel: str) -> bytes | None:
+    """A catalog file from the data branch, cached on disk (None when it doesn't exist / offline)."""
+    import requests
+    cp = os.path.join(CACHE, _data_version(), rel.replace("/", "__"))
+    if os.path.exists(cp):
+        return open(cp, "rb").read()
+    try:
+        r = requests.get(f"{DATA_URL}/{rel}", timeout=60)
+    except Exception:
+        return None
+    if r.status_code != 200:
+        return None
+    try:
+        os.makedirs(os.path.dirname(cp), exist_ok=True)
+        with open(cp + ".part", "wb") as fh:
+            fh.write(r.content)
+        os.replace(cp + ".part", cp)
+    except OSError:
+        pass  # read-only disk: still usable this run
+    return r.content
+
+
+@lru_cache(maxsize=1)
+def _data_version() -> str:
+    """Version of the published catalog files (new publish -> new cache folder)."""
+    idx = remote_index()
+    return str(idx.get("version") or "0")
+
+
+@lru_cache(maxsize=1)
+def remote_index() -> dict:
+    p = _remote_file("index.json")
+    if os.path.exists(p):
+        return json.load(open(p))
+    import requests
+    try:
+        r = requests.get(f"{DATA_URL}/index.json", timeout=30)
+        return r.json() if r.status_code == 200 else {}
+    except Exception:
+        return {}
 
 
 def _remote_file(*parts: str) -> str:
@@ -142,12 +196,16 @@ def _phash_table():
     """Photo fingerprints of every catalog photo: (uint64 array, [(photo id, set id)])."""
     import numpy as np
     rows = []
-    for i in range(16):
-        part = _read_remote(f"phash-{i}.json")
-        if part is None:
-            break
-        rows += part
-    rows = rows or _read_remote("phash.json")  # older single-file builds
+    files = [f for f, _ in remote_index().get("files", []) if f.startswith("phash")]
+    if files:
+        for f in files:
+            rows += _read_remote(f[: -len(".gz")] if f.endswith(".gz") else f) or []
+    else:
+        for i in range(16):  # older builds: phash-0..n
+            part = _read_remote(f"phash-{i}.json")
+            if part is None:
+                break
+            rows += part
     if not rows:
         return np.zeros(0, dtype=np.uint64), []
     return np.array([int(h, 16) for h, _, _ in rows], dtype=np.uint64), [(im, sid) for _, im, sid in rows]

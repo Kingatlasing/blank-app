@@ -1,0 +1,4 @@
+
+# big catalog files live on the catalog-data branch (data/publish_catalog.py)
+data/catalog/remote/
+data/raw/

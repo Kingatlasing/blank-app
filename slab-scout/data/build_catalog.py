@@ -373,6 +373,21 @@ def build():
         print(" ", s["name"], s["cards"], [ (t["name"], t["print_run"], t["median_raw"]) for t in s["tiers"][:4]])
 
 
+# photo fingerprint groups (the phone loads only the group of the game being scanned)
+PHASH_GROUPS = {"Pokémon": "pokemon", "Yu-Gi-Oh!": "yugioh", "Magic: The Gathering": "magic", "Lorcana": "tcg",
+                "One Piece": "tcg", "Dragon Ball": "tcg", "Digimon": "tcg", "Other TCG": "tcg", "Gundam": "tcg",
+                "Riftbound": "tcg", "Sorcery": "tcg", "Weiss Schwarz": "tcg", "Football": "football", "Baseball": "baseball",
+                "Basketball": "basketball", "Soccer": "soccer", "Hockey": "hockey"}
+
+
+def phash_group(category: str) -> str:
+    if category in PHASH_GROUPS:
+        return PHASH_GROUPS[category]
+    if category in ("Racing", "Wrestling", "UFC", "Golf", "Tennis", "Boxing"):
+        return "othersports"
+    return "nonsport"  # Marvel, Star Wars, Disney, Kakawow, Garbage Pail Kids, music...
+
+
 def write_gz(path: str, obj) -> None:
     import gzip
     with gzip.open(path, "wt", compresslevel=9) as fh:
@@ -427,26 +442,33 @@ def write_phone(sets: dict, cards: list, fields: list, remote_ids: set):
                   if k in wanted and re.fullmatch(r"[0-9a-f]{16}", v[0] if isinstance(v, list) else (v or "")))  # only photos a card uses
         gc.collect()
     del wanted
-    seen, prows = set(), []
+    seen, groups = set(), {}
+    cat_of = {sid: s.get("category", "") for sid, s in sets.items()}
     for r in cards:
         im = (r[9] or "").lstrip("~")
         h = ph.get(im)
         if h and (im, r[0]) not in seen:
             seen.add((im, r[0]))
-            prows.append([h, im, r[0]])
-    # split in 4 parts: one file would pass GitHub's 100 MB limit as the catalog grows
-    PARTS = 4
-    for i in range(PARTS):
-        write_gz(os.path.join(remote, f"phash-{i}.json.gz"), prows[i::PARTS])
-    for old in ("phash.json", "phash.json.gz"):
-        if os.path.exists(os.path.join(remote, old)):
-            os.remove(os.path.join(remote, old))
-    print(f"photo fingerprints: {len(prows)} (of {len(ph)} hashed photos in use)")
+            groups.setdefault(phash_group(cat_of.get(r[0], "")), []).append([h, im, r[0]])
+    # one set of files per game group, so the phone only loads the games being scanned; each part stays well
+    # under GitHub's file size limit
+    for old in glob.glob(os.path.join(remote, "phash*.json*")):
+        os.remove(old)
+    PART = 400_000
+    phash_files = {}
+    for g, rows in sorted(groups.items()):
+        n = max(1, -(-len(rows) // PART))
+        for i in range(n):
+            name = f"phash-{g}-{i}.json.gz"
+            write_gz(os.path.join(remote, name), rows[i::n])
+            phash_files.setdefault(g, []).append(name)
+    print(f"photo fingerprints: {sum(len(v) for v in groups.values())} (of {len(ph)} hashed photos in use) in "
+          + ", ".join(f"{g} {len(v)}" for g, v in sorted(groups.items())))
     import time as _t
     files = [("sets/" + f, os.path.getsize(os.path.join(remote, "sets", f))) for f in sorted(os.listdir(os.path.join(remote, "sets")))]
     files += [("names/" + f, os.path.getsize(os.path.join(remote, "names", f))) for f in sorted(os.listdir(os.path.join(remote, "names")))]
-    files += [(f"phash-{i}.json.gz", os.path.getsize(os.path.join(remote, f"phash-{i}.json.gz"))) for i in range(PARTS)]
-    json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files)},
+    files += [(f, os.path.getsize(os.path.join(remote, f))) for fs in phash_files.values() for f in fs]
+    json.dump({"version": _t.strftime("%Y%m%d%H%M%S"), "files": files, "bytes": sum(b for _, b in files), "phash": phash_files},
               open(os.path.join(remote, "index.json"), "w"), separators=(",", ":"))
     print(f"phone: {len(local)} cards bundled, {n_sets} sets + {n_shards} name shards downloadable")
 

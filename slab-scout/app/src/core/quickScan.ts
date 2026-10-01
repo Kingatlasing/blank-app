@@ -32,7 +32,7 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
   let byPicture = false;
   if (!cm.byCode) {
     try {
-      const pm = await photoLookup(phash);
+      const pm = await photoLookup(phash, 12, 8, game === "Auto" ? "" : game);
       if (pm.length && pm[0].distance <= 6) {
         const pics = pm.map((m) => m.card);
         cm.cards = [...pics, ...cm.cards.filter((c) => !pics.some((p) => p.key === c.key))];
