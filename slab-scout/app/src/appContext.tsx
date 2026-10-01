@@ -1,8 +1,9 @@
 import React, { createContext, useContext } from 'react';
 import type { Store, VaultRecord } from './core/community';
 import type { Settings } from './types';
+import type { Profile } from './storage';
 
-export type Tab = 'home' | 'scan' | 'explore' | 'collection' | 'settings';
+export type Tab = 'home' | 'collection' | 'scan' | 'feed' | 'explore' | 'settings';
 
 export interface AppCtx {
   settings: Settings;
@@ -17,6 +18,16 @@ export interface AppCtx {
   openSet: (id: string) => void;
   openCard: (key: string) => void;
   goTab: (t: Tab) => void;
+  /** open Explore with the search box focused */
+  openSearch: () => void;
+  /** 'FREE' | 'AI BOOST' | 'ADD KEY' */
+  modeLabel: string;
+  openSettings: () => void;
+  /** name / photo / cover shown on Discover and Collection (this phone only) */
+  profile: Profile;
+  setProfile: (p: Profile) => void;
+  /** display name: the profile name, else "My Collection" */
+  displayName: string;
 }
 
 export const Ctx = createContext<AppCtx | null>(null);
