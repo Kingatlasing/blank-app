@@ -171,8 +171,56 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
         _colour_check(cands, vision.tight_card(f["card"], f["edges"]))
     except Exception:
         pass
+    try:
+        _recut(f, cands[0] if cands else None)
+    except Exception:
+        pass
     return {"front": f, "back": b, "parsed": parsed, "cands": cands, "fakes": [c for c in comm if c.get("is_fake") and c["distance"] <= pipeline.MATCH_STRONG],
             "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": g}
+
+
+def _ref_image(x: dict | None):
+    """A clean picture of the matched card (large price-guide photo, else the official database image)."""
+    if not x:
+        return None
+    url = ""
+    if x["kind"] == "catalog" and x["card"].img and not x["card"].img.startswith("~"):
+        url = catalog.image_url(x["card"], 1600)[0]
+    elif x["kind"] == "tcgdb":
+        url = (x.get("c") or {}).get("image_url", "")
+    raw = databases.fetch_image(url) if url else None
+    if not raw and x["kind"] == "catalog" and x["card"].img and not x["card"].img.startswith("~"):
+        raw = databases.fetch_image(catalog.image_url(x["card"], 240)[0])
+    if not raw:
+        return None
+    from PIL import Image
+    import io
+    return Image.open(io.BytesIO(raw)).convert("RGB")
+
+
+def _recut(f: dict, x: dict | None) -> None:
+    """Re-cut the card from the photo at its exact edges now that we know which card it is: align to a clean
+    picture of the same card (sleeves, hands and backgrounds can't fool it), snap each side to the real cut edge
+    using the card's border colour, then measure centering and condition again on that crop."""
+    if not f.get("full"):
+        return
+    ref = _ref_image(x)
+    if ref is None:
+        return
+    r = vision.recut_with_reference(f["full"], ref)
+    if r is None:
+        return
+    card, info = r
+    if not info.get("snapped"):
+        return  # the design alone can't say where this card's edges are (that would copy the reference's centering)
+    f["card_first"] = f["card"]
+    f["card"] = card
+    f["found"] = True
+    f["edges"] = vision.find_lines(card, True)
+    L = f["edges"]
+    f["centering"] = vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])
+    f["inspect"] = condition.inspect_card(vision.tight_card(card, L))
+    f["recut"] = {"measured": info.get("measured", []), "border_colour": info.get("bc")}
 
 
 @st.cache_data(ttl=300, show_spinner=False)

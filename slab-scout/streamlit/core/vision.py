@@ -321,9 +321,11 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
         # tips): the photo's own border IS the card edge
         return (img.resize((CARD_W, CARD_H)) if w <= h else img.rotate(90, expand=True).resize((CARD_W, CARD_H))), True
     best = _best_quad(small)
+    detect_and_crop.pts = None
     if best is None:
         return _center_crop(img), False
     pts = _order(best) / s
+    detect_and_crop.pts = pts
     tight = _warp(rgb, pts)
     refined = _refine(tight)
     if refined is not tight:
@@ -337,6 +339,259 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
         if snapped is not None:
             return _refine(snapped), True
     return tight, True
+
+
+def border_snap(rgb: np.ndarray, pts: np.ndarray, margin: float = 0.10, expect_bc=None, debug: dict | None = None, keep_seed_sides: bool = False):
+    """Put the outline exactly on the card's cut edge, using the card's border colour.
+
+    The first outline can land on the printed frame inside the border (full-art and silver-border cards), on a
+    sleeve, or partly on a hand. Every card has one border colour running all the way round (yellow / silver /
+    white / black / the blue back), so on each side, among the straight colour edges near the first outline, the
+    real card edge is the outermost one with that border colour just inside it and something different (table,
+    hand, sleeve, shadow) just outside. The border colour is the one most sides agree on (or the colour learned
+    for this set, `expect_bc`). Returns (card image 630x880, new corner points) or None to keep the first crop."""
+    loose = np.array(_warp(rgb, _expand(pts, margin), replicate=True)).astype("float32")
+    h, w = loose.shape[:2]
+    lab = cv2.cvtColor(loose.astype("uint8"), cv2.COLOR_RGB2LAB).astype("float32")
+    sides = {}
+    for side in ("left", "right", "top", "bottom"):
+        along = h if side in ("left", "right") else w
+        across = w if side in ("left", "right") else h
+        band = int(across * margin * 2.4)
+        view = {"left": lab, "right": lab[:, ::-1], "top": lab.transpose(1, 0, 2), "bottom": lab[::-1].transpose(1, 0, 2)}[side]
+        rgbv = {"left": loose, "right": loose[:, ::-1], "top": loose.transpose(1, 0, 2), "bottom": loose[::-1].transpose(1, 0, 2)}[side]
+        per_line = []
+        for t in np.linspace(0.18, 0.82, 33):
+            i = int(t * (along - 1))
+            per_line.append((i, _steps(rgbv[max(0, i - 1): i + 2, :band].mean(axis=0))))
+        allpos = sorted(p for _, st in per_line for p, _ in st)
+        cands = []
+        for d0 in sorted(set(int(p / 4) for p in allpos)):
+            pts_, strg = [], []
+            for i, st in per_line:
+                near = [(p, g) for p, g in st if abs(p - (d0 * 4 + 2)) <= 5]
+                if near:
+                    p, g = max(near, key=lambda x: x[1])
+                    pts_.append((float(i), p + 0.5))
+                    strg.append(g)
+            f = _fit_edge(pts_) if len(pts_) >= 0.35 * len(per_line) else None  # fingers may cover part of a side
+            if f and f[2] <= 2.5:
+                depth = f[1] + f[0] * along / 2
+                k = max(3, int(across * 0.012))
+                d = int(round(depth))
+                inside = view[int(along * 0.2):int(along * 0.8), d + 2:d + 2 + k].reshape(-1, 3)
+                outside = view[int(along * 0.2):int(along * 0.8), max(0, d - 2 - k):max(1, d - 2)].reshape(-1, 3)
+                if len(inside) and len(outside):
+                    ci, co = np.median(inside, axis=0), np.median(outside, axis=0)
+                    spread = float(np.median(np.abs(inside - ci).sum(axis=1)))  # a border is one even colour
+                    cands.append({"depth": depth, "g": float(np.median(strg)), "fit": f, "in": ci, "out": co, "even": spread})
+        # dedupe: same edge seen from neighbouring clusters
+        cands.sort(key=lambda c: c["depth"])
+        merged = []
+        for c in cands:
+            if merged and abs(c["depth"] - merged[-1]["depth"]) < 4:
+                if c["g"] > merged[-1]["g"]:
+                    merged[-1] = c
+                continue
+            merged.append(c)
+        sides[side] = merged
+    if debug is not None:
+        debug["cands"] = {k: [(round(c["depth"]), round(c["g"]), [round(float(x)) for x in c["in"]], [round(float(x)) for x in c["out"]], round(c["even"])) for c in v] for k, v in sides.items()}
+    if any(not v for v in sides.values()):
+        return None
+    # colour difference with lightness counting half (shadow / glare change brightness more than hue)
+    dist = lambda a, b: float(np.linalg.norm((np.asarray(a, float) - np.asarray(b, float)) * (0.5, 1, 1)))
+    # what surrounds the card (table, hand, sleeve over the table): the border colour can't be that
+    rb = max(3, int(min(h, w) * 0.025))
+    surround = np.median(np.concatenate([lab[:rb].reshape(-1, 3), lab[-rb:].reshape(-1, 3), lab[:, :rb].reshape(-1, 3), lab[:, -rb:].reshape(-1, 3)]), axis=0)
+    hyps = [c["in"] for v in sides.values() for c in v if c["even"] < 30]
+    if expect_bc is not None:
+        e = cv2.cvtColor(np.uint8([[expect_bc]]), cv2.COLOR_RGB2LAB)[0, 0].astype("float32")
+        hyps = [e] + hyps
+    def quad_of(fs):
+        (ml, cl, _), (mr, cr, _), (mt, ct, _), (mb, cb, _) = (fs[s_] for s_ in ("left", "right", "top", "bottom"))
+        L_ = lambda y: ml * y + cl
+        R_ = lambda y: w - 1 - (mr * y + cr)
+        T_ = lambda x: mt * x + ct
+        B_ = lambda x: h - 1 - (mb * x + cb)
+
+        def cr_(x_of_y, y_of_x):
+            y = h / 2
+            for _ in range(20):
+                x = x_of_y(y)
+                y = y_of_x(x)
+            return x, y
+        q = np.array([cr_(L_, T_), cr_(R_, T_), cr_(R_, B_), cr_(L_, B_)], dtype="float32")
+        wd_ = (np.linalg.norm(q[1] - q[0]) + np.linalg.norm(q[2] - q[3])) / 2
+        ht_ = (np.linalg.norm(q[3] - q[0]) + np.linalg.norm(q[2] - q[1])) / 2
+        return q, (abs(wd_ / ht_ - CARD_W / CARD_H) if ht_ else 9)
+
+    import itertools
+    best = None
+    for hb in hyps:
+        opts = {}
+        for side, v in sides.items():
+            top_g = max(c["g"] for c in v)
+            opts[side] = [c for c in v if dist(c["in"], hb) < 22 and dist(c["out"], hb) > 18 and c["g"] >= 0.2 * top_g][:3]
+        missing = [k for k, o in opts.items() if not o]
+        if missing and (not keep_seed_sides or len(missing) > 2):
+            continue
+        for k in missing:  # a side hidden by fingers / glare: keep the seed outline there (reference-aligned)
+            along = h if k in ("left", "right") else w
+            across = w if k in ("left", "right") else h
+            seed_depth = across * margin / (1 + 2 * margin)
+            opts[k] = [{"fit": (0.0, seed_depth, 0.0), "g": 0.0, "out": hb + 100, "in": hb, "seed": True}]
+        # the four edges must make a card-shaped rectangle; among those, the outermost lines with the most contrast
+        for combo in itertools.product(*(opts[s_] for s_ in ("left", "right", "top", "bottom"))):
+            pick = dict(zip(("left", "right", "top", "bottom"), combo))
+            _, err = quad_of({k: c["fit"] for k, c in pick.items()})
+            rank = sum(i for s_, c in pick.items() for i, cc in enumerate(opts[s_]) if cc is c)  # 0 = outermost
+            score = -40 * err - 0.25 * rank + sum(min(dist(c["out"], hb), 60) / 60 for c in combo)
+            if err < 0.035 and (best is None or score > best[0]):
+                best = (score, pick, hb)
+    if best is None:
+        return None
+    fits = {k: v["fit"] for k, v in best[1].items()}
+    (ml, cl, _), (mr, cr, _), (mt, ct, _), (mb, cb, _) = (fits[s_] for s_ in ("left", "right", "top", "bottom"))
+    L = lambda y: ml * y + cl
+    R = lambda y: w - 1 - (mr * y + cr)
+    T = lambda x: mt * x + ct
+    B = lambda x: h - 1 - (mb * x + cb)
+
+    def corner(x_of_y, y_of_x):
+        y = h / 2
+        for _ in range(20):
+            x = x_of_y(y)
+            y = y_of_x(x)
+        return x, y
+
+    src = np.array([corner(L, T), corner(R, T), corner(R, B), corner(L, B)], dtype="float32")
+    wd = (np.linalg.norm(src[1] - src[0]) + np.linalg.norm(src[2] - src[3])) / 2
+    ht = (np.linalg.norm(src[3] - src[0]) + np.linalg.norm(src[2] - src[1])) / 2
+    if debug is not None:
+        debug.update(ratio=wd / ht if ht else 0, size=(wd / w, ht / h), bc=[round(float(x)) for x in best[2]], score=float(best[0]),
+                     measured=[k for k, c in best[1].items() if not c.get("seed")])
+    if not ht or abs(wd / ht - CARD_W / CARD_H) > 0.035 or wd < w * 0.70 or ht < h * 0.70:
+        return None
+    dst = np.array([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]], dtype="float32")
+    out = cv2.warpPerspective(loose.astype("uint8"), cv2.getPerspectiveTransform(src, dst), (CARD_W, CARD_H), flags=cv2.INTER_CUBIC,
+                              borderMode=cv2.BORDER_REPLICATE)
+    # back to photo coordinates
+    lw = _expand(pts, margin)
+    Mi = cv2.getPerspectiveTransform(np.array([[0, 0], [w - 1, 0], [w - 1, h - 1], [0, h - 1]], dtype="float32"), lw)
+    new = cv2.perspectiveTransform(src.reshape(-1, 1, 2), Mi).reshape(-1, 2)
+    return Image.fromarray(out), new
+
+
+def align_to_reference(rgb: np.ndarray, ref: Image.Image, max_side: int = 1400) -> np.ndarray | None:
+    """Where exactly the card is in the photo, found by matching it against a clean picture of the same card (the
+    price-guide / official image): SIFT features + a RANSAC homography map the reference card's four corners onto
+    the photo. Works through sleeves, glare, fingers over part of the card and busy backgrounds, because it
+    follows the printed design itself. Returns the four corners in photo pixels (tl, tr, br, bl) or None."""
+    h, w = rgb.shape[:2]
+    s = min(1.0, max_side / max(h, w))
+    g = cv2.cvtColor(cv2.resize(rgb, (int(w * s), int(h * s))) if s < 1 else rgb, cv2.COLOR_RGB2GRAY)
+    r = cv2.cvtColor(np.asarray(ref.convert("RGB").resize((CARD_W, CARD_H))), cv2.COLOR_RGB2GRAY)
+    sift = cv2.SIFT_create(nfeatures=3000)
+    k1, d1 = sift.detectAndCompute(r, None)
+    k2, d2 = sift.detectAndCompute(g, None)
+    if d1 is None or d2 is None or len(k1) < 30 or len(k2) < 30:
+        return None
+    matches = cv2.FlannBasedMatcher(dict(algorithm=1, trees=5), dict(checks=50)).knnMatch(d1, d2, k=2)
+    good = [m for m, n in (p for p in matches if len(p) == 2) if m.distance < 0.75 * n.distance]
+    if len(good) < 25:
+        return None
+    src = np.float32([k1[m.queryIdx].pt for m in good]).reshape(-1, 1, 2)
+    dst = np.float32([k2[m.trainIdx].pt for m in good]).reshape(-1, 1, 2)
+    H, inl = cv2.findHomography(src, dst, cv2.RANSAC, 4.0)
+    if H is None or inl is None or int(inl.sum()) < 20:
+        return None
+    corners = np.float32([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]]).reshape(-1, 1, 2)
+    q = cv2.perspectiveTransform(corners, H).reshape(-1, 2) / s
+    if not cv2.isContourConvex(q.reshape(-1, 1, 2).astype(np.float32)):
+        return None
+    wd = (np.linalg.norm(q[1] - q[0]) + np.linalg.norm(q[2] - q[3])) / 2
+    ht = (np.linalg.norm(q[3] - q[0]) + np.linalg.norm(q[2] - q[1])) / 2
+    if not ht or abs(wd / ht - CARD_W / CARD_H) > 0.06 or wd < 0.15 * w:
+        return None
+    return q.astype("float32")
+
+
+def border_colour(img: Image.Image) -> tuple[int, int, int]:
+    """Typical colour of a clean card picture's outer border (the band 1-3% in from the edge, sides only, away
+    from the corners)."""
+    a = np.asarray(img.convert("RGB").resize((CARD_W, CARD_H)))
+    band = np.concatenate([a[60:-60, 7:20].reshape(-1, 3), a[60:-60, -20:-7].reshape(-1, 3), a[7:16, 60:-60].reshape(-1, 3), a[-16:-7, 60:-60].reshape(-1, 3)])
+    return tuple(int(x) for x in np.median(band, axis=0))
+
+
+def recut_with_reference(img: Image.Image, ref: Image.Image) -> tuple[Image.Image, dict] | None:
+    """The card cut out of the photo at its exact edges, using a clean picture of the same card: align the
+    printed design (align_to_reference), then snap each side onto the real cut edge just around it with the
+    card's own border colour (border_snap). The cut can sit a little off the design (that IS the centering), so
+    the snap looks a few % either side of where a perfectly cut card's edge would be."""
+    rgb = np.asarray(img.convert("RGB"))
+    q = align_to_reference(rgb, ref)
+    if q is None:
+        return None
+    info = {"aligned": True}
+    snapped = border_snap(rgb, q, margin=0.045, expect_bc=border_colour(ref), debug=info, keep_seed_sides=True)
+    if snapped is not None:
+        info["snapped"] = True
+        return snapped[0], info
+    # no clear cut edge (sleeve glare, fingers): the design alignment alone
+    dst = np.array([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]], dtype="float32")
+    out = cv2.warpPerspective(rgb, cv2.getPerspectiveTransform(q, dst), (CARD_W, CARD_H), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    info["snapped"] = False
+    return Image.fromarray(out), info
+
+
+def grabcut_quad(rgb: np.ndarray, pts: np.ndarray, size: int = 700) -> np.ndarray | None:
+    """The card (or its sleeve) separated from hands and background by colour (GrabCut), started from a first
+    outline: inside it = probably card, well outside = background. Returns the rotated box around it in photo
+    coordinates."""
+    h, w = rgb.shape[:2]
+    s = size / max(h, w)
+    small = cv2.resize(rgb, (int(w * s), int(h * s)))
+    q = (pts * s).astype("float32")
+    mask = np.full(small.shape[:2], cv2.GC_BGD, np.uint8)
+    cv2.fillConvexPoly(mask, _expand(q, 0.12).astype(np.int32), cv2.GC_PR_BGD)
+    cv2.fillConvexPoly(mask, q.astype(np.int32), cv2.GC_PR_FGD)
+    cv2.fillConvexPoly(mask, _expand(q, -0.15).astype(np.int32), cv2.GC_FGD)
+    try:
+        cv2.grabCut(small, mask, None, np.zeros((1, 65)), np.zeros((1, 65)), 4, cv2.GC_INIT_WITH_MASK)
+    except cv2.error:
+        return None
+    m = cv2.morphologyEx(((mask == 1) | (mask == 3)).astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
+    cs, _ = cv2.findContours(m, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not cs:
+        return None
+    c = max(cs, key=cv2.contourArea)
+    return _order(cv2.boxPoints(cv2.minAreaRect(c)).astype("float32")) / s
+
+
+def precise_card(img: Image.Image, expect_bc=None) -> tuple[Image.Image, np.ndarray] | None:
+    """The card cut exactly at its edges in a photo with hands / sleeves / clutter: start from the first outline
+    and a GrabCut silhouette, then snap every side to the outermost straight edge with the card's border colour
+    inside it (border_snap). None when it can't do better than detect_and_crop."""
+    rgb = np.asarray(img.convert("RGB"))
+    p0 = getattr(detect_and_crop, "pts", None)
+    if p0 is None:
+        return None
+    seeds = [p0]
+    g = grabcut_quad(rgb, p0)
+    if g is not None:
+        seeds.insert(0, g)
+    best = None
+    for seed in seeds:
+        dbg: dict = {}
+        r = border_snap(rgb, seed, margin=0.08, expect_bc=expect_bc, debug=dbg)
+        if r is None:
+            continue
+        area = cv2.contourArea(r[1].reshape(-1, 1, 2).astype("float32"))
+        if best is None or area > best[0]:  # the card's cut edge is the outermost border-coloured rectangle
+            best = (area, r)
+    return best[1] if best else None
 
 
 def _expand(pts: np.ndarray, f: float) -> np.ndarray:

@@ -158,9 +158,16 @@ def _grade(res: dict, x: dict | None) -> dict:
     tips = list(fi.photo_notes) + ([] if b else ["Add a photo of the back: PSA and TAG grade centering, corners and edges on both sides."])
     if not f.get("found"):
         tips.insert(0, "The card's outline wasn't found: lay it flat on a plain, darker background with all four corners showing.")
+    rc = f.get("recut")
+    if rc:
+        hidden = [k for k in ("left", "right", "top", "bottom") if k not in rc.get("measured", [])]
+        if hidden:
+            tips.insert(0, f"The {', '.join(hidden)} edge was covered (fingers / glare), so centering on that side is less sure: hold the card by its edges or lay it flat.")
+    g_recut = bool(rc)
     if min(f["full"].size) < 700:
         tips.append("Photo is small: take it with the camera, card filling most of the frame, for corners and edges to be judged.")
     g["tips"] = tips
+    g["recut"] = g_recut  # cut out at its exact edges by matching it with a clean picture of the same card
     # how much to trust it: the four things that most often make a photo grade wrong
     issues = sum([not f.get("found"), not fi.photo_ok, min(f["full"].size) < 700, not b])
     g["confidence"] = "high" if issues == 0 else "medium" if issues == 1 else "low"
