@@ -10,7 +10,7 @@ import { Candidate, DB_GAMES, soldLinks } from '../core/databases';
 import { cardBack, identify, Scored } from '../core/identify';
 import { gradeText, nameGuess, readLabel, SlabInfo } from '../core/slab';
 import { CatalogRow, CardFields, Sale, Store } from '../core/community';
-import { CARD_STYLES, CONDITION_HELP, CONDITION_OPTIONS, GUIDE, GradeResult, cardStyle, estimate, graderCaps, subgradeToOption } from '../core/grading';
+import { CARD_STYLES, CONDITION_HELP, CONDITION_OPTIONS, GUIDE, GradeResult, cardStyle, allGraders, estimate, graderCaps, subgradeToOption } from '../core/grading';
 import { CardStyle, Centering, centeringText, centeringWorst, cropAndTrim, findLines, fingerprintCard, fingerprintRemote, hashDistance, Lines, measureCentering, pixels, thumbnail } from '../core/imageTools';
 import { ocrAvailable, parseText, readText } from '../core/ocr';
 import { analyzeWithAI } from '../core/ai';
@@ -36,6 +36,8 @@ const MATCH_WEAK = 16;
 const OFFICIAL_OK = 16;
 const OFFICIAL_BAD = 24;
 const EMPTY: CardFields = { game: '', name: '', set: '', number: '', year: '', brand: '', rarity: '', variant: '', card_type: 'Base' };
+
+const SPORTS_GAMES = ['Sports', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Racing', 'Wrestling', 'UFC', 'Golf', 'Tennis', 'Boxing'];
 
 interface Shot {
   uri: string;
@@ -1232,6 +1234,19 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               <Slab who="PSA · estimate" grade={grade.psa} label={grade.psa_label} sub={grade.psa_range ? `Likely ${grade.psa_range}` : undefined} />
               <Slab who="TAG-style · est." grade={grade.tag_grade} label={grade.tag_label} sub={grade.tag_score ? `Score ${grade.tag_score} / 1000` : undefined} />
             </View>
+            {grade.method !== 'ai' ? (
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                {Object.entries(allGraders({ corners: grade.sub.corners ?? autoSub.corners, edges: grade.sub.edges ?? autoSub.edges, surface: grade.sub.surface ?? autoSub.surface },
+                  sg && useSrvGrade && sg.centering.front ? sg.centering.front.worst : centeringWorst(cen),
+                  sg && useSrvGrade && sg.centering.back ? sg.centering.back.worst : backCen ? centeringWorst(backCen) : null,
+                  !SPORTS_GAMES.includes(fields.game))).map(([k, v]) => (
+                  <View key={k} style={{ backgroundColor: C.surface2, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10 }}>
+                    <Text style={S.eyebrow}>{k}</Text>
+                    <Text style={{ color: C.ink, fontWeight: '800', fontSize: 16 }}>{v.grade} <Text style={[S.muted, { fontWeight: '600' }]}>{v.label}</Text></Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             <Text style={S.muted}>
               {Object.entries(grade.sub || {}).filter(([, v]) => v != null).map(([k, v]) => `${k} ${v}`).join(' · ')}
               {est.centering_cap && est.centering_cap < 10 ? ` · centering alone caps PSA at ${est.centering_cap}` : ''}

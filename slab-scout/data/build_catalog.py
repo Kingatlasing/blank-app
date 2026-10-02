@@ -590,7 +590,51 @@ def build_colours():
     print(f"colour profiles: {len(out)} sets, {sum(len(v) for v in out.values())} parallels")
 
 
+# Factory corner radius per game: (radius mm, card width mm), same table as streamlit/core/condition.py
+CORNER_SPEC = {"Pokémon": (3.0, 63.0), "Magic: The Gathering": (3.0, 63.0), "Yu-Gi-Oh!": (2.5, 59.0), "Lorcana": (3.0, 63.0),
+               "One Piece": (3.0, 63.0), "sports": (3.175, 63.5)}
+
+
+def build_corners():
+    """How round each set's corners are, measured on its price-guide photos (raw/slabscout-corners*.json:
+    {set: [tl, tr, bl, br, photo w, photo h, photo id]}, radius / width * 1000, -1 = not measurable; see the
+    corners.js worker). Photos blur the corner a little, so the measurements are calibrated per game against the
+    makers' published radius (the median set of each game = its spec). Square-cut vintage sets come out near 0.
+    Writes catalog/corner_profiles.json: {set: [radius per 1000 of the card width, corners measured]}."""
+    raw = {}
+    for f in glob.glob(os.path.join(RAW, "slabscout-corners*.json*")):
+        raw.update(load_json(f))
+    if not raw:
+        return
+    sets = {x["id"]: x for x in json.load(open(os.path.join(OUT, "sets.json")))}
+    meas, groups = {}, {}
+    for sid, v in raw.items():
+        good = sorted(x for x in (v[:4] if isinstance(v, list) else []) if isinstance(x, (int, float)) and x >= 0)
+        if len(good) < 2 or sid not in sets:
+            continue
+        r = good[len(good) // 2]
+        meas[sid] = (r, len(good))
+        cat = sets[sid].get("category", "")
+        groups.setdefault(cat if cat in CORNER_SPEC else "sports", []).append(r)
+    factor = {}
+    for g, rs in groups.items():
+        rs = sorted(x for x in rs if x > 0)
+        if len(rs) >= 20:
+            mm, wmm = CORNER_SPEC[g]
+            factor[g] = (mm / wmm * 1000) / rs[len(rs) // 2]
+    out = {}
+    for sid, (r, n) in meas.items():
+        cat = sets[sid].get("category", "")
+        f = factor.get(cat if cat in CORNER_SPEC else "sports")
+        if f:
+            out[sid] = [round(r * f, 1), n]
+    json.dump(out, open(os.path.join(OUT, "corner_profiles.json"), "w"), separators=(",", ":"))
+    sq = sum(1 for v in out.values() if v[0] < 15)
+    print(f"corner profiles: {len(out)} sets ({sq} near-square), calibration {({k: round(v, 2) for k, v in factor.items()})}")
+
+
 if __name__ == "__main__":
     build()
     build_borders()
     build_colours()
+    build_corners()

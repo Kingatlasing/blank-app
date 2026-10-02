@@ -123,12 +123,16 @@ def _grade(res: dict, x: dict | None) -> dict:
     front_c = vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"]) if L else f["centering"]
     off = (x.get("c") or {}).get("_official") if x and x["kind"] == "tcgdb" else None
     rad = condition.corner_radius_px(game, style)
+    if sid and style != "vintage":
+        rad = catalog.corner_radius_px(sid) or rad  # this set's own corner shape, measured on its photos
     fi = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=style == "full_art")
     bi = (b or {}).get("inspect")
     subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     back_c = b["centering"] if b else None
-    g = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs["corners"], subs["edges"], subs["surface"])
+    g = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs["corners"], subs["edges"], subs["surface"],
+                         tcg=game not in SPORTS)
     g = {k: (_num(v) if isinstance(v, float) else v) for k, v in g.items()}
+    g["corner_radius_px"] = rad
     g["method"] = "automatic inspection"
     g["style"] = style
     g["centering"] = {"front": _centering_json(front_c), "back": _centering_json(back_c)}

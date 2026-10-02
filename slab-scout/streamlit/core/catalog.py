@@ -282,6 +282,23 @@ def border_profile(set_id: str, variant: str = "") -> dict | None:
 
 
 @lru_cache(maxsize=1)
+def _corners() -> dict:
+    d = _dir()
+    p = os.path.join(d, "corner_profiles.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else {}
+
+
+def corner_radius_px(set_id: str, width_px: int = 630) -> int | None:
+    """This set's factory corner radius in pixels on a card `width_px` wide, as measured on its price-guide photos
+    (None when it wasn't measured). Lets the corner check tell a square-cut vintage card or a set with tighter
+    corners from wear."""
+    v = _corners().get(set_id)
+    if not v or v[1] < 2:
+        return None
+    return int(round(v[0] / 1000 * width_px))
+
+
+@lru_cache(maxsize=1)
 def colour_profiles() -> dict:
     """{set: {parallel: colour signature}} learned from the price-guide photos of each parallel
     (see core/colour.py)."""

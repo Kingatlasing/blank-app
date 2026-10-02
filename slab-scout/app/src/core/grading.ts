@@ -114,3 +114,61 @@ export const GUIDE: [string, string][] = [
   ['Full art / die-cut / vintage', 'Full art: judged on the thin frame, more forgiving. Die-cut: no special rule; shaped edges held to the normal standard. Vintage: square-cut corners are not a flaw.'],
   ['Autographs', 'Authenticators (PSA/DNA, JSA, Beckett) compare with known examples of the signature, ink and flow. PSA auto 10 = bold, no skips; 9 = a very light skip; 8 = more noticeable skip or slight fading. Maker-certified autos are guaranteed by the maker.'],
 ];
+
+/* ---------- every company's grade from the same measurements (same rules as core/grading.py all_graders) ---------- */
+export interface CompanyGrade {
+  grade: string;
+  label: string;
+  note?: string;
+  sub?: Record<string, number>;
+}
+const HALF: Record<'BGS' | 'CGC' | 'SGC', Record<string, string>> = {
+  BGS: { '10': 'Pristine', '9.5': 'Gem Mint', '9': 'Mint', '8.5': 'NM-MT+', '8': 'NM-MT', '7.5': 'NM+', '7': 'NM', '6.5': 'EX-MT+', '6': 'EX-MT', '5.5': 'EX+', '5': 'EX', '4.5': 'VG-EX+', '4': 'VG-EX', '3.5': 'VG+', '3': 'VG', '2.5': 'G+', '2': 'Good', '1.5': 'Fair', '1': 'Poor' },
+  CGC: { '10': 'Gem Mint', '9.5': 'Mint+', '9': 'Mint', '8.5': 'NM/Mint+', '8': 'NM/Mint', '7.5': 'Near Mint+', '7': 'Near Mint', '6.5': 'Ex/NM+', '6': 'Ex/NM', '5.5': 'Excellent+', '5': 'Excellent', '4.5': 'VG/Ex+', '4': 'VG/Ex', '3.5': 'Very Good+', '3': 'Very Good', '2.5': 'Good+', '2': 'Good', '1.5': 'Fair', '1': 'Poor' },
+  SGC: { '10': 'Gem Mint', '9.5': 'Mint+', '9': 'Mint', '8.5': 'NM-MT+', '8': 'NM-MT', '7.5': 'NM+', '7': 'NM', '6.5': 'EX-NM+', '6': 'EX-NM', '5.5': 'EX+', '5': 'EX', '4.5': 'VG-EX+', '4': 'VG-EX', '3.5': 'VG+', '3': 'VG', '2.5': 'G+', '2': 'Good', '1.5': 'Fair', '1': 'Poor' },
+};
+const half = (x: number) => Math.max(1, Math.min(10, Math.round(x * 2) / 2));
+function companyCap(comp: string, front: number | null, back: number | null, tcg = true): number {
+  if (front == null) return 10;
+  for (const [label, f, b0] of GRADERS[comp]) {
+    const b = comp === 'TAG' ? TAG_BACK[tcg ? 'tcg' : 'sports'][label] ?? 100 : b0;
+    if (front <= f && (back == null || b == null || back <= b)) return label.includes('Pristine') ? 10.5 : parseFloat(label);
+  }
+  return 4;
+}
+function bgsCentering(front: number | null, back: number | null): number {
+  const rows: [number, number, number][] = [[10, 50, 55], [9.5, 55, 60], [9, 55, 70], [8.5, 60, 80], [8, 60, 80], [7, 65, 90], [6, 70, 95], [5, 75, 95], [4, 80, 100]];
+  if (front == null) return 9.5;
+  for (const [g, f, b] of rows) if (front <= f && (back == null || back <= b)) return g;
+  return 3;
+}
+/** Beckett: Black Label = four 10s; Pristine = all 9.5+ with three 10s; Gem Mint 9.5 = all 9+ with three 9.5+;
+ * otherwise the lowest subgrade sets the floor and the second-lowest caps it (at most half a grade above the lowest). */
+export function bgsOverall(sub: Record<string, number>): [number, string] {
+  const v = Object.values(sub).sort((a, b) => a - b);
+  if (v.every((x) => x >= 10)) return [10, 'Pristine (Black Label)'];
+  if (v[0] >= 9.5 && v.filter((x) => x >= 10).length >= 3) return [10, 'Pristine'];
+  if (v[0] >= 9 && v.filter((x) => x >= 9.5).length >= 3) return [9.5, 'Gem Mint'];
+  const g = half(Math.min(v[1], v[0] + 0.5));
+  return [g, HALF.BGS[String(g)] || ''];
+}
+export function allGraders(sub: { corners: number; edges: number; surface: number }, front: number | null, back: number | null, tcg = true): Record<string, CompanyGrade> {
+  const cond = [sub.corners, sub.edges, sub.surface];
+  const worst = Math.min(...cond);
+  const blended = half(0.75 * worst + 0.25 * (cond.reduce((a, b) => a + b, 0) / 3));
+  const out: Record<string, CompanyGrade> = {};
+  const cap = psaCenteringCap(front, back);
+  const psa = Math.min(cap, worst >= 10 ? 10 : Math.max(1, Math.floor(worst)));
+  out.PSA = { grade: String(psa), label: PSA_LABELS[psa] || '', note: `centering allows up to ${cap}` };
+  const bs = { centering: bgsCentering(front, back), corners: half(sub.corners), edges: half(sub.edges), surface: half(sub.surface) };
+  const [bg, bl] = bgsOverall(bs);
+  out.BGS = { grade: String(bg), label: bl, sub: bs };
+  for (const comp of ['CGC', 'SGC'] as const) {
+    const c = companyCap(comp, front, back, tcg);
+    const g = Math.min(blended, Math.min(c, 10));
+    out[comp] = g >= 10 && c >= 10.5 && worst >= 10 ? { grade: '10', label: 'Pristine' } : { grade: String(g), label: HALF[comp][String(g)] || '', note: `centering allows up to ${c >= 10 ? 10 : c}` };
+  }
+  const t = estimate(front, back, sub.corners, sub.edges, sub.surface);
+  out.TAG = { grade: t.tag_grade || '', label: t.tag_label || '', note: `score ${t.tag_score} / 1000` };
+  return out;
+}

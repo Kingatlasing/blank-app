@@ -634,6 +634,9 @@ def _inspection(scan: dict, x: dict):
     L = _user_lines(scan)
     off = (x.get("c") or {}).get("_official") if x["kind"] == "tcgdb" else None
     rad = condition.corner_radius_px(game_of(scan), scan.get("_style", ""))
+    sid = x["card"].set_id if x["kind"] == "catalog" else ""
+    if sid and scan.get("_style") != "vintage":
+        rad = catalog.corner_radius_px(sid) or rad  # this set's own corner shape, measured on its photos
     foil = scan.get("_style") == "full_art"
     ck = "_insp_" + str((x.get("c") or {}).get("ref_id") if off is not None else "") + f"_{rad}_{foil}_" + "_".join(str(round(L[k])) for k in ("ol", "ot", "or", "ob"))
     if ck not in scan:
@@ -750,7 +753,8 @@ def _grade_auth(scan: dict, x: dict):
             picked[lab], overridden = sel, True
         else:
             picked[lab] = auto[lab]
-    grade = grading.estimate(front_c.worst(), back_c.worst() if back_c else None, picked["corners"], picked["edges"], picked["surface"])
+    grade = grading.estimate(front_c.worst(), back_c.worst() if back_c else None, picked["corners"], picked["edges"], picked["surface"],
+                             tcg=game_of(scan) not in ("Sports", "Baseball", "Basketball", "Football", "Soccer", "Hockey"))
     grade["method"] = "inspection + your checklist" if overridden else "automatic inspection"
     grade["centering"] = {"front": front_c.text(), "back": back_c.text() if back_c else ""}
     aires = scan.get("ai") or {}
@@ -801,6 +805,12 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
         caps = grading.grader_caps(_worst_of(grade["centering"]["front"]), _worst_of(grade["centering"].get("back", "")),
                                    tcg=game_of(scan) not in ("Sports", "Baseball", "Basketball", "Football", "Soccer", "Hockey"))
         st.caption("Best grade the centering allows · " + " · ".join(f"**{k}** {v}" for k, v in caps.items()))
+        if grade.get("graders") and grade.get("method") != "ai":
+            st.markdown("**Estimated grade at each company** · " + " · ".join(
+                f"{k} **{v['grade']}**" + (f" {v['label']}" if v.get("label") else "") for k, v in grade["graders"].items()))
+            bs = grade["graders"].get("BGS", {}).get("sub")
+            if bs:
+                st.caption("BGS subgrades · " + " · ".join(f"{k} {v:g}" for k, v in bs.items()))
         with st.popover("How grading works"):
             st.markdown(grading.GUIDE)
         if (f.get("skew") or {}).get("applied"):

@@ -109,7 +109,89 @@ def tag_from_subs(subs: dict[str, float]) -> tuple[int, str, str]:
     return score, "1", "Poor"
 
 
-def estimate(front_worst: int | None, back_worst: int | None, corners, edges, surface) -> dict:
+HALF_LABELS = {
+    "BGS": {10: "Pristine", 9.5: "Gem Mint", 9: "Mint", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM", 6.5: "EX-MT+", 6: "EX-MT",
+            5.5: "EX+", 5: "EX", 4.5: "VG-EX+", 4: "VG-EX", 3.5: "VG+", 3: "VG", 2.5: "G+", 2: "Good", 1.5: "Fair", 1: "Poor"},
+    "CGC": {10: "Gem Mint", 9.5: "Mint+", 9: "Mint", 8.5: "NM/Mint+", 8: "NM/Mint", 7.5: "Near Mint+", 7: "Near Mint", 6.5: "Ex/NM+",
+            6: "Ex/NM", 5.5: "Excellent+", 5: "Excellent", 4.5: "VG/Ex+", 4: "VG/Ex", 3.5: "Very Good+", 3: "Very Good",
+            2.5: "Good+", 2: "Good", 1.5: "Fair", 1: "Poor"},
+    "SGC": {10: "Gem Mint", 9.5: "Mint+", 9: "Mint", 8.5: "NM-MT+", 8: "NM-MT", 7.5: "NM+", 7: "NM", 6.5: "EX-NM+", 6: "EX-NM",
+            5.5: "EX+", 5: "EX", 4.5: "VG-EX+", 4: "VG-EX", 3.5: "VG+", 3: "VG", 2.5: "G+", 2: "Good", 1.5: "Fair", 1: "Poor"},
+}
+
+
+def _half(x: float) -> float:
+    return max(1.0, min(10.0, round(x * 2) / 2))
+
+
+def _centering_cap(company: str, front_worst, back_worst, tcg: bool = True) -> float:
+    """Best numeric grade the centering allows at this company (10.5 = Pristine / Black Label possible)."""
+    if front_worst is None:
+        return 10.0
+    for label, f, b in GRADERS[company]:
+        if company == "TAG":
+            b = TAG_BACK["tcg" if tcg else "sports"].get(label, 100)
+        if front_worst <= f and (back_worst is None or b is None or back_worst <= b):
+            return 10.5 if "Pristine" in label else float(label.split()[0])
+    return 4.0
+
+
+def _bgs_centering_sub(front_worst, back_worst) -> float:
+    """BGS centering subgrade: 10 = 50/50 front + 55/45 back ... (Beckett's published centering table)."""
+    rows = [(10, 50, 55), (9.5, 55, 60), (9, 55, 70), (8.5, 60, 80), (8, 60, 80), (7, 65, 90), (6, 70, 95), (5, 75, 95), (4, 80, 100)]
+    if front_worst is None:
+        return 9.5
+    for g, f, b in rows:
+        if front_worst <= f and (back_worst is None or back_worst <= b):
+            return float(g)
+    return 3.0
+
+
+def bgs_overall(subs: dict[str, float]) -> tuple[float, str]:
+    """Beckett's overall from 4 subgrades: not an average. Black Label = four 10s; Pristine 10 = all 9.5+ with three
+    10s; Gem Mint 9.5 = all 9+ with three 9.5+; otherwise the lowest subgrade sets the floor and the second-lowest
+    caps it (at most half a grade above the lowest)."""
+    v = sorted(subs.values())
+    if all(x >= 10 for x in v):
+        return 10.0, "Pristine (Black Label)"
+    if v[0] >= 9.5 and sum(x >= 10 for x in v) >= 3:
+        return 10.0, "Pristine"
+    if v[0] >= 9 and sum(x >= 9.5 for x in v) >= 3:
+        return 9.5, "Gem Mint"
+    g = _half(min(v[1], v[0] + 0.5))
+    return g, HALF_LABELS["BGS"].get(g, "")
+
+
+def all_graders(subs: dict[str, float], front_worst, back_worst, tcg: bool = True) -> dict[str, dict]:
+    """Estimated grade at each company from the same measurements (centering split + corners / edges / surface).
+    Each company's own centering table caps its grade; condition follows its scale (PSA whole grades, the others
+    half grades). Estimates from photos, not what a grader under magnification will give."""
+    cond = {k: float(subs[k]) for k in ("corners", "edges", "surface")}
+    worst = min(cond.values())
+    blended = _half(0.75 * worst + 0.25 * (sum(cond.values()) / 3))  # weakest area decides, the rest nudge it
+    out: dict[str, dict] = {}
+    # PSA: whole grades, weakest attribute, PSA centering table
+    cap = psa_centering_cap(front_worst, back_worst)
+    psa = min(cap, 10 if worst >= 10 else int(max(1, worst)))
+    out["PSA"] = {"grade": f"{psa}", "label": PSA_LABELS.get(psa, ""), "note": f"centering allows up to {cap}"}
+    # BGS: four subgrades, overall by Beckett's rule
+    bsub = {"centering": _bgs_centering_sub(front_worst, back_worst), **{k: _half(v) for k, v in cond.items()}}
+    g, lab = bgs_overall(bsub)
+    out["BGS"] = {"grade": f"{g:g}", "label": lab, "sub": bsub}
+    # CGC and SGC: half grades; Pristine needs a flawless card and near-perfect (50/50 / 51/49) centering
+    for comp in ("CGC", "SGC"):
+        c = _centering_cap(comp, front_worst, back_worst)
+        g = min(blended, min(c, 10.0))
+        if g >= 10 and c >= 10.5 and worst >= 10:
+            out[comp] = {"grade": "10", "label": "Pristine", "note": ""}
+        else:
+            out[comp] = {"grade": f"{g:g}", "label": HALF_LABELS[comp].get(g, ""), "note": f"centering allows up to {'10' if c >= 10 else f'{c:g}'}"}
+    score, tg, tl = tag_from_subs({"centering": centering_subgrade(front_worst, back_worst), **cond})
+    out["TAG"] = {"grade": tg, "label": tl, "note": f"score {score} / 1000"}
+    return out
+
+
+def estimate(front_worst: int | None, back_worst: int | None, corners, edges, surface, tcg: bool = True) -> dict:
     """corners / edges / surface: a checklist answer ("Light wear") or a measured subgrade (8.0)."""
     val = lambda v: float(v) if isinstance(v, (int, float)) else CONDITION_OPTIONS.get(v, 9.0)
     subs = {
@@ -135,6 +217,7 @@ def estimate(front_worst: int | None, back_worst: int | None, corners, edges, su
         "tag_grade": tag_grade,
         "tag_label": tag_label,
         "centering_cap": cap,
+        "graders": all_graders(subs, front_worst, back_worst, tcg),
     }
 
 
