@@ -295,7 +295,14 @@ def corner_radius_px(set_id: str, width_px: int = 630) -> int | None:
     v = _corners().get(set_id)
     if not v or v[1] < 2:
         return None
-    return int(round(v[0] / 1000 * width_px))
+    from .condition import CORNER_SPEC
+    cat = sets().get(set_id, {}).get("category", "")
+    mm, wmm = CORNER_SPEC.get(cat, CORNER_SPEC["sports"])
+    spec = mm / wmm * 1000
+    r = v[0]
+    # photos are small and blurry at the corner: trust a clearly square-cut set, otherwise stay near the maker's spec
+    r = 0.0 if r < 12 else min(max(r, 0.6 * spec), 1.5 * spec)
+    return int(round(r / 1000 * width_px))
 
 
 @lru_cache(maxsize=1)
