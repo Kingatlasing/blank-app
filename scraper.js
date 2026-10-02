@@ -1,13 +1,14 @@
 // Sports set pull (runs in a sportscardspro.com tab). Resumes on its own: skips sets already in IndexedDB
 // 'slabscout' / 'sets'. Status: window.__ss (progress), window.__sl (recent warnings), window.__ls (set lists).
 (async () => {
-const O = 'https://www.sportscardspro.com';
+const O = location.origin; // sportscardspro.com, or pricecharting.com for the TCG / non-sport categories
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const PRI = ['basketball', 'soccer', 'baseball', 'football', 'hockey', 'racing', 'wrestling', 'ufc', 'golf', 'tennis', 'boxing'];
+const PRI = window.__CATS || ['basketball', 'soccer', 'baseball', 'football', 'hockey', 'racing', 'wrestling', 'ufc', 'golf', 'tennis', 'boxing'];
+const LSKEY = 'slabscout-all-sets' + (window.__CATS ? '-' + window.__CATS.join(',') : '');
 window.__ss = {state: 'loading set lists'};
 // 1. every set on the site (category page + every brand page), cached in localStorage
 let all = null;
-try { all = JSON.parse(localStorage.getItem('slabscout-all-sets') || 'null'); } catch (e) {}
+try { all = JSON.parse(localStorage.getItem(LSKEY) || 'null'); } catch (e) {}
 if (!all) {
   const grab = async p => {
     for (let t = 0; t < 5; t++) {
@@ -28,16 +29,18 @@ if (!all) {
     all[c] = [...S];
     window.__ls = Object.fromEntries(Object.entries(all).map(([k, v]) => [k, v.length]));
   }
-  try { localStorage.setItem('slabscout-all-sets', JSON.stringify(all)); } catch (e) {}
+  try { localStorage.setItem(LSKEY, JSON.stringify(all)); } catch (e) {}
 }
 const dec = s => { try { return decodeURIComponent(s.replace(/&amp;/g, '&')); } catch (e) { return s.replace(/&amp;/g, '&'); } };
 window.__all = all;
+// sets the app already has (pricecharting runs): skip them
+const SKIP = window.__SKIP ? new Set(window.__SKIP) : null;
 const PRIO = window.__PRIORITY || null; // regex: these sets first (sets someone asked for)
 const rank = s => (PRIO && PRIO.test(s) ? -1 : PRI.indexOf(s.split('-cards-')[0]));
-window.__todo = [...new Set(Object.values(all).flat().map(dec))].sort((a, b) => rank(a) - rank(b));
+window.__todo = [...new Set(Object.values(all).flat().map(dec))].filter(s => !SKIP || !SKIP.has(s)).sort((a, b) => rank(a) - rank(b));
 // 2. the worker: 3 lanes, 0.7 s pause per page, 20 s timeout per request, backs off on 429
 const W = `
-const O='https://www.sportscardspro.com';
+const O='${O}';const HOST='${O.includes('pricecharting') ? 'pricecharting' : 'sportscardspro'}';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const BR=['upper-deck','topps','panini','bowman','donruss','fleer','score','leaf','skybox','hoops','o-pee-chee','pinnacle','playoff','pacific','stadium-club','finest','ultra','select','prizm','mosaic','optic','futera','merlin','press-pass','wheels','sage','onyx','parkside','wild-card'];
 const cap=s=>s.split('-').map(w=>w?w[0].toUpperCase()+w.slice(1):w).join(' ');
@@ -60,7 +63,7 @@ async function one(slug){
     for(const x of ps){const im=((x.imageUri||'').match(/images\\.pricecharting\\.com\\/([^/]+)\\//)||[])[1]||'';
       c.push([x.productName,x.productUri,x.printRun?String(x.printRun):'',money(x.price1),money(x.price3),money(x.price2),im])}
     if(ps.length<150||!j.cursor||String(j.cursor)===String(cursor))break;cursor=j.cursor}
-  return {title:title(slug),brand:brand(slug),host:'sportscardspro',c}}
+  return {title:title(slug),brand:brand(slug),host:HOST,c}}
 onmessage=async e=>{const db=await open();
   const have=new Set(await new Promise(r=>{const q=db.transaction('sets').objectStore('sets').getAllKeys();q.onsuccess=()=>r(q.result)}));
   const todo=e.data.todo.filter(s=>!have.has(s));let i=0,done=0,cards=0,fail=[];const L=e.data.lanes||3;
