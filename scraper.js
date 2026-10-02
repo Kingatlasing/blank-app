@@ -32,7 +32,9 @@ if (!all) {
 }
 const dec = s => { try { return decodeURIComponent(s.replace(/&amp;/g, '&')); } catch (e) { return s.replace(/&amp;/g, '&'); } };
 window.__all = all;
-window.__todo = [...new Set(Object.values(all).flat().map(dec))].sort((a, b) => PRI.indexOf(a.split('-cards-')[0]) - PRI.indexOf(b.split('-cards-')[0]));
+const PRIO = window.__PRIORITY || null; // regex: these sets first (sets someone asked for)
+const rank = s => (PRIO && PRIO.test(s) ? -1 : PRI.indexOf(s.split('-cards-')[0]));
+window.__todo = [...new Set(Object.values(all).flat().map(dec))].sort((a, b) => rank(a) - rank(b));
 // 2. the worker: 3 lanes, 0.7 s pause per page, 20 s timeout per request, backs off on 429
 const W = `
 const O='https://www.sportscardspro.com';
