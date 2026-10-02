@@ -116,6 +116,9 @@ def _grade(res: dict, x: dict | None) -> dict:
     if style == "standard" and vision.looks_full_art(f["card"], f["edges"]):
         style = "full_art"
     prof = catalog.border_profile(sid, variant) if sid else None
+    if not prof and sid and (catalog.set_profile(sid) or {}).get("border"):
+        sb = catalog.set_profile(sid)
+        prof = {"l": sb["border"][0], "r": sb["border"][1], "t": sb["border"][2], "b": sb["border"][3], "n": sb.get("n", 1), "borderless": sb.get("borderless", 0)}
     expect = {k: prof[k] for k in ("l", "r", "t", "b")} if prof and prof.get("n", 0) >= 2 and (prof.get("borderless") or 0) < 0.5 else None
     L = f["edges"]
     if style != "standard" or expect:
@@ -126,6 +129,17 @@ def _grade(res: dict, x: dict | None) -> dict:
     if sid and style != "vintage":
         rad = catalog.corner_radius_px(sid) or rad  # this set's own corner shape, measured on its photos
     fi = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=style == "full_art")
+    sp = catalog.set_profile(sid) if sid else None
+    condition.apply_baseline(fi, (sp or {}).get("sub"))  # this set's design, learned from clean photos
+    dco = catalog.die_cut_outline(x["card"]) if x and x["kind"] == "catalog" else None
+    if dco:  # die-cut: the points of the shape are the corners; compare the outline with the set's cut
+        dcr = condition.die_cut_check(vision.tight_card(f["card"], L), dco["mask"], dco.get("agree", 1.0))
+        g_dc = condition._sev_to_grade(dcr["sev"])
+        fi.subgrades["corners"] = g_dc
+        fi.subgrades["edges"] = min(fi.subgrades["edges"], g_dc)
+        fi.findings += [condition.Finding("edges", "die-cut outline", n, dcr["sev"], "possible") for n in dcr["notes"]]
+        fi.metrics["die_cut"] = dcr
+        style = "die_cut"
     bi = (b or {}).get("inspect")
     subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     back_c = b["centering"] if b else None

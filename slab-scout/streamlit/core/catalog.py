@@ -282,6 +282,40 @@ def border_profile(set_id: str, variant: str = "") -> dict | None:
 
 
 @lru_cache(maxsize=1)
+def _set_profiles() -> dict:
+    d = _dir()
+    p = os.path.join(d, "set_profiles.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else {}
+
+
+def set_profile(set_id: str) -> dict | None:
+    """What a clean card of this set measures as (core/learn.py): 'sub' corners / edges / surface the grader gives
+    its clean price-guide photos, 'border' [l, r, t, b] share of width / height, 'bc' border colour, 'n' photos."""
+    return _set_profiles().get(set_id)
+
+
+@lru_cache(maxsize=1)
+def _die_cuts() -> dict:
+    d = _dir()
+    p = os.path.join(d, "die_cut_outlines.json") if d else ""
+    return json.load(open(p)) if p and os.path.exists(p) else {}
+
+
+DIE_CUT_RE = re.compile(r"die[- ]?cut", re.I)
+
+
+def die_cut_outline(card: "Card") -> dict | None:
+    """The learned die-cut shape for this card ({'mask' hex 64x90, 'agree', 'n'}), when it is a die-cut card:
+    the whole set is die-cut, or the card / parallel says Die-Cut (then its set's die-cut shape)."""
+    o = _die_cuts()
+    if card.set_id in o:
+        return o[card.set_id]
+    if DIE_CUT_RE.search(f"{card.name} {card.variant}"):
+        return o.get(card.set_id + "|die-cut")
+    return None
+
+
+@lru_cache(maxsize=1)
 def _corners() -> dict:
     d = _dir()
     p = os.path.join(d, "corner_profiles.json") if d else ""

@@ -6,6 +6,7 @@ Docker hosts) served from a Streamlit app, with the API under /api.
 POST /api/scan  form: front (photo), back (optional photo), game, grade -> identification + grade (JSON)
 POST /api/ocr   form: photo, lang (auto | ja | ko)                    -> text lines on the card
 GET  /api/health
+GET  /api/learn/start | status | stop | result   learn each set's clean-card baseline (core/learn.py)
 GET  /web/index.html  the phone app in a browser (mobile-web build), already pointed at this server
 """
 from __future__ import annotations
@@ -118,9 +119,37 @@ async def read(request: Request):
     return JSONResponse(await run_in_threadpool(svc.do_ocr, photo, str(form.get("lang") or "auto")))
 
 
+async def learn_status(request: Request):
+    from core import learn
+    return JSONResponse(learn.status())
+
+
+async def learn_start(request: Request):
+    from core import learn
+    await run_in_threadpool(engine)
+    url = request.query_params.get("list") or learn.LIST_URL
+    workers = int(request.query_params.get("workers") or 3)
+    return JSONResponse(await run_in_threadpool(learn.start, url, min(max(workers, 1), 6)))
+
+
+async def learn_stop(request: Request):
+    from core import learn
+    return JSONResponse(learn.stop())
+
+
+async def learn_result(request: Request):
+    from core import learn
+    from starlette.responses import Response
+    data = await run_in_threadpool(learn.result_gz)
+    return Response(data, media_type="application/gzip",
+                    headers={"Content-Disposition": 'attachment; filename="slabscout-learn-1.json.gz"'})
+
+
 app = st.App(
     "scan_page.py",
     routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/ocr", read, methods=["POST"]),
+            Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
+            Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],
     middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
 )

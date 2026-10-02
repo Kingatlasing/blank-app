@@ -440,3 +440,63 @@ def subgrade_to_option(g: float) -> str:
     if g >= 3.5:
         return "Heavy wear"
     return "Crease / damage"
+
+
+def apply_baseline(insp: Inspection, base: dict | None) -> Inspection:
+    """Allow for the set's own design. `base` = the subgrades this same check gives clean price-guide photos of
+    the set (see core/learn.py): foil patterns, sparkle, refractor lines and edge-to-edge art set off the chip /
+    speck / scratch detectors even on a gem card. Only wear beyond what a clean card of the set shows counts."""
+    if not base:
+        return insp
+    notes = []
+    for k in ("corners", "edges", "surface"):
+        b = base.get(k)
+        if b is None or b >= 10 or k not in insp.subgrades:
+            continue
+        before = insp.subgrades[k]
+        insp.subgrades[k] = float(min(10.0, before + (10.0 - b)))
+        if insp.subgrades[k] != before:
+            notes.append(k)
+    if notes:
+        insp.metrics["baseline"] = {k: base.get(k) for k in ("corners", "edges", "surface")}
+        insp.findings.append(Finding(notes[0], "this set", "Clean cards of this set already read as " + ", ".join(
+            f"{k} {base[k]:g}" for k in notes) + " (foil / pattern / design), so only wear beyond that counts", 0.0, "note"))
+    return insp
+
+
+def die_cut_check(card: Image.Image, outline_hex: str, agree: float = 1.0) -> dict:
+    """Compare a scanned die-cut card with its set's learned shape (core/learn.py). The card crop is the shape's
+    bounding box, so outside the shape is background: wherever the reference shape has card but the scan shows
+    background, material is missing (a chipped point, a dinged or bent tab); card where the shape has none means
+    a miscut or something stuck on. Returns {'sev' 0-1, 'missing', 'extra' (largest damaged patch, ~mm²), 'notes'}."""
+    from . import learn
+    ref = learn.hex_mask(outline_hex)
+    a = np.asarray(card.convert("RGB").resize((learn.OW * 6, learn.OH * 6))).astype(np.float32)
+    big = cv2.resize(ref.astype(np.uint8), (learn.OW * 6, learn.OH * 6), interpolation=cv2.INTER_NEAREST).astype(bool)
+    outside = cv2.erode((~big).astype(np.uint8), np.ones((9, 9), np.uint8)).astype(bool)
+    if outside.sum() < 200:  # nearly rectangular: nothing to compare
+        return {"sev": 0.0, "missing": 0.0, "extra": 0.0, "notes": []}
+    bg = np.median(a[outside], axis=0)
+    from .learn import silhouette
+    scan = silhouette(Image.fromarray(a.astype(np.uint8)), bg=bg, thresh=38.0, crop=False)
+    if scan is None:
+        return {"sev": 0.0, "missing": 0.0, "extra": 0.0, "notes": ["Couldn't separate the die-cut shape from the background: photograph it on a plain, contrasting surface."]}
+    # local damage, not slivers from a slightly different crop: blobs that survive a 1-cell erosion
+    def blobs(m):
+        m = cv2.erode(m.astype(np.uint8), np.ones((2, 2), np.uint8))
+        n, _, st, _ = cv2.connectedComponentsWithStats(m, 8)
+        return sorted((int(x) for x in st[1:, cv2.CC_STAT_AREA]), reverse=True) if n > 1 else []
+    inner = cv2.erode(ref.astype(np.uint8), np.ones((2, 2), np.uint8)).astype(bool)
+    miss = blobs(inner & ~scan)
+    outer = ~cv2.dilate(ref.astype(np.uint8), np.ones((3, 3), np.uint8)).astype(bool)
+    ext = blobs(outer & scan)
+    slack = 2 + (1 - agree) * 60  # cells; shapes that vary card to card in the set get more room
+    missing = max(miss or [0])
+    extra = max(ext or [0])
+    sev = float(min(1.0, max(0.0, missing - slack) / 18 + max(0.0, extra - slack) / 40))
+    notes = []
+    if missing > slack:
+        notes.append(f"Die-cut edge is missing material compared with this set's cut (about {missing} mm²): chipped point or dinged tab")
+    if extra > slack:
+        notes.append(f"Shape goes past this set's cut (about {extra} mm²): miscut, or the photo background is close to the card colour")
+    return {"sev": round(sev, 3), "missing": round(missing, 3), "extra": round(extra, 3), "notes": notes}

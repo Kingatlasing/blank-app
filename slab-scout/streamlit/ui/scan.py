@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import re
 from datetime import datetime
@@ -641,9 +642,19 @@ def _inspection(scan: dict, x: dict):
     ck = "_insp_" + str((x.get("c") or {}).get("ref_id") if off is not None else "") + f"_{rad}_{foil}_" + "_".join(str(round(L[k])) for k in ("ol", "ot", "or", "ob"))
     if ck not in scan:
         if off is None and L is f.get("_edges0", f["edges"]) and rad == 30 and not foil:
-            scan[ck] = f["inspect"]
+            scan[ck] = copy.deepcopy(f["inspect"])  # the set's baseline is applied to this copy below
         else:
             scan[ck] = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=foil)
+        if sid and not scan[ck].metrics.get("baseline"):
+            condition.apply_baseline(scan[ck], (catalog.set_profile(sid) or {}).get("sub"))  # the set's own design
+        dco = catalog.die_cut_outline(x["card"]) if x["kind"] == "catalog" else None
+        if dco and "die_cut" not in scan[ck].metrics:  # die-cut: compare the outline with the set's cut
+            dcr = condition.die_cut_check(vision.tight_card(f["card"], L), dco["mask"], dco.get("agree", 1.0))
+            g_dc = condition._sev_to_grade(dcr["sev"])
+            scan[ck].subgrades["corners"] = g_dc
+            scan[ck].subgrades["edges"] = min(scan[ck].subgrades["edges"], g_dc)
+            scan[ck].findings += [condition.Finding("edges", "die-cut outline", n, dcr["sev"], "possible") for n in dcr["notes"]]
+            scan[ck].metrics["die_cut"] = dcr
     return scan[ck]
 
 
@@ -710,6 +721,9 @@ def _apply_style(scan: dict, x: dict) -> str:
     pick = st.session_state.get(f"style_{scan['id']}")
     style = next((k for k, v in STYLE_LABELS.items() if v == pick), auto) if pick and pick != "Auto" else auto
     prof = catalog.border_profile(sid, variant) if sid else None
+    if not prof and sid and (catalog.set_profile(sid) or {}).get("border"):
+        sb = catalog.set_profile(sid)
+        prof = {"l": sb["border"][0], "r": sb["border"][1], "t": sb["border"][2], "b": sb["border"][3], "n": sb.get("n", 1), "borderless": sb.get("borderless", 0)}
     expect = {k: prof[k] for k in ("l", "r", "t", "b")} if prof and prof.get("n", 0) >= 2 and (prof.get("borderless") or 0) < 0.5 else None
     sig = (style, tuple(expect.values()) if expect else None)
     if scan.get("_style_sig") != sig:

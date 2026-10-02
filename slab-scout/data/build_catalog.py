@@ -633,8 +633,55 @@ def build_corners():
     print(f"corner profiles: {len(out)} sets ({sq} near-square), calibration {({k: round(v, 2) for k, v in factor.items()})}")
 
 
+def build_set_profiles():
+    """What a clean card of each set measures as (raw/slabscout-learn*.json: {set: [measurement per price-guide
+    photo]}, see streamlit/core/learn.py): the grader's own corner / edge / surface subgrades on clean photos (the
+    set's design baseline), the printed border, border colour. Writes catalog/set_profiles.json and adds the
+    learned corner radii to the corner measurements."""
+    raw = {}
+    for f in glob.glob(os.path.join(RAW, "slabscout-learn*.json*")):
+        raw.update(load_json(f))
+    if not raw:
+        return
+    import statistics as st_
+    dc = {k.split("outline:dc:", 1)[1]: v for k, v in raw.items() if k.startswith("outline:dc:") and v}
+    if dc:  # die-cut shapes: key = set id, or "set|die-cut" for the die-cut cards of a mixed set
+        json.dump(dc, open(os.path.join(OUT, "die_cut_outlines.json"), "w"), separators=(",", ":"))
+        print(f"die-cut outlines: {len(dc)} sets ({sum(1 for v in dc.values() if v['agree'] < 0.9)} whose shape varies card to card)")
+    raw = {k: v for k, v in raw.items() if not k.startswith("outline:") and isinstance(v, list)}
+    out = {}
+    for sid, ms in raw.items():
+        good = [m for m in ms if (m.get("m") or {}).get("sharpness", 0) >= 60 and (m.get("m") or {}).get("glare_pct", 0) < 3]
+        if not good:
+            continue
+        sub = {k: st_.median(m["sub"][k] for m in good) for k in ("corners", "edges", "surface")}
+        bord = [m["border"] for m in good if m.get("found") and all(m["found"]) and 0.005 < m["border"][0] + m["border"][1] < 0.3]
+        e = {"sub": sub, "n": len(good), "bc": good[0].get("bc", "")}
+        if bord:
+            lr = st_.median(b[0] + b[1] for b in bord) / 2
+            tb = st_.median(b[2] + b[3] for b in bord) / 2
+            e["border"] = [round(lr, 4), round(lr, 4), round(tb, 4), round(tb, 4)]
+        e["borderless"] = round(1 - len(bord) / len(good), 2)
+        out[sid] = e
+    json.dump(out, open(os.path.join(OUT, "set_profiles.json"), "w"), separators=(",", ":"))
+    lowered = sum(1 for e in out.values() if min(e["sub"].values()) < 9)
+    print(f"set profiles: {len(out)} sets learned, {lowered} whose clean cards trip the wear checks (design baseline used)")
+    # corner radii measured on the same photos feed the corner profiles
+    extra = {}
+    for sid, ms in raw.items():
+        for m in ms:
+            c = m.get("corner") or []
+            if sum(1 for x in c if x >= 0) >= 2:
+                extra[sid] = list(c) + [m.get("w", 0), 0, m.get("id", "")]
+                break
+    if extra:
+        p = os.path.join(RAW, "slabscout-corners-learn.json")
+        json.dump(extra, open(p, "w"), separators=(",", ":"))
+
+
 if __name__ == "__main__":
     build()
     build_borders()
     build_colours()
+    build_set_profiles()
     build_corners()
