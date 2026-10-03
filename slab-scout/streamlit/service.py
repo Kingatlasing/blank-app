@@ -237,6 +237,7 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
     """Everything the Scan page works out for a photo, as plain JSON."""
     t = time.time()
     with _lock:
+        catalog.trim()  # free the previous scans' downloaded card lists if they've grown large
         res = scan._analyze(fdata, bdata, game or "Auto")
         f = res["front"]
         cands = res.get("cands", [])

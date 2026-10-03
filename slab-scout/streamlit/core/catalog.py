@@ -25,7 +25,7 @@ def _dir() -> str | None:
     return None
 
 
-@dataclass
+@dataclass(slots=True)
 class Card:
     set_id: str
     name: str
@@ -62,6 +62,13 @@ class _Cat:
         self.loaded_sets: set[str] = set()
         self.loaded_shards: set[str] = set()
         self.dir: str | None = None
+        self.base_rows: list = []
+
+    def reset(self) -> None:
+        """Forget the downloaded card lists (back to the bundled cards) so memory stays bounded on a small server."""
+        self.cards, self.by_key, self.by_set, self.index = [], {}, {}, {}
+        self.loaded_sets, self.loaded_shards = set(), set()
+        self.add(self.base_rows)
 
     def add(self, rows) -> None:
         for r in rows:
@@ -89,7 +96,8 @@ def _cat() -> _Cat:
         return cat
     cat.dir = d
     cat.sets = {s["id"]: s for s in json.load(open(os.path.join(d, "sets.json")))}
-    cat.add(json.load(open(os.path.join(d, "cards.json")))["rows"])
+    cat.base_rows = json.load(open(os.path.join(d, "cards.json")))["rows"]
+    cat.add(cat.base_rows)
     sp = os.path.join(d, "sales.json")
     cat.sales = json.load(open(sp)) if os.path.exists(sp) else {}
     return cat
@@ -178,10 +186,37 @@ def ensure_set(set_id: str) -> None:
         cat.loaded_sets.add(set_id)
 
 
+# Words on almost every card (brand, product, sport, card type): their name shards hold hundreds of thousands of
+# cards and don't narrow anything down, so they're never loaded just for these words.
+_GENERIC = set("""topps panini prizm chrome bowman upper deck donruss fleer score select optic mosaic finest heritage
+update series rookie rookies card cards baseball football basketball hockey soccer racing wrestling golf tennis
+boxing edition base auto autograph autographs refractor refractors parallel insert team league official
+collection limited premium special national treasures stadium club sport sports trading game games the and
+for with from pokemon yugioh magic gathering one piece holo rare super ultra secret common uncommon promo
+season year first prices price graded psa bgs cgc sgc mint gem near
+basic stage evolves evolved from weakness resistance retreat cost ability illus illustrator pokémon trainer energy
+item supporter stadium tool damage attack attacks rule when your this that opponent opponents active bench
+discard deck hand turn each coin flip heads tails knocked out prize prizes put into play card's hit points
+monster effect spell trap level atk def counter don leader character event life power cost type creature
+instant sorcery enchantment artifact land legendary flying target player control draw gain""".split())
+MAX_LOADED_CARDS = 150_000  # bundled + downloaded cards kept in memory before starting over
+MAX_SHARDS_PER_QUERY = 3
+
+
+def trim() -> None:
+    """Call between scans: when the downloaded card lists have grown past MAX_LOADED_CARDS, go back to the bundled
+    cards so a small server doesn't run out of memory (never mid-scan: the scan's own lists must stay)."""
+    cat = _cat()
+    if len(cat.cards) > MAX_LOADED_CARDS:
+        with _lock:
+            cat.reset()
+
+
 def _ensure_shards(query: str) -> None:
     cat = _cat()
-    toks = [t for t in re.findall(r"[a-z]+", query.lower()) if len(t) >= 3]
-    for k in {t[:2] for t in toks}:
+    toks = [t for t in re.findall(r"[a-z]+", query.lower()) if len(t) >= 3 and t not in _GENERIC]
+    keys = list(dict.fromkeys(t[:2] for t in toks))[:MAX_SHARDS_PER_QUERY]  # in reading order: the name comes first
+    for k in keys:
         if k in cat.loaded_shards:
             continue
         with _lock:
@@ -198,10 +233,9 @@ except Exception:  # pragma: no cover
     _POP8 = None
 
 
-@lru_cache(maxsize=1)
-def _phash_table():
-    """Photo fingerprints of every catalog photo, kept compact (2.7M photos would be ~1 GB as Python lists, more
-    than a free server has): uint64 hashes, photo ids as fixed-width bytes (longer ids kept aside), set index."""
+def _build_phash_files(out_dir: str) -> None:
+    """Turn the published fingerprint lists into compact arrays on disk (run in a child process: parsing 2.7M
+    JSON rows leaves hundreds of MB the parent would never get back)."""
     import gc
 
     import numpy as np
@@ -218,20 +252,50 @@ def _phash_table():
                 break
             continue
         hs.append(np.fromiter((int(h, 16) for h, _, _ in part), dtype=np.uint64, count=len(part)))
-        ims.append(np.array([im.encode()[:24] for _, im, _ in part], dtype="S24"))
-        for j, (_, im, _) in enumerate(part):
-            if len(im) > 24:
-                long_ids[n + j] = im
+        ims.append(np.array([im.encode() for _, im, _ in part], dtype="S72"))  # memory-mapped: only rows looked at are read
         sis.append(np.fromiter((set_ids.setdefault(sid, len(set_ids)) for _, _, sid in part), dtype=np.int32, count=len(part)))
         n += len(part)
         del part
         gc.collect()
-    if not hs:
-        return np.zeros(0, dtype=np.uint64), None
+    os.makedirs(out_dir, exist_ok=True)
+    tmp = out_dir + ".part"
+    os.makedirs(tmp, exist_ok=True)
+    np.save(os.path.join(tmp, "h.npy"), np.concatenate(hs) if hs else np.zeros(0, np.uint64))
+    np.save(os.path.join(tmp, "im.npy"), np.concatenate(ims) if ims else np.zeros(0, "S72"))
+    np.save(os.path.join(tmp, "si.npy"), np.concatenate(sis) if sis else np.zeros(0, np.int32))
     by_index = [None] * len(set_ids)
     for sid, i in set_ids.items():
         by_index[i] = sid
-    return np.concatenate(hs), (np.concatenate(ims), np.concatenate(sis), by_index, long_ids)
+    json.dump({"sets": by_index, "long": {str(k): v for k, v in long_ids.items()}}, open(os.path.join(tmp, "meta.json"), "w"))
+    for f in os.listdir(tmp):
+        os.replace(os.path.join(tmp, f), os.path.join(out_dir, f))
+    os.rmdir(tmp)
+
+
+@lru_cache(maxsize=1)
+def _phash_table():
+    """Photo fingerprints of every catalog photo as arrays read straight from disk (memory-mapped): uint64 hashes,
+    photo ids (24 bytes; longer ids kept aside) and set index."""
+    import numpy as np
+    out_dir = os.path.join(CACHE, _data_version(), "phash-table")
+    if not os.path.exists(os.path.join(out_dir, "meta.json")):
+        try:
+            import subprocess
+            import sys
+            root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            subprocess.run([sys.executable, "-c", f"import sys; sys.path.insert(0, {root!r}); from core import catalog; catalog._build_phash_files({out_dir!r})"],
+                           timeout=900, check=False, env={**os.environ, "SLABSCOUT_CACHE": CACHE})
+        except Exception:
+            pass
+        if not os.path.exists(os.path.join(out_dir, "meta.json")):
+            _build_phash_files(out_dir)  # no child processes here: do it in this one
+    meta = json.load(open(os.path.join(out_dir, "meta.json")))
+    hashes = np.load(os.path.join(out_dir, "h.npy"), mmap_mode="r")
+    if not len(hashes):
+        return hashes, None
+    ims = np.load(os.path.join(out_dir, "im.npy"), mmap_mode="r")
+    sis = np.load(os.path.join(out_dir, "si.npy"), mmap_mode="r")
+    return hashes, (ims, sis, meta["sets"], {int(k): v for k, v in meta["long"].items()})
 
 
 def photo_lookup(phash_hex: str, max_distance: int = 12, limit: int = 8) -> list[tuple[Card, int]]:
@@ -460,7 +524,7 @@ def closest(text: str, name_hint: str = "", number_hint: str = "", limit: int = 
     lines = [l.lower().translate(ocr_fix) if re.search(r"[a-z]\d|\d[a-z]", l.lower()) else l for l in lines]
     if not words:
         return []
-    for w in dict.fromkeys(words):
+    for w in [w for w in dict.fromkeys(words) if w not in _GENERIC][:5]:  # the first few real words (name first)
         _ensure_shards(w)
     cat = _cat()
     vocab_by = {}
