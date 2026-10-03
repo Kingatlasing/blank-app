@@ -191,24 +191,47 @@ def _ensure_shards(query: str) -> None:
             cat.loaded_shards.add(k)
 
 
+try:
+    import numpy as _np
+    _POP8 = _np.array([bin(i).count("1") for i in range(256)], dtype=_np.uint8)
+except Exception:  # pragma: no cover
+    _POP8 = None
+
+
 @lru_cache(maxsize=1)
 def _phash_table():
-    """Photo fingerprints of every catalog photo: (uint64 array, [(photo id, set id)])."""
+    """Photo fingerprints of every catalog photo, kept compact (2.7M photos would be ~1 GB as Python lists, more
+    than a free server has): uint64 hashes, photo ids as fixed-width bytes (longer ids kept aside), set index."""
+    import gc
+
     import numpy as np
-    rows = []
     files = [f for f, _ in remote_index().get("files", []) if f.startswith("phash")]
-    if files:
-        for f in files:
-            rows += _read_remote(f[: -len(".gz")] if f.endswith(".gz") else f) or []
-    else:
-        for i in range(16):  # older builds: phash-0..n
-            part = _read_remote(f"phash-{i}.json")
-            if part is None:
+    names = [f[: -len(".gz")] if f.endswith(".gz") else f for f in files] or [f"phash-{i}.json" for i in range(16)]
+    hs, ims, sis = [], [], []
+    set_ids: dict[str, int] = {}
+    long_ids: dict[int, str] = {}
+    n = 0
+    for name in names:
+        part = _read_remote(name)
+        if part is None:
+            if not files:
                 break
-            rows += part
-    if not rows:
-        return np.zeros(0, dtype=np.uint64), []
-    return np.array([int(h, 16) for h, _, _ in rows], dtype=np.uint64), [(im, sid) for _, im, sid in rows]
+            continue
+        hs.append(np.fromiter((int(h, 16) for h, _, _ in part), dtype=np.uint64, count=len(part)))
+        ims.append(np.array([im.encode()[:24] for _, im, _ in part], dtype="S24"))
+        for j, (_, im, _) in enumerate(part):
+            if len(im) > 24:
+                long_ids[n + j] = im
+        sis.append(np.fromiter((set_ids.setdefault(sid, len(set_ids)) for _, _, sid in part), dtype=np.int32, count=len(part)))
+        n += len(part)
+        del part
+        gc.collect()
+    if not hs:
+        return np.zeros(0, dtype=np.uint64), None
+    by_index = [None] * len(set_ids)
+    for sid, i in set_ids.items():
+        by_index[i] = sid
+    return np.concatenate(hs), (np.concatenate(ims), np.concatenate(sis), by_index, long_ids)
 
 
 def photo_lookup(phash_hex: str, max_distance: int = 12, limit: int = 8) -> list[tuple[Card, int]]:
@@ -217,13 +240,18 @@ def photo_lookup(phash_hex: str, max_distance: int = 12, limit: int = 8) -> list
     hashes, meta = _phash_table()
     if not len(hashes) or not phash_hex:
         return []
+    ims, sis, set_names, long_ids = meta
     x = np.bitwise_xor(hashes, np.uint64(int(phash_hex, 16)))
-    d = np.unpackbits(x.view(np.uint8).reshape(-1, 8), axis=1).sum(axis=1)
+    if hasattr(np, "bitwise_count"):  # numpy 2: popcount without a 64x bigger temporary array
+        d = np.bitwise_count(x).astype(np.uint8)
+    else:
+        d = _POP8[x.view(np.uint8)].reshape(-1, 8).sum(axis=1, dtype=np.uint8)
+    del x
+    near = np.flatnonzero(d <= max_distance)
     out: list[tuple[Card, int]] = []
-    for i in np.argsort(d)[: limit * 3]:
-        if d[i] > max_distance:
-            break
-        im, sid = meta[i]
+    for i in near[np.argsort(d[near], kind="stable")][: limit * 3]:
+        im = long_ids.get(int(i)) or ims[i].decode()
+        sid = set_names[int(sis[i])]
         for c in set_cards(sid):
             if c.img.lstrip("~") == im and not c.img.startswith("~"):
                 out.append((c, int(d[i])))

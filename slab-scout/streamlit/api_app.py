@@ -163,7 +163,11 @@ async def scan_url(request: Request):
         return JSONResponse({"detail": f"Couldn't get the photo: {e}"}, status_code=400)
     svc = await run_in_threadpool(engine)
     grade = str(q.get("grade", "false")).lower() in ("true", "1", "yes")
-    out = await run_in_threadpool(svc.do_scan, front, back, q.get("game") or "Auto", grade)
+    try:
+        out = await run_in_threadpool(svc.do_scan, front, back, q.get("game") or "Auto", grade)
+    except Exception as e:
+        import traceback
+        return JSONResponse({"detail": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()[-1500:]}, status_code=500)
     out.pop("card_jpeg", None)
     return JSONResponse(out)
 
