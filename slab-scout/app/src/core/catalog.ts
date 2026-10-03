@@ -560,6 +560,7 @@ export function setCover(s: SetInfo | undefined, size = 240): string {
 export function imageUrl(card: Card | null | undefined, size = 240): [string, boolean] {
   if (!card?.img) return ['', false];
   if (card.img.startsWith('wc:')) return [`https://waifucards.app/img/cards/${card.img.slice(3)}.webp`, false]; // Naruto Kayou
+  if (card.img.startsWith('ct:')) return [`https://ekptjfsrfdagbefgwvkx.supabase.co/storage/v1/object/public/${card.img.slice(3)}`, false]; // Naruto Kayou English (CardToad)
   if (card.img.startsWith('nc:')) return [`https://cdn.narutocards.ca/${card.img.slice(3)}`, false]; // Naruto (narutocards.ca)
   const id = card.img.replace(/^~/, '');
   try {
@@ -574,7 +575,7 @@ export function imageUrl(card: Card | null | undefined, size = 240): [string, bo
 /** Save these cards' photos on the phone (your collection) so they show offline. */
 export async function savePhotos(cs: (Card | null | undefined)[], size = 240) {
   // only price-guide photos are saved (Naruto pictures from wc: / nc: sites stay online)
-  const ids = [...new Set(cs.filter((c): c is Card => !!c?.img && !/^(wc|nc):/.test(c.img)).map((c) => c.img.replace(/^~/, '')))];
+  const ids = [...new Set(cs.filter((c): c is Card => !!c?.img && !/^(wc|nc|ct):/.test(c.img)).map((c) => c.img.replace(/^~/, '')))];
   const q = ids.filter((id) => !photoFile(id, size).exists);
   await Promise.all(
     [0, 1, 2].map(async () => {

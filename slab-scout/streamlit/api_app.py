@@ -4,6 +4,7 @@ Docker hosts) served from a Streamlit app, with the API under /api.
     streamlit run api_app.py          (Streamlit 1.64+ runs the `app` below as an ASGI app)
 
 POST /api/scan  form: front (photo), back (optional photo), game, grade -> identification + grade (JSON)
+GET  /api/scan_url?url=&back=&game=&grade=   same, from photo links (testing with photos found online)
 POST /api/ocr   form: photo, lang (auto | ja | ko)                    -> text lines on the card
 GET  /api/health
 GET  /api/learn/start | status | stop | result   learn each set's clean-card baseline (core/learn.py)
@@ -119,6 +120,54 @@ async def read(request: Request):
     return JSONResponse(await run_in_threadpool(svc.do_ocr, photo, str(form.get("lang") or "auto")))
 
 
+def _get_public_image(url: str) -> bytes:
+    """Download a photo from a public https address (for testing identification with photos found online).
+    Only https, only public internet addresses (no local / private network), images only, 15 MB at most;
+    redirects are followed by hand so each hop is checked."""
+    import ipaddress
+    import socket
+    from urllib.parse import urljoin, urlparse
+
+    import requests
+    for _ in range(4):
+        u = urlparse(url)
+        if u.scheme != "https" or not u.hostname:
+            raise ValueError("Only https photo links")
+        for info in socket.getaddrinfo(u.hostname, 443):
+            ip = ipaddress.ip_address(info[4][0])
+            if not ip.is_global:
+                raise ValueError("That address isn't on the public internet")
+        r = requests.get(url, timeout=25, stream=True, allow_redirects=False, headers={"User-Agent": "Mozilla/5.0 SlabScout"})
+        if r.is_redirect or r.status_code in (301, 302, 303, 307, 308):
+            url = urljoin(url, r.headers.get("location", ""))
+            continue
+        r.raise_for_status()
+        if not r.headers.get("content-type", "").startswith("image/"):
+            raise ValueError("That link isn't a photo")
+        data = b""
+        for chunk in r.iter_content(65536):
+            data += chunk
+            if len(data) > MAX_BYTES:
+                raise ValueError("Photo is over 15 MB")
+        return data
+    raise ValueError("Too many redirects")
+
+
+async def scan_url(request: Request):
+    """GET /api/scan_url?url=<photo link>&back=<photo link>&game=Auto&grade=false: scan a photo from the web."""
+    q = request.query_params
+    try:
+        front = await run_in_threadpool(_get_public_image, q.get("url", ""))
+        back = await run_in_threadpool(_get_public_image, q["back"]) if q.get("back") else None
+    except Exception as e:
+        return JSONResponse({"detail": f"Couldn't get the photo: {e}"}, status_code=400)
+    svc = await run_in_threadpool(engine)
+    grade = str(q.get("grade", "false")).lower() in ("true", "1", "yes")
+    out = await run_in_threadpool(svc.do_scan, front, back, q.get("game") or "Auto", grade)
+    out.pop("card_jpeg", None)
+    return JSONResponse(out)
+
+
 async def learn_status(request: Request):
     from core import learn
     return JSONResponse(learn.status())
@@ -147,7 +196,7 @@ async def learn_result(request: Request):
 
 app = st.App(
     "scan_page.py",
-    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/ocr", read, methods=["POST"]),
+    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/ocr", read, methods=["POST"]),
             Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
             Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],

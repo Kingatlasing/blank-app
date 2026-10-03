@@ -507,6 +507,8 @@ def image_url(card: Card, size: int = 240) -> tuple[str, bool]:
         return "", False
     if card.img.startswith("wc:"):  # Naruto Kayou (WaifuCards)
         return f"https://waifucards.app/img/cards/{card.img[3:]}.webp", False
+    if card.img.startswith("ct:"):  # Naruto Kayou English (CardToad)
+        return f"https://ekptjfsrfdagbefgwvkx.supabase.co/storage/v1/object/public/{card.img[3:]}", False
     if card.img.startswith("nc:"):  # Naruto (narutocards.ca)
         return f"https://cdn.narutocards.ca/{card.img[3:]}", False
     other =card.img.startswith("~")

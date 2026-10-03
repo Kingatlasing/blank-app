@@ -174,7 +174,7 @@ def num(v):
 
 def build():
     sets: dict[str, dict] = {}
-    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-waifucards*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-narutocards*.json*")))
+    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-waifucards*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-narutocards*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-cardtoad*.json*")))
     load_json = load_raw  # narutocards.ca pulls come in their own shape
     # Two passes so only one raw file is in memory at a time: first find which file has the fullest copy of each
     # set (later files win ties), then process each set from that file.
@@ -219,7 +219,7 @@ def build():
         if not (s.get("c") or s.get("rows")):
             continue
         host = s.get("host", "pricecharting")
-        base_url = {"sportscardspro": "https://www.sportscardspro.com", "waifucards": "https://waifucards.app", "narutocards": "https://www.narutocards.ca"}.get(host, "https://www.pricecharting.com")
+        base_url = {"sportscardspro": "https://www.sportscardspro.com", "waifucards": "https://waifucards.app", "narutocards": "https://www.narutocards.ca", "cardtoad": "https://www.cardtoad.com"}.get(host, "https://www.pricecharting.com")
         meta = slug_meta(slug, s.get("title", slug))
         if s.get("brand") and meta["brand"] == "Other":
             meta["brand"] = s["brand"]
@@ -272,7 +272,7 @@ def build():
         sets[slug] = {"cover": cover,
             "id": slug, **meta, "cards": sum(t["count"] for t in tier_list), "tiers": tier_list,
             "box": BOX.get(slug), "notes": SET_NOTES.get(slug, ""),
-            "source": host, "source_url": f"{base_url}/set/{s['code']}" if host == "waifucards" else f"{base_url}/sets/{'kayou' if s['code'].startswith('kayou') else 'bandai-ccg'}/{s['code']}" if host == "narutocards" else f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
+            "source": host, "source_url": f"{base_url}/set/{s['code']}" if host == "waifucards" else f"{base_url}/sets/{'kayou' if s['code'].startswith('kayou') else 'bandai-ccg'}/{s['code']}" if host == "narutocards" else f"{base_url}/naruto" if host == "cardtoad" else f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
         }
 
     gc.collect()

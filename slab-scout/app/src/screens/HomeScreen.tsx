@@ -20,12 +20,14 @@ export default function HomeScreen() {
   const prev = hist.length >= 2 ? hist[hist.length - 2] : null;
   const change = ch30 ? ch30.abs : prev ? total - prev.value : 0;
   const changeLabel = ch30 ? '30d' : prev ? `since ${prev.day}` : '';
-  const top = useMemo(() => [...items].sort((a, b) => currentValue(b) - currentValue(a)).slice(0, 10), [items]);
-  const recent = useMemo(() => [...items].sort((a, b) => (b.added_at || '').localeCompare(a.added_at || '')).slice(0, 10), [items]);
+  // Discover only shows cards with a picture: the card's own photo, or the photo taken when it was scanned
+  const pictured = useMemo(() => items.filter((r) => !!(r.thumb || recordImage(r))), [items]);
+  const top = useMemo(() => [...pictured].sort((a, b) => currentValue(b) - currentValue(a)).slice(0, 10), [pictured]);
+  const recent = useMemo(() => [...pictured].sort((a, b) => (b.added_at || '').localeCompare(a.added_at || '')).slice(0, 10), [pictured]);
   const mode = app.settings.priceMode;
-  const chase = useMemo(() => cards().filter((c) => priceIn(c, mode).v).sort((a, b) => (priceIn(b, mode).v || 0) - (priceIn(a, mode).v || 0)).slice(0, 10), [mode]);
+  const chase = useMemo(() => cards().filter((c) => !!c.img && !c.img.startsWith('~') && priceIn(c, mode).v).sort((a, b) => (priceIn(b, mode).v || 0) - (priceIn(a, mode).v || 0)).slice(0, 10), [mode]);
   const allSets = sets();
-  const moves = useMemo(() => priceMoves(items).slice(0, 10), [items]);
+  const moves = useMemo(() => priceMoves(pictured).slice(0, 10), [pictured]);
   const cw = L.carouselW();
   const openRec = (r: (typeof items)[number]) => (r.match?.catalog_key ? app.openCard(r.match.catalog_key) : app.goTab('collection'));
   const av = L.sp(40);
