@@ -1,6 +1,12 @@
 """Read the printed text on a card and pull out the useful bits (name, number, year, brand, game)."""
 from __future__ import annotations
 
+import math
+
+import json
+
+import functools
+
 import os
 import re
 from functools import lru_cache
@@ -87,6 +93,66 @@ def read_text_cjk(img: Image.Image) -> list[tuple[str, float, float]]:
     return sorted(lines, key=lambda t: t[2])
 
 
+@functools.lru_cache(maxsize=1)
+def _vocab() -> tuple[dict, int]:
+    """Words in card / set names with counts (data/catalog/name_words.json)."""
+    from . import catalog
+    d = catalog._dir()
+    p = os.path.join(d, "name_words.json") if d else ""
+    words = json.load(open(p)) if p and os.path.exists(p) else {}
+    return words, sum(words.values()) or 1
+
+
+def _segment(run: str) -> str | None:
+    """Split letters the reader ran together into known words, most likely split first
+    ('PATRICKMAHOMESII' -> 'PATRICK MAHOMES II'). None when it can't be split into known words."""
+    words, total = _vocab()
+    low = run.lower()
+    n = len(low)
+    if not words or n > 60:
+        return None
+    best: list[tuple[float, int] | None] = [None] * (n + 1)
+    best[0] = (0.0, 0)
+    for i in range(1, n + 1):
+        for j in range(max(0, i - 20), i):
+            if best[j] is None:
+                continue
+            w = low[j:i]
+            c = words.get(w)
+            if not c or (len(w) == 1):
+                continue
+            cost = best[j][0] - math.log(c / total) + 4.0  # each extra piece costs a little: fewer, longer words win
+            if best[i] is None or cost < best[i][0]:
+                best[i] = (cost, j)
+    if best[n] is None:
+        return None
+    out, i = [], n
+    while i > 0:
+        j = best[i][1]
+        out.append(run[j:i])
+        i = j
+    return " ".join(reversed(out)) if len(out) > 1 else None
+
+
+def split_runs(text: str) -> str:
+    """'2017PANINIPRIZM PATRICKMAHOMESII' -> '2017 PANINI PRIZM PATRICK MAHOMES II': slab labels and small print often
+    come back without spaces. Words already known are left alone."""
+    words, _ = _vocab()
+    def fix(m):
+        tok = m.group(0)
+        parts = re.findall(r"\d+|[^\W\d_]+", tok)  # digits | letters
+        out = []
+        for p in parts:
+            if p.isalpha() and len(p) >= 8 and p.lower() not in words:
+                out.append(_segment(p) or p)
+            else:
+                out.append(p)
+        if len(parts) > 1 and re.fullmatch(r"(19|20)\d\d", parts[0]):  # year stuck to a brand
+            return " ".join(out)
+        return " ".join(out) if any(" " in o for o in out) else tok
+    return re.sub(r"[A-Za-z0-9]{8,}", fix, text)
+
+
 def read_text(img: Image.Image) -> list[tuple[str, float, float]]:
     """Returns (text, confidence, y_position 0..1) for each line, top to bottom."""
     arr = np.array(img.convert("RGB"))
@@ -95,7 +161,7 @@ def read_text(img: Image.Image) -> list[tuple[str, float, float]]:
     lines = []
     for box, text, conf in result or []:
         y = float(np.mean([p[1] for p in box])) / h
-        lines.append((text.strip(), float(conf), y))
+        lines.append((split_runs(text.strip()), float(conf), y))
     return sorted(lines, key=lambda t: t[2])
 
 

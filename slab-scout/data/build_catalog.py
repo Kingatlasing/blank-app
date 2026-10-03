@@ -537,6 +537,33 @@ class CardSink:
         print(f"phone: {len(self.local)} cards bundled, {self.n_sets} sets + {len(self.shard_files)} name shards downloadable")
 
 
+
+def build_name_words():
+    """Every word in card and set names with how often it appears (catalog/name_words.json): lets the scanner split
+    text that the reader ran together on slab labels ('PATRICKMAHOMESII' -> 'PATRICK MAHOMES II')."""
+    import collections
+    import gzip
+    cnt = collections.Counter()
+    def add(text):
+        for w in re.findall(r"[a-z]+", (text or "").lower()):
+            if len(w) >= 2 or w in ("a",):
+                cnt[w] += 1
+    for f in glob.glob(os.path.join(OUT, "remote", "names", "*.json.gz")):
+        for r in json.load(gzip.open(f)):
+            add(r[1])
+            add(r[3])
+    for r in json.load(open(os.path.join(OUT, "cards.json")))["rows"]:
+        add(r[1])
+        add(r[3])
+    for s in json.load(open(os.path.join(OUT, "sets.json"))):
+        for _ in range(20):  # set / brand / product words are common on labels
+            add(s.get("name", ""))
+            add(s.get("brand", ""))
+    words = {w: n for w, n in cnt.items() if n >= 2 or len(w) >= 4}
+    json.dump(words, open(os.path.join(OUT, "name_words.json"), "w"), separators=(",", ":"))
+    print(f"name words: {len(words)}")
+
+
 def build_borders():
     """Printed border layout per set and rarity, from border widths measured on price-guide photos
     (raw/slabscout-borders*.json: {photo id: [set id, parallel, left, right, top, bottom, w, h]}, each side a share
@@ -717,3 +744,4 @@ if __name__ == "__main__":
     build_colours()
     build_set_profiles()
     build_corners()
+    build_name_words()
