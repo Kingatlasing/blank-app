@@ -482,6 +482,7 @@ def by_code(code: str) -> list[Card]:
 
 
 CODE_RE = re.compile(r"\b([A-Z]{2,5})-([A-Z]{1,5})-?(\d{1,3})\b")
+LONG_CODE_RE = re.compile(r"\b([A-Z]{2,6}\d{1,3}-[A-Z]{1,5}-\d{2,4}[A-Z0-9]{0,3}|[A-Z]{2,5}-[A-Z]{1,5}-\d{2,4}[A-Z][A-Z0-9]{0,2})\b")
 
 
 def match_text(text: str, name_hint: str = "", number_hint: str = "") -> list[Card]:
@@ -491,6 +492,9 @@ def match_text(text: str, name_hint: str = "", number_hint: str = "") -> list[Ca
     for m in CODE_RE.finditer(up):
         out += by_code(f"{m.group(1)}-{m.group(2)}-{m.group(3)}")
         out += by_code(f"{m.group(1)}-{m.group(2)}-{m.group(3).zfill(2)}")
+    if not out:  # codes with digits in the prefix / a suffix, read exactly as printed (Kayou 'NRSA01-SSR-020L3')
+        for code in dict.fromkeys(LONG_CODE_RE.findall(up)):
+            out += by_code(code)
     if out:
         return _dedupe(out)
     q = " ".join(x for x in [name_hint, number_hint.split("/")[0] if number_hint else ""] if x)

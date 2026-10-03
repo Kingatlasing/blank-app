@@ -494,6 +494,7 @@ export function byCode(code: string): Card[] {
 }
 
 const CODE_RE = /\b([A-Z]{2,5})-([A-Z]{1,5})-?(\d{1,3})\b/g;
+const LONG_CODE_RE = /\b([A-Z]{2,6}\d{1,3}-[A-Z]{1,5}-\d{2,4}[A-Z0-9]{0,3}|[A-Z]{2,5}-[A-Z]{1,5}-\d{2,4}[A-Z][A-Z0-9]{0,2})\b/g;
 
 /** Best matches for text read off a card. Card codes like CDT-BBG-199 pin the exact parallel. */
 export function matchText(text: string, nameHint = '', numberHint = ''): { cards: Card[]; byCode: boolean } {
@@ -501,6 +502,10 @@ export function matchText(text: string, nameHint = '', numberHint = ''): { cards
   const up = (text || '').toUpperCase();
   for (const m of up.matchAll(CODE_RE)) {
     out.push(...byCode(`${m[1]}-${m[2]}-${m[3]}`), ...byCode(`${m[1]}-${m[2]}-${m[3].padStart(2, '0')}`));
+  }
+  if (!out.length) {
+    // codes with digits in the prefix or a suffix, read exactly as printed (Kayou 'NRSA01-SSR-020L3')
+    for (const m of up.matchAll(LONG_CODE_RE)) out.push(...byCode(m[1]));
   }
   if (out.length) return { cards: dedupe(out), byCode: true };
   const q = [nameHint, numberHint ? numberHint.split('/')[0] : ''].filter(Boolean).join(' ');
