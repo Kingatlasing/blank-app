@@ -214,6 +214,25 @@ def do_ocr(data: bytes, lang: str = "auto") -> dict:
             "found": found, "langs": langs}
 
 
+def _plain(v):
+    """numpy numbers / arrays and tuples -> plain JSON values (the engine mixes them in)."""
+    try:
+        import numpy as np
+        if isinstance(v, np.generic):
+            return v.item()
+        if isinstance(v, np.ndarray):
+            return v.tolist()
+    except Exception:
+        pass
+    if isinstance(v, dict):
+        return {str(k): _plain(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple, set)):
+        return [_plain(x) for x in v]
+    if isinstance(v, float) and v != v:
+        return None
+    return v
+
+
 def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade: bool = True) -> dict:
     """Everything the Scan page works out for a photo, as plain JSON."""
     t = time.time()
@@ -261,7 +280,7 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
                 chosen = top.get("c") if top["kind"] == "tcgdb" else None
                 out["authenticity"] = pipeline.authenticity_signals(chosen, res.get("fakes", []), None)
     out["seconds"] = round(time.time() - t, 2)
-    return out
+    return _plain(out)
 
 
 @app.post("/ocr")
