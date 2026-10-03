@@ -107,7 +107,9 @@ def load_raw(path: str):
     out = {}
     for slug, v in d.get("sets", {}).items():
         code = v.get("code", "")
-        title = v.get("title", code)
+        title = re.sub(r"^\s*(KAYOU|Bandai CCG)\s+", "", v.get("title", code) or code)
+        title = re.sub(r"\s{2,}", " — ", title.strip())  # dashes were stripped when the file was made: '  ' -> ' — '
+
         m = re.fullmatch(r"kayou-t(\d)-w(\d)", code)
         if m:
             sid = f"naruto-kayou-t{m.group(1)}w{m.group(2)}"
