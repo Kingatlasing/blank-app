@@ -49,10 +49,17 @@ def _ratio(a: int, b: int) -> tuple[int, int]:
     return big, 100 - big
 
 
+MAX_SIDE = 2400
+
+
 def load_image(data: bytes) -> Image.Image:
     img = Image.open(io.BytesIO(data))
+    img.draft("RGB", (MAX_SIDE, MAX_SIDE))  # JPEG: decode straight at a smaller size when the photo is huge
     img = ImageOps.exif_transpose(img)  # respect phone orientation
-    return img.convert("RGB")
+    img = img.convert("RGB")
+    if max(img.size) > MAX_SIDE:  # 2400 px is plenty for reading, matching and grading, and keeps memory down
+        img.thumbnail((MAX_SIDE, MAX_SIDE), Image.LANCZOS)
+    return img
 
 
 def _order(pts: np.ndarray) -> np.ndarray:

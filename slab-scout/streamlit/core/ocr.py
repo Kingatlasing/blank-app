@@ -155,6 +155,9 @@ def split_runs(text: str) -> str:
 
 def read_text(img: Image.Image) -> list[tuple[str, float, float]]:
     """Returns (text, confidence, y_position 0..1) for each line, top to bottom."""
+    if max(img.size) > 1600:  # the reader's memory grows with the photo; 1600 px still reads card print
+        img = img.copy()
+        img.thumbnail((1600, 1600), Image.LANCZOS)
     arr = np.array(img.convert("RGB"))
     result, _ = _engine()(arr)
     h = arr.shape[0]
@@ -220,6 +223,23 @@ def parse(lines: list[tuple[str, float, float]], game_hint: str = "Auto") -> dic
         if len(clean) >= 3:
             name = clean
             break
+
+    # Sports / unknown cards: the player's name is often at the bottom (Prizm, Topps Chrome, Bowman) and the top
+    # line can be a fragment ('LERS' from OILERS). Prefer a line that reads like a person's name: 2-3 words that
+    # all appear in card names.
+    if game not in ("Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "One Piece", "Lorcana", "Digimon", "Dragon Ball"):
+        words_known, _ = _vocab()
+        def person(t: str) -> bool:
+            ws = re.findall(r"[A-Za-zÀ-ÿ'.]+", t)
+            if not 2 <= len(ws) <= 3 or len("".join(ws)) < 6 or re.search(r"\d", t):
+                return False
+            if any(b.lower() in t.lower() for b in BRANDS):
+                return False
+            return all(w.lower().strip(".'") in words_known and len(w.strip(".'")) >= 2 for w in ws)
+        people = [t.strip() for t, c, _ in lines if c > 0.6 and person(t)]
+        short = len(re.findall(r"[A-Za-z]+", name)) <= 1 and len(name) <= 6
+        if people and (not name or short or not person(name)):
+            name = people[0]
 
     serial = ""
     for a, b in SERIAL.findall(blob):
