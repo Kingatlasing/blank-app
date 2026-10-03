@@ -25,6 +25,10 @@ export interface ScanItem {
   note?: string; // e.g. "back of a Pokémon card"
   added?: boolean;
   wish?: boolean;
+  /** the front alone wasn't enough: why the back is needed (shown with a "Scan the back" button) */
+  needBack?: string;
+  /** identified from front + back */
+  withBack?: boolean;
 }
 
 let cache: ScanItem[] | null = null;

@@ -43,7 +43,7 @@ TAG_CENTER = [(10.5, 51), (10, 55), (9, 60), (8.5, 62.5), (8, 65), (7.5, 67.5), 
 # (Beckett's own page was unavailable). None = the company publishes no back figure for that grade.
 GRADERS: dict[str, list[tuple[str, float, float | None]]] = {
     "PSA": [("10", 55, 75), ("9", 60, 90), ("8", 65, 90), ("7", 70, 90), ("6", 80, 90), ("5", 85, 90), ("4", 85, 90), ("3", 90, 90), ("2", 95, 95)],
-    "BGS": [("10 Pristine", 50, 55), ("9.5", 55, 60), ("9", 55, 70), ("8", 60, 80), ("7", 65, 90), ("6", 70, 95)],
+    "BGS": [("10 Pristine", 50, 60), ("9.5", 55, 60), ("9", 55, 70), ("8", 60, 80), ("7", 65, 90), ("6", 70, 95)],
     "SGC": [("10 Pristine", 50, None), ("10", 55, None), ("9", 60, None), ("8", 65, None), ("7", 70, None), ("6", 75, None)],
     "CGC": [("10 Pristine", 50, None), ("10", 55, 75), ("9", 60, 90), ("8", 65, None), ("7.5", 65, None), ("7", 70, None), ("6", 75, None), ("4.5", 85, None)],
     "TAG": [("10 Pristine", 51, None), ("10", 55, None), ("9", 60, None), ("8.5", 62.5, None), ("8", 65, None), ("7", 70, None), ("6", 75, None), ("5", 80, None)],
@@ -138,7 +138,7 @@ def _centering_cap(company: str, front_worst, back_worst, tcg: bool = True) -> f
 
 def _bgs_centering_sub(front_worst, back_worst) -> float:
     """BGS centering subgrade: 10 = 50/50 front + 55/45 back ... (Beckett's published centering table)."""
-    rows = [(10, 50, 55), (9.5, 55, 60), (9, 55, 70), (8.5, 60, 80), (8, 60, 80), (7, 65, 90), (6, 70, 95), (5, 75, 95), (4, 80, 100)]
+    rows = [(10, 50, 60), (9.5, 55, 60), (9, 55, 70), (8.5, 60, 80), (8, 60, 80), (7, 65, 90), (6, 70, 95), (5, 75, 95), (4, 80, 100)]
     if front_worst is None:
         return 9.5
     for g, f, b in rows:

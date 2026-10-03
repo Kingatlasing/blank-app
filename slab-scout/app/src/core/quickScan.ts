@@ -17,11 +17,27 @@ import { serverOn, serverScan, type ServerMatch } from './server';
 
 const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-export async function quickIdentify(uri: string, game: string, store?: Store | null, orig?: string): Promise<ScanItem> {
+/** Sports cards (and other photo-heavy sets) reuse the same picture across many parallels and years, so the front
+ * alone often can't settle which one it is. */
+export const HARD_GAMES = ['Sports', 'Baseball', 'Basketball', 'Football', 'Soccer', 'Hockey', 'Racing', 'Wrestling', 'UFC', 'Golf', 'Tennis', 'Boxing'];
+const isHard = (game: string) => HARD_GAMES.includes(game);
+
+/** One photo of the front identifies most cards. Asks for the back (needBack) only when the match isn't certain
+ * or it's a sports card whose parallels / years look alike and nothing printed (card code, serial) settled it. */
+export async function quickIdentify(uri: string, game: string, store?: Store | null, orig?: string, backUri?: string | null): Promise<ScanItem> {
+  const it = await identifyOnce(uri, game, store, orig, backUri);
+  if (backUri) return { ...it, withBack: true, needBack: undefined };
+  return it;
+}
+
+async function identifyOnce(uri: string, game: string, store?: Store | null, orig?: string, backUri?: string | null): Promise<ScanItem> {
   // scan server first (full engine: text in English / Japanese / Korean, fingerprint, colours, serials);
   // the text reader below reuses its answer, and the phone's own checks run if it's unreachable
-  const srv = serverOn() ? serverScan(orig || uri, { game, grade: false, key: uri, timeoutMs: 60000 }) : null;
-  const [phash, thumb, lines] = await Promise.all([fingerprintCard(uri), thumbnail(uri, 160), readText(uri).catch(() => [] as string[])]);
+  const srv = serverOn() ? serverScan(orig || uri, { game, grade: false, key: uri, back: backUri || null, timeoutMs: 60000 }) : null;
+  const [phash, thumb, lines, backLines] = await Promise.all([
+    fingerprintCard(uri), thumbnail(uri, 160), readText(uri).catch(() => [] as string[]),
+    backUri ? readText(backUri).catch(() => [] as string[]) : Promise.resolve([] as string[]),
+  ]);
   const base: ScanItem = { id: uid(), at: new Date().toISOString(), uri, thumb, phash, game: '', name: '', set: '', number: '', rarity: '', price: null, currency: 'USD', source: '' };
   const s = srv ? await srv : null;
   if (s) {
@@ -30,7 +46,14 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
     if (top && top.score >= 55) {
       const item = await fromServer(top, base);
       const note = s.slab ? `${s.slab.grade_text} slab${s.slab.cert ? ` · cert ${s.slab.cert}` : ''}` : top.why[0];
-      return { ...item, uri, thumb, phash, note: note || item.note, source: 'scan server' };
+      const second = s.matches[1];
+      const printed = top.why.some((w) => /code|serial|number on the card|slab|cert/i.test(w)) || !!s.slab;
+      const close = !!second && second.score >= top.score - 8 && second.name === top.name;
+      const needBack = printed ? undefined
+        : top.score < 75 ? 'Not fully sure from the front alone.'
+        : isHard(item.game || top.game) && close ? `${top.name} has look-alike parallels / years.`
+        : undefined;
+      return { ...item, uri, thumb, phash, note: note || item.note, source: 'scan server', needBack };
     }
   }
   const back = cardBack(lines, phash);
@@ -82,7 +105,7 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
   if (!cm.byCode) {
     // corrections people made before + a serial number on the card (see verify.ts)
     try {
-      const r = await refineMatches(cm.cards, { phash, text: parsed.rawText, number: parsed.number, tcg: DB_GAMES.includes(gg) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(gg), store });
+      const r = await refineMatches(cm.cards, { phash, text: parsed.rawText, number: parsed.number, backLines, tcg: DB_GAMES.includes(gg) || ['One Piece', 'Dragon Ball', 'Digimon'].includes(gg), store });
       refined = !!r.notes.length;
       cm.cards = r.cards;
       refineNote = r.notes[0] || '';
@@ -111,16 +134,24 @@ export async function quickIdentify(uri: string, game: string, store?: Store | n
         /* colour check is optional */
       }
     }
-    return { ...fromCatalog(top), id: base.id, at: base.at, uri, thumb, phash, note, source: byPicture ? 'picture match' : byClosest ? 'closest match to the text read' : 'card database' };
+    const item = fromCatalog(top);
+    const siblings = cm.cards.filter((c) => c.key !== top!.key && c.name === top!.name).length;
+    const settled = cm.byCode || /serial|back/i.test(refineNote);
+    const needBack = settled ? undefined
+      : byClosest || (!byPicture && !refined && !cm.byCode) ? 'Not fully sure from the front alone.'
+      : isHard(item.game) && siblings > 0 ? `${top.name} has ${siblings + 1} look-alike versions.`
+      : undefined;
+    return { ...item, id: base.id, at: base.at, uri, thumb, phash, note, needBack, source: byPicture ? 'picture match' : byClosest ? 'closest match to the text read' : 'card database' };
   }
   if ((!gg || DB_GAMES.includes(gg)) && (parsed.name || parsed.number)) {
     const list = await identify(lines, parsed.rawText, parsed.name, parsed.number, parsed.setCode, gg).catch(() => []);
     const best = list[0];
     if (best && best.score >= 45) {
-      return { ...base, game: best.game, name: best.name, set: best.set, number: best.number, rarity: best.rarity, price: best.raw.mid ?? null, currency: best.currency, source: best.source, cand: stripCand(best) };
+      return { ...base, game: best.game, name: best.name, set: best.set, number: best.number, rarity: best.rarity, price: best.raw.mid ?? null, currency: best.currency, source: best.source, cand: stripCand(best),
+        needBack: best.score < 70 ? 'Not fully sure from the front alone.' : undefined };
     }
   }
-  return { ...base, game: gg, name: parsed.name, number: parsed.number, source: parsed.name ? 'text read' : '', note: parsed.name ? 'Not sure about this one: tap Grade to check the details.' : 'Could not read this card. Move closer, fill the frame and tap again.' };
+  return { ...base, game: gg, name: parsed.name, number: parsed.number, source: parsed.name ? 'text read' : '', needBack: parsed.name ? 'Could not match this card from the front.' : undefined, note: parsed.name ? 'Not sure about this one: tap Grade to check the details.' : 'Could not read this card. Move closer, fill the frame and tap again.' };
 }
 
 /** A server match as a scan result: the phone's own catalog card when it has it (prices, parallels, add to collection). */

@@ -505,7 +505,11 @@ def image_url(card: Card, size: int = 240) -> tuple[str, bool]:
     """(url, is_other_parallel). Sizes: 60, 240, 1600."""
     if not card.img:
         return "", False
-    other = card.img.startswith("~")
+    if card.img.startswith("wc:"):  # Naruto Kayou (WaifuCards)
+        return f"https://waifucards.app/img/cards/{card.img[3:]}.webp", False
+    if card.img.startswith("nc:"):  # Naruto (narutocards.ca)
+        return f"https://cdn.narutocards.ca/{card.img[3:]}", False
+    other =card.img.startswith("~")
     return f"https://storage.googleapis.com/images.pricecharting.com/{card.img.lstrip('~')}/{size}.jpg", other
 
 

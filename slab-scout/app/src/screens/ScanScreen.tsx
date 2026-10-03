@@ -70,7 +70,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [camBox, setCamBox] = useState<LayoutRectangle | null>(null);
   const [guideBox, setGuideBox] = useState<LayoutRectangle | null>(null);
   const [phase, setPhase] = useState<Phase>('capture');
-  const [side, setSide] = useState<'front' | 'back'>('front');
+  const [side, setSide] = useState<GradeSide>('front');
+  // optional extra grading photos: the card tilted toward one light, so scratches / dents / print lines catch it
+  const [extras, setExtras] = useState<{ tiltF: Shot | null; tiltB: Shot | null }>({ tiltF: null, tiltB: null });
+  const [inspTilt, setInspTilt] = useState<{ f: Inspection | null; b: Inspection | null }>({ f: null, b: null });
+  // live scanner: the next tap scans the back of this result (the front alone wasn't enough)
+  const [backFor, setBackFor] = useState<string | null>(null);
   const [front, setFront] = useState<Shot | null>(null);
   const [back, setBack] = useState<Shot | null>(null);
   const frontState = front;
@@ -177,6 +182,11 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       analyze(s);
       return;
     }
+    if (side === 'tiltF' || side === 'tiltB') {
+      setExtras((x) => ({ ...x, [side]: s }));
+      setPhase('review');
+      return;
+    }
     if (side === 'front') {
       setFront(s);
       if (back) setPhase('review');
@@ -220,8 +230,40 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setLast(it);
     setSession((s) => [...s, { id: it.id, price: it.price || 0 }]);
   }
+  /** The back of the card showing: identify again from front + back. */
+  async function scanBackOf(id: string, backShot: Shot) {
+    const fs = shots.current.get(id);
+    const prev = lastRef.current;
+    if (!fs || !prev) return;
+    const it = await quickIdentify(fs.uri, game, store, fs.orig, backShot.uri);
+    shots.current.set(`${id}:back`, backShot);
+    const patch: Partial<ScanItem> = { ...it, id, at: prev.at, uri: prev.uri, thumb: prev.thumb, phash: prev.phash };
+    if (!it.name) {
+      setError("Couldn't read the back either. Tap Grade to check the details yourself.");
+      return;
+    }
+    await updateHistory(id, patch);
+    setLast({ ...prev, ...patch } as ScanItem);
+    setSession((s) => s.map((x) => (x.id === id ? { ...x, price: it.price || 0 } : x)));
+  }
   async function tapScan(quiet = false) {
     if (!cam.current || scanning) return;
+    if (backFor) {
+      if (quiet) return;
+      setScanning(true);
+      setError('');
+      const id = backFor;
+      try {
+        const pic = await cam.current.takePictureAsync({ quality: 0.92, shutterSound: false });
+        await scanBackOf(id, { ...(await cropAndTrim(pic.uri, pic.width, pic.height, guideRect(pic.width, pic.height))), tight: true, orig: pic.uri });
+      } catch (e: any) {
+        setError(`Couldn't scan the back: ${e?.message || e}. Try again.`);
+      } finally {
+        setBackFor(null);
+        setScanning(false);
+      }
+      return;
+    }
     setScanning(true);
     if (!quiet) setError('');
     try {
@@ -235,10 +277,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   }
   // Auto: scan again ~2.5 s after the scanner goes idle
   useEffect(() => {
-    if (!auto || paused || mode !== 'live' || !camOn || scanning || gameSheet || chipSheet) return;
+    if (!auto || paused || mode !== 'live' || !camOn || scanning || gameSheet || chipSheet || backFor) return;
     const t = setTimeout(() => tapScan(true), 2500);
     return () => clearTimeout(t);
-  }, [auto, paused, mode, camOn, scanning, gameSheet, chipSheet, last?.id]);
+  }, [auto, paused, mode, camOn, scanning, gameSheet, chipSheet, last?.id, backFor]);
   /** Another parallel picked for the scanned card (finish chip). */
   async function pickFinish(it: ScanItem, c: CatCard) {
     const [v] = catValue(c);
@@ -289,9 +331,16 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     curItem.current = it.id;
     setShowHistory(false);
     setFront(shot);
-    setBack(null);
-    setSide('front');
-    analyze(shot);
+    setExtras({ tiltF: null, tiltB: null });
+    // grading looks at both sides: use the back already scanned, else ask for it next
+    const b = shots.current.get(`${it.id}:back`) || null;
+    setBack(b);
+    setMode('grade');
+    if (b) setPhase('review');
+    else {
+      setSide('back');
+      setPhase('capture');
+    }
   }
 
   /* ---------- analysis ---------- */
@@ -370,6 +419,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       const [fi, bi] = await Promise.all([inspectCard(front.uri).catch(() => null), back ? inspectCard(back.uri, null, true).catch(() => null) : Promise.resolve(null)]);
       setInsp(fi);
       setInspBack(bi);
+      if (!shot && (extras.tiltF || extras.tiltB)) {
+        setProgress('Checking the tilted photos for scratches and dents…');
+        const [tf, tb] = await Promise.all([
+          extras.tiltF ? inspectCard(extras.tiltF.uri).catch(() => null) : Promise.resolve(null),
+          extras.tiltB ? inspectCard(extras.tiltB.uri, null, true).catch(() => null) : Promise.resolve(null),
+        ]);
+        setInspTilt({ f: tf, b: tb });
+      } else setInspTilt({ f: null, b: null });
       setCorners('');
       setEdges('');
       setSurface('');
@@ -598,6 +655,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setFront(null);
     setBack(null);
     setSide('front');
+    setExtras({ tiltF: null, tiltB: null });
+    setInspTilt({ f: null, b: null });
     setCandidates([]);
     setSlab(null);
     setInsp(null);
@@ -711,10 +770,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     };
   }, [phase, frontUri, backUri, rawText, signedByType]);
 
+  const flatSurface = Math.min(insp?.subgrades.surface ?? 9, inspBack?.subgrades.surface ?? 10);
+  const tiltSurface = tiltSurfaceGrade(flatSurface, inspTilt.f, inspTilt.b);
   const autoSub = {
     corners: Math.min(insp?.subgrades.corners ?? 9, inspBack?.subgrades.corners ?? 10),
     edges: Math.min(insp?.subgrades.edges ?? 9, inspBack?.subgrades.edges ?? 10),
-    surface: Math.min(insp?.subgrades.surface ?? 9, inspBack?.subgrades.surface ?? 10),
+    surface: tiltSurface ?? flatSurface,
   };
   const pickedSub = (user: string, auto: number) => (user && user !== subgradeToOption(auto) ? user : auto);
   const overridden = [[corners, autoSub.corners], [edges, autoSub.edges], [surface, autoSub.surface]].some(([u, a]) => u && u !== subgradeToOption(a as number));
@@ -728,6 +789,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       tag_score: sg.tag_score, tag_grade: sg.tag_grade, tag_label: sg.tag_label, sub: sg.sub, centering_cap: undefined,
       centering: { front: sg.centering.front?.text || grade.centering?.front, back: sg.centering.back?.text || grade.centering?.back },
     };
+    const ts = tiltSurfaceGrade(sg.sub.surface, inspTilt.f, inspTilt.b);
+    if (ts != null && ts < sg.sub.surface) {
+      // the tilted photos found surface wear the flat ones couldn't see
+      const re = estimate(sg.centering.front?.worst ?? centeringWorst(cen), sg.centering.back?.worst ?? (backCen ? centeringWorst(backCen) : null), sg.sub.corners, sg.sub.edges, ts);
+      grade = { ...grade, ...re, method: 'scan server + tilted photos', sub: { ...sg.sub, surface: ts }, centering: grade.centering };
+    }
   }
   if (useAiGrade && aiRes?.psa) {
     const cnd = aiRes.condition || {};
@@ -823,7 +890,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" zoom={ZOOMS[zoomIdx][1]} />
           {shade}
           <Pressable style={StyleSheet.absoluteFill} onPress={() => tapScan()} accessibilityLabel="Tap to scan the card" />
-          {frame(scanning ? 'Scanning…' : auto ? 'Looking for card…' : 'Tap to scan')}
+          {frame(scanning ? 'Scanning…' : backFor ? 'Flip the card · tap to scan the back' : auto ? 'Looking for card…' : 'Tap to scan')}
 
           {/* top: back + control pill */}
           <View pointerEvents="box-none" style={{ position: 'absolute', left: Math.max(L.gutter, (L.width - 640) / 2), right: Math.max(L.gutter, (L.width - 640) / 2), top: L.top + L.sp(6), gap: L.sp(8) }}>
@@ -841,7 +908,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
             </View>
             <View pointerEvents="box-none" style={[S.row, { justifyContent: 'flex-end', gap: 8 }]}>
               <SmallPill label="Photos" icon="photo" onPress={pickLive} />
-              <SmallPill label="Grade front + back" onPress={() => { setMode('grade'); setSide('front'); }} />
+              <SmallPill label="Grade (front + back)" onPress={() => { setMode('grade'); setSide('front'); }} />
             </View>
             {slabMode ? <Text style={{ color: '#fff', fontSize: L.fs(12), textAlign: 'center', textShadowColor: '#000', textShadowRadius: 4 }}>Graded: fit the whole slab, label at the top, then pick the grade on the result.</Text> : null}
           </View>
@@ -883,6 +950,18 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                     <DropChip label="Grade ›" onPress={() => gradeItem(last)} arrow={false} />
                     {cat ? <DropChip label="Card page ›" onPress={() => app.openCard(cat.key)} arrow={false} /> : null}
                   </ScrollView>
+                  {last.needBack && !last.withBack ? (
+                    <View style={[S.row, { gap: 8, backgroundColor: 'rgba(212,242,90,0.08)', borderRadius: L.sp(12), borderWidth: 1, borderColor: 'rgba(212,242,90,0.35)', padding: L.sp(8) }]}>
+                      <Text style={{ flex: 1, color: C.ink, fontSize: L.fs(12) }} numberOfLines={3}>
+                        {backFor === last.id ? 'Flip the card over and tap the frame to scan its back.' : `${last.needBack} Scan the back to confirm the exact card.`}
+                      </Text>
+                      <Pressable onPress={() => setBackFor(backFor === last.id ? null : last.id)} style={({ pressed }) => [{ backgroundColor: backFor === last.id ? C.surface2 : C.lime, borderRadius: 999, paddingHorizontal: L.sp(12), paddingVertical: L.sp(7) }, pressed && { opacity: 0.8 }]}>
+                        <Text style={{ color: backFor === last.id ? C.ink : C.accentInk, fontWeight: '900', fontSize: L.fs(12) }}>{backFor === last.id ? 'Cancel' : 'Scan back'}</Text>
+                      </Pressable>
+                    </View>
+                  ) : last.withBack ? (
+                    <Text style={{ color: C.good, fontSize: L.fs(11.5), fontWeight: '700' }}>✓ Confirmed with the back of the card</Text>
+                  ) : null}
                 </>
               ) : (
                 <View style={[S.row, { gap: L.sp(12), minHeight: L.sp(67) }]}>
@@ -923,17 +1002,26 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       <View style={S.screen} onLayout={(e) => setCamBox(e.nativeEvent.layout)}>
         <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" />
         {shade}
-        {frame(bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'Front · step 1 of 2' : 'Back · step 2 of 2')}
+        {frame(bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'Front · step 1 of 2' : side === 'back' ? 'Back · step 2 of 2' : side === 'tiltF' ? 'Extra · front tilted to the light' : 'Extra · back tilted to the light')}
         <View pointerEvents="box-none" style={{ position: 'absolute', left: L.gutter, right: L.gutter, top: L.top + L.sp(6), gap: L.sp(8) }}>
           <View style={[S.row, { gap: L.sp(8) }]}>
             <RoundBtn icon="back" onPress={() => setMode('live')} label="Back to the live scanner" />
             <View style={{ flex: 1, height: L.sp(40), borderRadius: 999, backgroundColor: 'rgba(16,18,28,0.78)', justifyContent: 'center', paddingHorizontal: L.sp(14) }}>
-              <Text style={{ color: C.lime, fontWeight: '800', letterSpacing: 1, fontSize: L.fs(12) }} numberOfLines={1}>{side === 'front' ? 'GRADING · FRONT' : 'GRADING · BACK'}</Text>
+              <Text style={{ color: C.lime, fontWeight: '800', letterSpacing: 1, fontSize: L.fs(12) }} numberOfLines={1}>GRADING · {(GRADE_STEPS.find((g) => g.id === side)?.title || '').toUpperCase()}</Text>
             </View>
           </View>
-          <Text style={{ color: '#fff', fontSize: L.fs(12.5), textAlign: 'center', textShadowColor: '#000', textShadowRadius: 4 }}>
-            Card out of its sleeve, flat on a plain dark surface, edges lined up with the frame. A held or tilted card still works; it gets straightened.
-          </Text>
+          {(() => {
+            const g = GRADE_STEPS.find((x) => x.id === side) || GRADE_STEPS[0];
+            return (
+              <View style={[S.row, { gap: L.sp(10), backgroundColor: 'rgba(16,18,28,0.82)', borderRadius: L.sp(14), padding: L.sp(8), alignItems: 'flex-start' }]}>
+                <GuidePic step={g.id} size={L.sp(74)} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={{ color: '#fff', fontSize: L.fs(12), lineHeight: L.fs(16) }}>{g.how}</Text>
+                  <Text style={{ color: C.ink2, fontSize: L.fs(11), fontWeight: '700' }}>Checks: {g.finds}</Text>
+                </View>
+              </View>
+            );
+          })()}
         </View>
         <View style={[S.row, { position: 'absolute', left: 0, right: 0, bottom: 0, justifyContent: 'space-around', paddingTop: L.sp(16), paddingBottom: L.bottom + L.sp(20), backgroundColor: 'rgba(10,11,16,0.7)' }]}>
           <Pressable style={st.side} onPress={pick}>
@@ -943,10 +1031,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           <Pressable style={[st.shutter, { width: L.sp(76), height: L.sp(76), borderRadius: L.sp(38) }]} onPress={snap} disabled={busy} accessibilityLabel="Take photo">
             {busy ? <ActivityIndicator color={C.accentInk} /> : <View style={[st.shutterIn, { width: L.sp(60), height: L.sp(60), borderRadius: L.sp(30) }]} />}
           </Pressable>
-          {side === 'back' ? (
+          {side !== 'front' ? (
             <Pressable style={st.side} onPress={() => setPhase('review')}>
               <Icon name="forward" size={L.fs(22)} color="#fff" />
-              <Text style={st.sideText}>Skip back</Text>
+              <Text style={st.sideText}>{side === 'back' ? 'Skip back' : 'Skip'}</Text>
             </Pressable>
           ) : (
             <View style={st.side} />
@@ -985,7 +1073,28 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           </ScrollView>
           {!ocrAvailable() ? <Text style={S.muted}>Text reading needs the installed app (not Expo Go). You can still type the card details after scanning.</Text> : null}
           {error ? <View style={S.banner}><Text style={[S.body, { color: C.warn }]}>{error}</Text></View> : null}
-          <Btn primary label="Scan card" onPress={() => analyze()} />
+          {!back ? (
+            <View style={S.banner}><Text style={[S.body, { color: C.warn }]}>No back photo: the grade will only cover the front. Tap the back box above to add it (graders check both sides).</Text></View>
+          ) : null}
+          <Text style={S.eyebrow}>Sharper surface grade (optional)</Text>
+          <Text style={S.muted}>Flat photos hide fine scratches and dents. One extra photo per side, tilted toward a single light, shows them the way a grader's lamp does.</Text>
+          {GRADE_STEPS.filter((g) => g.optional).map((g) => {
+            const shotX = extras[g.id as 'tiltF' | 'tiltB'];
+            return (
+              <View key={g.id} style={[S.card, S.row, { gap: 12, alignItems: 'flex-start' }]}>
+                {shotX ? <Image source={{ uri: shotX.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <GuidePic step={g.id} size={84} />}
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={[S.body, { fontWeight: '800' }]}>{g.title}</Text>
+                  <Text style={S.muted}>{g.how}</Text>
+                  <View style={[S.row, { gap: 8 }]}>
+                    <Btn label={shotX ? 'Retake' : 'Take photo'} onPress={() => { setSide(g.id); setPhase('capture'); }} />
+                    {shotX ? <Btn label="Remove" onPress={() => setExtras((x) => ({ ...x, [g.id]: null }))} /> : null}
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+          <Btn primary label={back ? 'Scan and grade' : 'Scan card'} onPress={() => analyze()} />
           <Btn label="Start over" onPress={reset} />
           {!aiOn ? (
             <Text style={[S.muted, { textAlign: 'center' }]} onPress={goSettings}>
@@ -1182,6 +1291,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                   </Text>
                 ))}
                 {!insp.findings.length && !inspBack?.findings.length ? <Text style={S.muted}>No corner whitening, edge chips, scratches or stains found in this photo.</Text> : null}
+                {inspTilt.f || inspTilt.b ? (
+                  <Text style={S.muted}>
+                    Tilted photos: {tiltSurface == null ? 'too much glare or blur to use, so the surface grade is from the flat photos' : tiltSurface < flatSurface ? `surface wear showed under the light, so surface is ${tiltSurface} (flat photos: ${flatSurface})` : `no extra surface wear under the light (surface ${flatSurface})`}.
+                    {[...(inspTilt.f?.findings || []), ...(inspTilt.b?.findings || [])].filter((x) => x.area === 'surface' && x.sure === 'likely').slice(0, 3).map((x) => ` ${x.what} (${x.where}).`).join('')}
+                  </Text>
+                ) : null}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
                   {[...insp.views.map((v) => v.name), ...(inspBack ? inspBack.views.map((v) => `Back · ${v.name}`) : [])].map((n) => (
                     <Pressable key={n} onPress={() => setView(n)} style={[S.chip, { paddingVertical: 7, paddingHorizontal: 12 }, view === n && { backgroundColor: C.accent }]}>
@@ -1508,3 +1623,44 @@ const st = StyleSheet.create({
   vbox: { flex: 1, backgroundColor: C.surface2, borderRadius: 12, padding: 12, gap: 2 },
   big: { color: C.ink, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });
+
+type GradeSide = 'front' | 'back' | 'tiltF' | 'tiltB';
+
+/** Surface subgrade from the tilted (raking-light) photos: they show scratches, dents and print lines that flat photos
+ * miss. Only photos without large glare count, and they can lower the flat-photo surface grade by at most one step
+ * (a reflection read as a scratch shouldn't sink a card). Null when there are no usable tilted photos. */
+function tiltSurfaceGrade(flat: number, f: Inspection | null, b: Inspection | null): number | null {
+  const ok = [f, b].filter((x): x is Inspection => !!x && (x.metrics.glarePct ?? 0) < 8 && (x.metrics.sharpness ?? 100) >= 60);
+  if (!ok.length) return null;
+  const seen = Math.min(...ok.map((x) => x.subgrades.surface));
+  return Math.min(flat, Math.max(seen, flat - 1));
+}
+
+/** What each grading photo should look like: a small drawing of the card on the table, flat or tilted toward a lamp. */
+export const GRADE_STEPS: { id: GradeSide; title: string; how: string; finds: string; optional?: boolean }[] = [
+  { id: 'front', title: 'Front, flat', how: 'Card out of its sleeve, face up, flat on a plain dark surface. Phone straight above it, card filling the frame, even light with no reflections.', finds: 'Centering, corners, edges and surface' },
+  { id: 'back', title: 'Back, flat', how: 'Flip it over in the same spot and the same light. Same distance, straight above.', finds: 'Back centering, back corners and edges, back surface' },
+  { id: 'tiltF', title: 'Front, tilted to one light', how: 'One lamp or window to the side. Tilt the card about 30° toward it so the light skims across the face: scratches, dents and print lines light up as bright lines. Keep the whole card in the frame.', finds: 'Scratches, dents, print lines, indentations', optional: true },
+  { id: 'tiltB', title: 'Back, tilted to one light', how: 'Same as the front: back facing up, tilted about 30° toward the light, whole card in the frame.', finds: 'Back scratches and dents', optional: true },
+];
+
+/** Example drawing for a grading step: dark table, the card (flat or tilted in perspective) and the lamp. */
+export function GuidePic({ step, size = 120 }: { step: GradeSide; size?: number }) {
+  const tilt = step === 'tiltF' || step === 'tiltB';
+  const back = step === 'back' || step === 'tiltB';
+  const w = size * 0.5;
+  const h = w * (88 / 63);
+  return (
+    <View style={{ width: size, height: size, borderRadius: 14, backgroundColor: '#0B0C12', borderWidth: 1, borderColor: C.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      {tilt ? <Text style={{ position: 'absolute', top: 4, right: 6, fontSize: size * 0.16 }}>💡</Text> : null}
+      <View style={{ width: w, height: h, borderRadius: 5, backgroundColor: back ? '#1F3B8F' : '#F2EFE6', padding: w * 0.07,
+        transform: tilt ? [{ perspective: 300 }, { rotateX: '38deg' }, { rotateZ: '-6deg' }] : [] }}>
+        <View style={{ flex: 1, borderRadius: 3, backgroundColor: back ? '#2B55C9' : '#E8B04A', alignItems: 'center', justifyContent: 'center' }}>
+          {back ? <View style={{ width: w * 0.45, height: w * 0.45, borderRadius: w, backgroundColor: '#F2C94C' }} /> : <View style={{ width: '80%', height: '45%', borderRadius: 3, backgroundColor: '#7FB3E8' }} />}
+          {tilt ? <View style={{ position: 'absolute', left: '15%', top: '30%', width: '70%', height: 2, backgroundColor: '#fff', opacity: 0.9, transform: [{ rotateZ: '-20deg' }] }} /> : null}
+        </View>
+      </View>
+      <Text style={{ position: 'absolute', bottom: 4, color: C.ink2, fontSize: size * 0.085, fontWeight: '700' }}>{tilt ? '~30° toward the light' : 'flat · straight above'}</Text>
+    </View>
+  );
+}

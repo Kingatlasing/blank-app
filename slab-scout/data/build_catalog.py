@@ -96,6 +96,33 @@ def load_json(path: str):
         return json.load(fh)
 
 
+def load_raw(path: str):
+    """A raw pull as {sets: {slug: {title, c: [[t, uri, pr, raw, g9, psa10, img]], ...}}}. narutocards.ca pulls
+    ({name, number, rarity, image path} per card) are turned into that shape: Kayou waves keep WaifuCards' slug
+    (naruto-kayou-t1w1) so the copy with English names, official card codes (NR-SSR-001) and photos replaces it
+    when it's at least as complete; the English Bandai CCG sets get their own."""
+    d = load_json(path)
+    if "narutocards" not in os.path.basename(path):
+        return d
+    out = {}
+    for slug, v in d.get("sets", {}).items():
+        code = v.get("code", "")
+        title = v.get("title", code)
+        m = re.fullmatch(r"kayou-t(\d)-w(\d)", code)
+        if m:
+            sid = f"naruto-kayou-t{m.group(1)}w{m.group(2)}"
+            title = f"Naruto Kayou T{m.group(1)}W{m.group(2)} · {title}"
+        elif v.get("pub") == "Kayou":
+            sid = "naruto-kayou-" + re.sub(r"^kayou-", "", code)
+            title = f"Naruto Kayou {title}"
+        else:
+            sid = "naruto-bandai-" + re.sub(r"^bandai-ccg-", "", code)
+            title = f"Naruto CCG (Bandai) {title}"
+        rows = [[f"{n} [{r}] #{num}", "", "", "", "", "", f"nc:{img}" if img else ""] for n, num, r, img in v.get("c", [])]
+        out[sid] = {"title": title, "brand": v.get("pub", ""), "category": "Naruto", "host": "narutocards", "code": code, "c": rows}
+    return {"sets": out, "fetched_at": d.get("fetched_at", "")}
+
+
 def slug_meta(slug: str, title: str) -> dict:
     s = slug.lower()
     year = (re.search(r"(19|20)\d\d", s) or [""])[0]
@@ -114,6 +141,8 @@ def slug_meta(slug: str, title: str) -> dict:
         category = "Marvel"
     elif "star-wars" in s:
         category = "Star Wars"
+    elif "naruto" in s:
+        category, brand = "Naruto", "Kayou" if "kayou" in s else brand
     elif "harry-potter" in s:
         category = "Harry Potter"
     elif "michael-jackson" in s:
@@ -145,7 +174,8 @@ def num(v):
 
 def build():
     sets: dict[str, dict] = {}
-    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*")))
+    raw_files = sorted(glob.glob(os.path.join(RAW, "slabscout-pricecharting*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-sportscardspro*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-waifucards*.json*"))) + sorted(glob.glob(os.path.join(RAW, "slabscout-narutocards*.json*")))
+    load_json = load_raw  # narutocards.ca pulls come in their own shape
     # Two passes so only one raw file is in memory at a time: first find which file has the fullest copy of each
     # set (later files win ties), then process each set from that file.
     winner: dict[str, tuple[int, int]] = {}  # slug -> (file index, row count)
@@ -182,14 +212,14 @@ def build():
     sink = CardSink()
     for slug, s in raw_sets():
         if "c" in s and "rows" not in s:  # compact browser export: [t, uri, pr, raw, g9, psa10, img]
-            rows = ({"t": t, "u": f"/game/{slug}/{u}", "pr": pr, "raw": rw, "g9": g9, "psa10": p10, "img": im}
-                    for t, u, pr, rw, g9, p10, im in s["c"])
+            rows = ({"t": t, "u": f"/game/{slug}/{u}" if u else "", "pr": pr, "raw": rw, "g9": g9, "psa10": p10, "img": im}
+                    for t, u, pr, rw, g9, p10, im, *_ in s["c"])
         else:
             rows = s.get("rows") or []
         if not (s.get("c") or s.get("rows")):
             continue
         host = s.get("host", "pricecharting")
-        base_url = "https://www.sportscardspro.com" if host == "sportscardspro" else "https://www.pricecharting.com"
+        base_url = {"sportscardspro": "https://www.sportscardspro.com", "waifucards": "https://waifucards.app", "narutocards": "https://www.narutocards.ca"}.get(host, "https://www.pricecharting.com")
         meta = slug_meta(slug, s.get("title", slug))
         if s.get("brand") and meta["brand"] == "Other":
             meta["brand"] = s["brand"]
@@ -237,10 +267,12 @@ def build():
             tier_list.append(t)
         tier_list.sort(key=lambda t: (t["print_run"] or 10**6), reverse=True)
         sink.add(slug, set_rows, slug in remote_ids, meta["category"])
-        sets[slug] = {
+        own = [r for r in set_rows if r[9] and not r[9].startswith("~")]
+        cover = max(own, key=lambda r: r[5] or 0)[9] if own else ""
+        sets[slug] = {"cover": cover,
             "id": slug, **meta, "cards": sum(t["count"] for t in tier_list), "tiers": tier_list,
             "box": BOX.get(slug), "notes": SET_NOTES.get(slug, ""),
-            "source": host, "source_url": f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
+            "source": host, "source_url": f"{base_url}/set/{s['code']}" if host == "waifucards" else f"{base_url}/sets/{'kayou' if s['code'].startswith('kayou') else 'bandai-ccg'}/{s['code']}" if host == "narutocards" else f"{base_url}/console/{slug}", "base_url": base_url, "prices_as_of": fetched.get(slug, "")[:10],
         }
 
     gc.collect()

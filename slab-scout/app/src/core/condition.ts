@@ -243,6 +243,7 @@ export async function inspectCard(uri: string, officialUrl?: string | null, isBa
     }
   const sharp = lapSq / n - (lapSum / n) ** 2;
   metrics.sharpness = Math.round(sharp);
+  metrics.glarePct = n ? Math.round((glare / n) * 1000) / 10 : 0;
   if (sharp < 60) photoNotes.push('Photo looks soft or blurry, so small scratches and whitening may be missed. Hold steady, add light, no zoom.');
   if (glare / n > 0.03) photoNotes.push("Glare on the card. Tilt it slightly away from the light so reflections don't hide the surface.");
 

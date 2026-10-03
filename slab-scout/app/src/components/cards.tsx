@@ -343,6 +343,7 @@ export function ChangeChip({ abs, pct, label }: { abs: number; pct: number; labe
 export { money };
 
 const st = StyleSheet.create({
+  series: { backgroundColor: C.surface, borderWidth: 1, borderColor: C.lineSoft },
   tile: { backgroundColor: C.surface, borderRadius: R.lg - 2, padding: 8, gap: 3 },
   imgWrap: { borderRadius: 10, overflow: 'hidden', backgroundColor: C.surface3 },
   ph: { aspectRatio: 63 / 88, alignItems: 'center', justifyContent: 'center', padding: 6 },
@@ -363,3 +364,118 @@ const st = StyleSheet.create({
   utab: { flex: 1, alignItems: 'center', paddingTop: 10, gap: 9 },
   uline: { height: 3, borderRadius: 2, alignSelf: 'stretch', marginHorizontal: 10, backgroundColor: 'transparent', marginBottom: -1 },
 });
+
+/** Frame colour for a card's rarity / parallel, like a binder sleeve colour (numbered and 1-of-1 parallels glow). */
+export function rarityTint(rarity?: string, printRun?: number | null): string {
+  if (printRun) return printRun <= 1 ? '#FF4D6D' : printRun <= 10 ? '#FF8A3D' : printRun <= 50 ? '#FFC93C' : printRun <= 299 ? '#4FCFE8' : '#8B8FF5';
+  const r = (rarity || '').toUpperCase();
+  if (!r || r === 'BASE' || r === 'C' || r === 'COMMON' || r === 'N') return '#3A3E52';
+  if (/\b(SP|SSP|SPECIAL)\b/.test(r)) return '#F78FE3';
+  if (/\b(UR|SEC|SECRET|MUR|HR|GOLD|ULTRA)\b/.test(r)) return '#FF9F1C';
+  if (/\b(SSR|SAR|SIR|ALT|MANGA|ZR)\b/.test(r)) return '#FFD23F';
+  if (/\b(SR|AR|IR|RR|HOLO|R)\b/.test(r)) return '#8B5CF6';
+  if (/(PRIZM|REFRACTOR|CHROME|SILVER|FOIL)/.test(r)) return '#A9B4C8';
+  if (/(RED)/.test(r)) return '#FF5A4A';
+  if (/(BLUE)/.test(r)) return '#4F5BF5';
+  if (/(GREEN)/.test(r)) return '#3DDC84';
+  if (/(PURPLE)/.test(r)) return '#A100FF';
+  if (/(PINK)/.test(r)) return '#F78FE3';
+  return '#5B6080';
+}
+
+/** Short rarity badge text: 'SSR', '/25', '1/1', or the first letters of a parallel name. */
+export function rarityBadge(rarity?: string, printRun?: number | null): string {
+  if (printRun) return printRun === 1 ? '1/1' : `/${printRun}`;
+  const r = (rarity || '').trim();
+  if (!r || r === 'Base') return '';
+  if (/^[A-Z0-9+]{1,5}$/.test(r)) return r;
+  return r.split(/\s+/).slice(0, 2).join(' ').slice(0, 14);
+}
+
+/** Card-art tile (catalog grids): the whole card picture in a rounded frame tinted by rarity, a rarity badge on the
+ * corner, then name, number and price underneath. */
+export function CardArt({ title, number, rarity, printRun, price, uri, width, owned, onPress, onLongPress }: {
+  title: string; number?: string; rarity?: string; printRun?: number | null; price?: string; uri?: string; width: number; owned?: boolean;
+  onPress?: () => void; onLongPress?: () => void;
+}) {
+  const L = useLayout();
+  const tint = rarityTint(rarity, printRun);
+  const badge = rarityBadge(rarity, printRun);
+  const num = number ? `#${String(number).replace(/^#/, '')}` : '';
+  return (
+    <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={350} style={({ pressed }) => [{ width }, pressed && { opacity: 0.8, transform: [{ scale: 0.98 }] }]}>
+      <View style={{ width, height: Math.round(width * 1.4), borderRadius: L.sp(12), borderWidth: 2, borderColor: tint, backgroundColor: C.surface3, overflow: 'hidden' }}>
+        {uri ? <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : (
+          <View style={st.ph}><Text style={st.phText} numberOfLines={4}>{title}</Text></View>
+        )}
+        {badge ? (
+          <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: 'rgba(10,11,16,0.82)', borderRadius: 999, borderWidth: 1, borderColor: tint, paddingHorizontal: 7, paddingVertical: 2 }}>
+            <Text style={{ color: tint, fontWeight: '900', fontSize: L.fs(10) }} numberOfLines={1}>{badge}</Text>
+          </View>
+        ) : null}
+        {owned ? (
+          <View style={{ position: 'absolute', top: 6, left: 6, width: L.sp(22), height: L.sp(22), borderRadius: L.sp(11), backgroundColor: C.good, alignItems: 'center', justifyContent: 'center' }}>
+            <Icon name="check" size={L.fs(13)} color={C.bg} />
+          </View>
+        ) : null}
+      </View>
+      <Text style={{ color: C.ink, fontWeight: '800', fontSize: L.fs(12.5), marginTop: L.sp(6) }} numberOfLines={1}>{title}</Text>
+      <View style={[S.row, { gap: 4, marginTop: 1 }]}>
+        <Text style={{ flex: 1, color: C.ink2, fontSize: L.fs(11), fontWeight: '600' }} numberOfLines={1}>{num || ' '}</Text>
+        {price ? <Text style={{ color: price === '—' || price.startsWith('~') ? C.ink2 : C.lime, fontWeight: '800', fontSize: L.fs(11.5), fontVariant: ['tabular-nums'] }} numberOfLines={1}>{price}</Text> : null}
+      </View>
+    </Pressable>
+  );
+}
+
+/** Series tile (Explore, grouped): cover picture, name, "N sets · brand", a line about it, and small sub-series chips. */
+export function SeriesTile({ title, cover, meta, about, chips, onPress, onChip }: {
+  title: string; cover?: string; meta: string; about?: string; chips?: string[]; onPress?: () => void; onChip?: (c: string) => void;
+}) {
+  const L = useLayout();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [st.series, { borderRadius: L.sp(18), padding: L.sp(12) }, pressed && { opacity: 0.8 }]}>
+      <View style={[S.row, { gap: L.sp(12), alignItems: 'flex-start' }]}>
+        <View style={{ width: L.sp(82), height: L.sp(54), borderRadius: L.sp(10), backgroundColor: C.surface3, overflow: 'hidden' }}>
+          {cover ? <Image source={{ uri: cover }} style={{ width: '100%', height: '160%', marginTop: '-12%' }} resizeMode="cover" /> : null}
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+          <Text style={{ color: C.ink, fontWeight: '800', fontSize: L.fs(15.5) }} numberOfLines={1}>{title}</Text>
+          <Text style={{ color: C.ink2, fontWeight: '700', fontSize: L.fs(12) }} numberOfLines={1}>{meta}</Text>
+          {about ? <Text style={{ color: C.ink3, fontSize: L.fs(12), lineHeight: L.fs(16) }} numberOfLines={2}>{about}</Text> : null}
+        </View>
+      </View>
+      {chips?.length ? (
+        <View style={{ gap: 6, marginTop: L.sp(10) }}>
+          <Text style={{ color: C.ink3, fontWeight: '800', fontSize: L.fs(10), letterSpacing: 1 }}>SUBSERIES</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+            {chips.map((c) => (
+              <Pressable key={c} onPress={() => onChip?.(c)} hitSlop={4} style={({ pressed }) => [{ backgroundColor: C.surface2, borderRadius: 8, paddingHorizontal: 9, paddingVertical: 5 }, pressed && { opacity: 0.7 }]}>
+                <Text style={{ color: C.ink, fontSize: L.fs(11.5), fontWeight: '700' }} numberOfLines={1}>{c}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** Set tile (Explore, expanded): cover picture, set name, year · brand, card count, rarest parallel, owned count. */
+export function SetTile({ title, cover, meta, chips, owned, onPress }: { title: string; cover?: string; meta: string; chips?: React.ReactNode; owned?: number; onPress?: () => void }) {
+  const L = useLayout();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [st.series, S.row, { borderRadius: L.sp(18), padding: L.sp(12), gap: L.sp(12), alignItems: 'flex-start' }, pressed && { opacity: 0.8 }]}>
+      <View style={{ width: L.sp(56), height: L.sp(78), borderRadius: L.sp(8), backgroundColor: C.surface3, overflow: 'hidden' }}>
+        {cover ? <Image source={{ uri: cover }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
+      </View>
+      <View style={{ flex: 1, minWidth: 0, gap: L.sp(4) }}>
+        <Text style={{ color: C.ink, fontWeight: '800', fontSize: L.fs(15) }} numberOfLines={2}>{title}</Text>
+        <Text style={{ color: C.ink2, fontWeight: '700', fontSize: L.fs(12) }} numberOfLines={1}>{meta}</Text>
+        {chips ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{chips}</View> : null}
+        {owned ? <Text style={{ color: C.good, fontWeight: '800', fontSize: L.fs(12) }}>You own {owned}</Text> : null}
+      </View>
+      <Icon name="forward" size={L.fs(14)} color={C.ink3} />
+    </Pressable>
+  );
+}

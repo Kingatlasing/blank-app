@@ -28,7 +28,7 @@ export function psaCenteringCap(front?: number | null, back?: number | null) {
 }
 
 export interface GradeResult {
-  method: 'checklist' | 'ai' | 'automatic inspection' | 'inspection + your checklist' | 'scan server';
+  method: 'checklist' | 'ai' | 'automatic inspection' | 'inspection + your checklist' | 'scan server' | 'scan server + tilted photos';
   sub: { centering?: number; corners?: number; edges?: number; surface?: number };
   psa?: number;
   psa_label?: string;
@@ -65,7 +65,7 @@ export function estimate(front: number | null, back: number | null, corners: str
  * scales; BGS and SGC from published collector guides. Same table as the web app (core/grading.py). */
 export const GRADERS: Record<string, [string, number, number | null][]> = {
   PSA: [['10', 55, 75], ['9', 60, 90], ['8', 65, 90], ['7', 70, 90], ['6', 80, 90], ['5', 85, 90], ['4', 85, 90], ['3', 90, 90], ['2', 95, 95]],
-  BGS: [['10 Pristine', 50, 55], ['9.5', 55, 60], ['9', 55, 70], ['8', 60, 80], ['7', 65, 90], ['6', 70, 95]],
+  BGS: [['10 Pristine', 50, 60], ['9.5', 55, 60], ['9', 55, 70], ['8', 60, 80], ['7', 65, 90], ['6', 70, 95]],
   SGC: [['10 Pristine', 50, null], ['10', 55, null], ['9', 60, null], ['8', 65, null], ['7', 70, null], ['6', 75, null]],
   CGC: [['10 Pristine', 50, null], ['10', 55, 75], ['9', 60, 90], ['8', 65, null], ['7.5', 65, null], ['7', 70, null], ['6', 75, null], ['4.5', 85, null]],
   TAG: [['10 Pristine', 51, null], ['10', 55, null], ['9', 60, null], ['8.5', 62.5, null], ['8', 65, null], ['7', 70, null], ['6', 75, null], ['5', 80, null]],
@@ -107,7 +107,7 @@ export function cardStyle(variant = '', name = '', year = '', number = ''): 'sta
 }
 
 export const GUIDE: [string, string][] = [
-  ['Centering', 'Opposite borders are compared (55/45 = one side is 55% of the pair); the back is judged much more loosely. PSA 10: 55/45 front, 75/25 back. BGS 9.5: 55 both ways (Pristine 10: 50/50). SGC 10: 55. CGC 10: 55 front, 75 back. TAG 10: 55 front; TAG backs differ for TCG (65) and sports (70).'],
+  ['Centering', 'Opposite borders are compared (55/45 = one side is 55% of the pair); the back is judged much more loosely. PSA 10: 55/45 front, 75/25 back. BGS 9.5: 55/45 front, 60/40 back (Pristine 10: 50/50 front, 60/40 back). SGC 10: 55. CGC 10: 55 front, 75 back. TAG 10: 55 front; TAG backs differ for TCG (65) and sports (70).'],
   ['Corners', 'PSA 10: four perfectly sharp corners. 9: one very minor flaw. 8: slightest fraying at one or two corners. 7: slight fraying on some. 5: minor rounding.'],
   ['Edges & surface', '10: no chipping, full original gloss, no staining. 9 allows one minor print imperfection or a very slight wax stain on the back.'],
   ['Overall', 'The weakest area decides the grade (BGS: at most a half grade above the lowest subgrade).'],
@@ -137,7 +137,7 @@ function companyCap(comp: string, front: number | null, back: number | null, tcg
   return 4;
 }
 function bgsCentering(front: number | null, back: number | null): number {
-  const rows: [number, number, number][] = [[10, 50, 55], [9.5, 55, 60], [9, 55, 70], [8.5, 60, 80], [8, 60, 80], [7, 65, 90], [6, 70, 95], [5, 75, 95], [4, 80, 100]];
+  const rows: [number, number, number][] = [[10, 50, 60], [9.5, 55, 60], [9, 55, 70], [8.5, 60, 80], [8, 60, 80], [7, 65, 90], [6, 70, 95], [5, 75, 95], [4, 80, 100]];
   if (front == null) return 9.5;
   for (const [g, f, b] of rows) if (front <= f && (back == null || back <= b)) return g;
   return 3;

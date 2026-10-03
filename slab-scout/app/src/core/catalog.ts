@@ -42,6 +42,8 @@ export interface SetInfo {
   remote?: boolean;
   /** sample card photo for sets without per-card photos */
   image?: string;
+  /** photo id of the set's most valuable card (series / set tiles) */
+  cover?: string;
 }
 
 export interface Card {
@@ -547,9 +549,18 @@ const photoFile = (id: string, size: number) => {
   return new File(d, `${id}-${size}.jpg`);
 };
 
+/** A set's cover picture: its most valuable card's photo, else its sample photo. */
+export function setCover(s: SetInfo | undefined, size = 240): string {
+  if (!s) return '';
+  if (s.cover) return imageUrl({ img: s.cover } as Card, size)[0];
+  return s.image || '';
+}
+
 /** [url, isAnotherParallel]. Sizes: 60, 240, 1600. Uses the copy saved on the phone when there is one. */
 export function imageUrl(card: Card | null | undefined, size = 240): [string, boolean] {
   if (!card?.img) return ['', false];
+  if (card.img.startsWith('wc:')) return [`https://waifucards.app/img/cards/${card.img.slice(3)}.webp`, false]; // Naruto Kayou
+  if (card.img.startsWith('nc:')) return [`https://cdn.narutocards.ca/${card.img.slice(3)}`, false]; // Naruto (narutocards.ca)
   const id = card.img.replace(/^~/, '');
   try {
     const f = photoFile(id, size);
@@ -562,7 +573,8 @@ export function imageUrl(card: Card | null | undefined, size = 240): [string, bo
 
 /** Save these cards' photos on the phone (your collection) so they show offline. */
 export async function savePhotos(cs: (Card | null | undefined)[], size = 240) {
-  const ids = [...new Set(cs.filter((c): c is Card => !!c?.img).map((c) => c.img.replace(/^~/, '')))];
+  // only price-guide photos are saved (Naruto pictures from wc: / nc: sites stay online)
+  const ids = [...new Set(cs.filter((c): c is Card => !!c?.img && !/^(wc|nc):/.test(c.img)).map((c) => c.img.replace(/^~/, '')))];
   const q = ids.filter((id) => !photoFile(id, size).exists);
   await Promise.all(
     [0, 1, 2].map(async () => {
