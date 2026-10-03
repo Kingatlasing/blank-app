@@ -258,7 +258,7 @@ def _build_phash_files(out_dir: str) -> None:
         del part
         gc.collect()
     os.makedirs(out_dir, exist_ok=True)
-    tmp = out_dir + ".part"
+    tmp = f"{out_dir}.part-{os.getpid()}"  # each builder its own folder: two at once mustn't share one
     os.makedirs(tmp, exist_ok=True)
     np.save(os.path.join(tmp, "h.npy"), np.concatenate(hs) if hs else np.zeros(0, np.uint64))
     np.save(os.path.join(tmp, "im.npy"), np.concatenate(ims) if ims else np.zeros(0, "S72"))
@@ -278,6 +278,21 @@ def _phash_table():
     photo ids (24 bytes; longer ids kept aside) and set index."""
     import numpy as np
     out_dir = os.path.join(CACHE, _data_version(), "phash-table")
+    with _phash_lock:  # one build at a time; the others wait and then read the files
+        _ensure_phash_files(out_dir)
+    meta = json.load(open(os.path.join(out_dir, "meta.json")))
+    hashes = np.load(os.path.join(out_dir, "h.npy"), mmap_mode="r")
+    if not len(hashes):
+        return hashes, None
+    ims = np.load(os.path.join(out_dir, "im.npy"), mmap_mode="r")
+    sis = np.load(os.path.join(out_dir, "si.npy"), mmap_mode="r")
+    return hashes, (ims, sis, meta["sets"], {int(k): v for k, v in meta["long"].items()})
+
+
+_phash_lock = threading.Lock()
+
+
+def _ensure_phash_files(out_dir: str) -> None:
     if not os.path.exists(os.path.join(out_dir, "meta.json")):
         try:
             import subprocess
@@ -289,13 +304,6 @@ def _phash_table():
             pass
         if not os.path.exists(os.path.join(out_dir, "meta.json")):
             _build_phash_files(out_dir)  # no child processes here: do it in this one
-    meta = json.load(open(os.path.join(out_dir, "meta.json")))
-    hashes = np.load(os.path.join(out_dir, "h.npy"), mmap_mode="r")
-    if not len(hashes):
-        return hashes, None
-    ims = np.load(os.path.join(out_dir, "im.npy"), mmap_mode="r")
-    sis = np.load(os.path.join(out_dir, "si.npy"), mmap_mode="r")
-    return hashes, (ims, sis, meta["sets"], {int(k): v for k, v in meta["long"].items()})
 
 
 def photo_lookup(phash_hex: str, max_distance: int = 12, limit: int = 8) -> list[tuple[Card, int]]:
