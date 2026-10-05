@@ -17,7 +17,7 @@ import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import { AutographResult, checkAutograph, SIGNED } from '../core/autograph';
 import CenteringTool from '../components/CenteringTool';
-import { Card as CatCard, closestRemote, getCard, imageUrl, loadSet, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
+import { Card as CatCard, closestRemote, GRADE_OPTIONS, GRADE_SUB, gradedPrice, getCard, imageUrl, loadSet, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip, Sheet, SheetOption } from '../components/cards';
 import { Icon } from '../components/visual';
@@ -51,7 +51,12 @@ type Phase = 'capture' | 'review' | 'working' | 'result';
 
 /** Live-scanner zoom steps. expo-camera's zoom is 0..1 of the lens's range, so these are close to 1x / 1.5x / 2x, not exact on every phone. */
 const ZOOMS: [string, number][] = [['1×', 0], ['1.5×', 0.07], ['2×', 0.14]];
-const SCAN_GRADES = ['RAW', 'PSA 10', 'PSA 9', 'PSA 8', 'BGS 9.5', 'BGS 9', 'CGC 10', 'CGC 9.5', 'SGC 10', 'TAG 10'];
+const SCAN_GRADES: string[] = ['RAW', ...GRADE_OPTIONS];
+/** The scanned card's price at a grade (RAW = its raw price). */
+function scanPrice(it: ScanItem, grade: string): { v: number; est: boolean } | null {
+  const c = it.catalog_key ? getCard(it.catalog_key) : null;
+  return gradedPrice({ raw: it.price ?? null, psa9: c?.psa9, psa10: c?.psa10 }, grade || 'RAW');
+}
 const SCAN_CONDS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const sameCard = (a: ScanItem | null, b: ScanItem | null) => !!a && !!b && (a.catalog_key && b.catalog_key ? a.catalog_key === b.catalog_key : !!a.name && a.name === b.name && a.number === b.number);
 
@@ -136,6 +141,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [mode, setMode] = useState<'live' | 'grade'>('live');
   const [scanning, setScanning] = useState(false);
   const [last, setLast] = useState<ScanItem | null>(null);
+  /** a photo picked from the library: shown in the frame instead of the camera while it's scanned */
+  const [picked, setPicked] = useState<string | null>(null);
   const [history, setHistory] = useState<ScanItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -277,10 +284,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   }
   // Auto: scan again ~2.5 s after the scanner goes idle
   useEffect(() => {
-    if (!auto || paused || mode !== 'live' || !camOn || scanning || gameSheet || chipSheet || backFor) return;
+    if (!auto || paused || mode !== 'live' || !camOn || picked || scanning || gameSheet || chipSheet || backFor) return;
     const t = setTimeout(() => tapScan(true), 2500);
     return () => clearTimeout(t);
-  }, [auto, paused, mode, camOn, scanning, gameSheet, chipSheet, last?.id, backFor]);
+  }, [auto, paused, mode, camOn, picked, scanning, gameSheet, chipSheet, last?.id, backFor]);
   /** Another parallel picked for the scanned card (finish chip). */
   async function pickFinish(it: ScanItem, c: CatCard) {
     const [v] = catValue(c);
@@ -293,7 +300,11 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
     if (res.canceled || !res.assets?.[0]) return;
     const a = res.assets[0];
+    setMode('live');
+    setPicked(a.uri);
+    setLast(null);
     setScanning(true);
+    setError('');
     try {
       await liveIdentify({ ...(await cropAndTrim(a.uri, a.width, a.height)), tight: false, orig: a.uri });
     } catch (e: any) {
@@ -310,9 +321,13 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       // grade and condition picked under the result are saved on the record
       const graded = pick.grade && pick.grade !== 'RAW' ? pick.grade : '';
       rec.grade = { ...(rec.grade || {}), method: rec.grade?.method || 'owner', ...(graded ? { label: graded } : {}), condition: pick.cond };
-      const c = it.catalog_key ? getCard(it.catalog_key) : null;
-      if (c && graded === 'PSA 10' && c.psa10) rec.pricing.raw.mid = c.psa10;
-      if (c && graded === 'PSA 9' && c.psa9) rec.pricing.raw.mid = c.psa9;
+      const gp = graded ? scanPrice(it, graded) : null;
+      if (gp) {
+        rec.pricing.raw.mid = gp.v;
+        rec.pricing.graded_label = graded;
+        rec.pricing.graded_mid = gp.v;
+        if (gp.est) rec.pricing.note = `${graded} price estimated from this card's PSA / raw sold prices`;
+      }
     }
     try {
       await app.addRecord(rec, list);
@@ -843,7 +858,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   /* ---------- render: capture ---------- */
   if (phase === 'capture') {
     if (!perm) return <View style={S.screen} />;
-    if (!perm.granted)
+    if (!perm.granted && !picked)
       return (
         <View style={[S.screen, { padding: L.gutter, paddingTop: L.top + L.sp(8), gap: L.sp(14) }]}>
           {onBack ? <RoundBtn icon="back" onPress={onBack} label="Back" /> : null}
@@ -854,7 +869,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
             <Text style={[S.h2, { textAlign: 'center', fontSize: L.fs(22) }]}>Camera access</Text>
             <Text style={[S.body, { textAlign: 'center' }]}>Slab Scout needs the camera to photograph your cards.</Text>
             <Btn primary label="Allow camera" onPress={requestPerm} />
-            <Btn label="Choose from photos instead" onPress={pick} />
+            <Btn label="Choose from photos instead" onPress={pickLive} />
           </View>
         </View>
       );
@@ -887,10 +902,15 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       const setName = (last?.set || last?.game || '').toUpperCase();
       return (
         <View style={S.screen} onLayout={(e) => setCamBox(e.nativeEvent.layout)}>
-          <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" zoom={ZOOMS[zoomIdx][1]} />
+          {perm.granted ? <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" zoom={ZOOMS[zoomIdx][1]} /> : null}
+          {picked ? (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: C.bg }]}>
+              <Image source={{ uri: picked }} resizeMode="contain" style={{ position: 'absolute', left: fr.x, top: fr.y, width: fr.w, height: fr.h, borderRadius: L.sp(18) }} />
+            </View>
+          ) : null}
           {shade}
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => tapScan()} accessibilityLabel="Tap to scan the card" />
-          {frame(scanning ? 'Scanning…' : backFor ? 'Flip the card · tap to scan the back' : auto ? 'Looking for card…' : 'Tap to scan')}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => (picked ? null : tapScan())} accessibilityLabel="Tap to scan the card" />
+          {frame(scanning ? 'Scanning…' : picked ? 'Your photo' : backFor ? 'Flip the card · tap to scan the back' : auto ? 'Looking for card…' : 'Tap to scan')}
 
           {/* top: back + control pill */}
           <View pointerEvents="box-none" style={{ position: 'absolute', left: Math.max(L.gutter, (L.width - 640) / 2), right: Math.max(L.gutter, (L.width - 640) / 2), top: L.top + L.sp(6), gap: L.sp(8) }}>
@@ -907,7 +927,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               </View>
             </View>
             <View pointerEvents="box-none" style={[S.row, { justifyContent: 'flex-end', gap: 8 }]}>
-              <SmallPill label="Photos" icon="photo" onPress={pickLive} />
+              {picked ? <SmallPill label={perm.granted ? 'Back to camera' : 'Done'} icon="camera" onPress={() => { setPicked(null); if (!perm.granted) setLast(null); }} /> : null}
+              <SmallPill label={picked ? 'Another photo' : 'Photos'} icon="photo" onPress={pickLive} />
               <SmallPill label="Grade (front + back)" onPress={() => { setMode('grade'); setSide('front'); }} />
             </View>
             {slabMode ? <Text style={{ color: '#fff', fontSize: L.fs(12), textAlign: 'center', textShadowColor: '#000', textShadowRadius: 4 }}>Graded: fit the whole slab, label at the top, then pick the grade on the result.</Text> : null}
@@ -930,7 +951,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                       <Text style={{ color: C.ink, fontWeight: '900', fontSize: L.fs(16) }} numberOfLines={1}>{last.name || 'No match'}{last.number ? <Text style={{ color: C.ink2 }}> #{last.number}</Text> : null}</Text>
                       {last.name ? (
                         <Text style={{ color: C.ink2, fontSize: L.fs(12) }} numberOfLines={1}>
-                          <Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{priceText(last)}</Text>  Est. Value
+                          {(() => {
+                            const g = choice.grade && choice.grade !== 'RAW' ? choice.grade : '';
+                            const gp = g ? scanPrice(last, g) : null;
+                            if (!g) return <><Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{priceText(last)}</Text>  Est. Value</>;
+                            return <><Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{gp ? `${gp.est ? '~' : ''}${money(gp.v)}` : '—'}</Text>  {g}{gp?.est ? ' est.' : ''} · raw {priceText(last)}</>;
+                          })()}
                         </Text>
                       ) : (
                         <Text style={{ color: C.warn, fontSize: L.fs(12) }} numberOfLines={2}>{last.note || 'Try again, closer and flatter, or tap Grade to type it in.'}</Text>
@@ -992,7 +1018,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                   return <SheetOption key={c.key} label={`${c.variant || 'Normal'}${c.printRun ? ` ${printRunLabel(c.printRun)}` : ''}`} sub={v ? money(v) : undefined} on={c.key === last.catalog_key} onPress={() => { pickFinish(last, c); setChipSheet(null); }} />;
                 })
               : null}
-            {chipSheet === 'grade' ? SCAN_GRADES.map((g) => <SheetOption key={g} label={g} on={choice.grade === g} onPress={() => { setChoice((c) => ({ ...c, grade: g })); setChipSheet(null); }} />) : null}
+            {chipSheet === 'grade' ? SCAN_GRADES.map((g) => { const gp = last ? scanPrice(last, g) : null; return <SheetOption key={g} label={g} sub={[GRADE_SUB[g], gp ? `${gp.est ? '~' : ''}${money(gp.v)}${gp.est ? ' est.' : ''}` : 'No price'].filter(Boolean).join(' · ')} on={choice.grade === g} onPress={() => { setChoice((c) => ({ ...c, grade: g })); setChipSheet(null); }} />; }) : null}
             {chipSheet === 'cond' ? SCAN_CONDS.map((g) => <SheetOption key={g} label={g} sub={{ NM: 'Near mint', LP: 'Lightly played', MP: 'Moderately played', HP: 'Heavily played', DMG: 'Damaged' }[g]} on={choice.cond === g} onPress={() => { setChoice((c) => ({ ...c, cond: g })); setChipSheet(null); }} />) : null}
           </Sheet>
         </View>
@@ -1526,7 +1552,7 @@ function BarSeg({ label, onPress, on, flex = 1 }: { label: string; onPress: () =
 }
 const BarDiv = () => <View style={{ width: 1, height: '50%', backgroundColor: 'rgba(255,255,255,0.16)' }} />;
 
-function SmallPill({ label, onPress, icon }: { label: string; onPress: () => void; icon?: 'photo' }) {
+function SmallPill({ label, onPress, icon }: { label: string; onPress: () => void; icon?: 'photo' | 'camera' }) {
   const L = useLayout();
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [S.row, { gap: 5, backgroundColor: 'rgba(16,18,28,0.72)', borderRadius: 999, paddingHorizontal: L.sp(11), paddingVertical: L.sp(6) }, pressed && { opacity: 0.7 }]}>
