@@ -44,8 +44,8 @@ async function one(id){
   const px=x.getImageData(0,0,w,h).data;return [phash(px,w,h),colour(px,w,h)]}
 onmessage=async(e)=>{
   db=await open();const ids=e.data.ids;
-  const done=new Set(await new Promise(r=>{const q=db.transaction('r').objectStore('r').getAllKeys();q.onsuccess=()=>r(q.result)}));
-  const bad=new Set(await new Promise(r=>{const q=db.transaction('bad').objectStore('bad').getAllKeys();q.onsuccess=()=>r(q.result)}));
+  
+  const has=async(st,list)=>{const out=new Set();for(let s=0;s<list.length;s+=5000){const ch=list.slice(s,s+5000);await new Promise(r=>{const t=db.transaction(st);const o=t.objectStore(st);for(const id of ch){const q=o.getKey(id);q.onsuccess=()=>{if(q.result!==undefined)out.add(id)}}t.oncomplete=r});postMessage({state:'checking',at:s,total:list.length})}return out};const done=await has('r',ids);const bad=await has('bad',ids);
   const todo=ids.filter(i=>!done.has(i)&&!bad.has(i));let i=0,ok=0,fail=0,buf=[],bbuf=[];
   const flush=()=>{if(!buf.length&&!bbuf.length)return;const t=db.transaction(['r','bad'],'readwrite');
     for(const [k,v] of buf)t.objectStore('r').put(v,k);for(const k of bbuf)t.objectStore('bad').put(1,k);buf=[];bbuf=[]};
