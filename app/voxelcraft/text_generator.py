@@ -39,7 +39,42 @@ def _parse_floor_count(text: str) -> int | None:
 
 
 def _wants_staircase(text: str) -> bool:
-    return bool(re.search(r"(spiral|helix|helical|winding)\s*stair", text))
+    return bool(re.search(r"(spiral|helix|helical|winding)?\s*stair", text))
+
+
+def _wants_ladder(text: str) -> bool:
+    return bool(re.search(r"\bladder", text)) and not _wants_staircase(text)
+
+
+# "glass" is genuinely ambiguous in English: a material/color adjective
+# ("a glass house", "a glass table") versus the drinking vessel ("a
+# glass", "a glass of water", "a table with a glass and a plate on it").
+# Disambiguated by what follows it — a material word suggests adjective
+# use, otherwise (end of phrase, "of", "and", a comma, ...) it's the
+# object. Not a full parse, just enough for the common cases.
+_GLASS_MATERIAL_FOLLOWERS = (
+    "house", "table", "window", "door", "wall", "roof", "floor", "ceiling",
+    "box", "jar", "bottle", "ball", "sphere", "cube", "panel", "case",
+)
+
+
+def _wants_glass_object(text: str) -> bool:
+    for m in re.finditer(r"\bglass(?:es)?\b", text):
+        rest = text[m.end():].lstrip()
+        next_word = re.match(r"[a-z]+", rest)
+        if not next_word or next_word.group() not in _GLASS_MATERIAL_FOLLOWERS:
+            return True
+    return False
+
+
+def _parse_roof_style(text: str) -> str:
+    if re.search(r"\bflat\s*roof", text):
+        return "flat"
+    if re.search(r"\b(triangle|triangular|gable|pitched|a-frame)\s*roof", text):
+        return "triangle"
+    if re.search(r"\b(complex|hip|hipped)\s*roof", text):
+        return "complex"
+    return "complex"  # unchanged default when no roof style is named
 
 
 # Ordered (specific-first) keyword -> builder table. Keywords are matched
@@ -74,8 +109,23 @@ _RULES: list[tuple[list[str], object]] = [
         wall=colors[0] if colors else "oak_planks",
         roof=colors[1] if len(colors) > 1 else "red",
         floors=_parse_floor_count(_last_prompt[0]) or 1,
-        staircase=_wants_staircase(_last_prompt[0]))),
+        staircase=_wants_staircase(_last_prompt[0]),
+        ladder=_wants_ladder(_last_prompt[0]),
+        roof_style=_parse_roof_style(_last_prompt[0]))),
     (["pyramid"], lambda colors: shapes.pyramid(color=colors[0] if colors else "sand")),
+    (["table", "desk"], lambda colors: shapes.table(wood=colors[0] if colors else "oak_planks")),
+    (["chair", "stool"], lambda colors: shapes.chair(wood=colors[0] if colors else "oak_planks")),
+    (["bed"], lambda colors: shapes.bed(
+        sheet=colors[0] if colors else "white", frame=colors[1] if len(colors) > 1 else "brown")),
+    (["sofa", "couch"], lambda colors: shapes.sofa(
+        cushion=colors[0] if colors else "red", frame=colors[1] if len(colors) > 1 else "brown")),
+    (["shelf", "bookcase", "bookshelf"], lambda colors: shapes.shelf(wood=colors[0] if colors else "brown")),
+    (["lamp", "lantern"], lambda colors: shapes.lamp(shade=colors[0] if colors else "yellow")),
+    (["rug", "carpet"], lambda colors: shapes.rug(color=colors[0] if colors else "red")),
+    (["cup", "tumbler", "mug"], lambda colors: shapes.glass_cup(color=colors[0] if colors else "glass")),
+    (["plate", "dish", "saucer"], lambda colors: shapes.plate(color=colors[0] if colors else "white")),
+    (["computer", "monitor", "pc", "desktop", "laptop"], lambda colors: shapes.computer(
+        case=colors[0] if colors else "black")),
     (["tree", "oak", "pine", "forest"], lambda colors: shapes.tree()),
     (["planet", "globe", "moon", "world", "orb", "ball", "sphere"], lambda colors: shapes.sphere(
         color=colors[0] if colors else "light_blue")),
@@ -165,6 +215,14 @@ def generate_from_text(prompt: str) -> tuple[list[Voxel], str, bool]:
         matched = next((k for k in keywords if word_matches(k, prompt_lower)), None)
         if matched:
             matches.append((matched, builder))
+
+    # "glass" the drinking vessel is handled separately from the plain
+    # keyword table above (which only catches "cup"/"tumbler"/"mug") —
+    # see _wants_glass_object for why: "glass" alone is ambiguous with
+    # the material/color word of the same name ("a glass house"), so it
+    # needs the surrounding context, not a fixed keyword list.
+    if not any(k in ("cup", "tumbler", "mug") for k, _ in matches) and _wants_glass_object(prompt_lower):
+        matches.append(("glass", lambda colors: shapes.glass_cup(color=colors[0] if colors else "glass")))
 
     matched_keys = {k for k, _ in matches}
     detailed_tier_keys = {"face", "portrait", "body", "torso", "physique"}

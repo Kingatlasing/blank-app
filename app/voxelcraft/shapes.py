@@ -487,8 +487,32 @@ def _spiral_staircase(cx: int, cz: int, y0: int, height: int, radius=1, color="c
     return voxels
 
 
+def _ladder(x0: int, z: int, y0: int, height: int, color="oak_planks") -> list[Voxel]:
+    """A simple straight ladder against a wall: two rails 2 voxels apart
+    with a rung between them every other row — simpler and narrower than
+    `_spiral_staircase`, for when a prompt asks for a ladder rather than
+    stairs."""
+    c = hex_of(color)
+    voxels = []
+    for dy in range(height + 1):
+        voxels.append((x0, y0 + dy, z, c))
+        voxels.append((x0 + 2, y0 + dy, z, c))
+        if dy % 2 == 0:
+            voxels.append((x0 + 1, y0 + dy, z, c))
+    return voxels
+
+
 def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red",
-          floors=1, staircase=False) -> list[Voxel]:
+          floors=1, staircase=False, ladder=False, roof_style="complex") -> list[Voxel]:
+    """`roof_style`: "complex" (default) is a hip roof sloping in on all 4
+    sides to a single peak; "triangle" is a classic gable roof (ridge
+    *line* along x, so it reads as an actual triangle from the end, not a
+    point); "flat" is a plain flat cap. `staircase` winds a real spiral
+    staircase between every pair of floors (punching a matching hole
+    through each floor/ceiling slab); `ladder` is a simpler straight
+    ladder against the back wall instead — `staircase` wins if both are
+    set. Neither does anything for a single-floor house (nothing to
+    connect)."""
     wall_c, roof_c = hex_of(wall), hex_of(roof)
     hw, hd = width // 2, depth // 2
     floors = max(1, floors)
@@ -505,35 +529,58 @@ def house(width=9, depth=9, wall_h=5, wall="oak_planks", roof="red",
             grid.pop((x, y, -hd), None)
 
     base: list[Voxel]
-    if floors > 1 and staircase:
+    if floors > 1 and (staircase or ladder):
         # punch a hole through the (double-thick, ceiling+floor) slab
-        # between every pair of stories, and wind a staircase up through it
-        stair_cx = hw - 2 if hw >= 3 else 0
-        stair_cz = hd - 2 if hd >= 3 else 0
+        # between every pair of stories, and connect them vertically
+        vert_cx = hw - 2 if hw >= 3 else 0
+        vert_cz = hd - 2 if hd >= 3 else 0
         for level in range(1, floors):
             y_slab = level * wall_h
             for dy in (y_slab - 1, y_slab):
                 for dx in (-1, 0, 1):
                     for dz in (-1, 0, 1):
-                        grid.pop((stair_cx + dx, dy, stair_cz + dz), None)
-        stairs = _spiral_staircase(stair_cx, stair_cz, 0, floors * wall_h, radius=1)
-        base = _merge([(x, y, z, c) for (x, y, z), c in grid.items()], stairs)
+                        grid.pop((vert_cx + dx, dy, vert_cz + dz), None)
+        connector = (
+            _spiral_staircase(vert_cx, vert_cz, 0, floors * wall_h, radius=1)
+            if staircase
+            else _ladder(vert_cx - 1, vert_cz, 0, floors * wall_h, color=wall)
+        )
+        base = _merge([(x, y, z, c) for (x, y, z), c in grid.items()], connector)
     else:
         base = [(x, y, z, c) for (x, y, z), c in grid.items()]
 
-    # pitched roof on top of the topmost floor, shrinking each layer
+    # roof on top of the topmost floor
     roof_layers = []
-    layer_hw, layer_hd = hw + 1, hd + 1
     y = floors * wall_h
-    while layer_hw >= 0 and layer_hd >= 0:
-        for x in range(-layer_hw, layer_hw + 1):
-            for z in range(-layer_hd, layer_hd + 1):
-                on_edge = x in (-layer_hw, layer_hw) or z in (-layer_hd, layer_hd)
-                if on_edge or layer_hw == 0 or layer_hd == 0:
-                    roof_layers.append((x, y, z, roof_c))
-        layer_hw -= 1
-        layer_hd -= 1
-        y += 1
+    if roof_style == "flat":
+        for x in range(-(hw + 1), hw + 2):
+            for z in range(-(hd + 1), hd + 2):
+                roof_layers.append((x, y, z, roof_c))
+    elif roof_style == "triangle":
+        # gable roof: ridge *line* along x (full width kept constant),
+        # sloping down only in z, so it reads as an actual triangle when
+        # viewed from the end rather than converging to a single point
+        full_hw = hw + 1
+        layer_hd = hd + 1
+        while layer_hd >= 0:
+            for x in range(-full_hw, full_hw + 1):
+                for z in range(-layer_hd, layer_hd + 1):
+                    on_edge = x in (-full_hw, full_hw) or z in (-layer_hd, layer_hd) or layer_hd == 0
+                    if on_edge:
+                        roof_layers.append((x, y, z, roof_c))
+            layer_hd -= 1
+            y += 1
+    else:  # "complex": hip roof, shrinking on all 4 sides to a peak
+        layer_hw, layer_hd = hw + 1, hd + 1
+        while layer_hw >= 0 and layer_hd >= 0:
+            for x in range(-layer_hw, layer_hw + 1):
+                for z in range(-layer_hd, layer_hd + 1):
+                    on_edge = x in (-layer_hw, layer_hw) or z in (-layer_hd, layer_hd)
+                    if on_edge or layer_hw == 0 or layer_hd == 0:
+                        roof_layers.append((x, y, z, roof_c))
+            layer_hw -= 1
+            layer_hd -= 1
+            y += 1
 
     return _merge(base, roof_layers)
 
@@ -691,6 +738,34 @@ def lamp(shade="yellow", pole="iron") -> list[Voxel]:
 
 def rug(color="red", width=4, length=6) -> list[Voxel]:
     return _box(0, width, 0, 1, 0, length, hex_of(color))
+
+
+def glass_cup(color="glass") -> list[Voxel]:
+    """A small drinking glass — table-top scale (meant to sit on `table`'s
+    tabletop, not stand alone at room scale). 2x2 footprint, 3 tall; too
+    small at this resolution for a hollow interior to read as anything but
+    noise, so it's a solid block in the glass's own color/shape instead."""
+    c = hex_of(color)
+    return [(x, y, z, c) for x in range(2) for y in range(3) for z in range(2)]
+
+
+def plate(color="white") -> list[Voxel]:
+    """A flat plate — table-top scale, a single thin 3x3 layer."""
+    c = hex_of(color)
+    return _box(0, 3, 0, 1, 0, 3, c)
+
+
+def computer(case="black", screen="light_blue") -> list[Voxel]:
+    """A small desktop computer: a flat-screen monitor on a stand, plus a
+    keyboard in front — table-top scale, meant to sit on `table`."""
+    case_c, screen_c = hex_of(case), hex_of(screen)
+    parts = [
+        _box(1, 3, 0, 1, 2, 3, case_c),  # monitor stand/base
+        _box(0, 4, 1, 3, 2, 3, case_c),  # monitor frame
+        _box(1, 3, 1, 2, 2, 3, screen_c),  # screen itself, inset in the frame
+        _box(0, 5, 0, 1, 0, 2, case_c),  # keyboard, flat, in front of the monitor
+    ]
+    return _merge(*parts)
 
 
 # ---------------------------------------------------------------------------

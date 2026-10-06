@@ -52,7 +52,9 @@ class CatalogEntry:
 # dimensions are measured, not guessed. Every entry must be callable with
 # zero arguments (all shape builders take only optional kwargs).
 _REGISTRY: list[tuple[str, str, str, str]] = [
-    ("house", "blocky", "structure", "a house; floors=N and staircase=True for multi-story"),
+    ("house", "blocky", "structure",
+     "a house; floors=N for multi-story, staircase=True or ladder=True to connect floors "
+     "(staircase wins if both), roof_style='complex' (hip, default) | 'triangle' (gable) | 'flat'"),
     ("temple", "blocky", "structure", "a Greek temple with a genuinely hollow, walkable interior"),
     ("tower", "blocky", "structure", "a round crenellated tower"),
     ("castle", "blocky", "structure", "a central keep with 4 corner towers"),
@@ -64,6 +66,9 @@ _REGISTRY: list[tuple[str, str, str, str]] = [
     ("shelf", "blocky", "furniture", "a bookcase/shelf, thin — meant to sit flush against a wall"),
     ("lamp", "blocky", "furniture", "a floor lamp"),
     ("rug", "blocky", "furniture", "a flat floor rug"),
+    ("glass_cup", "blocky", "tabletop", "a small drinking glass — table-top scale, place on top of table()"),
+    ("plate", "blocky", "tabletop", "a flat plate — table-top scale, place on top of table()"),
+    ("computer", "blocky", "tabletop", "a monitor-on-a-stand + keyboard — table-top scale, place on top of table()"),
     ("humanoid", "blocky", "creature", "a blocky Steve-style person — the person-sized figure to use in blocky scenes"),
     ("dog", "blocky", "creature", "a standing dog"),
     ("cat", "blocky", "creature", "a standing cat"),
