@@ -320,10 +320,17 @@ function preMoveStatusCheck(mon, msgs) {
   if (!neg) return false;
   const def = STATUS_DEFS[neg.slug];
   if (!def) return false;
-  if (def.flinchChance && Math.random() < def.flinchChance) {
-    msgs.push(monsterDisplayName(mon) + ' flinched and couldn\'t move!');
+  if (def.flinchChance) {
+    // oneShot: flinching only ever gets the one check, right after the hit
+    // that caused it - win or lose that roll, it's gone, so it can't linger
+    // for several turns re-rolling a stun if the holder doesn't act again
+    // right away (e.g. is asleep/confused on the intervening turn).
+    const triggered = Math.random() < def.flinchChance;
     clearStatusSlot(mon, 'negative');
-    return true;
+    if (triggered) {
+      msgs.push(monsterDisplayName(mon) + ' flinched and couldn\'t move!');
+      return true;
+    }
   }
   if (def.sleepChance) {
     neg.turns = (neg.turns || 0) + 1;
