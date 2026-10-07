@@ -279,6 +279,14 @@ function moveRangeWeaken(mon, move) {
   }
   return 1;
 }
+// charging (real: a one-turn power boost set up by a prior move - piece_of_cake,
+// ten_thousand_feathers, energy_field) - applies to the holder's very next
+// attack, then expires via the generic oneTurn handling in tickStatusEffects.
+function chargeBoostMult(mon) {
+  const st = mon.status && mon.status.positive;
+  const def = st && STATUS_DEFS[st.slug];
+  return (def && def.chargeBoost) || 1;
+}
 // After a hit lands, roll the move's real inflict chance (potency) and
 // apply to whichever side its real `target` says (own_monster/enemy_monster).
 function rollInflictStatuses(move, attackerMon, defenderMon, msgs) {
@@ -1950,7 +1958,8 @@ function dealDamage(atkMon, defMon, move, msgs) {
   const atkStat = move.range === 'ranged' ? getEffectiveStat(atkMon, 'ranged') : getEffectiveStat(atkMon, 'atk');
   const defStat = getEffectiveStat(defMon, 'def');
   const weaken = moveRangeWeaken(atkMon, move);
-  const base = Math.max(1, atkStat * move.power * weaken - defStat * 0.5) / DAMAGE_DIVISOR;
+  const charge = chargeBoostMult(atkMon);
+  const base = Math.max(1, atkStat * move.power * weaken * charge - defStat * 0.5) / DAMAGE_DIVISOR;
   const mult = typeEffectiveness(move.type, MONSTERS[defMon.slug].types);
   let dmg = Math.max(1, Math.floor(base * mult * (0.85 + Math.random() * 0.3)));
   // retaliate (real: accumulates damage taken, adds it to the holder's next
