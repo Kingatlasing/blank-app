@@ -1432,7 +1432,16 @@ function professorDialogue() {
       }
     };
   }
-  return ["Your " + monsterDisplayName(state.party[0]) + " looks strong. Good luck out there!"];
+  // Research check-in: previously this was one flat line forever, with no
+  // tie at all back to the Bestiary/dex the professor is supposed to care
+  // about - report real progress against it instead, same data the
+  // Bestiary screen itself reads (state.dex), not an invented counter.
+  const total = Object.keys(MONSTERS).length;
+  const caught = Object.values(state.dex).filter(s => s === 'caught').length;
+  const seen = Object.keys(state.dex).length;
+  if (caught >= total) return ["Every single species, caught and catalogued!", "You've done what I set out to do and never finished. Incredible work."];
+  if (caught === 0 && seen === 0) return ["Your " + monsterDisplayName(state.party[0]) + " looks strong. Good luck out there!", "Keep an eye out for new species - every one you see gets logged automatically."];
+  return ["Research update: you've caught " + caught + " of " + total + " species (" + seen + " seen so far).", "Keep it up - every creature tells us something new."];
 }
 function rivalHometownDialogue() {
   if (!state.flags.starterChosen) return ["Hurry up and get your starter from the Professor!"];
@@ -2473,7 +2482,18 @@ function showVictory() {
 }
 
 /* ============================ SHOP ============================ */
-const SHOP_STOCK = ['potion', 'super_potion', 'tuxeball', 'tuxeball_refined', 'antidote_grapes', 'revive'];
+// Every real, priced ITEMS_DB entry the player can actually use (all 4 HP
+// potions, every priced capture ball variant, the status-cure/revive/cureall
+// items) - previously only 6 of these were ever stocked anywhere, so
+// mega_potion, imperial_potion, cureall, and 3 of the 6 real ball variants
+// existed fully implemented in code but had no acquisition path at all.
+// tuxeball_ancient is left out deliberately: its real cost is 0 and it has
+// no description, matching the other "ancient" items that are meant to be
+// found, not bought - there's no real hidden-pickup location for it in this
+// build, so it stays a known gap rather than inventing one.
+const SHOP_STOCK = ['potion', 'super_potion', 'mega_potion', 'imperial_potion',
+  'tuxeball', 'tuxeball_earth', 'tuxeball_refined', 'tuxeball_nocturnal', 'tuxeball_majestic',
+  'antidote_grapes', 'cureall', 'revive'];
 function openShop() {
   state.screen = 'menu';
   const el = document.getElementById('shopOverlay');
