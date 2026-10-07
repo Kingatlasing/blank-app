@@ -2022,6 +2022,18 @@ function pickEnemyMove(enemyMon) {
 function resolveBattleTurn() {
   const enemy = currentEnemy(); const pm = currentPlayerMon();
   if (enemy.currentHP <= 0) {
+    // The player's own active mon can also hit 0 HP in this same exchange -
+    // e.g. it lands the finishing blow, then its own poison/burn status tick
+    // (applied right after the attack, in playerUseMove/resolveEnemyOnlyTurn)
+    // finishes it off too. If that was the player's last conscious monster,
+    // they have nothing left to have "won" with: resolve it as a loss/blackout
+    // like an ordinary wipe, rather than declaring a win while leaving
+    // state.party with zero living members - which left the next battle's
+    // startWildBattle() computing playerIdx = findIndex(alive) = -1, and
+    // currentPlayerMon() being undefined crashed inside renderBattleMain().
+    if (pm.currentHP <= 0 && state.party.every(m => m.currentHP <= 0)) {
+      finishBattle(false); return;
+    }
     const expLog = [];
     const gained = 12 + enemy.level * 4;
     grantExp(pm, gained, expLog);
