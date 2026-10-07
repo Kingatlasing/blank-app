@@ -1143,24 +1143,33 @@ MAPS.classic_route8 = {
 })();
 
 (function computeClassicCollision() {
-  // CLASSIC_TILED's baked collision data covers buildings/fences/water fine but
-  // never marks the standalone decorative rocks, boulders, tree stumps and logs
-  // scattered across the 7 cities and 8 routes as solid - every single one of
-  // these world-layer tile indices is collide=false in 100% of its real
+  // CLASSIC_TILED's baked collision data covers buildings and water fine, but
+  // several whole families of tiles are collide=false in 100% of their real
   // placements (double-checked against the actual map data, not just one
-  // sample), despite being unmistakably the same impassable rock/stump/log
-  // formations the original 5-map region's TILED data (which IS fully and
-  // correctly collidable) uses. Confirmed in-game: walking north onto one of
-  // these in hearthrock (world GID 21, a tree stump) went straight through it
-  // with nothing stopping the player. Identified this full list by rendering
-  // every world-layer tile actually used on the 8 classic routes to a labeled,
-  // collision-coded contact sheet and checking each one by eye.
+  // sample) despite being unmistakably impassable:
+  //  - standalone decorative rocks, boulders, tree stumps and logs scattered
+  //    across the 7 cities and 8 routes - the same graphics the original
+  //    5-map region's TILED data (which IS fully and correctly collidable)
+  //    uses for the exact same purpose. Confirmed in-game: walking north onto
+  //    one of these in hearthrock (world GID 21, a tree stump) went straight
+  //    through it with nothing stopping the player.
+  //  - a picket-fence tile set (GID 109/110/111/159/192) used as real
+  //    building-perimeter fencing in Hearthrock and Steamshore (e.g. fencing
+  //    off the Monster Center's back lot) - confirmed by rendering the actual
+  //    map tiles around several placements, not just the isolated atlas tile.
+  //    A different, unrelated fence graphic (GID 108) is already correctly
+  //    solid, so this bug is specific to this one tile family.
+  // Identified this full list by rendering every world-layer tile actually
+  // used across the second region to a labeled, collision-coded contact
+  // sheet and checking each one by eye, then confirming the concerning ones
+  // against the real map tiles around their placements.
   const SOLID_WORLD_GIDS = new Set([
     21, 22, 23, 43, 44, 45, 46,
     185, 186, 187, 188, 189, 190, 191, 193, 194, 195, 196, 197,
     238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250,
     251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263,
     264, 265, 266, 267, 397, 398, 399, 400, 405, 406, 407,
+    109, 110, 111, 159, 192,
   ]);
   for (const name in CLASSIC_TILED.maps) {
     const td = CLASSIC_TILED.maps[name];
