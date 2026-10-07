@@ -2115,9 +2115,11 @@ function finishBattle(playerWon) {
       const caught = battle.enemyTeam[0];
       state.flags.lostPetDone = true;
       markDexCaught(caught.slug);
-      if (state.party.length < 6) state.party.push(caught); else state.boxParty.push(caught);
+      const hadRoom = state.party.length < 6;
+      if (hadRoom) state.party.push(caught); else state.boxParty.push(caught);
       closeBattleUI();
-      pushDialogue(['You gently coaxed ' + monsterDisplayName(caught) + ' to safety!', 'It joined your team!']);
+      pushDialogue(['You gently coaxed ' + monsterDisplayName(caught) + ' to safety!',
+        hadRoom ? 'It joined your team!' : 'Your party was full, so it was sent to your Box.']);
     } else {
       closeBattleUI();
     }
@@ -2143,9 +2145,11 @@ function battleThrowBall() {
   const chance = Math.min(0.95, ((1 - hpFrac) * 0.75 + 0.12) * (enemy.catch_rate ? MONSTERS[enemy.slug].catch_rate/100 : 1) * ballBonus);
   appendBattleLog(['You threw a ' + ITEMS_DB[ballSlug].name + '!']);
   if (Math.random() < chance) {
-    appendBattleLog(['Gotcha! ' + monsterDisplayName(enemy) + ' was caught!']);
+    const hadRoom = state.party.length < 6;
+    appendBattleLog(['Gotcha! ' + monsterDisplayName(enemy) + ' was caught!',
+      hadRoom ? 'It joined your team!' : 'Your party was full, so it was sent to your Box.']);
     markDexCaught(enemy.slug);
-    if (state.party.length < 6) state.party.push(enemy); else state.boxParty.push(enemy);
+    if (hadRoom) state.party.push(enemy); else state.boxParty.push(enemy);
     setTimeout(() => { closeBattleUI(); }, 900);
   } else {
     appendBattleLog(['Argh! It broke free!']);
@@ -2284,6 +2288,7 @@ function renderMenu() {
   el.innerHTML = `<div class="panel">
     <h2>Menu</h2>
     <button onclick="renderPartyMenu()">${menuIcon('creatures')}Creatures</button>
+    <button onclick="renderBoxMenu()">Box${state.boxParty.length ? ' (' + state.boxParty.length + ')' : ''}</button>
     <button onclick="renderBagMenu()">${menuIcon('bag')}Bag</button>
     <button onclick="renderBadgesMenu()">Badges</button>
     <button onclick="renderBestiaryMenu()">${menuIcon('bestiary')}Bestiary</button>
@@ -2304,6 +2309,41 @@ function renderPartyMenu() {
     const moves = getActiveMoves(m).map(mv => mv.name).join(', ');
     return `<div class="battlecard"><img src="data:image/png;base64,${ASSET_B64.monsters[m.slug]}" style="image-rendering:pixelated;width:64px"><br><b>${monsterDisplayName(m)}</b> Lv${m.level} (${MONSTERS[m.slug].types.join('/')})${bondIconHtml(m)}${monsterStatusIcons(m)}<br>HP ${m.currentHP}/${m.derived.hp} | EXP ${m.exp}/${expToNext(m.level)}<br>Moves: ${moves}</div>`;
   }).join('') + `<button onclick="renderMenu()">Back</button></div>`;
+}
+// A caught creature only lands here once the active party is full (6/6) -
+// previously it just vanished into state.boxParty with no menu, button, or
+// screen anywhere that ever read it again, so every capture past the 6th
+// was effectively a silent, permanent loss the player had no way to notice
+// or undo. This screen plus withdrawFromBox()/swapFromBox() give it a real,
+// reachable round trip: view what's stored, and bring it into the active
+// party (swapping out a current member if the party's already full).
+function renderBoxMenu() {
+  const el = document.getElementById('menuOverlay');
+  const rows = state.boxParty.length
+    ? state.boxParty.map((m, i) => `<div class="battlecard"><img src="data:image/png;base64,${ASSET_B64.monsters[m.slug]}" style="image-rendering:pixelated;width:64px"><br><b>${monsterDisplayName(m)}</b> Lv${m.level} (${MONSTERS[m.slug].types.join('/')})${bondIconHtml(m)}<br>HP ${m.currentHP}/${m.derived.hp}<br><button onclick="withdrawFromBox(${i})">Withdraw</button></div>`).join('')
+    : `<p>No creatures in storage - caught creatures land here once your party is full (6/6).</p>`;
+  el.innerHTML = `<div class="panel"><h2>Box</h2>${rows}<button onclick="renderMenu()">Back</button></div>`;
+}
+function withdrawFromBox(boxIdx) {
+  if (state.party.length < 6) {
+    state.party.push(state.boxParty.splice(boxIdx, 1)[0]);
+    renderBoxMenu();
+  } else {
+    renderBoxSwapPicker(boxIdx);
+  }
+}
+function renderBoxSwapPicker(boxIdx) {
+  const el = document.getElementById('menuOverlay');
+  const boxed = state.boxParty[boxIdx];
+  el.innerHTML = `<div class="panel"><h2>Your party is full</h2><p>Send which creature to storage to make room for ${monsterDisplayName(boxed)}?</p>` +
+    state.party.map((m, i) => `<button onclick="swapFromBox(${boxIdx}, ${i})">${monsterDisplayName(m)} Lv${m.level}</button>`).join('') +
+    `<button onclick="renderBoxMenu()">Cancel</button></div>`;
+}
+function swapFromBox(boxIdx, partyIdx) {
+  const boxed = state.boxParty[boxIdx];
+  state.boxParty[boxIdx] = state.party[partyIdx];
+  state.party[partyIdx] = boxed;
+  renderBoxMenu();
 }
 function renderBagMenu() {
   const el = document.getElementById('menuOverlay');
