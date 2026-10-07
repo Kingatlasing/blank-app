@@ -1133,12 +1133,40 @@ MAPS.classic_route8 = {
   // Tiled files, so derive it here from the same real "World" ground-layer tile
   // indices already baked into CLASSIC_TILED: every tile is open grass field
   // except the sandy path (world GID 19/20) and open water (GID 177) - rocks,
-  // trees and bushes are already excluded by the existing collision data, so
-  // they can't become hidden-encounter spots regardless of this bitmap.
+  // trees and bushes are excluded separately below by computeClassicCollision(),
+  // so they can't become hidden-encounter spots regardless of this bitmap.
   const NOT_GRASS_WORLD_GIDS = new Set([19, 20, 177]);
   for (const name in CLASSIC_TILED.maps) {
     const td = CLASSIC_TILED.maps[name];
     td.grass = td.world.map(gid => !NOT_GRASS_WORLD_GIDS.has(gid));
+  }
+})();
+
+(function computeClassicCollision() {
+  // CLASSIC_TILED's baked collision data covers buildings/fences/water fine but
+  // never marks the standalone decorative rocks, boulders, tree stumps and logs
+  // scattered across the 7 cities and 8 routes as solid - every single one of
+  // these world-layer tile indices is collide=false in 100% of its real
+  // placements (double-checked against the actual map data, not just one
+  // sample), despite being unmistakably the same impassable rock/stump/log
+  // formations the original 5-map region's TILED data (which IS fully and
+  // correctly collidable) uses. Confirmed in-game: walking north onto one of
+  // these in hearthrock (world GID 21, a tree stump) went straight through it
+  // with nothing stopping the player. Identified this full list by rendering
+  // every world-layer tile actually used on the 8 classic routes to a labeled,
+  // collision-coded contact sheet and checking each one by eye.
+  const SOLID_WORLD_GIDS = new Set([
+    21, 22, 23, 43, 44, 45, 46,
+    185, 186, 187, 188, 189, 190, 191, 193, 194, 195, 196, 197,
+    238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250,
+    251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263,
+    264, 265, 266, 267, 397, 398, 399, 400, 405, 406, 407,
+  ]);
+  for (const name in CLASSIC_TILED.maps) {
+    const td = CLASSIC_TILED.maps[name];
+    for (let i = 0; i < td.world.length; i++) {
+      if (SOLID_WORLD_GIDS.has(td.world[i])) td.collide[i] = true;
+    }
   }
 })();
 
