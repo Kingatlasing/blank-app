@@ -2180,7 +2180,7 @@ function openBagInBattle() {
   if (locked) { appendBattleLog([monsterDisplayName(pm) + " can't use items - it's in lockdown!"]); return; }
   setBattlePrompt('');
   const menu = document.getElementById('battleMenu');
-  const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && ITEMS_DB[s].category === 'potion' && state.inventory[s] > 0);
+  const usable = Object.keys(state.inventory).filter(s => ITEMS_DB[s] && (ITEMS_DB[s].category === 'potion' || s === 'antidote_grapes') && state.inventory[s] > 0);
   menu.innerHTML = `<div class="listmenu">` +
     (usable.length ? usable.map(s => `<button onclick="useItemInBattle('${s}')">${ITEMS_DB[s].name} x${state.inventory[s]}</button>`).join('') : '<div class="hptext" style="padding:8px">No usable items.</div>') +
     `</div><button class="backbtn" onclick="renderBattleMain()">Back</button>`;
@@ -2191,6 +2191,23 @@ function useItemInBattle(slug) {
   // is auto-switched out as soon as it faints, in resolveBattleTurn()).
   if (slug === 'revive') { openRevivePicker(); return; }
   const pm = currentPlayerMon();
+  // antidote_grapes has category 'none' rather than 'potion' (not a heal-HP
+  // item), and nothing special-cased its slug the way revive/cureall are -
+  // it was sellable, found as a real hidden pickup on route2, and completely
+  // absent from the usable-items list this function builds its menu from,
+  // so there was no way to ever actually use one. Cures the negative status
+  // slot without healing HP, matching what "antidote" items do elsewhere.
+  if (slug === 'antidote_grapes') {
+    if (!pm.status || !pm.status.negative) {
+      appendBattleLog(['It won\'t have any effect.']);
+      return;
+    }
+    clearStatusSlot(pm, 'negative');
+    removeItem(slug, 1);
+    appendBattleLog(['Used ' + ITEMS_DB[slug].name + ' on ' + monsterDisplayName(pm) + '. The status was cured!']);
+    setTimeout(() => resolveEnemyOnlyTurn(), 500);
+    return;
+  }
   if (slug === 'cureall') {
     pm.currentHP = pm.derived.hp;
     pm.status = { negative: null, positive: null };
