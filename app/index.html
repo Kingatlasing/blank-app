@@ -497,13 +497,26 @@ function chargeBoostMult(mon) {
   const def = st && STATUS_DEFS[st.slug];
   return (def && def.chargeBoost) || 1;
 }
-// After a hit lands, roll the move's real inflict chance (potency) and
-// apply to whichever side its real `target` says (own_monster/enemy_monster).
+function teamOf(mon) { return state.party.includes(mon) ? state.party : battle.enemyTeam; }
+// After a hit lands, roll the move's real inflict chance (potency) and apply
+// to whichever side its real `target` says: own_monster/enemy_monster for
+// the single attacker/defender, or own_team/enemy_team (e.g. lava, sleep_bomb,
+// sleeping_powder) for that side's whole roster, not just whoever's active -
+// previously only own_monster was special-cased, so every own_team/enemy_team
+// inflict silently fell through to "apply to defenderMon", landing status
+// effects on the wrong side entirely for the 6 real moves that use them
+// (lava's own-team burn drawback, say, was instead burning the opponent).
 function rollInflictStatuses(move, attackerMon, defenderMon, msgs) {
   if (!move.inflicts) return;
   const chance = move.potency != null ? move.potency : 1;
   for (const inf of move.inflicts) {
     if (Math.random() > chance) continue;
+    if (inf.target === 'own_team' || inf.target === 'enemy_team') {
+      const team = teamOf(inf.target === 'own_team' ? attackerMon : defenderMon);
+      for (const m of team) applyStatus(m, inf.status, null);
+      msgs.push((team === state.party ? 'Your' : "The opponent's") + ' whole team is afflicted with ' + inf.status + '!');
+      continue;
+    }
     const target = inf.target === 'own_monster' ? attackerMon : defenderMon;
     applyStatus(target, inf.status, msgs);
   }
