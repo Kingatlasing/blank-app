@@ -65,7 +65,7 @@ def main():
     # listed price); it replaces the eBay row for the same item and adds the sales eBay's search didn't return
     for f in sorted(glob.glob(os.path.join(HERE, "raw", "slabscout-ags-130point-*.json.gz"))):
         for k, v in json.load(gzip.open(f))["sales"].items():
-            if not isinstance(v, dict) or not isinstance(v.get("v"), (int, float)) or v["v"] <= 0:
+            if not re.fullmatch(r"\d{9,15}", k) or not isinstance(v, dict) or not isinstance(v.get("v"), (int, float)) or v["v"] <= 0:
                 continue
             d = ""
             try:
