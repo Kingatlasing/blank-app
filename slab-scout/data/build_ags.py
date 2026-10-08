@@ -61,6 +61,18 @@ def main():
     sales = {}
     for f in sorted(glob.glob(os.path.join(HERE, "raw", "slabscout-ags-sold-*.json.gz"))):
         sales.update(json.load(gzip.open(f))["sales"])
+    # 130point: the same eBay sales with the real price when a Best Offer was accepted (eBay's page shows the
+    # listed price); it replaces the eBay row for the same item and adds the sales eBay's search didn't return
+    for f in sorted(glob.glob(os.path.join(HERE, "raw", "slabscout-ags-130point-*.json.gz"))):
+        for k, v in json.load(gzip.open(f))["sales"].items():
+            if not isinstance(v, dict) or not isinstance(v.get("v"), (int, float)) or v["v"] <= 0:
+                continue
+            d = ""
+            try:
+                d = datetime.strptime(" ".join(str(v.get("d", "")).split()[:3]).replace("Sept", "Sep"), "%d %b %y").strftime("%b %d, %Y")
+            except ValueError:
+                d = sales.get(k, {}).get("d", "")
+            sales[k] = {"t": str(v.get("t", ""))[:300], "p": f"${v['v']:.2f}", "d": d}
     # AGS 10 only: drop titles that also name another grade or company slab
     keep = {}
     for k, v in sales.items():
