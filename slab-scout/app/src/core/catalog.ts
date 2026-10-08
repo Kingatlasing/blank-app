@@ -188,6 +188,38 @@ async function cachedJson(rel: string) {
   }
 }
 
+let _ags: Promise<Record<string, { v: number; sales: number; last: string }>> | null = null;
+/** AGS 10 sold prices per card page path (data/build_ags.py: eBay sold listings matched to the card). */
+export function agsPrices(): Promise<Record<string, { v: number; sales: number; last: string }>> {
+  if (!_ags) {
+    _ags = (async () => {
+      try {
+        const r = await fetch(`${REMOTE}/ags10.json.gz?v=${Date.now() >> 22}`);
+        if (r.ok) {
+          const buf = await r.arrayBuffer();
+          try {
+            const f = cacheFile('ags10.json.gz');
+            if (!f.exists) f.create();
+            f.write(new Uint8Array(buf));
+          } catch {
+            /* still usable this session */
+          }
+          return parseGz(buf);
+        }
+      } catch {
+        /* offline: the saved copy */
+      }
+      try {
+        const f = cacheFile('ags10.json.gz');
+        if (f.exists) return parseGz(await f.arrayBuffer());
+      } catch {}
+      return {};
+    })();
+    _ags.then((t) => { if (!Object.keys(t).length) _ags = null; });
+  }
+  return _ags;
+}
+
 export interface OfflineStatus { files: number; total: number; bytes: number; totalBytes: number; version: string }
 
 /** How much of the card database is saved on this phone. Pass the online index to compare. */

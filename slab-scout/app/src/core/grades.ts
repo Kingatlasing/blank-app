@@ -1,11 +1,11 @@
 /**
  * Real sold prices for every grade of one card, read from its PriceCharting / SportsCardsPro page
  * ("Full Price Guide" table + the sold-listing counts). Only grades with at least one sold listing are kept,
- * so nothing here is guessed. AGS is not covered by those sites, so it has no price unless one is found.
+ * so nothing here is guessed. AGS 10 comes from eBay sold listings matched to the card (data/build_ags.py).
  * Phone: the page is read directly. Browser build: through the scan server (a browser can't read another site).
  */
 import { Platform } from 'react-native';
-import { Card, priceUrl } from './catalog';
+import { agsPrices, Card, priceUrl } from './catalog';
 import { scanServer, serverApi } from './server';
 
 export interface GradePrice { v: number; sales: number }
@@ -49,6 +49,18 @@ export function cardGrades(card: Card): Promise<GradeTable | null> {
   const hit = cache.get(url);
   if (hit) return hit;
   const p = (async () => {
+    const [t, ags] = await Promise.all([pageGrades(url).catch(() => null), agsPrices().catch(() => ({} as Record<string, { v: number; sales: number }>))]);
+    const a = card.path ? ags[card.path] : undefined;
+    if (!a) return t;
+    return { ...(t || {}), 'AGS 10': { v: a.v, sales: a.sales } };
+  })().catch(() => null);
+  cache.set(url, p);
+  p.then((v) => { if (!v) cache.delete(url); });
+  return p;
+}
+
+async function pageGrades(url: string): Promise<GradeTable | null> {
+  {
     if (Platform.OS !== 'web') {
       try {
         const r = await fetch(url, { headers: { Accept: 'text/html' } });
@@ -64,8 +76,5 @@ export function cardGrades(card: Card): Promise<GradeTable | null> {
     if (!r.ok) return null;
     const j = await r.json();
     return (j?.grades as GradeTable) || null;
-  })().catch(() => null);
-  cache.set(url, p);
-  p.then((v) => { if (!v) cache.delete(url); });
-  return p;
+  }
 }
