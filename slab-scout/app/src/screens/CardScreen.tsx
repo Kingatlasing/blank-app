@@ -10,6 +10,7 @@ import { Glow, Icon, IconName } from '../components/visual';
 import RecordSheet from '../components/RecordSheet';
 import { useApp } from '../appContext';
 import { useLayout } from '../layout';
+import { cardGrades, type GradeTable } from '../core/grades';
 import { GRADE_OPTIONS, GRADE_SUB, gradedPrice, getCard, loadSet, useCatalogVersion, imageUrl, oddsText, priceUrl, printRunLabel, relatedSales, sets, siblings, tier, value } from '../core/catalog';
 import { changeOver, currentValue, duplicateRecord, recordFromCatalog, recordImage } from '../core/portfolio';
 import { soldLinks } from '../core/databases';
@@ -40,6 +41,16 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
     loadSet(sid).catch(() => {}).finally(() => setLoadingSet(false));
   }, [cardKey]);
   const [cond, setCond] = useState('Raw');
+  const [gTable, setGTable] = useState<GradeTable | null>(null);
+  const [gLoading, setGLoading] = useState(false);
+  const cardForGrades = getCard(cardKey);
+  useEffect(() => {
+    if (!cardForGrades) return;
+    let live = true;
+    setGLoading(true);
+    cardGrades(cardForGrades).then((t) => { if (live) { setGTable(t); setGLoading(false); } });
+    return () => { live = false; };
+  }, [cardKey, !!cardForGrades]);
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
   const [comm, setComm] = useState<Sale[]>([]);
@@ -86,7 +97,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
   const q = [s.year, s.brand, s.name.split(' Checklist')[0], c.name, c.variant, c.number].filter(Boolean).join(' ');
   const img = imageUrl(c, 1600)[0];
   const rarity = `${c.variant || 'Base'}${c.printRun ? ` ${printRunLabel(c.printRun)}` : ''}`;
-  const gradeP = (g: string) => (g === 'Raw' ? (v ? { v, est: false } : null) : gradedPrice({ raw: v, psa9: c.psa9, psa10: c.psa10 }, g));
+  const gradeP = (g: string) => (g === 'Raw' ? (v ? { v, sales: undefined as number | undefined } : null) : gradedPrice({ raw: v, psa9: c.psa9, psa10: c.psa10, table: gTable }, g));
   const priceFor = (g: string): number | null => gradeP(g)?.v ?? null;
   const shownPrice = priceFor(cond);
   const lang = /japan|korean|chinese/i.test(`${s.category} ${s.name}`) ? (/korean/i.test(`${s.category} ${s.name}`) ? 'KR' : /chinese/i.test(`${s.category} ${s.name}`) ? 'CN' : 'JP') : 'EN';
@@ -117,7 +128,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
           rec.pricing.raw.mid = gp.v;
           rec.pricing.graded_label = grade;
           rec.pricing.graded_mid = gp.v;
-          if (gp.est) rec.pricing.note = `${grade} price estimated from this card's PSA / raw sold prices`;
+          rec.pricing.note = `${grade} sold price${gp.sales ? ` (${gp.sales} sales)` : ''} from the price guide`;
         }
       }
       await app.addRecord(rec, list);
@@ -300,7 +311,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
                 return (
                   <Pressable key={g} onPress={() => setCond(g)} style={{ flex: 1, borderRadius: L.sp(14), padding: L.sp(10), backgroundColor: C.surface, borderWidth: 1.5, borderColor: on ? C.blue : C.lineSoft, gap: 2 }}>
                     <Text style={{ color: C.ink2, fontWeight: '800', fontSize: L.fs(11), letterSpacing: 0.8 }}>{g === 'Raw' ? 'RAW' : g}</Text>
-                    <Text style={{ color: C.ink, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{gradeP(g)?.est ? '~' : ''}{money(p ?? undefined)}</Text>
+                    <Text style={{ color: C.ink, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>{money(p ?? undefined)}</Text>
                   </Pressable>
                 );
               })}
@@ -415,7 +426,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
       </Sheet>
       <Sheet visible={gradeSheet} onClose={() => setGradeSheet(false)} title="Grade">
         {CONDITIONS.map((g) => (
-          <SheetOption key={g} label={g} sub={[GRADE_SUB[g], gradeP(g) ? `${gradeP(g)!.est ? '~' : ''}${money(gradeP(g)!.v)}${gradeP(g)!.est ? ' est.' : ''}` : 'No guide price'].filter(Boolean).join(' · ')} on={g === cond} onPress={() => { setCond(g); setGradeSheet(false); }} />
+          <SheetOption key={g} label={g} sub={[GRADE_SUB[g], gradeP(g) ? `${money(gradeP(g)!.v)}${gradeP(g)!.sales ? ` · ${gradeP(g)!.sales} sales` : ''}` : gLoading ? 'Looking up sold prices…' : 'No sold prices found'].filter(Boolean).join(' · ')} on={g === cond} onPress={() => { setCond(g); setGradeSheet(false); }} />
         ))}
       </Sheet>
       <RecordSheet rec={openRec} onClose={() => setOpenRec(null)} />

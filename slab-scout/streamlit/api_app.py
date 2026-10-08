@@ -172,6 +172,64 @@ async def scan_url(request: Request):
     return JSONResponse(out)
 
 
+_GRADE_LABELS = {
+    "PSA 10": "PSA 10", "BGS 10": "BGS 10 Pristine", "BGS 10 Black": "BGS 10 Black Label", "CGC 10": "CGC 10",
+    "CGC 10 Pristine": "CGC 10 Pristine", "CGC 10 Prist.": "CGC 10 Pristine", "SGC 10": "SGC 10", "TAG 10": "TAG 10",
+    "ACE 10": "ACE 10", "Grade 9.5": "Grade 9.5", "Grade 9": "Grade 9", "Grade 8": "Grade 8", "Grade 7": "Grade 7",
+    "Grade 6": "Grade 6", "Grade 5": "Grade 5", "Grade 4": "Grade 4", "Grade 3": "Grade 3", "Grade 2": "Grade 2",
+    "Grade 1": "Grade 1", "Ungraded": "RAW",
+}
+_grade_cache: dict[str, dict] = {}
+
+
+def parse_grade_page(html: str) -> dict:
+    """Real sold prices per grade from a PriceCharting / SportsCardsPro card page (same rules as app/src/core/grades.ts):
+    only grades with at least one sold listing are kept, so the site's own estimates are skipped."""
+    import re
+    counts: dict[str, int] = {}
+    for m in re.finditer(r'<option value="completed-auctions[^"]*">\s*([^<(]+?)\s*\((\d+)\)\s*</option>', html):
+        k = _GRADE_LABELS.get(m.group(1).strip())
+        if k:
+            counts[k] = max(counts.get(k, 0), int(m.group(2)))
+    out = {}
+    for m in re.finditer(r'<td>\s*([^<]{2,30}?)\s*</td>\s*<td class="price js-price">\s*([^<]*?)\s*</td>', html):
+        k = _GRADE_LABELS.get(m.group(1).strip())
+        try:
+            v = float(m.group(2).replace("$", "").replace(",", ""))
+        except ValueError:
+            continue
+        if k and v > 0 and counts.get(k, 0) > 0:
+            out[k] = {"v": v, "sales": counts[k]}
+    return out
+
+
+def _get_grades(url: str) -> dict:
+    import re
+    import requests
+    if not re.match(r"^https://www\.(pricecharting|sportscardspro)\.com/game/[\w%&'.,()+-]+/[\w%&'.,()+-]+$", url):
+        raise ValueError("Only PriceCharting / SportsCardsPro card pages")
+    hit = _grade_cache.get(url)
+    if hit is not None:
+        return hit
+    r = requests.get(url, timeout=20, allow_redirects=False, headers={"User-Agent": "Mozilla/5.0 SlabScout", "Accept": "text/html"})
+    if r.status_code != 200:
+        raise ValueError(f"price page returned {r.status_code}")
+    out = parse_grade_page(r.text[:3_000_000])
+    if len(_grade_cache) > 5000:
+        _grade_cache.clear()
+    _grade_cache[url] = out
+    return out
+
+
+async def grades(request: Request):
+    """GET /api/grades?url=<PriceCharting / SportsCardsPro card page>: real sold prices for every grade of that card."""
+    try:
+        g = await run_in_threadpool(_get_grades, request.query_params.get("url", ""))
+    except Exception as e:
+        return JSONResponse({"detail": str(e)}, status_code=400)
+    return JSONResponse({"grades": g})
+
+
 async def learn_status(request: Request):
     from core import learn
     return JSONResponse(learn.status())
@@ -200,7 +258,7 @@ async def learn_result(request: Request):
 
 app = st.App(
     "scan_page.py",
-    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/ocr", read, methods=["POST"]),
+    routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/grades", grades), Route("/api/ocr", read, methods=["POST"]),
             Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
             Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],

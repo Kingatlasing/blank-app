@@ -135,6 +135,8 @@ async function apiRoot(timeoutMs = 90000): Promise<string | null> {
   return probing;
 }
 export const scanServer = () => base;
+/** The API path prefix on the scan server ('/api', '/~/+/api' or ''), or null when it can't be reached. */
+export const serverApi = (timeoutMs = 30000) => apiRoot(timeoutMs);
 export const serverOn = () => !!base;
 
 /** A photo as an upload: big camera shots shrunk to 2000 px on the long side (plenty for grading, quick to send). */

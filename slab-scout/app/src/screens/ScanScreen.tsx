@@ -17,6 +17,7 @@ import { analyzeWithAI } from '../core/ai';
 import { Inspection, inspectCard, LEGEND } from '../core/condition';
 import { AutographResult, checkAutograph, SIGNED } from '../core/autograph';
 import CenteringTool from '../components/CenteringTool';
+import { cardGrades, type GradeTable } from '../core/grades';
 import { Card as CatCard, closestRemote, GRADE_OPTIONS, GRADE_SUB, gradedPrice, getCard, imageUrl, loadSet, matchText, photoLookup, printRunLabel, searchRemote, sets as catSets, siblings, value as catValue } from '../core/catalog';
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip, Sheet, SheetOption } from '../components/cards';
@@ -53,10 +54,12 @@ type Phase = 'capture' | 'review' | 'working' | 'result';
 const ZOOMS: [string, number][] = [['1×', 0], ['1.5×', 0.07], ['2×', 0.14]];
 const SCAN_GRADES: string[] = ['RAW', ...GRADE_OPTIONS];
 /** The scanned card's price at a grade (RAW = its raw price). */
-function scanPrice(it: ScanItem, grade: string): { v: number; est: boolean } | null {
+function scanPrice(it: ScanItem, grade: string, table?: GradeTable | null): { v: number; sales?: number } | null {
   const c = it.catalog_key ? getCard(it.catalog_key) : null;
-  return gradedPrice({ raw: it.price ?? null, psa9: c?.psa9, psa10: c?.psa10 }, grade || 'RAW');
+  return gradedPrice({ raw: it.price ?? null, psa9: c?.psa9, psa10: c?.psa10, table }, grade || 'RAW');
 }
+const priceSub = (gp: { v: number; sales?: number } | null, loading: boolean) =>
+  gp ? `${money(gp.v)}${gp.sales ? ` · ${gp.sales} sale${gp.sales === 1 ? '' : 's'}` : ''}` : loading ? 'Looking up sold prices…' : 'No sold prices found';
 const SCAN_CONDS = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const sameCard = (a: ScanItem | null, b: ScanItem | null) => !!a && !!b && (a.catalog_key && b.catalog_key ? a.catalog_key === b.catalog_key : !!a.name && a.name === b.name && a.number === b.number);
 
@@ -143,6 +146,17 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [last, setLast] = useState<ScanItem | null>(null);
   /** a photo picked from the library: shown in the frame instead of the camera while it's scanned */
   const [picked, setPicked] = useState<string | null>(null);
+  /** real sold prices per grade for the card showing (null while loading / not found) */
+  const [gTable, setGTable] = useState<{ key: string; t: GradeTable | null; loading: boolean } | null>(null);
+  useEffect(() => {
+    const c = last?.catalog_key ? getCard(last.catalog_key) : null;
+    if (!c) return setGTable(null);
+    let live = true;
+    setGTable({ key: c.key, t: null, loading: true });
+    cardGrades(c).then((t) => live && setGTable({ key: c.key, t, loading: false }));
+    return () => { live = false; };
+  }, [last?.catalog_key]);
+  const tableFor = (it: ScanItem | null) => (it && gTable && gTable.key === it.catalog_key ? gTable.t : null);
   const [history, setHistory] = useState<ScanItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
@@ -321,12 +335,12 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       // grade and condition picked under the result are saved on the record
       const graded = pick.grade && pick.grade !== 'RAW' ? pick.grade : '';
       rec.grade = { ...(rec.grade || {}), method: rec.grade?.method || 'owner', ...(graded ? { label: graded } : {}), condition: pick.cond };
-      const gp = graded ? scanPrice(it, graded) : null;
+      const gp = graded ? scanPrice(it, graded, tableFor(it)) : null;
       if (gp) {
         rec.pricing.raw.mid = gp.v;
         rec.pricing.graded_label = graded;
         rec.pricing.graded_mid = gp.v;
-        if (gp.est) rec.pricing.note = `${graded} price estimated from this card's PSA / raw sold prices`;
+        rec.pricing.note = `${graded} sold price${gp.sales ? ` (${gp.sales} sales)` : ''} from the price guide`;
       }
     }
     try {
@@ -953,9 +967,10 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                         <Text style={{ color: C.ink2, fontSize: L.fs(12) }} numberOfLines={1}>
                           {(() => {
                             const g = choice.grade && choice.grade !== 'RAW' ? choice.grade : '';
-                            const gp = g ? scanPrice(last, g) : null;
+                            const gp = g ? scanPrice(last, g, tableFor(last)) : null;
                             if (!g) return <><Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{priceText(last)}</Text>  Est. Value</>;
-                            return <><Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{gp ? `${gp.est ? '~' : ''}${money(gp.v)}` : '—'}</Text>  {g}{gp?.est ? ' est.' : ''} · raw {priceText(last)}</>;
+                            const loading = !!gTable?.loading && gTable.key === last.catalog_key;
+                            return <><Text style={{ color: C.lime, fontWeight: '900', fontSize: L.fs(16), fontVariant: ['tabular-nums'] }}>{gp ? money(gp.v) : loading ? '…' : '—'}</Text>  {g}{gp?.sales ? ` (${gp.sales} sales)` : gp ? '' : loading ? ' looking up' : ' no sales found'} · raw {priceText(last)}</>;
                           })()}
                         </Text>
                       ) : (
@@ -1018,7 +1033,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                   return <SheetOption key={c.key} label={`${c.variant || 'Normal'}${c.printRun ? ` ${printRunLabel(c.printRun)}` : ''}`} sub={v ? money(v) : undefined} on={c.key === last.catalog_key} onPress={() => { pickFinish(last, c); setChipSheet(null); }} />;
                 })
               : null}
-            {chipSheet === 'grade' ? SCAN_GRADES.map((g) => { const gp = last ? scanPrice(last, g) : null; return <SheetOption key={g} label={g} sub={[GRADE_SUB[g], gp ? `${gp.est ? '~' : ''}${money(gp.v)}${gp.est ? ' est.' : ''}` : 'No price'].filter(Boolean).join(' · ')} on={choice.grade === g} onPress={() => { setChoice((c) => ({ ...c, grade: g })); setChipSheet(null); }} />; }) : null}
+            {chipSheet === 'grade' ? SCAN_GRADES.map((g) => { const gp = last ? scanPrice(last, g, tableFor(last)) : null; return <SheetOption key={g} label={g} sub={[GRADE_SUB[g], priceSub(gp, !!gTable?.loading)].filter(Boolean).join(' · ')} on={choice.grade === g} onPress={() => { setChoice((c) => ({ ...c, grade: g })); setChipSheet(null); }} />; }) : null}
             {chipSheet === 'cond' ? SCAN_CONDS.map((g) => <SheetOption key={g} label={g} sub={{ NM: 'Near mint', LP: 'Lightly played', MP: 'Moderately played', HP: 'Heavily played', DMG: 'Damaged' }[g]} on={choice.cond === g} onPress={() => { setChoice((c) => ({ ...c, cond: g })); setChipSheet(null); }} />) : null}
           </Sheet>
         </View>

@@ -540,45 +540,29 @@ export function priceIn(card: Card, mode: PriceMode = 'raw'): { v: number | null
   return { v, text: `${est ? '~' : ''}$${v.toFixed(2)}${mode !== 'raw' ? ' raw' : ''}`, graded: false };
 }
 
-/** Grades a card can be valued at, by company (AGS 10 = Gem Mint 10). */
+/** Grades a card can be valued at. 'Grade 9.5' ... 'Grade 7' are any company (the price guides don't split them). */
 export const GRADE_OPTIONS = [
-  'PSA 10', 'PSA 9', 'PSA 8',
-  'BGS 10 Black Label', 'BGS 10 Pristine', 'BGS 9.5', 'BGS 9',
-  'CGC 10 Pristine', 'CGC 10', 'CGC 9.5', 'CGC 9',
-  'SGC 10', 'SGC 9.5', 'SGC 9',
-  'TAG 10 Pristine', 'TAG 10', 'TAG 9',
-  'AGS 10',
+  'PSA 10', 'BGS 10 Black Label', 'BGS 10 Pristine', 'CGC 10 Pristine', 'CGC 10', 'SGC 10', 'TAG 10', 'ACE 10', 'AGS 10',
+  'Grade 9.5', 'Grade 9', 'Grade 8', 'Grade 7',
 ] as const;
-export const GRADE_SUB: Record<string, string> = { 'AGS 10': 'Gem Mint 10', 'CGC 10': 'Gem Mint 10', 'SGC 10': 'Gem Mint 10', 'TAG 10': 'Gem Mint 10', 'BGS 9.5': 'Gem Mint' };
-
-/* Rough market price of each grade next to a PSA grade (modern cards; vintage and low-pop cards vary a lot).
- * [anchor, ratio]: the price is about ratio x the card's PSA 10 ('10') or PSA 9 ('9') sold price. */
-const GRADE_RATIO: Record<string, ['10' | '9', number]> = {
-  'PSA 8': ['9', 0.6],
-  'BGS 10 Black Label': ['10', 3], 'BGS 10 Pristine': ['10', 1.2], 'BGS 9.5': ['10', 0.6], 'BGS 9': ['9', 0.85],
-  'CGC 10 Pristine': ['10', 1.1], 'CGC 10': ['10', 0.6], 'CGC 9.5': ['10', 0.45], 'CGC 9': ['9', 0.7],
-  'SGC 10': ['10', 0.65], 'SGC 9.5': ['10', 0.45], 'SGC 9': ['9', 0.75],
-  'TAG 10 Pristine': ['10', 1], 'TAG 10': ['10', 0.6], 'TAG 9': ['9', 0.7],
-  'AGS 10': ['10', 0.5],
+export const GRADE_SUB: Record<string, string> = {
+  'AGS 10': 'Gem Mint 10', 'CGC 10': 'Gem Mint 10', 'SGC 10': 'Gem Mint 10', 'TAG 10': 'Gem Mint 10',
+  'Grade 9.5': 'any company (BGS / CGC / SGC 9.5)', 'Grade 9': 'any company (PSA 9, BGS 9...)', 'Grade 8': 'any company', 'Grade 7': 'any company',
 };
 
-/** Price at a grade from the card's raw / PSA 9 / PSA 10 prices. PSA 9 and 10 use real sold prices when the guide
- * has them; every other grade (and a missing PSA price) is an estimate from typical price gaps between grades. */
-export function gradedPrice(p: { raw?: number | null; psa9?: number | null; psa10?: number | null }, grade: string): { v: number; est: boolean } | null {
-  const raw = p.raw || null;
-  const g = grade.toUpperCase() === 'RAW' ? 'RAW' : grade;
-  if (g === 'RAW') return raw ? { v: raw, est: false } : null;
-  let p9 = p.psa9 || null, p10 = p.psa10 || null, est9 = !p9, est10 = !p10;
-  if (!p10 && p9) p10 = p9 * 2.2;
-  if (!p9 && p10) p9 = Math.max(p10 / 2.2, raw || 0);
-  if (!p10 && raw) { p9 = raw * 1.8; p10 = raw * 4; }
-  if (!p9 || !p10) return null;
-  const floor = (v: number) => Math.round(Math.max(v, raw || 0) * 100) / 100;
-  if (g === 'PSA 10') return { v: floor(p10), est: est10 };
-  if (g === 'PSA 9') return { v: floor(p9), est: est9 };
-  const r = GRADE_RATIO[g];
-  if (!r) return null;
-  return { v: floor((r[0] === '10' ? p10 : p9) * r[1]), est: true };
+/** Real price at a grade: the card's sold-price table for that grade (see grades.ts), else the guide's PSA 10 /
+ * Grade 9 columns, else nothing. Never estimated. `sales` = sold listings behind it when known. */
+export function gradedPrice(
+  p: { raw?: number | null; psa9?: number | null; psa10?: number | null; table?: Record<string, { v: number; sales: number }> | null },
+  grade: string,
+): { v: number; sales?: number } | null {
+  const g = !grade || grade.toUpperCase() === 'RAW' ? 'RAW' : grade;
+  const t = p.table?.[g];
+  if (t) return { v: t.v, sales: t.sales };
+  if (g === 'RAW') return p.raw ? { v: p.raw } : null;
+  if (g === 'PSA 10' && p.psa10) return { v: p.psa10 };
+  if ((g === 'Grade 9' || g === 'PSA 9') && p.psa9) return { v: p.psa9 };
+  return null;
 }
 
 /** [price, isEstimate]: the card's own sold price, else the typical sold price of its parallel. */
