@@ -36,7 +36,8 @@ def publish() -> None:
     remote = os.path.join(HERE, "catalog", "remote")
     if not os.path.exists(os.path.join(remote, "index.json")):
         sys.exit("Build the catalog first (data/build_catalog.py)")
-    with tempfile.TemporaryDirectory() as tmp:
+    # ignore_cleanup_errors: git can still be writing into the temp repo's .git as it is removed (after the push)
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         shutil.copytree(remote, os.path.join(tmp, "remote"))
         raw = os.path.join(HERE, "raw")
         if os.path.isdir(raw):
