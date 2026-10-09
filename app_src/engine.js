@@ -1917,6 +1917,7 @@ function gameLoop() {
 
 /* ---------------------------- HUD ---------------------------- */
 function updateHud() {
+  updateObjectiveBanner();
   const bar = document.getElementById('partyBar');
   if (state.screen === 'battle' || state.screen === 'boot' || state.screen === 'title') { bar.style.display = 'none'; return; }
   bar.style.display = 'flex';
@@ -1924,6 +1925,51 @@ function updateHud() {
     const pct = Math.max(0, Math.floor(m.currentHP / m.derived.hp * 100));
     return `<div class="hudmon"><img src="data:image/png;base64,${ASSET_B64.monsters[m.slug]}"/><div class="hudname">${monsterDisplayName(m)} Lv${m.level}</div><div class="hpbar"><div class="hpfill" style="width:${pct}%;background:${pct>50?'#4caf50':pct>20?'#e0a52b':'#e04b2b'}"></div></div></div>`;
   }).join('') + `<div class="moneybox">₡ ${state.money}</div>`;
+}
+
+// The 8 Arena Halls in their intended challenge order (matches the level
+// curve their own team rosters are built around, above), used only to pick
+// which one currentObjectiveText() should point the player at next - not a
+// new quest system, just reading the same flag/badge state the story gates
+// already check.
+const GYM_ORDER = [
+  { flag: 'sylva_defeated', mapKey: 'gym_ashveld' },
+  { flag: 'pyra_defeated', mapKey: 'gym_crysthaven' },
+  { flag: 'mila_defeated', mapKey: 'gym_hearthrock1' },
+  { flag: 'granite_defeated', mapKey: 'gym_hearthrock2' },
+  { flag: 'marin_defeated', mapKey: 'gym_steamshore1' },
+  { flag: 'orion_defeated', mapKey: 'gym_steamshore2' },
+  { flag: 'voltessa_defeated', mapKey: 'gym_stormpeak' },
+  { flag: 'zephra_defeated', mapKey: 'gym_aerolume' },
+];
+function currentObjectiveText() {
+  if (!state.flags.starterChosen) return "Visit Professor Larkspur's Lab to choose your first partner!";
+  if (state.flags.gameWon) return "You're the Champion! Keep exploring and fill out your Bestiary.";
+  const next = GYM_ORDER.find(g => !state.flags[g.flag]);
+  if (next) {
+    const map = MAPS[next.mapKey];
+    const npc = (map.npcs || []).find(n => n.trainer && n.trainer.flag === next.flag);
+    return `Next: beat ${npc.trainer.name} at ${map.name} for the ${npc.trainer.badge}. (${state.badges.length}/8 badges)`;
+  }
+  if (!state.flags.enforcerDefeated) return 'All 8 badges earned! Clear the Enforcer Outpost south of Crysthaven to open the way to the Summit.';
+  return 'The Summit awaits - challenge Champion Reyes!';
+}
+function toggleObjectiveBanner() {
+  state.flags.hideObjectiveBanner = !state.flags.hideObjectiveBanner;
+  updateObjectiveBanner();
+}
+function updateObjectiveBanner() {
+  const el = document.getElementById('objectiveBanner');
+  const toggle = document.getElementById('objectiveToggle');
+  if (!el || !toggle) return;
+  if (state.screen === 'battle' || state.screen === 'boot' || state.screen === 'title') {
+    el.style.display = 'none'; toggle.style.display = 'none'; return;
+  }
+  toggle.style.display = 'block';
+  toggle.textContent = state.flags.hideObjectiveBanner ? 'i' : '×';
+  if (state.flags.hideObjectiveBanner) { el.style.display = 'none'; return; }
+  el.textContent = currentObjectiveText();
+  el.style.display = 'block';
 }
 
 /* ============================ BATTLE SYSTEM ============================ */

@@ -48,6 +48,19 @@
   .hpfill { height:100%; }
   .moneybox { margin-left:auto; font-size:16px; color:#ffd76b; flex-shrink:0; padding-right:10px; }
 
+  /* A small, always-on-top-of-screen objective hint ("where do I go next?") -
+     plain text driven by the same state flags/badges the story gates
+     already check (see currentObjectiveText()), not a new quest system.
+     pointer-events:none so it never blocks clicking/tapping the map under
+     it; toggleObjectiveBanner() (the (i) button) just hides/shows it for
+     players who'd rather not have it up. */
+  #objectiveBanner { position:absolute; top:8px; left:50%; transform:translateX(-50%); max-width:86%;
+    background:rgba(10,15,30,0.78); color:#ffd76b; font-size:12px; line-height:1.4; text-align:center;
+    padding:5px 14px; border-radius:8px; border:1px solid #4a5a8a; z-index:25; pointer-events:none; }
+  #objectiveToggle { position:absolute; top:8px; right:8px; width:22px; height:22px; border-radius:50%;
+    background:rgba(10,15,30,0.78); color:#9fb4d8; border:1px solid #4a5a8a; font-size:12px; line-height:1;
+    cursor:pointer; z-index:26; padding:0; }
+
   #dialogueBox { position:absolute; left:20px; right:20px; bottom:98px; background:#12172a; border:3px solid #4a5a8a; border-radius:8px; padding:14px 18px; font-size:16px; min-height:60px; display:none; z-index:30; cursor:pointer; }
   #choiceBox { position:absolute; left:20px; right:20px; bottom:170px; display:none; flex-direction:column; gap:6px; z-index:31; }
   #choiceBox button { padding:10px; font-size:15px; background:#2f8fd6; color:#fff; border:none; border-radius:6px; cursor:pointer; }
@@ -227,6 +240,8 @@
   </div>
 
   <canvas id="game" width="960" height="632"></canvas>
+  <div id="objectiveBanner" style="display:none"></div>
+  <button id="objectiveToggle" title="Show/hide objective hint" onclick="toggleObjectiveBanner()">i</button>
   <div id="partyBar"></div>
   <div id="dialogueBox" onclick="advanceDialogue()"><div id="dialogueText"></div></div>
   <div id="choiceBox"></div>
