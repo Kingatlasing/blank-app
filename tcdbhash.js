@@ -40,7 +40,7 @@ function colour(px,w,h){
   const spread=vw>0?1-Math.hypot(vx,vy)/vw:0;
   return enc(ring,nr)+enc(cen,nc)+hh+q(spread*255)}
 async function one(id){
-  const ac=new AbortController();const to=setTimeout(()=>ac.abort(),20000);const r=await fetch(O+URL_OF(id),{signal:ac.signal});await new Promise(r=>setTimeout(r,250));if(!r.ok)throw new Error('http '+r.status);clearTimeout(to);
+  const ac=new AbortController();const to=setTimeout(()=>ac.abort(),20000);const r=await fetch(O+URL_OF(id),{signal:ac.signal});await new Promise(r=>setTimeout(r,400));if(!r.ok)throw new Error('http '+r.status);clearTimeout(to);
   const bm=await createImageBitmap(await r.blob());const w=bm.width,h=bm.height;
   const cv=new OffscreenCanvas(w,h);const x=cv.getContext('2d');x.drawImage(bm,0,0);bm.close();
   const px=x.getImageData(0,0,w,h).data;return [phash(px,w,h),colour(px,w,h)]}
@@ -55,7 +55,7 @@ onmessage=async(e)=>{
   async function lane(){while(i<todo.length){const id=todo[i++];
     let tries=0;for(;;){try{buf.push([id,await one(id)]);ok++;break}catch(err){if(++tries>=3||String(err).includes('http 404')){bbuf.push(id);fail++;break}await new Promise(r=>setTimeout(r,1500))}}
     if(buf.length+bbuf.length>=200){flush();postMessage({total:ids.length,todo:todo.length,ok,fail,at:i})}}}
-  await Promise.all(Array.from({length:4},lane));flush();postMessage({total:ids.length,todo:todo.length,ok,fail,at:i,finished:true})};
+  await Promise.all(Array.from({length:2},lane));flush();postMessage({total:ids.length,todo:todo.length,ok,fail,at:i,finished:true})};
 `;
 window.__hw && window.__hw.terminate();
 window.__hs = {state: 'reading checklists'};
