@@ -29,14 +29,14 @@ function rowsOf(h,sid){
   const out=[];
   for(const tr of h.split(/<tr[\\s>]/).slice(1)){
     const body=tr.split(/<\\/tr>/)[0];
-    const m=body.match(/ViewCard\\.cfm\\/sid\\/(\\d+)\\/cid\\/(\\d+)\\//);if(!m||m[1]!==String(sid))continue;
+    const m=body.match(/ViewCard\\.cfm\\/sid\\/(\\d+)\\/cid\\/(\\d+)\\/([^\"?#<>\\s]*)/);if(!m||m[1]!==String(sid))continue;
     const tds=body.split(/<td(?=[\\s>])/).slice(1).map(x=>x.slice(x.indexOf('>')+1).split(/<\\/td>/)[0]);
     const img=(body.match(/(?:data-original|src)="([^"]*(?:Thumb\\.jpg|AddImage\\.gif)[^"]*)"/)||[])[1]||'';
     let num='',name='',notes='';
     for(let i=0;i<tds.length;i++){const td=tds[i];
       if(!num&&/ViewCard\\.cfm/.test(td)&&!/<img/.test(td)&&txt(td)){num=txt(td);
         for(let k=i+1;k<tds.length;k++){if(txt(tds[k])){name=txt(tds[k].split(/<figcaption/)[0]);notes=notesOf(tds[k]);break}}break}}
-    out.push([+m[2],num,name,notes,/Thumb\\.jpg/.test(img)?1:0])}
+    out.push([+m[2],num,name,notes,/Thumb\\.jpg/.test(img)?1:0,m[3]||''])}
   return out}
 async function one(s){
   const [sid,slug]=s;const cards=[];const seen=new Set();
