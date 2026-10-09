@@ -161,6 +161,27 @@ function loadAllImages(cb) {
   }
 })();
 
+(function gateRoute1UntilStarterChosen() {
+  // Town's real Tiled data has its own native south-edge warp straight onto
+  // Route 1 (a wild-encounter map) with no gate at all - a player who
+  // wanders south instead of visiting the lab first could step onto Route 1,
+  // and then into grass, while state.party is still empty. That crashed
+  // startWildBattle()/renderBattleMain() (reading .currentHP off an
+  // undefined currentPlayerMon()) mid-way through the game loop, which both
+  // left the battle screen blank (the crash happened before the HP
+  // cards/menu were drawn into it) and killed the loop's own
+  // requestAnimationFrame chain for good, freezing the whole game. Gating
+  // this one warp the same way other story gates already work (requires +
+  // a custom blocked-message) stops a starter-less player from ever
+  // reaching a wild encounter in the first place.
+  const t = TILED.maps.town;
+  const w = t && (t.warps || []).find(w => w.to === 'route1');
+  if (w) {
+    w.requires = 'starterChosen';
+    w.blockedMessage = "Mom catches your arm. \"Hold on - don't head out there without a partner! Go see Professor Larkspur first.\"";
+  }
+})();
+
 (function patchTreeCollision() {
   const TREE_SLOTS = new Set([12, 13, 16, 17]);
   for (const name in TILED.maps) {
@@ -1412,7 +1433,7 @@ function onArrive() {
       (!w.requiresFacing || w.requiresFacing === state.facing));
     if (hit) {
       if (hit.requires && !state.flags[hit.requires]) {
-        pushDialogue(["It's blocked for now."]);
+        pushDialogue([hit.blockedMessage || "It's blocked for now."]);
         state.x = state.moveFrom.x; state.y = state.moveFrom.y;
         return;
       }
@@ -1863,21 +1884,34 @@ function updateMovementAnim() {
 }
 
 function gameLoop() {
-  pollMovementInput();
-  updateMovementAnim();
-  // A trainer's preBattle dialogue runs through the same pushDialogue() as
-  // ordinary overworld dialogue, which sets state.screen to 'dialogue' - so
-  // checking state.screen alone here would redraw the overworld map (and,
-  // once dismissed, state.screen goes to 'overworld' too) right over the
-  // already-drawn battle scene/sprites while the battle is still up. `battle`
-  // is the authoritative "a fight is in progress" flag regardless of which
-  // screen value dialogue plumbing leaves behind, so gate on it too.
-  if (!battle && (state.screen === 'overworld' || state.screen === 'dialogue')) renderOverworld();
-  // Keeps the trainer sprites' idle bob animating smoothly while a battle is
-  // up - renderBattleScene() alone (not the full renderBattleMain(), which
-  // also rebuilds the HP cards/menu HTML) is all a canvas-only bob needs.
-  if (battle && state.screen === 'battle') renderBattleScene();
-  updateHud();
+  // Everything below throws exactly once in a blue moon if it throws at all,
+  // but an uncaught exception anywhere in here used to be fatal: it unwinds
+  // straight out of this function and skips the requestAnimationFrame(...)
+  // call at the end, which is the only thing that ever reschedules another
+  // frame - so the whole game would silently freeze forever on a single bad
+  // frame (this is exactly how the empty-party battle crash above froze the
+  // game, before that got its own direct fix). try/catch here means any
+  // future edge case like that logs to the console and skips one frame
+  // instead of ending the game.
+  try {
+    pollMovementInput();
+    updateMovementAnim();
+    // A trainer's preBattle dialogue runs through the same pushDialogue() as
+    // ordinary overworld dialogue, which sets state.screen to 'dialogue' - so
+    // checking state.screen alone here would redraw the overworld map (and,
+    // once dismissed, state.screen goes to 'overworld' too) right over the
+    // already-drawn battle scene/sprites while the battle is still up. `battle`
+    // is the authoritative "a fight is in progress" flag regardless of which
+    // screen value dialogue plumbing leaves behind, so gate on it too.
+    if (!battle && (state.screen === 'overworld' || state.screen === 'dialogue')) renderOverworld();
+    // Keeps the trainer sprites' idle bob animating smoothly while a battle is
+    // up - renderBattleScene() alone (not the full renderBattleMain(), which
+    // also rebuilds the HP cards/menu HTML) is all a canvas-only bob needs.
+    if (battle && state.screen === 'battle') renderBattleScene();
+    updateHud();
+  } catch (e) {
+    console.error('gameLoop error (skipping this frame):', e);
+  }
   requestAnimationFrame(gameLoop);
 }
 
@@ -1908,7 +1942,19 @@ function playCry(slug) {
     audio.play().catch(() => {});
   } catch (e) {}
 }
+// Belt-and-suspenders guard: whatever path a battle trigger comes through
+// (grass encounter, a fixed/scripted wild mon, a trainer's sightline), a
+// battle with nobody able to fight has no sane screen to show - playerIdx
+// resolves to -1 and currentPlayerMon()/battleHpBar() crash on undefined
+// mid-way through the game loop, which both leaves the battle screen blank
+// and kills the loop's own requestAnimationFrame chain for good (the whole
+// game freezes). Bailing out here before `battle` is even set turns that
+// into a harmless no-op instead.
+function hasConsciousPartyMember() {
+  return state.party.some(m => m.currentHP > 0);
+}
 function startWildBattle(slug, level, isFixed) {
+  if (!hasConsciousPartyMember()) return;
   battle = {
     kind: 'wild', isFixed,
     enemyTeam: [createMonsterInstance(slug, level)],
@@ -1922,6 +1968,7 @@ function startWildBattle(slug, level, isFixed) {
   openBattleUI();
 }
 function startTrainerBattle(trainerDef, trainerSprite) {
+  if (!hasConsciousPartyMember()) return;
   battle = {
     kind: 'trainer', trainer: trainerDef, trainerSprite: trainerSprite || null,
     enemyTeam: trainerDef.team.map(t => createMonsterInstance(t.slug, t.level)),
