@@ -397,6 +397,18 @@ def build():
         print(" ", s["name"], s["cards"], [ (t["name"], t["print_run"], t["median_raw"]) for t in s["tiers"][:4]])
 
 
+# Price-guide photos that show the wrong card (user-sent photos on the price guides): photo_blocklist.json lists the
+# card pages ("paths") whose own photo is wrong and photo ids ("images") that are wrong wherever they're used. Those
+# cards get no photo, and the photo is kept out of the scan fingerprints so it can't send a scan to the wrong card.
+def _bad_photos() -> dict:
+    p = os.path.join(HERE, "photo_blocklist.json")
+    d = json.load(open(p)) if os.path.exists(p) else {}
+    return {"paths": set(d.get("paths", {})), "images": set(d.get("images", {}))}
+
+
+BAD_PHOTOS = _bad_photos()
+
+
 # photo fingerprint groups (the phone loads only the group of the game being scanned)
 PHASH_GROUPS = {"Pokémon": "pokemon", "Yu-Gi-Oh!": "yugioh", "Magic: The Gathering": "magic", "Lorcana": "tcg",
                 "One Piece": "tcg", "Dragon Ball": "tcg", "Digimon": "tcg", "Other TCG": "tcg", "Gundam": "tcg",
@@ -466,6 +478,8 @@ class CardSink:
         for r in rows:
             if not r[9]:
                 r[9] = self.imgs.get(r[8], "")
+            if r[9] and (r[8] in BAD_PHOTOS["paths"] or r[9].lstrip("~") in BAD_PHOTOS["images"]):
+                r[9] = ""  # the price guide's photo shows a different card: no photo beats a wrong one
             if r[9]:
                 base = re.sub(r"^[A-Z]{2,5}-[A-Z]{1,5}-", "", r[2] or "")
                 by_sib.setdefault((r[1], base), r[9])
