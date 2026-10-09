@@ -1402,6 +1402,12 @@ MAPS.classic_route8 = {
   //    map tiles around several placements, not just the isolated atlas tile.
   //    A different, unrelated fence graphic (GID 108) is already correctly
   //    solid, so this bug is specific to this one tile family.
+  //  - open water (world GID 177) - confirmed with a real screenshot
+  //    (steamshore, a lake bordering the gym) and a real walk test: nothing
+  //    stopped the player from walking straight into it. The original
+  //    region's own water tiles are, by contrast, already 100% correctly
+  //    solid, so this is the same "second region never got full collision"
+  //    pattern as the rocks/fences above, not a new category of bug.
   // Identified this full list by rendering every world-layer tile actually
   // used across the second region to a labeled, collision-coded contact
   // sheet and checking each one by eye, then confirming the concerning ones
@@ -1413,11 +1419,29 @@ MAPS.classic_route8 = {
     251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262, 263,
     264, 265, 266, 267, 397, 398, 399, 400, 405, 406, 407,
     109, 110, 111, 159, 192,
+    177,
   ]);
   for (const name in CLASSIC_TILED.maps) {
     const td = CLASSIC_TILED.maps[name];
     for (let i = 0; i < td.world.length; i++) {
       if (SOLID_WORLD_GIDS.has(td.world[i])) td.collide[i] = true;
+    }
+    // Several route-connection warps sit exactly on a water tile (world GID
+    // 177) right at the map's edge - a real reachability check caught this:
+    // making water solid silently sealed off hearthrock/steamshore/aerolume/
+    // thornwood/umbrastar and all 4 routes between them, since the player
+    // could no longer ever step onto the warp tile to trigger it. A warp
+    // tile is walkable by definition regardless of what's drawn under it, so
+    // force every one of this map's own warp tiles back open after the pass
+    // above, rather than leaving a handful of GID177 placements excluded
+    // from the fix (which would make water only sometimes impassable).
+    const map = MAPS[name];
+    for (const w of (map && map.extraWarps) || []) {
+      for (let wy = w.y; wy < w.y + (w.h || 1); wy++) {
+        for (let wx = w.x; wx < w.x + (w.w || 1); wx++) {
+          if (wx >= 0 && wy >= 0 && wx < td.w && wy < td.h) td.collide[wy * td.w + wx] = false;
+        }
+      }
     }
   }
 })();
