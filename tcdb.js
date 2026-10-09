@@ -91,5 +91,5 @@ const w = new Worker(URL.createObjectURL(new Blob([W], {type: 'text/javascript'}
 window.__tw = w;
 w.onmessage = e => { if (e.data.warn) { window.__tl.push({...e.data, t: Date.now()}); if (window.__tl.length > 50) window.__tl.shift(); } else window.__ts = {...e.data, sets: sets.length, t: Date.now()}; };
 w.onerror = e => { window.__ts = {err: e.message}; };
-w.postMessage({sets: ordered, lanes: 1});
+w.postMessage({sets: ordered, lanes: window.__TLANES || 3});
 })();
