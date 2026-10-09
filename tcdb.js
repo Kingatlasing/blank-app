@@ -79,7 +79,6 @@ if (!sets) {
       seen.add(+m[1]);
       sets.push([+m[1], m[2], a.textContent.trim(), y]);
     }
-    await new Promise(r => setTimeout(r, 900));
   }
   try { localStorage.setItem(LS, JSON.stringify(sets)); } catch (e) {}
 }
