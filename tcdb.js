@@ -13,16 +13,16 @@ const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const open=()=>new Promise((r,j)=>{const q=indexedDB.open('slabscout-tcdb2',1);q.onupgradeneeded=()=>{q.result.createObjectStore('sets')};q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
 const txt=h=>h.replace(/<figcaption[\\s\\S]*?<\\/figcaption>/g,' ').replace(/<br\\s*\\/?>/g,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;|&rsquo;/g,"'").replace(/&quot;/g,'"').replace(/\\s+/g,' ').trim();
 const notesOf=h=>[...h.matchAll(/<figcaption[^>]*>([\\s\\S]*?)<\\/figcaption>/g)].map(m=>txt(m[1])).join(' ; ');
-let reqs=0,pause=1200;
+let reqs=0,pause=8000;const MINP=8000;
 async function get(p){
   for(let t=0;t<8;t++){try{
     const ac=new AbortController();const to=setTimeout(()=>ac.abort(),25000);
     const r=await fetch(O+p,{signal:ac.signal,credentials:'include'});clearTimeout(to);
     if(r.status===404)return '';
     const h=await r.text();
-    if(r.status===429||r.status===403||/Just a moment|cf-chl|challenge-platform/.test(h.slice(0,3000))){postMessage({warn:'slow down '+r.status,p});pause=Math.min(pause*1.5,6000);await sleep(60000*(t+1));continue}
+    if(r.status===429||r.status===403||/<title>Just a moment/i.test(h.slice(0,3000))){postMessage({warn:'slow down '+r.status,p});pause=Math.min(pause*1.5,30000);await sleep(300000*(t+1));continue}
     if(!r.ok)throw new Error('http '+r.status);
-    reqs++;await sleep(pause);if(pause>1200)pause=Math.max(1200,pause*0.97);return h}
+    reqs++;await sleep(pause);if(pause>MINP)pause=Math.max(MINP,pause*0.98);return h}
   catch(e){postMessage({warn:String(e),p});await sleep(5000*(t+1))}}
   throw new Error('failed '+p)}
 function rowsOf(h,sid){
@@ -91,5 +91,5 @@ const w = new Worker(URL.createObjectURL(new Blob([W], {type: 'text/javascript'}
 window.__tw = w;
 w.onmessage = e => { if (e.data.warn) { window.__tl.push({...e.data, t: Date.now()}); if (window.__tl.length > 50) window.__tl.shift(); } else window.__ts = {...e.data, sets: sets.length, t: Date.now()}; };
 w.onerror = e => { window.__ts = {err: e.message}; };
-w.postMessage({sets: ordered, lanes: window.__TLANES || 3});
+w.postMessage({sets: ordered, lanes: window.__TLANES || 1});
 })();
