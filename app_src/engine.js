@@ -1584,6 +1584,84 @@ document.addEventListener('keydown', e => {
   }
 });
 
+/* ---------------------------- On-screen (mobile) D-pad/A/B/Start/Select ----------------------------
+   Drives the exact same `keys` object and action paths the keyboard already uses -
+   pollMovementInput()/advanceDialogue()/toggleMenu()/handleNpcInteract() don't need
+   to know whether a direction came from a real key or a touch. Only visible on
+   touch-primary devices (see the @media block in shell_top.html); wiring it
+   unconditionally here is harmless on desktop since the buttons are just hidden. */
+function pressActionButton() {
+  if (state.screen === 'dialogue') { advanceDialogue(); return; }
+  if (state.screen === 'overworld') {
+    const map = currentMap();
+    const [dx, dy] = DIRS[state.facing];
+    const npc = (map.npcs || []).find(n => n.x === state.x + dx && n.y === state.y + dy);
+    if (npc) handleNpcInteract(npc);
+  }
+}
+function pressSelectButton() {
+  if (state.screen === 'overworld' && state.flags.hasBike) {
+    state.biking = !state.biking;
+    pushDialogue([state.biking ? "Hopped on the bike!" : "Hopped off the bike."]);
+  }
+}
+(function setupMobileControls() {
+  function bindHold(id, key) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const down = (e) => { e.preventDefault(); keys[key] = true; };
+    const up = (e) => { e.preventDefault(); keys[key] = false; };
+    el.addEventListener('touchstart', down, { passive: false });
+    el.addEventListener('touchend', up);
+    el.addEventListener('touchcancel', up);
+    el.addEventListener('mousedown', down);
+    el.addEventListener('mouseup', up);
+    el.addEventListener('mouseleave', up);
+  }
+  bindHold('dpadUp', 'ArrowUp');
+  bindHold('dpadDown', 'ArrowDown');
+  bindHold('dpadLeft', 'ArrowLeft');
+  bindHold('dpadRight', 'ArrowRight');
+  function bindTap(id, fn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('click', (e) => { e.preventDefault(); fn(); });
+  }
+  bindTap('btnA', pressActionButton);
+  bindTap('btnB', toggleMenu);
+  bindTap('btnStart', toggleMenu);
+  bindTap('btnSelect', pressSelectButton);
+})();
+
+// Scales the fixed 960x728 #appScale box to fit whatever viewport it's running in
+// (phones especially) via a CSS transform, keeping the canvas's own pixel grid
+// untouched - resizing canvas.width/height instead would rescale every draw call
+// and reintroduce the 1px tile-seam issue the fixed-size CSS box was written to
+// avoid. Recomputed on resize/orientation change.
+function fitAppToViewport() {
+  const shell = document.getElementById('deviceShell');
+  const scaleEl = document.getElementById('appScale');
+  const app = document.getElementById('app');
+  if (!shell || !scaleEl || !app) return;
+  const controls = document.getElementById('mobileControls');
+  const controlsH = controls && getComputedStyle(controls).display !== 'none' ? controls.offsetHeight : 0;
+  const availW = shell.clientWidth, availH = shell.clientHeight - controlsH;
+  const scale = Math.min(1, availW / 960, availH / 728);
+  // The transform:scale() goes on #app (the fixed 960x728 native-pixel box),
+  // not on #appScale itself - #appScale's own layout box is instead resized
+  // directly to the post-scale pixel size below. Putting both the transform
+  // AND the resize on the same element double-shrinks it (the box gets laid
+  // out at the already-scaled size, then that box is scaled down again
+  // visually), which is what made the game render far smaller than intended
+  // and threw off #deviceShell's flexbox centering.
+  app.style.transform = `scale(${scale})`;
+  scaleEl.style.width = (960 * scale) + 'px';
+  scaleEl.style.height = (728 * scale) + 'px';
+}
+window.addEventListener('resize', fitAppToViewport);
+window.addEventListener('orientationchange', fitAppToViewport);
+window.addEventListener('load', fitAppToViewport);
+
 /* ---------------------------- Rendering ---------------------------- */
 const canvas = document.getElementById('game');
 canvas.width = VIEW_COLS * TILE;
@@ -2632,7 +2710,21 @@ function continueGame() {
 window.addEventListener('load', () => {
   loadAllImages(() => {
     document.getElementById('loadingScreen').style.display = 'none';
-    document.getElementById('titleScreen').style.display = 'flex';
+    // Brief logo/title intro before the real title screen, the way most of
+    // these games open - auto-advances after a few seconds, or immediately
+    // on a tap/keypress if the player doesn't want to wait.
+    const introEl = document.getElementById('introScreen');
+    introEl.style.display = 'flex';
+    let introDone = false;
+    function finishIntro() {
+      if (introDone) return;
+      introDone = true;
+      introEl.style.display = 'none';
+      document.getElementById('titleScreen').style.display = 'flex';
+    }
+    introEl.addEventListener('click', finishIntro);
+    window.addEventListener('keydown', finishIntro, { once: true });
+    setTimeout(finishIntro, 3200);
     // Real Tuxemon HP-card frame art (mods/tuxemon/gfx/ui/combat/hp_*_nohp.png) -
     // set as CSS vars here since the base64 data isn't known until ASSET_B64 loads.
     document.documentElement.style.setProperty('--hp-frame-player', "url(data:image/png;base64," + ASSET_B64.battleui.hp_player_frame + ")");

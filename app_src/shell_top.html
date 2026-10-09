@@ -2,11 +2,25 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Emberwild Trails</title>
 <style>
   * { box-sizing: border-box; }
-  html, body { margin:0; padding:0; background:#0b0f1a; color:#eee; font-family: 'Segoe UI', system-ui, sans-serif; overflow:hidden; }
-  #app { position:relative; width:960px; height:728px; margin:0 auto; background:#000; border:4px solid #2a2f45; border-radius:8px; overflow:hidden; image-rendering: pixelated; }
+  html, body { margin:0; padding:0; background:#0b0f1a; color:#eee; font-family: 'Segoe UI', system-ui, sans-serif; overflow:hidden; height:100%; }
+  /* #deviceShell only takes on the handheld-console look on touch/narrow screens
+     (see the @media block near the bottom) - on desktop it's an invisible wrapper
+     so the existing layout is unchanged. #appScale is what the resize handler in
+     engine.js applies a CSS transform:scale() to, so the fixed 960x728 #app keeps
+     rendering at its native pixel grid (no fractional-scale seams) while visually
+     shrinking to fit whatever screen it's on. */
+  #deviceShell { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+  /* transform:scale() only shrinks the rendered pixels, not the element's
+     layout box, so centering it with flexbox needs its width/height set to
+     match the post-scale size too (done in fitAppToViewport()) - otherwise
+     the flex box centers the full unscaled 960x728 box and the visibly
+     shrunk content ends up offset away from where it was centered to. */
+  #appScale { overflow:hidden; }
+  #app { position:relative; width:960px; height:728px; margin:0 auto; background:#000; border:4px solid #2a2f45; border-radius:8px; overflow:hidden; image-rendering: pixelated; transform-origin: top left; }
   /* canvas.width/height are set in JS to exactly 960x640 (VIEW_COLS/ROWS * TILE) - the CSS box
      below is pinned to those exact same pixel dimensions so the browser never rescales the
      pixel-art canvas by a fractional amount (a non-integer scale creates 1px seams right at
@@ -141,11 +155,60 @@
 
   #victoryOverlay { display:none; z-index:60; }
   #victoryOverlay h1 { color:#ffd76b; font-size:48px; }
+
+  #introScreen {
+    position:absolute; inset:0; display:none; flex-direction:column; align-items:center; justify-content:center;
+    background:#0b0f1a; z-index:70; text-align:center; cursor:pointer;
+  }
+  #introScreen h1 { font-size:58px; color:#ffd76b; text-shadow:4px 4px 0 #7a4a1a; letter-spacing:4px; margin:0;
+    opacity:0; transform:scale(0.7); animation: introPop 1.1s ease-out forwards; }
+  #introScreen p.introHint { color:#7f90b8; font-size:14px; position:absolute; bottom:48px; opacity:0;
+    animation: introFadeIn 0.8s ease-out 1.4s forwards; }
+  @keyframes introPop { 0% { opacity:0; transform:scale(0.7); } 65% { opacity:1; transform:scale(1.06); } 100% { opacity:1; transform:scale(1); } }
+  @keyframes introFadeIn { to { opacity:1; } }
+
+  /* On-screen D-pad/A/B/Start/Select - built entirely in CSS (no new art), wired
+     in engine.js to the same `keys` object and action functions the keyboard
+     already drives. Hidden by default; only shown for touch-primary devices via
+     the @media block below, so desktop/mouse play is completely unaffected. */
+  #mobileControls { display:none; width:100%; justify-content:space-between; align-items:center; padding:14px 18px; user-select:none; -webkit-user-select:none; touch-action:none; }
+  #dpad { display:grid; grid-template-columns:42px 42px 42px; grid-template-rows:42px 42px 42px; gap:2px; }
+  .dbtn { background:#3a3f52; border:2px solid #20222e; color:#dfe3ef; font-size:16px; display:flex; align-items:center; justify-content:center; touch-action:none; }
+  .dbtn:active { background:#55597a; }
+  #dpadUp { grid-column:2; grid-row:1; border-radius:6px 6px 0 0; }
+  #dpadLeft { grid-column:1; grid-row:2; border-radius:6px 0 0 6px; }
+  #dpadCenter { grid-column:2; grid-row:2; background:#2a2d3b; border-color:#20222e; }
+  #dpadRight { grid-column:3; grid-row:2; border-radius:0 6px 6px 0; }
+  #dpadDown { grid-column:2; grid-row:3; border-radius:0 0 6px 6px; }
+  #abButtons { display:flex; align-items:flex-end; gap:14px; }
+  .roundbtn { width:54px; height:54px; border-radius:50%; background:#c0304a; color:#fff; font-weight:bold; font-size:18px;
+    border:2px solid #7a1d2e; touch-action:none; }
+  .roundbtn:active { background:#da4560; }
+  #btnB { margin-bottom:22px; }
+  #startSelect { position:absolute; left:50%; bottom:6px; transform:translateX(-50%); display:flex; gap:10px; }
+  .pillbtn { background:#555a70; color:#dfe3ef; border:2px solid #20222e; border-radius:10px; padding:4px 10px; font-size:10px;
+    transform:rotate(-18deg); touch-action:none; }
+
+  /* Touch-primary devices (phones/tablets, not a mouse-driven desktop that merely
+     happens to have a narrow window) get the handheld-console frame and controls. */
+  @media (hover: none) and (pointer: coarse) {
+    #deviceShell { background: radial-gradient(circle at 50% 20%, #5b4fa0, #2e2a52 75%); flex-direction:column; padding:10px 0; }
+    #appScale { border-radius:18px; }
+    #app { border-radius:14px; border-width:3px; }
+    #mobileControls { display:flex; position:relative; min-height:150px; max-width:960px; margin-top:28px; }
+  }
 </style>
 </head>
 <body>
+<div id="deviceShell">
+<div id="appScale">
 <div id="app">
   <div id="loadingScreen"><h1>Loading Emberwild Trails...</h1></div>
+
+  <div id="introScreen">
+    <h1>EMBERWILD<br>TRAILS</h1>
+    <p class="introHint">Press any key to continue</p>
+  </div>
 
   <div id="titleScreen" style="display:none">
     <h1>Emberwild Trails</h1>
@@ -195,5 +258,24 @@
     <p style="max-width:500px">You've battled Enforcers, earned every badge, and defeated the Champion. Emberwild Trails keeps going &mdash; explore, catch the rest of the roster, and keep training!</p>
     <button class="bigbtn" onclick="document.getElementById('victoryOverlay').style.display='none'">Keep Playing</button>
   </div>
+</div>
+</div>
+<div id="mobileControls">
+  <div id="dpad">
+    <button class="dbtn" id="dpadUp">&#9650;</button>
+    <button class="dbtn" id="dpadLeft">&#9664;</button>
+    <div class="dbtn" id="dpadCenter"></div>
+    <button class="dbtn" id="dpadRight">&#9654;</button>
+    <button class="dbtn" id="dpadDown">&#9660;</button>
+  </div>
+  <div id="startSelect">
+    <button class="pillbtn" id="btnSelect">SELECT</button>
+    <button class="pillbtn" id="btnStart">START</button>
+  </div>
+  <div id="abButtons">
+    <button class="roundbtn" id="btnB">B</button>
+    <button class="roundbtn" id="btnA">A</button>
+  </div>
+</div>
 </div>
 <script>
