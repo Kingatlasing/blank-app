@@ -615,6 +615,8 @@ def image_url(card: Card, size: int = 240) -> tuple[str, bool]:
         return f"https://ekptjfsrfdagbefgwvkx.supabase.co/storage/v1/object/public/{card.img[3:]}", False
     if card.img.startswith("nc:"):  # Naruto (narutocards.ca)
         return f"https://cdn.narutocards.ca/{card.img[3:]}", False
+    if card.img.lstrip("~").startswith("td:"):  # TCDB: photo used for scan fingerprints only (not shown elsewhere)
+        return "", False
     other =card.img.startswith("~")
     return f"https://storage.googleapis.com/images.pricecharting.com/{card.img.lstrip('~')}/{size}.jpg", other
 

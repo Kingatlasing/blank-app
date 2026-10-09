@@ -167,6 +167,33 @@ def slug_meta(slug: str, title: str) -> dict:
     return {"year": year, "brand": brand, "category": category, "name": name}
 
 
+TCDB_STOP = {"the", "and", "of", "a", "cards", "card", "trading", "series", "set", "collection", "collector", "collectors"}
+TCDB_BRANDS = ["Topps", "Upper Deck", "Fleer", "SkyBox", "Panini", "Cryptozoic", "Rittenhouse", "Inkworks", "Donruss",
+               "Score", "Pro Set", "Impel", "Comic Images", "Dart", "Leaf", "O-Pee-Chee", "Kakawow", "Zerocool", "Funko",
+               "Bowman", "Flair", "Philadelphia", "Wonder Bread", "Breygent", "5finity", "Card.Fun", "Kayou", "Wacky Packages",
+               "Marvel", "DC", "Hasbro", "Mattel", "Score Board", "Pacific", "Krome", "Wizards", "Dynamic Forces",
+               "Keepsake", "Historic Autographs", "Cardsmiths", "Futera", "Merlin", "Panini America", "A&BC", "Monty"]
+
+
+def tcdb_brand(title: str) -> str:
+    low = title.lower()
+    for b in sorted(TCDB_BRANDS, key=len, reverse=True):
+        if low.startswith(b.lower() + " ") or low == b.lower():
+            return b
+    return "Other"
+
+
+def tcdb_category(title: str) -> str:
+    low = title.lower()
+    for k, c in (("star wars", "Star Wars"), ("mandalorian", "Star Wars"), ("garbage pail", "Garbage Pail Kids"),
+                 ("harry potter", "Harry Potter"), ("fantastic beasts", "Harry Potter"), ("kakawow", "Kakawow"),
+                 ("marvel", "Marvel"), ("x-men", "Marvel"), ("spider-man", "Marvel"), ("avengers", "Marvel"),
+                 ("disney", "Disney"), ("pixar", "Disney")):
+        if k in low:
+            return c
+    return "Non-sport"
+
+
 def num(v):
     try:
         return round(float(v), 2) if v not in (None, "") else None
@@ -324,6 +351,49 @@ def build():
                 "source_url": "https://www.baseball-almanac.com/baseball_cards/baseball_cards_oneset.php?s=" + code,
                 "base_url": "", "prices_as_of": "", "image": b.get("sample", ""),
             }
+
+    # TCDB (Trading Card Database) non-sport checklists: every set TCDB lists (TV, movies, comics, vintage...),
+    # numbers + names + each card's own front photo where TCDB has one (img 'td:<set>-<card>'). No price-guide
+    # prices; real eBay sold prices are attached separately. Sets the price guides already cover (same year + name)
+    # are skipped so nothing shows twice.
+    tcdb_n = tcdb_cards = 0
+    tcdb_files = sorted(glob.glob(os.path.join(RAW, "slabscout-tcdb-*.json.gz")))
+    if tcdb_files:
+        def words(t):
+            return frozenset(w for w in re.findall(r"[a-z0-9]+", t.lower().replace("&", " and ")) if w not in TCDB_STOP)
+        have = {(str(s["year"]), words(re.sub(r"^\d{4}\s+", "", s["name"]))) for s in sets.values()}
+        tsets = {}
+        for f in tcdb_files:
+            tsets.update(load_raw(f)["sets"])
+        for key, t in tsets.items():
+            sid_num, title, year = int(t["sid"]), str(t.get("title", "")).strip(), str(t.get("year", ""))
+            cards = t.get("cards") or []
+            if not title or not cards or not re.fullmatch(r"\d{4}", year):
+                continue
+            rest = re.sub(r"^\d{4}(-\d{2,4})?\s+", "", title)
+            if (year, words(rest)) in have:
+                continue  # the price guides have this set (with prices)
+            sid = f"tcdb-{sid_num}"
+            sp = t.get("sp", "Non-Sport")
+            rows = []
+            for c in cards:
+                cid, number, name, notes, photo = (list(c) + ["", "", "", 0])[:5]
+                name = str(name).strip() or str(number)
+                img = f"td:{sid_num}-{int(cid)}" if photo and sp == "Non-Sport" else ""
+                rows.append([sid, name, str(number).strip(), "", None, None, None, None, "", img])
+            remote_ids.add(sid)
+            sink.add(sid, rows, True, tcdb_category(title))
+            sets[sid] = {
+                "cover": "", "id": sid, "name": title, "year": year,
+                "brand": tcdb_brand(rest), "category": tcdb_category(title), "cards": len(rows),
+                "tiers": [{"name": "Base", "print_run": None, "count": len(rows), "priced": 0, "median_raw": None, "top_raw": None}],
+                "box": None, "notes": "Checklist and card photos from TCDB. Prices: eBay sold listings where there are any.",
+                "source": "tcdb", "source_url": f"https://www.tcdb.com/Checklist.cfm/sid/{sid_num}/{t.get('slug', '')}",
+                "base_url": "", "prices_as_of": "", "remote": True,
+            }
+            tcdb_n += 1
+            tcdb_cards += len(rows)
+        print(f"TCDB: {tcdb_n} sets added ({tcdb_cards} cards), {len(tsets) - tcdb_n} skipped (already priced or empty)")
 
     # Set index: every set/product the checklist sites list (name, year, where to find it, cover photo)
     index = []

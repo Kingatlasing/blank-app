@@ -560,7 +560,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         const pool: CatCard[] = [];
         const seenImg = new Set<string>();
         for (const c of cm.cards.slice(0, 6).flatMap((c) => [c, ...siblings(c)])) {
-          if (!c.img || c.img.startsWith('~') || seenImg.has(c.img)) continue;
+          if (!c.img || c.img.startsWith('~') || !imageUrl(c)[0] || seenImg.has(c.img)) continue;
           seenImg.add(c.img);
           pool.push(c);
           if (pool.length >= 16) break;
