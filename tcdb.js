@@ -20,7 +20,7 @@ async function get(p){
     const r=await fetch(O+p,{signal:ac.signal,credentials:'include'});clearTimeout(to);
     if(r.status===404)return '';
     const h=await r.text();
-    if(r.status===429||r.status===403||/<title>Just a moment/i.test(h.slice(0,3000))){postMessage({warn:'slow down '+r.status,p});pause=Math.min(pause*1.5,30000);await sleep(300000*(t+1));continue}
+    if(r.status===429||r.status===403||/<title>Just a moment/i.test(h.slice(0,3000))){postMessage({warn:'slow down '+r.status,p});pause=Math.min(pause*1.5,30000);t--;await sleep(1800000);continue}
     if(!r.ok)throw new Error('http '+r.status);
     reqs++;await sleep(pause);if(pause>MINP)pause=Math.max(MINP,pause*0.98);return h}
   catch(e){postMessage({warn:String(e),p});await sleep(5000*(t+1))}}
