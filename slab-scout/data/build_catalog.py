@@ -377,10 +377,13 @@ def build():
             sp = t.get("sp", "Non-Sport")
             rows = []
             for c in cards:
-                cid, number, name, notes, photo = (list(c) + ["", "", "", 0])[:5]
+                cid, number, name, notes, photo, cslug = (list(c) + ["", "", "", 0, ""])[:6]
                 name = str(name).strip() or str(number)
                 img = f"td:{sid_num}-{int(cid)}" if photo and sp == "Non-Sport" else ""
-                rows.append([sid, name, str(number).strip(), "", None, None, None, None, "", img])
+                # the card's own TCDB page (the app shows it in place of a photo): slug as TCDB links it, or
+                # rebuilt the way TCDB makes them (set slug-number-name, each other character a dash)
+                cslug = cslug or re.sub(r"[^A-Za-z0-9]", "-", f"{t.get('slug', '')}-{number}-{name}")
+                rows.append([sid, name, str(number).strip(), "", None, None, None, None, f"tcdb:{sid_num}/{int(cid)}/{cslug}", img])
             remote_ids.add(sid)
             sink.add(sid, rows, True, tcdb_category(title))
             sets[sid] = {

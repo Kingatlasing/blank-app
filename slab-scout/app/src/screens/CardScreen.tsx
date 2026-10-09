@@ -15,6 +15,7 @@ import { GRADE_OPTIONS, GRADE_SUB, gradedPrice, getCard, loadSet, useCatalogVers
 import { changeOver, currentValue, duplicateRecord, recordFromCatalog, recordImage } from '../core/portfolio';
 import { soldLinks } from '../core/databases';
 import type { Sale, VaultRecord } from '../core/community';
+import { TcdbCard, tcdbPage } from '../components/TcdbCard';
 
 const CONDITIONS: string[] = ['Raw', ...GRADE_OPTIONS];
 type SaleFilter = 'recent' | '6m' | 'market';
@@ -214,6 +215,8 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
           <Glow color="#FFD27A" size={imgW * 1.05} style={{ alignSelf: 'center' }} />
           {img ? (
             <Image source={{ uri: img }} style={{ width: imgW, aspectRatio: 63 / 88, borderRadius: L.sp(12), resizeMode: 'contain' }} />
+          ) : tcdbPage(c) ? (
+            <TcdbCard card={c} width={imgW} radius={L.sp(12)} />
           ) : (
             <View style={{ width: imgW, aspectRatio: 63 / 88, borderRadius: L.sp(12), backgroundColor: C.surface, alignItems: 'center', justifyContent: 'center', padding: 12 }}>
               <Text style={[S.muted, { textAlign: 'center' }]}>{c.name}</Text>
