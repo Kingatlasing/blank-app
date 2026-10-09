@@ -1,5 +1,5 @@
 // TCDB non-sport pull (runs in a www.tcdb.com tab). Resumes on its own: sets already saved in IndexedDB
-// 'slabscout-tcdb' / 'sets' are skipped. Status: window.__ts; warnings: window.__tl.
+// 'slabscout-tcdb2' / 'sets' are skipped. Status: window.__ts; warnings: window.__tl.
 // Phase 1: every non-sport set, year by year (cached in localStorage 'slabscout-tcdb-sets').
 // Phase 2: each set's checklist (card id, number, name, notes, has-photo), parsed in a worker so a hidden tab
 // isn't throttled. One request at a time with a pause between, backing off on 429 / 403 / Cloudflare pages.
@@ -10,7 +10,7 @@ window.__ts = {state: 'starting'};
 const W = `
 const SP='${SP}';const O='${location.origin}';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const open=()=>new Promise((r,j)=>{const q=indexedDB.open('slabscout-tcdb',1);q.onupgradeneeded=()=>{q.result.createObjectStore('sets')};q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
+const open=()=>new Promise((r,j)=>{const q=indexedDB.open('slabscout-tcdb2',1);q.onupgradeneeded=()=>{q.result.createObjectStore('sets')};q.onsuccess=()=>r(q.result);q.onerror=()=>j(q.error)});
 const txt=h=>h.replace(/<figcaption[\\s\\S]*?<\\/figcaption>/g,' ').replace(/<br\\s*\\/?>/g,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#39;|&rsquo;/g,"'").replace(/&quot;/g,'"').replace(/\\s+/g,' ').trim();
 const notesOf=h=>[...h.matchAll(/<figcaption[^>]*>([\\s\\S]*?)<\\/figcaption>/g)].map(m=>txt(m[1])).join(' ; ');
 let reqs=0,pause=1200;
@@ -30,7 +30,7 @@ function rowsOf(h,sid){
   for(const tr of h.split(/<tr[\\s>]/).slice(1)){
     const body=tr.split(/<\\/tr>/)[0];
     const m=body.match(/ViewCard\\.cfm\\/sid\\/(\\d+)\\/cid\\/(\\d+)\\//);if(!m||m[1]!==String(sid))continue;
-    const tds=body.split(/<td[\\s>]/).slice(1).map(x=>x.split(/<\\/td>/)[0]);
+    const tds=body.split(/<td(?=[\\s>])/).slice(1).map(x=>x.slice(x.indexOf('>')+1).split(/<\\/td>/)[0]);
     const img=(body.match(/(?:data-original|src)="([^"]*(?:Thumb\\.jpg|AddImage\\.gif)[^"]*)"/)||[])[1]||'';
     let num='',name='',notes='';
     for(let i=0;i<tds.length;i++){const td=tds[i];
