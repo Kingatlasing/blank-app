@@ -1004,13 +1004,18 @@ MAPS.house_downstairs = {
     dialogue: () => ["Off on an adventure already? Don't forget to visit Professor Larkspur first!"] }],
   extraWarps: [
     { x: 4, y: 6, w: 1, h: 1, to: 'town', tx: 8, ty: 35 },
-    { x: 0, y: 1, w: 1, h: 1, to: 'house_bedroom', tx: 8, ty: 2 },
+    // The stairs up to the bedroom: a plain floor tile right at the room's
+    // top-left edge with no distinct staircase art, so only walking "up"
+    // onto it (toward the wall, as if climbing) counts as using the stairs -
+    // see the requiresFacing comment in onArrive(). Arrives facing down, as
+    // if having just stepped off the stairs into the bedroom.
+    { x: 0, y: 1, w: 1, h: 1, to: 'house_bedroom', tx: 8, ty: 2, requiresFacing: 'up', arriveFacing: 'down' },
   ],
 };
 MAPS.house_bedroom = {
   tiledKey: 'house_bedroom', tiledSrc: 'interior', name: "Player's Bedroom",
   npcs: [],
-  extraWarps: [{ x: 8, y: 2, w: 1, h: 1, to: 'house_downstairs', tx: 0, ty: 1 }],
+  extraWarps: [{ x: 8, y: 2, w: 1, h: 1, to: 'house_downstairs', tx: 0, ty: 1, requiresFacing: 'up', arriveFacing: 'down' }],
 };
 MAPS.gym_ashveld = {
   tiledKey: 'gym_astra', tiledSrc: 'interior', name: 'Ashveld Hall',
@@ -1579,7 +1584,18 @@ function onArrive() {
   if (map.tiledKey) {
     const td = tiledSourceFor(map).data;
     const allWarps = (td.warps || []).concat(map.extraWarps || []);
-    const hit = allWarps.find(w => state.x >= w.x && state.x < w.x + w.w && state.y >= w.y && state.y < w.y + w.h);
+    // requiresFacing (used by the two stairs-equivalent floor transitions,
+    // player_house_bedroom <-> player_house_downstairs): those warp tiles
+    // are ordinary floor tiles with no distinct staircase art to signal
+    // "this one's special", positioned right at the room's edge - without
+    // this check, just walking sideways past that corner (not actually
+    // trying to go up/down at all) silently teleported the player, which
+    // read as "I brushed the wall and got kicked out of the room." A
+    // facing mismatch simply isn't treated as a warp at all, so the tile
+    // behaves like normal floor from any other direction - no blocked
+    // dialogue, since the player likely wasn't even trying to use it.
+    const hit = allWarps.find(w => state.x >= w.x && state.x < w.x + w.w && state.y >= w.y && state.y < w.y + w.h &&
+      (!w.requiresFacing || w.requiresFacing === state.facing));
     if (hit) {
       if (hit.requires && !state.flags[hit.requires]) {
         pushDialogue(["It's blocked for now."]);
@@ -1599,6 +1615,7 @@ function onArrive() {
         tx = targetTd.spawns[hit.spawn].x; ty = targetTd.spawns[hit.spawn].y;
       }
       state.map = targetKey; state.x = tx; state.y = ty;
+      if (hit.arriveFacing) state.facing = hit.arriveFacing;
       return;
     }
     for (const o of (map.objects || [])) {
