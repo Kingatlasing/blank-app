@@ -398,6 +398,50 @@ def build():
             tcdb_cards += len(rows)
         print(f"TCDB: {tcdb_n} sets added ({tcdb_cards} cards), {len(tsets) - tcdb_n} skipped (already priced or empty)")
 
+    # BreakNinja non-sport checklists (recent TV / movie / pop-culture sets): every card with its parallel
+    # ("Card Set": Base, Base Yellow, Autographs Red...) and print run ("Copies"). No prices or photos here; real eBay
+    # sold prices are attached separately. Sets the price guides already have (same year + name) are skipped.
+    bn_files = sorted(glob.glob(os.path.join(RAW, "slabscout-breakninja-*.json.gz")))
+    if bn_files:
+        def words2(t):
+            return frozenset(w for w in re.findall(r"[a-z0-9]+", t.lower().replace("&", " and ")) if w not in TCDB_STOP)
+        have = {(str(s["year"]), words2(re.sub(r"^\d{4}\s+", "", s["name"]))) for s in sets.values()}
+        bsets = {}
+        for f in bn_files:
+            bsets.update(load_raw(f)["sets"])
+        bn_n = bn_cards = 0
+        for slug, b in bsets.items():
+            title = re.sub(r"\s+(Card|Cards|Trading Cards?)$", "", str(b.get("title", "")).strip())
+            m = re.match(r"^((19|20)\d\d)\s+(.+)$", title)
+            rows_in = [r for r in b.get("rows") or [] if isinstance(r, list) and len(r) >= 3 and str(r[0]).strip()]
+            if not m or not rows_in:
+                continue
+            year, rest = m.group(1), m.group(3)
+            if (year, words2(rest)) in have:
+                continue
+            sid = "bn-" + re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")
+            rows, tiers = [], {}
+            for r in rows_in:
+                name, number, cset = str(r[0]).strip(), str(r[1]).strip(), str(r[2]).strip()
+                copies = str(r[3]).strip() if len(r) > 3 else ""
+                variant = "" if cset.lower() == "base" else cset
+                prun = int(copies) if copies.isdigit() else None
+                rows.append([sid, name, number, variant, prun, None, None, None, "", ""])
+                t = tiers.setdefault(variant or "Base", {"name": variant or "Base", "print_run": prun, "count": 0, "priced": 0, "median_raw": None, "top_raw": None})
+                t["count"] += 1
+            remote_ids.add(sid)
+            cat = tcdb_category(title)
+            sink.add(sid, rows, True, cat)
+            sets[sid] = {
+                "cover": "", "id": sid, "name": title, "year": year, "brand": tcdb_brand(rest), "category": cat,
+                "cards": len(rows), "tiers": sorted(tiers.values(), key=lambda t: (t["print_run"] or 10**6), reverse=True),
+                "box": None, "notes": "Checklist from BreakNinja. Prices: eBay sold listings where there are any.",
+                "source": "breakninja", "source_url": b.get("url", ""), "base_url": "", "prices_as_of": "", "remote": True,
+            }
+            bn_n += 1
+            bn_cards += len(rows)
+        print(f"BreakNinja: {bn_n} sets added ({bn_cards} cards), {len(bsets) - bn_n} skipped (already priced or not a checklist)")
+
     # Set index: every set/product the checklist sites list (name, year, where to find it, cover photo)
     index = []
     idx_file = os.path.join(RAW, "slabscout-set-index.json")
