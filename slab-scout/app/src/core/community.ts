@@ -59,6 +59,8 @@ export interface VaultRecord {
   list?: 'collection' | 'wishlist';
   print_run?: number | null;
   odds?: string;
+  /** the text read on the card when it was scanned (front / back lines) */
+  text?: { front: string[]; back: string[] };
 }
 
 export const cardKey = (c: Partial<CardFields>) =>

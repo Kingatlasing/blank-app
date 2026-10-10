@@ -25,12 +25,20 @@ const isHard = (game: string) => HARD_GAMES.includes(game);
 /** One photo of the front identifies most cards. Asks for the back (needBack) only when the match isn't certain
  * or it's a sports card whose parallels / years look alike and nothing printed (card code, serial) settled it. */
 export async function quickIdentify(uri: string, game: string, store?: Store | null, orig?: string, backUri?: string | null): Promise<ScanItem> {
-  const it = await identifyOnce(uri, game, store, orig, backUri);
+  const read: { text?: string[]; backText?: string[] } = {};
+  const it = { ...(await identifyOnce(uri, game, store, orig, backUri, read)), ...clean(read) };
   if (backUri) return { ...it, withBack: true, needBack: undefined };
   return it;
 }
 
-async function identifyOnce(uri: string, game: string, store?: Store | null, orig?: string, backUri?: string | null): Promise<ScanItem> {
+/** the text kept with a scan: the lines actually read, trimmed (no empty lines, at most 80 lines of 200 characters) */
+function clean(read: { text?: string[]; backText?: string[] }) {
+  const tidy = (l?: string[]) => (l || []).map((t) => String(t).trim().slice(0, 200)).filter(Boolean).slice(0, 80);
+  return { text: tidy(read.text), backText: tidy(read.backText) };
+}
+
+async function identifyOnce(uri: string, game: string, store?: Store | null, orig?: string, backUri?: string | null,
+  read: { text?: string[]; backText?: string[] } = {}): Promise<ScanItem> {
   // scan server first (full engine: text in English / Japanese / Korean, fingerprint, colours, serials);
   // the text reader below reuses its answer, and the phone's own checks run if it's unreachable
   const srv = serverOn() ? serverScan(orig || uri, { game, grade: false, key: uri, back: backUri || null, timeoutMs: 60000 }) : null;
@@ -40,6 +48,9 @@ async function identifyOnce(uri: string, game: string, store?: Store | null, ori
   ]);
   const base: ScanItem = { id: uid(), at: new Date().toISOString(), uri, thumb, phash, game: '', name: '', set: '', number: '', rarity: '', price: null, currency: 'USD', source: '' };
   const s = srv ? await srv : null;
+  // keep what was read: the scan server's reading when it answered (sharper, repairs misread words), else the phone's
+  read.text = s?.lines?.length ? s.lines : lines;
+  read.backText = s?.back_lines?.length ? s.back_lines : backLines;
   if (s) {
     if (s.is_back) return { ...base, game: s.is_back, note: `Back of a ${s.is_back} card: scan the front to identify it (the back is used when grading).` };
     const top = s.matches[0];
@@ -184,7 +195,8 @@ function fromCatalog(c: Card): ScanItem {
 /** A collection record for a scanned card, or null when it wasn't identified well enough to save. */
 export function recordFromScan(it: ScanItem, list: 'collection' | 'wishlist' = 'collection'): Omit<VaultRecord, 'id'> | null {
   const c = it.catalog_key ? getCard(it.catalog_key) : null;
-  if (c) return recordFromCatalog(c, { thumb: it.thumb, phash: it.phash, list });
+  const text = it.text?.length || it.backText?.length ? { text: { front: it.text || [], back: it.backText || [] } } : {};
+  if (c) return { ...recordFromCatalog(c, { thumb: it.thumb, phash: it.phash, list }), ...text };
   if (!it.name) return null;
   const now = new Date().toISOString();
   const d = it.cand;
@@ -194,6 +206,6 @@ export function recordFromScan(it: ScanItem, list: 'collection' | 'wishlist' = '
     grade: {}, authenticity: { verdict: 'not_checked', reasons: [] },
     pricing: { raw: d?.raw || { mid: it.price ?? undefined }, currency: it.currency, note: d?.price_note || '', graded_label: '', graded_mid: null, priced_at: now },
     match: { source: it.source, ref_id: d?.ref_id || '', image_url: d?.image_url || '', url: d?.url || '' },
-    thumb: it.thumb, phash: it.phash, print_run: null, odds: '',
+    thumb: it.thumb, phash: it.phash, print_run: null, odds: '', ...text,
   };
 }

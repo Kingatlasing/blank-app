@@ -29,6 +29,9 @@ export interface ScanItem {
   needBack?: string;
   /** identified from front + back */
   withBack?: boolean;
+  /** every line of text read on the card (front / back), kept with the scan */
+  text?: string[];
+  backText?: string[];
 }
 
 let cache: ScanItem[] | null = null;
