@@ -509,7 +509,7 @@ def build():
         return frozenset(w for w in re.findall(r"[a-z0-9]+", t.lower().replace("&", " and ")) if w not in TCDB_STOP)
     for label, pattern, source, prefix, note in (
             ("BreakNinja", "slabscout-breakninja-*.json.gz", "breakninja", "bn-", "Checklist from BreakNinja."),
-            ("Checklist sites", "slabscout-checklists-*.json.gz", "checklist", "cl-", "Checklist from {site}.")):
+            ("Checklist sites", "slabscout-checklists-*.json.gz", "checklist-site", "cl-", "Checklist from {site}.")):
         files = sorted(glob.glob(os.path.join(RAW, pattern)))
         if not files:
             continue
