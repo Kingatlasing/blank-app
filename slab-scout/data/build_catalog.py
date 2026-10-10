@@ -251,6 +251,9 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
     def wset(s):
         return {w for w in re.findall(r"[a-z0-9]+", s.lower().replace("'", "")) if w not in TCDB_STOP}
 
+    numcount: dict[str, int] = {}
+    for r in rows:
+        numcount[(r[2] or "").strip().upper()] = numcount.get((r[2] or "").strip().upper(), 0) + 1
     hits: dict[int, list] = {}
     for s in sales:
         t = s["t"]
@@ -268,8 +271,8 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
             if not nw or not nw <= tw:
                 continue
             vw = wset(variant)
-            if variant and not vw <= tw:
-                continue
+            if variant and not vw <= tw and numcount.get(number.upper(), 0) > 1:
+                continue  # the same number in several parallels: the title must name this one
             if not variant and (PARALLEL_WORDS.search(t) or re.search(r"\b\d{1,4}\s*/\s*\d{1,4}\b", t)):
                 continue  # a foil / auto / numbered copy, not the base card
             score = len(nw) * 3 + len(vw) * 2
@@ -495,33 +498,45 @@ def build():
             tcdb_cards += len(rows)
         print(f"TCDB: {tcdb_n} sets added ({tcdb_cards} cards), {len(tsets) - tcdb_n} skipped (already priced or empty)")
 
-    # BreakNinja non-sport checklists (recent TV / movie / pop-culture sets): every card with its parallel
-    # ("Card Set": Base, Base Yellow, Autographs Red...) and print run ("Copies"). No prices or photos here; real eBay
-    # sold prices are attached separately. Sets the price guides already have (same year + name) are skipped.
-    bn_files = sorted(glob.glob(os.path.join(RAW, "slabscout-breakninja-*.json.gz")))
-    if bn_files:
-        def words2(t):
-            return frozenset(w for w in re.findall(r"[a-z0-9]+", t.lower().replace("&", " and ")) if w not in TCDB_STOP)
+    # Non-sport checklists from article / checklist sites, all in one shape {sets: {slug: {title, url, rows:
+    # [[name, number, section or parallel, print run]]}}}:
+    #   BreakNinja (raw/slabscout-breakninja-*): recent TV / movie sets, "Card Set" = parallel (Base, Base Yellow...)
+    #   TraderCracks / Cardboard Connection / Beckett (raw/slabscout-checklists-*): older sets (Simpsons, Rick and
+    #     Morty...), section = subset or insert (Base Set, Anatomy Park Set, Radioactive Man...)
+    # No prices or photos here; real eBay sold prices are attached separately. Sets the price guides already have
+    # (same year + name) are skipped.
+    def words2(t):
+        return frozenset(w for w in re.findall(r"[a-z0-9]+", t.lower().replace("&", " and ")) if w not in TCDB_STOP)
+    for label, pattern, source, prefix, note in (
+            ("BreakNinja", "slabscout-breakninja-*.json.gz", "breakninja", "bn-", "Checklist from BreakNinja."),
+            ("Checklist sites", "slabscout-checklists-*.json.gz", "checklist", "cl-", "Checklist from {site}.")):
+        files = sorted(glob.glob(os.path.join(RAW, pattern)))
+        if not files:
+            continue
         have = {(str(s["year"]), words2(re.sub(r"^\d{4}\s+", "", s["name"]))) for s in sets.values()}
         bsets = {}
-        for f in bn_files:
+        for f in files:
             bsets.update(load_raw(f)["sets"])
         bn_n = bn_cards = 0
         for slug, b in bsets.items():
             title = re.sub(r"\s+(Card|Cards|Trading Cards?)$", "", str(b.get("title", "")).strip())
+            title = re.sub(r"\s*[,|–-]\s*$", "", title)
             m = re.match(r"^((19|20)\d\d)\s+(.+)$", title)
-            rows_in = [r for r in b.get("rows") or [] if isinstance(r, list) and len(r) >= 3 and str(r[0]).strip()]
+            rows_in = [r for r in b.get("rows") or [] if isinstance(r, list) and len(r) >= 3 and str(r[0]).strip() and str(r[1]).strip()]
             if not m or not rows_in:
                 continue
             year, rest = m.group(1), m.group(3)
             if (year, words2(rest)) in have:
                 continue
-            sid = "bn-" + re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")
-            rows, tiers = [], {}
+            sid = prefix + re.sub(r"[^a-z0-9]+", "-", slug.lower()).strip("-")
+            rows, tiers, seen = [], {}, set()
             for r in rows_in:
-                name, number, cset = str(r[0]).strip(), str(r[1]).strip(), str(r[2]).strip()
+                name, number, cset = str(r[0]).strip()[:120], str(r[1]).strip()[:20], str(r[2]).strip()[:80]
                 copies = str(r[3]).strip() if len(r) > 3 else ""
-                variant = "" if cset.lower() == "base" else cset
+                if (number, cset) in seen:
+                    continue
+                seen.add((number, cset))
+                variant = "" if re.fullmatch(r"(?i)base( set)?", cset) else re.sub(r"(?i)\s+set$", "", cset)
                 prun = int(copies) if copies.isdigit() else None
                 rows.append([sid, name, number, variant, prun, None, None, None, "", ""])
                 t = tiers.setdefault(variant or "Base", {"name": variant or "Base", "print_run": prun, "count": 0, "priced": 0, "median_raw": None, "top_raw": None})
@@ -533,15 +548,16 @@ def build():
             remote_ids.add(sid)
             cat = tcdb_category(title)
             sink.add(sid, rows, True, cat)
+            site = re.sub(r"^www\.", "", (re.match(r"https?://([^/]+)", b.get("url", "")) or [None, "the web"])[1])
             sets[sid] = {
                 "cover": next((r[9] for r in rows if r[9].startswith("eb:")), ""), "id": sid, "name": title, "year": year, "brand": tcdb_brand(rest), "category": cat,
                 "cards": len(rows), "tiers": sorted(tiers.values(), key=lambda t: (t["print_run"] or 10**6), reverse=True),
-                "box": None, "notes": "Checklist from BreakNinja. Prices: eBay sold listings where there are any.",
-                "source": "breakninja", "source_url": b.get("url", ""), "base_url": "", "prices_as_of": "", "remote": True,
+                "box": None, "notes": note.format(site=site) + " Prices: eBay sold listings where there are any.",
+                "source": source, "source_url": b.get("url", ""), "base_url": "", "prices_as_of": "", "remote": True,
             }
             bn_n += 1
             bn_cards += len(rows)
-        print(f"BreakNinja: {bn_n} sets added ({bn_cards} cards), {len(bsets) - bn_n} skipped (already priced or not a checklist)")
+        print(f"{label}: {bn_n} sets added ({bn_cards} cards), {len(bsets) - bn_n} skipped (already priced or not a checklist)")
 
     # Set index: every set/product the checklist sites list (name, year, where to find it, cover photo)
     index = []
