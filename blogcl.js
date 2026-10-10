@@ -2,7 +2,11 @@
 // window.__CLURLS = [same-site article urls]; result window.__cl = {state, sets: {slug: {title, url, rows: [[name, number, section, print run]]}}}.
 // Rows are numbered lines ('S1 Homer Simpson', '01 Title Card', 'CB02 Morty Smith #/25') under the section heading they follow.
 (async () => {
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// pauses run in a small worker: a background tab slows its own timers to once a minute, a worker's are not slowed
+const SW = new Worker(URL.createObjectURL(new Blob(['onmessage=e=>setTimeout(()=>postMessage(e.data[0]),e.data[1])'], {type: 'text/javascript'})));
+const waits = {}; let wid = 0;
+SW.onmessage = e => { const f = waits[e.data]; delete waits[e.data]; f && f(); };
+const sleep = ms => new Promise(r => { const id = ++wid; waits[id] = r; SW.postMessage([id, ms]); });
 window.__cl = {state: 'running', done: 0, sets: {}};
 const NUM = /^\s*(?:#\s*)?([A-Z]{0,5}-?[A-Z]{0,3}\d{1,3}[a-zA-Z]?)\s*[.:)\-–—]?\s+(.{2,120})$/;
 for (const u of window.__CLURLS) {
