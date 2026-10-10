@@ -185,7 +185,8 @@ def tcdb_brand(title: str) -> str:
 
 def tcdb_category(title: str) -> str:
     low = title.lower()
-    for k, c in (("star wars", "Star Wars"), ("mandalorian", "Star Wars"), ("garbage pail", "Garbage Pail Kids"),
+    for k, c in (("star wars", "Star Wars"), ("mandalorian", "Star Wars"), ("empire strikes back", "Star Wars"),
+                 ("return of the jedi", "Star Wars"), ("phantom menace", "Star Wars"), ("clone wars", "Star Wars"), ("garbage pail", "Garbage Pail Kids"),
                  ("harry potter", "Harry Potter"), ("fantastic beasts", "Harry Potter"), ("kakawow", "Kakawow"),
                  ("marvel", "Marvel"), ("x-men", "Marvel"), ("spider-man", "Marvel"), ("avengers", "Marvel"),
                  ("disney", "Disney"), ("pixar", "Disney")):
@@ -536,7 +537,9 @@ def build():
                 if (number, cset) in seen:
                     continue
                 seen.add((number, cset))
-                variant = "" if re.fullmatch(r"(?i)base( set)?", cset) else re.sub(r"(?i)\s+set$", "", cset)
+                if re.search(r"(?i)buy on|shop |ebay|amazon|price guide|check out|gallery|^sets?$|^checklist", cset):
+                    cset = "Base"  # an ad / page heading read as a section: these are the base cards
+                variant = "" if re.fullmatch(r"(?i)base( set)?|base cards?", cset) else re.sub(r"(?i)\s+set$", "", cset)
                 prun = int(copies) if copies.isdigit() else None
                 rows.append([sid, name, number, variant, prun, None, None, None, "", ""])
                 t = tiers.setdefault(variant or "Base", {"name": variant or "Base", "print_run": prun, "count": 0, "priced": 0, "median_raw": None, "top_raw": None})
