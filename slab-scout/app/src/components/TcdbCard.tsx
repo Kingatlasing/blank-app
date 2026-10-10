@@ -7,10 +7,14 @@ import React, { createElement, useState } from 'react';
 import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import type { Card } from '../core/catalog';
 
-/** The card's TCDB page, or '' when the card isn't from TCDB. path: 'tcdb:<set id>/<card id>/<slug>'. */
+/** The card's TCDB page, or '' when the card isn't from TCDB.
+ *  path 'tcdb:<set id>/<card id>/<card slug>' -> the card's own page;
+ *  path 'tcdbset:<set id>/<card id>/<set slug>' -> the set checklist, scrolled to that card's row. */
 export function tcdbPage(card: Card | null | undefined): string {
-  const m = card?.path?.match(/^tcdb:(\d+)\/(\d+)\/(.*)$/);
-  return m ? `https://www.tcdb.com/ViewCard.cfm/sid/${m[1]}/cid/${m[2]}/${m[3]}#content` : '';
+  const m = card?.path?.match(/^tcdb:(\d+)\/(\d+)\/(.+)$/);
+  if (m) return `https://www.tcdb.com/ViewCard.cfm/sid/${m[1]}/cid/${m[2]}/${m[3]}#content`;
+  const s = card?.path?.match(/^tcdbset:(\d+)\/(\d+)\/(.+)$/);
+  return s ? `https://www.tcdb.com/Checklist.cfm/sid/${s[1]}/${s[3]}#${s[2]}` : '';
 }
 
 export function TcdbCard({ card, width, radius = 12 }: { card: Card; width: number; radius?: number }) {
