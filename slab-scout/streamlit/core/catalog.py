@@ -617,6 +617,8 @@ def image_url(card: Card, size: int = 240) -> tuple[str, bool]:
         return f"https://cdn.narutocards.ca/{card.img[3:]}", False
     if card.img.lstrip("~").startswith("td:"):  # TCDB: photo used for scan fingerprints only (not shown elsewhere)
         return "", False
+    if card.img.lstrip("~").startswith("eb:https://i.ebayimg.com/"):  # eBay sold-listing photo of this exact card
+        return card.img.lstrip("~")[3:], card.img.startswith("~")
     other =card.img.startswith("~")
     return f"https://storage.googleapis.com/images.pricecharting.com/{card.img.lstrip('~')}/{size}.jpg", other
 

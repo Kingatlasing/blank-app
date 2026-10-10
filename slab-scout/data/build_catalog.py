@@ -194,6 +194,100 @@ def tcdb_category(title: str) -> str:
     return "Non-sport"
 
 
+PARALLEL_WORDS = re.compile(r"\b(foil|refractor|parallel|prismatic|sparkle|holo|holofoil|rainbow|gold|silver|red|blue|green|purple|"
+                            r"orange|yellow|black|pink|bronze|platinum|sapphire|x-?fractor|wave|shimmer|auto|autograph|autographed|signed|"
+                            r"sketch|relic|patch|memorabilia|printing plate|plate|redemption|1/1|one of one)\b", re.I)
+LOT_WORDS = re.compile(r"\b(lot|lots|bundle|set of|complete set|base set|team set|you pick|pick your|choose|u-?pick|"
+                       r"\d+\s*cards?|cards\s*\d+\s*-\s*\d+|singles|sealed|box|pack|hobby|blaster|case|binder)\b", re.I)
+GRADED = re.compile(r"\b(PSA|BGS|CGC|SGC|TAG|ACE|AGS|Beckett|graded|slab)\b", re.I)
+
+
+def _ebay_ns() -> dict:
+    """eBay sold listings for the non-sport sets (raw/slabscout-ebay-ns-*.json.gz): {set id: [{t, p, d, img}]}."""
+    import gzip
+    out: dict[str, list] = {}
+    for f in sorted(glob.glob(os.path.join(RAW, "slabscout-ebay-ns-*.json.gz"))):
+        for sid, s in json.load(gzip.open(f)).get("sets", {}).items():
+            items = s.get("items") if isinstance(s, dict) else None
+            if not isinstance(items, dict):
+                continue
+            lst = out.setdefault(str(sid), [])
+            for iid, it in items.items():
+                if not re.fullmatch(r"\d{9,15}", str(iid)) or not isinstance(it, dict):
+                    continue
+                m = re.search(r"\$([\d,]+\.\d{2})", str(it.get("p", "")))
+                if not m or " to " in str(it.get("p", "")):
+                    continue
+                img = str(it.get("img", ""))
+                img = img if re.fullmatch(r"https://i\.ebayimg\.com/[A-Za-z0-9/_.~-]{5,200}", img) else ""
+                lst.append({"id": iid, "t": str(it.get("t", ""))[:250], "p": float(m.group(1).replace(",", "")),
+                            "d": str(it.get("d", ""))[:40], "img": img})
+    return out
+
+
+EBAY_NS = None
+
+
+def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
+    """Real eBay sold prices (and a listing photo) for the cards of one non-sport set, in place: row raw price = median
+    of the sales that match that exact card, img = 'eb:<photo url>' of its newest sale when the card has no photo of
+    its own to show. A sale counts only when its title has the card's number and every word of its name, is raw (not
+    graded), is not a lot, and names the card's parallel (a base card never takes a foil / auto / numbered sale).
+    Sales that fit several cards equally are left out. Returns how many cards got a price."""
+    global EBAY_NS
+    if EBAY_NS is None:
+        EBAY_NS = _ebay_ns()
+    sales = EBAY_NS.get(sid)
+    if not sales:
+        return 0
+    from datetime import datetime
+
+    def day(d):
+        try:
+            return datetime.strptime(d.replace("Sold", "").strip(), "%b %d, %Y").strftime("%Y-%m-%d")
+        except ValueError:
+            return ""
+
+    def wset(s):
+        return {w for w in re.findall(r"[a-z0-9]+", s.lower().replace("'", "")) if w not in TCDB_STOP}
+
+    hits: dict[int, list] = {}
+    for s in sales:
+        t = s["t"]
+        if LOT_WORDS.search(t) or GRADED.search(t):
+            continue
+        tw = wset(t)
+        best, best_score, tie = None, -1, False
+        for i, r in enumerate(rows):
+            name, number, variant = r[1], (r[2] or "").strip(), (r[3] or "").strip()
+            if not number:
+                continue
+            if not re.search(r"(?:#|no\.?\s*|\b)" + re.escape(number) + r"\b", t, re.I):
+                continue
+            nw = wset(re.sub(r"\b(UER|FOIL|SP|SSP|RC)\b", "", name))
+            if not nw or not nw <= tw:
+                continue
+            vw = wset(variant)
+            if variant and not vw <= tw:
+                continue
+            if not variant and (PARALLEL_WORDS.search(t) or re.search(r"\b\d{1,4}\s*/\s*\d{1,4}\b", t)):
+                continue  # a foil / auto / numbered copy, not the base card
+            score = len(nw) * 3 + len(vw) * 2
+            if score > best_score:
+                best, best_score, tie = i, score, False
+            elif score == best_score:
+                tie = True
+        if best is not None and not tie:
+            hits.setdefault(best, []).append(s)
+    for i, ss in hits.items():
+        ps = sorted(x["p"] for x in ss)
+        rows[i][5] = round(st.median(ps), 2)
+        newest = max(ss, key=lambda x: day(x["d"]))
+        if newest["img"] and not (rows[i][9] and not rows[i][9].startswith(("td:", "~"))):
+            rows[i][9] = "eb:" + newest["img"]
+    return len(hits)
+
+
 def num(v):
     try:
         return round(float(v), 2) if v not in (None, "") else None
@@ -384,13 +478,16 @@ def build():
                 # older pulls have no card slug: then the set checklist, scrolled to the card's row (#<card id>)
                 page = f"tcdb:{sid_num}/{int(cid)}/{cslug}" if cslug else f"tcdbset:{sid_num}/{int(cid)}/{t.get('slug', '')}"
                 rows.append([sid, name, str(number).strip(), "", None, None, None, None, page, img])
+            ebay_prices(sid, rows, title)
+            ps = sorted(r[5] for r in rows if r[5])
             remote_ids.add(sid)
             sink.add(sid, rows, True, tcdb_category(title))
             sets[sid] = {
-                "cover": "", "id": sid, "name": title, "year": year,
+                "cover": next((r[9] for r in rows if r[9].startswith("eb:")), ""), "id": sid, "name": title, "year": year,
                 "brand": tcdb_brand(rest), "category": tcdb_category(title), "cards": len(rows),
-                "tiers": [{"name": "Base", "print_run": None, "count": len(rows), "priced": 0, "median_raw": None, "top_raw": None}],
-                "box": None, "notes": "Checklist and card photos from TCDB. Prices: eBay sold listings where there are any.",
+                "tiers": [{"name": "Base", "print_run": None, "count": len(rows), "priced": len(ps),
+                           "median_raw": round(st.median(ps), 2) if ps else None, "top_raw": ps[-1] if ps else None}],
+                "box": None, "notes": "Checklist from TCDB (card view on TCDB). Prices and photos: eBay sold listings where there are any.",
                 "source": "tcdb", "source_url": f"https://www.tcdb.com/Checklist.cfm/sid/{sid_num}/{t.get('slug', '')}",
                 "base_url": "", "prices_as_of": "", "remote": True,
             }
@@ -429,11 +526,15 @@ def build():
                 rows.append([sid, name, number, variant, prun, None, None, None, "", ""])
                 t = tiers.setdefault(variant or "Base", {"name": variant or "Base", "print_run": prun, "count": 0, "priced": 0, "median_raw": None, "top_raw": None})
                 t["count"] += 1
+            ebay_prices(sid, rows, title)
+            for t in tiers.values():
+                ps = sorted(r[5] for r in rows if r[5] and (r[3] or "Base") == t["name"])
+                t.update(priced=len(ps), median_raw=round(st.median(ps), 2) if ps else None, top_raw=ps[-1] if ps else None)
             remote_ids.add(sid)
             cat = tcdb_category(title)
             sink.add(sid, rows, True, cat)
             sets[sid] = {
-                "cover": "", "id": sid, "name": title, "year": year, "brand": tcdb_brand(rest), "category": cat,
+                "cover": next((r[9] for r in rows if r[9].startswith("eb:")), ""), "id": sid, "name": title, "year": year, "brand": tcdb_brand(rest), "category": cat,
                 "cards": len(rows), "tiers": sorted(tiers.values(), key=lambda t: (t["print_run"] or 10**6), reverse=True),
                 "box": None, "notes": "Checklist from BreakNinja. Prices: eBay sold listings where there are any.",
                 "source": "breakninja", "source_url": b.get("url", ""), "base_url": "", "prices_as_of": "", "remote": True,
