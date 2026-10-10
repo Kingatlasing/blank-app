@@ -8,7 +8,22 @@ const KEY = window.__EKEY || 'slabscout-ebay-ns';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 let store = {};
 try { store = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
-const todo = (await fetch(LIST).then(r => r.json())).filter(x => !store[x.set]);
+const doneKey = KEY + '-saved';  // sets already saved to a part file (when saving in parts)
+let saved = new Set();
+try { saved = new Set(JSON.parse(localStorage.getItem(doneKey) || '[]')); } catch (e) {}
+// save what's collected as a file (slabscout-ebay-ns-<part>.json.gz) and clear it from the tab's storage
+async function savePart() {
+  const n = (window.__EPARTNO = (window.__EPARTNO || window.__EPART) + 0);
+  const out = JSON.stringify({sets: store, fetched_at: new Date().toISOString()});
+  const gz = await new Response(new Blob([out]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
+  const a = document.createElement('a'); a.href = URL.createObjectURL(gz); a.download = 'slabscout-ebay-ns-' + n + '.json.gz';
+  document.body.appendChild(a); a.click();
+  Object.keys(store).forEach(k => saved.add(k));
+  try { localStorage.setItem(doneKey, JSON.stringify([...saved])); } catch (e) {}
+  store = {}; window.__EPARTNO = n + 1;
+  window.__es.parts = (window.__es.parts || []).concat(['slabscout-ebay-ns-' + n + '.json.gz']);
+}
+const todo = (await fetch(LIST).then(r => r.json())).filter(x => !store[x.set] && !saved.has(x.set));
 window.__es = {state: 'running', todo: todo.length, done: 0, items: 0};
 for (const x of todo) {
   const items = {};
@@ -42,7 +57,9 @@ for (const x of todo) {
   }
   store[x.set] = {q: x.q, items};
   window.__es.done++; window.__es.items += Object.keys(items).length;
+  if (window.__EPART && Object.keys(store).length >= (window.__EPARTN || 120)) await savePart();
   try { localStorage.setItem(KEY, JSON.stringify(store)); } catch (e) { window.__es.state = 'storage full'; return; }
 }
+if (window.__EPART && Object.keys(store).length) await savePart();
 window.__es.state = 'done';
 })();
