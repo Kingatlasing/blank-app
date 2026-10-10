@@ -9,7 +9,7 @@ for (const u of window.__CLURLS) {
   try {
     const h = await fetch(u).then(r => r.text());
     const d = new DOMParser().parseFromString(h, 'text/html');
-    const art = d.querySelector('.entry-content, article .entry-content, article, .post-content, main') || d.body;
+    const art = d.querySelector('.set-checklist') || d.querySelector('.entry-content, article .entry-content, article, .post-content, main') || d.body;
     const rows = [];
     let section = 'Base Set';
     const walk = el => {
@@ -21,7 +21,7 @@ for (const u of window.__CLURLS) {
           if (txt && !/buy on ebay|shop now|shop on|related|share this|comments?|advertis|subscribe|you may also|popular|newsletter/i.test(txt)) section = txt.replace(/\s*(checklist|card list)\s*$/i, '').replace(/\s+/g, ' ').trim();
           continue;
         }
-        if (/^(P|LI|TD|DIV|SPAN|UL|OL|TABLE|TBODY|TR)$/.test(tag) && n.children.length && !/^(P|LI)$/.test(tag)) { walk(n); continue; }
+        if (/^(DIV|SPAN|UL|OL|TABLE|TBODY|TR|TD|SECTION)$/.test(tag) && [...n.children].some(c => !/^(BR|STRONG|B|EM|I|A|SPAN)$/.test(c.tagName))) { walk(n); continue; }
         const raw = (n.innerHTML || '').split(/<br\s*\/?>|\n/i);
         for (const r of raw) {
           const p = r.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, "'").replace(/&nbsp;/g, ' ').trim();
