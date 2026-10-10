@@ -23,7 +23,7 @@ def analyze_photo(data: bytes) -> dict:
             card, skew = vision.rectify(card)
         except Exception:
             pass
-    lines = ocr.read_text(card)
+    lines = ocr.read_card(card)
     return {
         "full": img,
         "card": card,

@@ -199,7 +199,7 @@ def do_ocr(data: bytes, lang: str = "auto") -> dict:
     with _lock:
         img = vision.load_image(data)
         card, found = vision.detect_and_crop(img)
-        lines = ocr.read_text(card)
+        lines = ocr.read_card(card)
         langs = ["en"]
         if lang in ("ja", "ko", "auto") and (lang != "auto" or ocr.has_cjk(lines) or len(re.findall(r"[A-Za-z]{4,}", " ".join(t for t, *_ in lines))) < 5):
             if lang in ("ja", "auto"):
