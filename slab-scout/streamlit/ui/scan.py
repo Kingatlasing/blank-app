@@ -161,6 +161,10 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             elif d is not None and d > 26:
                 sc -= 12
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
+    try:
+        _text_check(cands, parsed)
+    except Exception:
+        pass
     cands.sort(key=lambda x: -x["score"])
     try:
         _verify(cands, f, b, parsed, store)
@@ -252,6 +256,50 @@ def _player_name(lines) -> str:
         if len(hits) > best_n:
             best, best_n = name, len(hits)
     return best
+
+
+_SET_STOP = {"the", "and", "of", "a", "cards", "card", "trading", "series", "set", "edition", "pokemon", "pokémon",
+             "japanese", "english", "promo", "base", "collection", "checklist", "topps", "panini", "upper", "deck"}
+
+
+def _text_check(cands: list, parsed: dict) -> None:
+    """Uses all the text read on the card, not just the name, to rank the database cards that fit:
+    - the card number printed on the card agrees with the candidate's number (+8) or plainly contradicts it (-12)
+    - words of the candidate's set name printed on the card ('Hidden Fates', 'Surging Sparks', 'Prizm') (+4 each, max 8)
+    - the year printed on the card is the set's year (+3); the brand printed on the card is the set's brand (+3)
+    A candidate never gains more than 16 here, so a picture or printed code still outranks it."""
+    text = parsed.get("raw_text", "") or ""
+    words = set(re.findall(r"[a-z0-9]+", text.lower().replace("é", "e")))
+    num = (parsed.get("number") or "").split("/")[0].strip().lstrip("#").lstrip("0").lower()
+    year = str(parsed.get("year") or "")
+    for x in cands:
+        if x["kind"] != "catalog":
+            continue
+        c = x["card"]
+        s = catalog.sets().get(c.set_id, {})
+        gain, why = 0, []
+        cn = re.sub(r"^[a-z]{1,5}-(?=\d)", "", (c.number or "").lower()).lstrip("#").lstrip("0")
+        if num and cn:
+            if cn == num or cn.endswith(num) and len(num) >= 2:
+                gain += 8
+                why.append(f"number {c.number} on the card ✓")
+            elif re.fullmatch(r"\d+", num) and re.fullmatch(r"\d+", cn) and cn != num:
+                gain -= 12
+                why.append(f"card reads #{num}, not #{c.number}")
+        sw = [w for w in re.findall(r"[a-z0-9]+", re.sub(r"^\d{4}\s+", "", s.get("name", "")).lower().replace("é", "e"))
+              if len(w) >= 4 and w not in _SET_STOP and not w.isdigit()]
+        hits = [w for w in dict.fromkeys(sw) if w in words and w not in (c.name or "").lower()]
+        if hits:
+            gain += min(8, 4 * len(hits))
+            why.append("set " + " ".join(hits[:2]) + " on the card ✓")
+        if year and str(s.get("year", "")) == year:
+            gain += 3
+        brand = (s.get("brand") or "").lower()
+        if brand and brand != "other" and all(w in words for w in brand.split()):
+            gain += 3
+        if gain:
+            x["score"] += max(-12, min(16, gain))
+            x["why"].extend(why)
 
 
 def _verify(cands: list[dict], f: dict, b: dict | None, parsed: dict, store) -> None:
