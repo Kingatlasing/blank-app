@@ -5,7 +5,11 @@
 (async () => {
 const LIST = window.__ELIST;
 const KEY = window.__EKEY || 'slabscout-ebay-ns';
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+// pauses run in a small worker: a background tab slows its own timers to once a minute, a worker's are not slowed
+const SW = new Worker(URL.createObjectURL(new Blob(['onmessage=e=>setTimeout(()=>postMessage(e.data[0]),e.data[1])'], {type: 'text/javascript'})));
+const waits = {}; let wid = 0;
+SW.onmessage = e => { const f = waits[e.data]; delete waits[e.data]; f && f(); };
+const sleep = ms => new Promise(r => { const id = ++wid; waits[id] = r; SW.postMessage([id, ms]); });
 let store = {};
 try { store = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch (e) {}
 const doneKey = KEY + '-saved';  // sets already saved to a part file (when saving in parts)
