@@ -22,8 +22,14 @@ for (const u of window.__CLURLS) {
           continue;
         }
         if (/^(P|LI|TD|DIV|SPAN|UL|OL|TABLE|TBODY|TR)$/.test(tag) && n.children.length && !/^(P|LI)$/.test(tag)) { walk(n); continue; }
-        const parts = (n.innerHTML || '').split(/<br\s*\/?>|\n/i).map(x => x.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, "'").replace(/&nbsp;/g, ' ').trim()).filter(Boolean);
-        for (const p of parts) {
+        const raw = (n.innerHTML || '').split(/<br\s*\/?>|\n/i);
+        for (const r of raw) {
+          const p = r.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&#8217;|&rsquo;/g, "'").replace(/&nbsp;/g, ' ').trim();
+          if (!p) continue;
+          if (/^\s*<(strong|b)\b/i.test(r) && !NUM.test(p) && p.length < 90) {  // bold line at the top of a paragraph: a section name
+            if (!/buy on ebay|shop now|shop on|related|share this|comments?|advertis|subscribe|you may also|popular|newsletter/i.test(p)) section = p.replace(/\s*(checklist|card list)\s*$/i, '').replace(/\s+/g, ' ').trim();
+            continue;
+          }
           const m = p.match(NUM);
           if (!m || /^\d+\s+(cards?|packs?|boxes|per)\b/i.test(p)) continue;
           let name = m[2].trim(), pr = '';
