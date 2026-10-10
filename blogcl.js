@@ -18,7 +18,7 @@ for (const u of window.__CLURLS) {
         if (/^(SCRIPT|STYLE|NOSCRIPT|FIGURE|IMG|ASIDE|NAV|FORM|IFRAME)$/.test(tag)) continue;
         const txt = (n.innerText || n.textContent || '').trim();
         if (/^H[1-6]$/.test(tag) || (tag === 'P' && n.children.length === 1 && /^(STRONG|B)$/.test(n.children[0].tagName) && txt.length < 90 && !NUM.test(txt))) {
-          if (txt) section = txt.replace(/\s*(checklist|card list)\s*$/i, '').replace(/\s+/g, ' ').trim();
+          if (txt && !/buy on ebay|shop now|shop on|related|share this|comments?|advertis|subscribe|you may also|popular|newsletter/i.test(txt)) section = txt.replace(/\s*(checklist|card list)\s*$/i, '').replace(/\s+/g, ' ').trim();
           continue;
         }
         if (/^(P|LI|TD|DIV|SPAN|UL|OL|TABLE|TBODY|TR)$/.test(tag) && n.children.length && !/^(P|LI)$/.test(tag)) { walk(n); continue; }
