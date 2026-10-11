@@ -261,6 +261,24 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
     numcount: dict[str, int] = {}
     for r in rows:
         numcount[(r[2] or "").strip().upper()] = numcount.get((r[2] or "").strip().upper(), 0) + 1
+    # cards by printed number, so a listing is only checked against cards whose number is in its title
+    by_num: dict[str, list[int]] = {}
+    odd: list[int] = []  # numbers with characters other than letters, digits and dashes: always checked
+    for i, r in enumerate(rows):
+        n = (r[2] or "").strip().upper()
+        if not n:
+            continue
+        (by_num.setdefault(n, []) if re.fullmatch(r"[A-Z0-9]+(?:-[A-Z0-9]+)*", n) else odd).append(i)
+
+    def candidates(t):
+        out = set(odd)
+        for tok in re.findall(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*", t):
+            parts = tok.upper().split("-")
+            for a in range(len(parts)):
+                for z in range(a + 1, len(parts) + 1):
+                    out.update(by_num.get("-".join(parts[a:z]), ()))
+        return sorted(out)
+
     def match(pool):
       hits: dict[int, list] = {}
       for s in pool:
@@ -269,7 +287,8 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
             continue
         tw = wset(t)
         best, best_score, tie = None, -1, False
-        for i, r in enumerate(rows):
+        for i in candidates(t):
+            r = rows[i]
             name, number, variant = r[1], (r[2] or "").strip(), (r[3] or "").strip()
             if not number:
                 continue

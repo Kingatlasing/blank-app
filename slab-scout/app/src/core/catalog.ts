@@ -626,8 +626,8 @@ export function imageUrl(card: Card | null | undefined, size = 240): [string, bo
   if (card.img.startsWith('nc:')) return [`https://cdn.narutocards.ca/${card.img.slice(3)}`, false]; // Naruto (narutocards.ca)
   // TCDB non-sport: the photo is only used for scan fingerprints (TCDB doesn't allow its photos to be shown elsewhere)
   if (/^~?td:/.test(card.img)) return ['', false];
-  // eBay sold-listing photo of this exact card (non-sport sets without a price-guide photo)
-  if (/^~?eb:https:\/\/i\.ebayimg\.com\//.test(card.img)) return [card.img.replace(/^~?eb:/, ''), card.img.startsWith('~')];
+  // eBay listing photo of this exact card (non-sport sets without a price-guide photo), at 500 px
+  if (/^~?eb:https:\/\/i\.ebayimg\.com\//.test(card.img)) return [card.img.replace(/^~?eb:/, '').replace(/\/s-l\d+\./, '/s-l500.'), card.img.startsWith('~')];
   const id = card.img.replace(/^~/, '');
   try {
     const f = photoFile(id, size);
