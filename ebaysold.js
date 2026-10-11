@@ -4,7 +4,9 @@
 // Status: window.__es ; results: localStorage 'slabscout-ebay-ns' {set id: {q, items: {item id: {t,p,d,img}}}}
 (async () => {
 const LIST = window.__ELIST;
-const KEY = window.__EKEY || 'slabscout-ebay-ns';
+const ACTIVE = !!window.__EACTIVE;  // listings still for sale (photos only), not sold ones
+const KEY = window.__EKEY || (ACTIVE ? 'slabscout-ebay-active' : 'slabscout-ebay-ns');
+const FILE = ACTIVE ? 'slabscout-ebay-active-' : 'slabscout-ebay-ns-';
 // pauses run in a small worker: a background tab slows its own timers to once a minute, a worker's are not slowed
 const SW = new Worker(URL.createObjectURL(new Blob(['onmessage=e=>setTimeout(()=>postMessage(e.data[0]),e.data[1])'], {type: 'text/javascript'})));
 const waits = {}; let wid = 0;
@@ -18,21 +20,21 @@ try { saved = new Set(JSON.parse(localStorage.getItem(doneKey) || '[]')); } catc
 // save what's collected as a file (slabscout-ebay-ns-<part>.json.gz) and clear it from the tab's storage
 async function savePart() {
   const n = (window.__EPARTNO = (window.__EPARTNO || window.__EPART) + 0);
-  const out = JSON.stringify({sets: store, fetched_at: new Date().toISOString()});
+  const out = JSON.stringify({sets: store, active: ACTIVE, fetched_at: new Date().toISOString()});
   const gz = await new Response(new Blob([out]).stream().pipeThrough(new CompressionStream('gzip'))).blob();
-  const a = document.createElement('a'); a.href = URL.createObjectURL(gz); a.download = 'slabscout-ebay-ns-' + n + '.json.gz';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(gz); a.download = FILE + n + '.json.gz';
   document.body.appendChild(a); a.click();
   Object.keys(store).forEach(k => saved.add(k));
   try { localStorage.setItem(doneKey, JSON.stringify([...saved])); } catch (e) {}
   store = {}; window.__EPARTNO = n + 1;
-  window.__es.parts = (window.__es.parts || []).concat(['slabscout-ebay-ns-' + n + '.json.gz']);
+  window.__es.parts = (window.__es.parts || []).concat([FILE + n + '.json.gz']);
 }
 const todo = (await fetch(LIST).then(r => r.json())).filter(x => !store[x.set] && !saved.has(x.set));
 window.__es = {state: 'running', todo: todo.length, done: 0, items: 0};
 for (const x of todo) {
   const items = {};
   for (let pg = 1; pg <= 3; pg++) {
-    const url = '/sch/i.html?_nkw=' + encodeURIComponent(x.q) + '&LH_Sold=1&LH_Complete=1&_ipg=240&_pgn=' + pg;
+    const url = '/sch/i.html?_nkw=' + encodeURIComponent(x.q) + (ACTIVE ? '' : '&LH_Sold=1&LH_Complete=1') + '&_ipg=240&_pgn=' + pg;
     let h = '';
     try { const r = await fetch(url, {credentials: 'include'}); h = await r.text(); } catch (e) { await sleep(30000); continue; }
     if (/Pardon Our Interruption|captcha|Checking your browser/i.test(h.slice(0, 20000))) {
