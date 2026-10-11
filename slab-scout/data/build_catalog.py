@@ -203,11 +203,12 @@ LOT_WORDS = re.compile(r"\b(lot|lots|bundle|set of|complete set|base set|team se
 GRADED = re.compile(r"\b(PSA|BGS|CGC|SGC|TAG|ACE|AGS|Beckett|graded|slab)\b", re.I)
 
 
-def _ebay_ns() -> dict:
-    """eBay sold listings for the non-sport sets (raw/slabscout-ebay-ns-*.json.gz): {set id: [{t, p, d, img}]}."""
+def _ebay_ns(pattern: str = "slabscout-ebay-ns-*.json.gz", need_price: bool = True) -> dict:
+    """eBay listings for the non-sport sets: sold ones (raw/slabscout-ebay-ns-*.json.gz) or, with
+    pattern 'slabscout-ebay-active-*' and need_price False, ones still for sale (photos only). {set id: [{t, p, d, img}]}."""
     import gzip
     out: dict[str, list] = {}
-    for f in sorted(glob.glob(os.path.join(RAW, "slabscout-ebay-ns-*.json.gz"))):
+    for f in sorted(glob.glob(os.path.join(RAW, pattern))):
         for sid, s in json.load(gzip.open(f)).get("sets", {}).items():
             items = s.get("items") if isinstance(s, dict) else None
             if not isinstance(items, dict):
@@ -217,16 +218,19 @@ def _ebay_ns() -> dict:
                 if not re.fullmatch(r"\d{9,15}", str(iid)) or not isinstance(it, dict):
                     continue
                 m = re.search(r"\$([\d,]+\.\d{2})", str(it.get("p", "")))
-                if not m or " to " in str(it.get("p", "")):
+                if need_price and (not m or " to " in str(it.get("p", ""))):
                     continue
                 img = str(it.get("img", ""))
                 img = img if re.fullmatch(r"https://i\.ebayimg\.com/[A-Za-z0-9/_.~-]{5,200}", img) else ""
-                lst.append({"id": iid, "t": str(it.get("t", ""))[:250], "p": float(m.group(1).replace(",", "")),
+                if not need_price and not img:
+                    continue
+                lst.append({"id": iid, "t": str(it.get("t", ""))[:250], "p": float(m.group(1).replace(",", "")) if m else 0.0,
                             "d": str(it.get("d", ""))[:40], "img": img})
     return out
 
 
 EBAY_NS = None
+EBAY_ACTIVE = None
 
 
 def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
@@ -235,11 +239,13 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
     its own to show. A sale counts only when its title has the card's number and every word of its name, is raw (not
     graded), is not a lot, and names the card's parallel (a base card never takes a foil / auto / numbered sale).
     Sales that fit several cards equally are left out. Returns how many cards got a price."""
-    global EBAY_NS
+    global EBAY_NS, EBAY_ACTIVE
     if EBAY_NS is None:
         EBAY_NS = _ebay_ns()
-    sales = EBAY_NS.get(sid)
-    if not sales:
+        EBAY_ACTIVE = _ebay_ns("slabscout-ebay-active-*.json.gz", need_price=False)
+    sales = EBAY_NS.get(sid) or []
+    listed = EBAY_ACTIVE.get(sid) or []
+    if not sales and not listed:
         return 0
     from datetime import datetime
 
@@ -255,8 +261,9 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
     numcount: dict[str, int] = {}
     for r in rows:
         numcount[(r[2] or "").strip().upper()] = numcount.get((r[2] or "").strip().upper(), 0) + 1
-    hits: dict[int, list] = {}
-    for s in sales:
+    def match(pool):
+      hits: dict[int, list] = {}
+      for s in pool:
         t = s["t"]
         if LOT_WORDS.search(t) or GRADED.search(t):
             continue
@@ -283,12 +290,19 @@ def ebay_prices(sid: str, rows: list[list], set_title: str) -> int:
                 tie = True
         if best is not None and not tie:
             hits.setdefault(best, []).append(s)
+      return hits
+
+    hits = match(sales)
     for i, ss in hits.items():
         ps = sorted(x["p"] for x in ss)
         rows[i][5] = round(st.median(ps), 2)
         newest = max(ss, key=lambda x: day(x["d"]))
         if newest["img"] and not (rows[i][9] and not rows[i][9].startswith(("td:", "~"))):
             rows[i][9] = "eb:" + newest["img"]
+    # cards still without a photo: a photo from a listing of that exact card that is still for sale (no price taken)
+    for i, ss in match(listed).items():
+        if not (rows[i][9] and not rows[i][9].startswith(("td:", "~"))):
+            rows[i][9] = "eb:" + ss[0]["img"]
     return len(hits)
 
 

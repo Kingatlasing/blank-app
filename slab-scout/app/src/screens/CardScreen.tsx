@@ -223,7 +223,7 @@ export default function CardScreen({ cardKey, onBack }: { cardKey: string; onBac
             </View>
           )}
           {imageUrl(c)[1] ? <Text style={[S.muted, { marginTop: 6, fontSize: L.fs(12) }]}>Photo of another parallel of this card</Text> : null}
-          {/^~?eb:/.test(c.img) ? <Text style={[S.muted, { marginTop: 6, fontSize: L.fs(12) }]}>Photo from an eBay sale of this card</Text> : null}
+          {/^~?eb:/.test(c.img) ? <Text style={[S.muted, { marginTop: 6, fontSize: L.fs(12) }]}>Photo from an eBay listing of this card</Text> : null}
         </View>
 
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
