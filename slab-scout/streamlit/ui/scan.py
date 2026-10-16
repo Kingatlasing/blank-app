@@ -19,6 +19,41 @@ GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi
          "Non-sport (history, music…)", "Other"]
 
 
+def _narrow(parsed: dict, cards: list) -> list:
+    """A player's / subject's cards ordered by how well they fit what's printed on this one: the card number
+    (or code), the year, the brand and set-name words, and parallel words. Used to choose which price-guide
+    photos to compare, so the right card is among them even for players with hundreds of cards."""
+    text = (parsed.get("raw_text") or "").lower().replace("é", "e")
+    words = set(re.findall(r"[a-z0-9]+", text))
+    num = (parsed.get("number") or "").split("/")[0].strip().lstrip("#").lstrip("0").lower()
+    codes = {m.lower() for m in re.findall(r"\b[A-Z]{1,5}-[A-Z0-9]{1,5}\b", parsed.get("raw_text") or "")}
+    year = str(parsed.get("year") or "")
+    sets = catalog.sets()
+    scored = []
+    for c in cards:
+        s = sets.get(c.set_id, {})
+        sc = 0.0
+        cn = (c.number or "").lower()
+        if cn and (cn.lstrip("0") == num or cn in codes or (num and cn.endswith(num) and len(num) >= 2)):
+            sc += 10
+        sy = str(s.get("year", ""))
+        if year and sy == year:
+            sc += 4
+        elif year and sy.isdigit() and abs(int(sy) - int(year)) == 1:
+            sc += 2
+        sw = [w for w in re.findall(r"[a-z0-9]+", re.sub(r"^\d{4}\s+", "", s.get("name", "")).lower()) if len(w) >= 4 and w not in _SET_STOP]
+        sc += min(9, 3 * sum(1 for w in dict.fromkeys(sw) if w in words))
+        b = (s.get("brand") or "").lower()
+        if b and b != "other" and all(w in words for w in b.split()):
+            sc += 3
+        vw = [w for w in re.findall(r"[a-z]+", (c.variant or "").lower()) if len(w) >= 3]
+        if vw and all(w in words for w in vw):
+            sc += 2
+        scored.append((sc, -(c.raw or 0), c))
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    return [c for _, _, c in scored]
+
+
 class _Timer:
     """Seconds spent in each step of a scan (returned as 'timing', used by the speed test)."""
 
@@ -113,8 +148,12 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
         for x in cands:
             if x["kind"] == "catalog":
                 pool += [x["card"]] + catalog.siblings(x["card"])
-        if not pool and parsed.get("name"):
-            pool = catalog.search(parsed["name"], limit=40)
+        if parsed.get("name"):
+            # narrow the player's / subject's cards with what's printed on this one before comparing photos
+            near = _narrow(parsed, catalog.search(parsed["name"], limit=1500))
+            have_p = {c.key for c in pool}
+            pool = near[:16] + [c for c in pool if c.key not in {n.key for n in near[:16]}] + \
+                [c for c in near[16:] if c.key not in have_p]
         if pool:
             pm = pipeline.catalog_photo_match(vision.tight_card(f["card"], f["edges"]), pool)
             by_key = {x["card"].key: x for x in cands if x["kind"] == "catalog"}
@@ -353,6 +392,10 @@ def _text_check(cands: list, parsed: dict) -> None:
     words = set(re.findall(r"[a-z0-9]+", text.lower().replace("é", "e")))
     num = (parsed.get("number") or "").split("/")[0].strip().lstrip("#").lstrip("0").lower()
     year = str(parsed.get("year") or "")
+    import difflib
+    pgame = parsed.get("game") or ""
+    kana = len(re.findall(r"[぀-ヿ]", text + (parsed.get("name_local") or ""))) >= 4
+    long_words = [w for w in words if len(w) >= 4 and w.isalpha()]
     for x in cands:
         if x["kind"] != "catalog":
             continue
@@ -375,11 +418,35 @@ def _text_check(cands: list, parsed: dict) -> None:
             why.append("set " + " ".join(hits[:2]) + " on the card ✓")
         if year and str(s.get("year", "")) == year:
             gain += 3
+        elif year and str(s.get("year", "")).isdigit() and abs(int(s["year"]) - int(year)) >= 2 and int(year) <= 2030:
+            gain -= 5
+            why.append(f"card reads {year}, set is {s['year']}")
         brand = (s.get("brand") or "").lower()
         if brand and brand != "other" and all(w in words for w in brand.split()):
             gain += 3
+        # the game the card reads as (Pokémon text, Yu-Gi-Oh! text...) rules out cards of other games
+        cat = s.get("category", "")
+        if pgame in identify.TCG_GAMES and cat and cat != pgame and not (pgame == "Pokémon" and cat == "Pokémon"):
+            gain -= 20
+            why.append(f"card reads as {pgame}, not {cat}")
+        # language: Japanese text means a Japanese printing, none means an English one
+        if cat == "Pokémon":
+            jp_set = "japanese" in s.get("name", "").lower()
+            if kana and jp_set:
+                gain += 8
+            elif kana and not jp_set:
+                gain -= 8
+                why.append("card is in Japanese")
+            elif not kana and jp_set and len(words) >= 8:
+                gain -= 6
+        # a player / subject whose name isn't anywhere in the text read is unlikely (sports, non-sport)
+        if cat not in identify.TCG_GAMES and len(words) >= 6:
+            nw = [w for w in re.findall(r"[a-z]+", (c.name or "").lower()) if len(w) >= 4]
+            if nw and not any(w in words or any(difflib.SequenceMatcher(None, w, t).ratio() >= 0.8 for t in long_words) for w in nw):
+                gain -= 10
+                why.append(f"{c.name} isn't printed on the card")
         if gain:
-            x["score"] += max(-12, min(16, gain))
+            x["score"] += max(-25, min(16, gain))
             x["why"].extend(why)
 
 

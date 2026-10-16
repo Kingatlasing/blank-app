@@ -446,7 +446,8 @@ def rarity_mark(blob: str) -> str:
     return RARITY_NAMES.get(code, code)
 
 
-def refine(lines: list[tuple[str, float, float]], parsed: dict) -> dict:
+def refine(lines: list[tuple[str, float, float]], parsed: dict, use_catalog: bool = False) -> dict:
+    """use_catalog: also look the text up in the catalog (slower; the scan does its own catalog search)."""
     texts = [t for t, c, _ in lines if c > 0.5]
     blob = "\n".join(texts)
     game = parsed.get("game", "")
@@ -513,7 +514,7 @@ def refine(lines: list[tuple[str, float, float]], parsed: dict) -> dict:
             if full:
                 xref["player"] = full
                 parsed["name"] = full
-        cm = catalog_match(lines, parsed)
+        cm = catalog_match(lines, parsed) if use_catalog else None
         if cm:
             xref["catalog"] = cm
             if cm["exact"]:
