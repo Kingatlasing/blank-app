@@ -88,27 +88,47 @@ def border_wear(card) -> dict:
     inside it: wear / whitening, measured against the card's own border so the lighting doesn't matter."""
     import numpy as np
     import cv2
-    a = np.asarray(card.convert("RGB").resize((630, 880)))
+    W, H, R = 630, 880, 32  # card at 10 px/mm; standard corner radius ~3.2 mm
+    a = np.asarray(card.convert("RGB").resize((W, H)))
     lab = cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.float32)
     Lc, C = lab[..., 0], np.hypot(lab[..., 1] - 128, lab[..., 2] - 128)
+    # the card's own shape (rounded corners): only pixels on the card count, never the background past the arc
+    shape = np.zeros((H, W), np.uint8)
+    cv2.rectangle(shape, (R, 0), (W - 1 - R, H - 1), 1, -1)
+    cv2.rectangle(shape, (0, R), (W - 1, H - 1 - R), 1, -1)
+    for cx, cy in ((R, R), (W - 1 - R, R), (R, H - 1 - R), (W - 1 - R, H - 1 - R)):
+        cv2.circle(shape, (cx, cy), R, 1, -1)
+    inner = cv2.erode(shape, np.ones((3, 3), np.uint8), iterations=3)  # skip the cut line itself (blur / shadow)
+    rim = inner & (1 - cv2.erode(shape, np.ones((3, 3), np.uint8), iterations=10))  # last ~0.7 mm on the card
     c0 = 60
-    bands = {"top": (np.s_[2:10, c0:-c0], np.s_[14:28, c0:-c0]), "bottom": (np.s_[-10:-2, c0:-c0], np.s_[-28:-14, c0:-c0]),
-             "left": (np.s_[c0:-c0, 2:10], np.s_[c0:-c0, 14:28]), "right": (np.s_[c0:-c0, -10:-2], np.s_[c0:-c0, -28:-14])}
-    out = {}
-    ci_all = float(np.median(C[c0:-c0, 14:28]))
-    li_all = float(np.median(Lc[c0:-c0, 14:28]))
-    colourful = ci_all > 18  # a white / grey border can't show whitening by colour
+    bands = {"top": (np.s_[0:14, c0:-c0], np.s_[16:30, c0:-c0]), "bottom": (np.s_[-14:, c0:-c0], np.s_[-30:-16, c0:-c0]),
+             "left": (np.s_[c0:-c0, 0:14], np.s_[c0:-c0, 16:30]), "right": (np.s_[c0:-c0, -14:], np.s_[c0:-c0, -30:-16])}
+    corners = {"tl": (np.s_[0:48, 0:48], ("top", "left")), "tr": (np.s_[0:48, -48:], ("top", "right")),
+               "bl": (np.s_[-48:, 0:48], ("bottom", "left")), "br": (np.s_[-48:, -48:], ("bottom", "right"))}
+    out, ref = {}, {}
+    plain = []
     for k, (o, i) in bands.items():
         ci, li = float(np.median(C[i])), float(np.median(Lc[i]))
-        if colourful:
-            worn = (C[o] < 0.6 * ci) & (Lc[o] > li - 10)
-        else:
-            worn = np.abs(Lc[o] - li) > 25
-        out[k] = round(float(worn.mean()), 4)
-    for k, s in {"tl": np.s_[2:40, 2:40], "tr": np.s_[2:40, -40:-2], "bl": np.s_[-40:-2, 2:40], "br": np.s_[-40:-2, -40:-2]}.items():
-        worn = ((C[s] < 0.6 * ci_all) & (Lc[s] > li_all - 10)) if colourful else (np.abs(Lc[s] - li_all) > 25)
-        out[k] = round(float(worn.mean()), 4)
-    out["colourful"] = colourful
+        # a side counts only when the band just inside is a plain border (one even colour), not artwork / borderless
+        flat = float(np.std(Lc[i])) < 14 and float(np.std(C[i])) < 12
+        ref[k] = (ci, li, flat)
+        if not flat:
+            continue
+        plain.append(k)
+        m = rim[o].astype(bool)
+        worn = ((C[o] < 0.6 * ci) & (Lc[o] > li - 10)) if ci > 18 else (np.abs(Lc[o] - li) > 25)
+        out[k] = round(float(worn[m].mean()) if m.any() else 0.0, 4)
+    for k, (s, sides) in corners.items():
+        use = [ref[sd] for sd in sides if ref[sd][2]]
+        if not use:
+            continue
+        ci = float(np.mean([u[0] for u in use]))
+        li = float(np.mean([u[1] for u in use]))
+        m = rim[s].astype(bool)
+        worn = ((C[s] < 0.6 * ci) & (Lc[s] > li - 10)) if ci > 18 else (np.abs(Lc[s] - li) > 25)
+        out[k] = round(float(worn[m].mean()) if m.any() else 0.0, 4)
+    out["colourful"] = bool(np.mean([ref[k][0] for k in plain]) > 18) if plain else None
+    out["plain_sides"] = len(plain)
     return out
 
 

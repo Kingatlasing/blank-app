@@ -145,19 +145,28 @@ def _grade(res: dict, x: dict | None) -> dict:
         wear = gradebench.border_wear(tight)
     except Exception:
         wear = None
-    if ref_cmp and ref_cmp.get("ok") and ref_cmp.get("agree", 0) >= 0.5 and ref_cmp.get("glare_pct", 0) < 8:
+    # surface against the clean picture only when the photo can show it: big and sharp enough, card not behind
+    # slab plastic (reflections read as scuffs), and the clean picture lined up well
+    sharp = fi.metrics.get("sharpness")
+    can_see = min(tight.size) >= 450 and (sharp is None or sharp >= 60) and not res.get("_in_slab")
+    if can_see and ref_cmp and ref_cmp.get("ok") and ref_cmp.get("agree", 0) >= 0.5 and ref_cmp.get("glare_pct", 0) < 8:
         sg = grading.surface_from_reference(ref_cmp["surface_sev"])
         if sg < fi.subgrades["surface"]:
             fi.findings.append(condition.Finding("surface", "front", f"Compared with a clean copy of this card: {ref_cmp['scratch_mm']:.0f} mm of "
                                                  f"scratch lines, {ref_cmp['damage_pct']:.1f}% of the surface marked, {ref_cmp['scuff_pct']:.1f}% scuffed / dulled",
                                                  ref_cmp["surface_sev"]))
         fi.subgrades["surface"] = min(fi.subgrades["surface"], sg)
-    if wear:
+    if wear and (wear.get("plain_sides") or 0) >= 2 and style in ("standard", "vintage") and min(tight.size) >= 300:
         base = (sp or {}).get("wear") or {}
-        cw = max(max(0.0, wear.get(k, 0) - base.get(k, 0)) for k in ("tl", "tr", "bl", "br"))
-        ew = max(max(0.0, wear.get(k, 0) - base.get(k, 0)) for k in ("top", "bottom", "left", "right"))
-        fi.subgrades["corners"] = min(fi.subgrades["corners"], grading.corners_from_wear(cw))
-        fi.subgrades["edges"] = min(fi.subgrades["edges"], grading.edges_from_wear(ew))
+        cks = [k for k in ("tl", "tr", "bl", "br") if k in wear]
+        eks = [k for k in ("top", "bottom", "left", "right") if k in wear]
+        if cks:
+            cw = max(max(0.0, wear[k] - base.get(k, 0)) for k in cks)
+            fi.subgrades["corners"] = min(fi.subgrades["corners"], grading.corners_from_wear(cw))
+        if eks:
+            ew = max(max(0.0, wear[k] - base.get(k, 0)) for k in eks)
+            fi.subgrades["edges"] = min(fi.subgrades["edges"], grading.edges_from_wear(ew))
+    if wear:
         fi.metrics["border_wear"] = wear
     dco = catalog.die_cut_outline(x["card"]) if x and x["kind"] == "catalog" else None
     if dco:  # die-cut: the points of the shape are the corners; compare the outline with the set's cut
@@ -306,7 +315,7 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
                         L = vision.find_lines(card, True)
                         inner = {**f, "card": card, "found": True, "edges": L,
                                  "centering": vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])}
-                        gi = _grade({**res, "front": inner}, top)
+                        gi = _grade({**res, "front": inner, "_in_slab": True}, top)
                         gi["note"] = "Estimated from the card inside the slab (the label grade above is the official one)."
                         out["grade"] = gi
                 except Exception as e:
