@@ -68,6 +68,22 @@ def measure(photo: bytes) -> dict:
     return out
 
 
+def measure_raw(photo: bytes) -> dict:
+    """A photo of a card out of its slab, graded exactly as the app grades any raw card."""
+    import service
+    out = service.do_scan(photo, None, "Auto", True)
+    if out.get("slab"):
+        return {"error": "still in the slab (label read)"}
+    g = out.get("grade") or {}
+    if not g or g.get("error"):
+        return {"error": f"no grade: {g.get('error', '')}"[:120]}
+    top = (out.get("matches") or [{}])[0]
+    return {"card": f"{top.get('name')} #{top.get('number')} {top.get('set', '')}", "est": {k: v.get("grade") for k, v in (g.get("graders") or {}).items()},
+            "sub": g.get("sub"), "centering": g.get("centering"), "reference_check": g.get("reference_check"),
+            "wear": g.get("border_wear"), "confidence": g.get("confidence"),
+            "recut": g.get("recut"), "style": g.get("style")}
+
+
 def border_wear(card) -> dict:
     """Share of the outer border (the last ~1 mm) that has lost the border's colour compared with the border just
     inside it: wear / whitening, measured against the card's own border so the lighting doesn't matter."""
@@ -111,11 +127,11 @@ def _run(url: str, limit: int) -> None:
         if _stop.is_set():
             STATE["state"] = "stopped"
             return
-        row = {k: it.get(k) for k in ("img", "company", "grade", "title", "cat")}
+        row = {k: it.get(k) for k in ("img", "company", "grade", "title", "cat", "raw")}
         t = time.time()
         try:
             raw = databases.fetch_image(re.sub(r"/s-l\d+\.", "/s-l1600.", it["img"]))
-            row.update(measure(raw) if raw else {"error": "no photo"})
+            row.update((measure_raw(raw) if it.get("raw") else measure(raw)) if raw else {"error": "no photo"})
         except Exception as e:
             row["error"] = f"{type(e).__name__}: {e}"[:200]
         row["seconds"] = round(time.time() - t, 1)
@@ -148,7 +164,19 @@ def status() -> dict:
         if r.get("error"):
             k = r["error"].split(":")[0][:40]
             errs[k] = errs.get(k, 0) + 1
-    return {**{k: v for k, v in STATE.items() if k != "results"}, "measured": len(ok), "errors": errs}
+    raw = [r for r in rs if r.get("est") and r.get("grade") is not None]
+    summ = None
+    if raw:
+        miss = []
+        for r in raw:
+            try:
+                miss.append(abs(float(str(r["est"].get(r["company"])).split()[0]) - float(r["grade"])))
+            except Exception:
+                pass
+        if miss:
+            summ = {"graded": len(miss), "exact": sum(m == 0 for m in miss), "within 0.5": sum(m <= 0.5 for m in miss),
+                    "within 1": sum(m <= 1 for m in miss), "average miss": round(sum(miss) / len(miss), 2)}
+    return {**{k: v for k, v in STATE.items() if k != "results"}, "measured": len(ok) + len(raw), "errors": errs, "raw_summary": summ}
 
 
 def result_gz() -> bytes:

@@ -10,7 +10,7 @@ Gem Mint ~55/45, 9 ~60/40, 8.5 ~62.5/37.5, 8 ~65/35, then +2.5 per half grade. H
 """
 from __future__ import annotations
 
-PSA_CENTER = [(10, 55, 75), (9, 60, 90), (8, 65, 90), (7, 70, 90), (6, 80, 90), (5, 85, 90), (4, 85, 90), (3, 90, 90), (2, 95, 95), (1, 100, 100)]
+PSA_CENTER = [(10, 55, 75), (9, 60, 90), (8, 65, 90), (7, 70, 90), (6, 80, 90), (5, 85, 90), (4, 85, 90), (3, 90, 90), (2, 90, 90), (1, 100, 100)]
 PSA_LABELS = {10: "GEM MT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1.5: "FAIR", 1: "POOR"}
 
 # Checklist answers -> subgrade (1-10)
@@ -39,16 +39,16 @@ TAG_CENTER = [(10.5, 51), (10, 55), (9, 60), (8.5, 62.5), (8, 65), (7.5, 67.5), 
 
 # Centering limits per grading company: (grade label, front max %, back max %). Larger side of the split,
 # so 55 means 55/45. Sources: PSA grading standards; CGC cgccards.com/card-grading/grading-scale; TAG
-# taggrading.com/pages/rubric (separate TCG / sports back limits); BGS and SGC from published secondary guides
-# (Beckett's own page was unavailable). None = the company publishes no back figure for that grade.
+# taggrading.com/pages/rubric (separate TCG / sports back limits); BGS Pristine from beckett.com/grading-standards
+# (50/50 front, 55/45 back), the other BGS rows and SGC from published secondary guides. None = the company publishes no back figure for that grade.
 GRADERS: dict[str, list[tuple[str, float, float | None]]] = {
-    "PSA": [("10", 55, 75), ("9", 60, 90), ("8", 65, 90), ("7", 70, 90), ("6", 80, 90), ("5", 85, 90), ("4", 85, 90), ("3", 90, 90), ("2", 95, 95)],
-    "BGS": [("10 Pristine", 50, 60), ("9.5", 55, 60), ("9", 55, 70), ("8", 60, 80), ("7", 65, 90), ("6", 70, 95)],
+    "PSA": [("10", 55, 75), ("9", 60, 90), ("8", 65, 90), ("7", 70, 90), ("6", 80, 90), ("5", 85, 90), ("4", 85, 90), ("3", 90, 90), ("2", 90, 90)],
+    "BGS": [("10 Pristine", 50, 55), ("9.5", 55, 60), ("9", 55, 70), ("8", 60, 80), ("7", 65, 90), ("6", 70, 95)],
     "SGC": [("10 Pristine", 50, None), ("10", 55, None), ("9", 60, None), ("8", 65, None), ("7", 70, None), ("6", 75, None)],
-    "CGC": [("10 Pristine", 50, None), ("10", 55, 75), ("9", 60, 90), ("8", 65, None), ("7.5", 65, None), ("7", 70, None), ("6", 75, None), ("4.5", 85, None)],
+    "CGC": [("10 Pristine", 50, None), ("10", 55, 75), ("9", 60, 90), ("8", 65, None), ("7.5", 65, None), ("7", 70, None), ("6", 75, None), ("4.5", 85, None), ("3.5", 90, None)],
     "TAG": [("10 Pristine", 51, None), ("10", 55, None), ("9", 60, None), ("8.5", 62.5, None), ("8", 65, None), ("7", 70, None), ("6", 75, None), ("5", 80, None)],
 }
-TAG_BACK = {"tcg": {"10 Pristine": 52, "10": 65, "9": 75, "8.5": 85}, "sports": {"10 Pristine": 54.5, "10": 70, "9": 90, "8.5": 95}}
+TAG_BACK = {"tcg": {"10 Pristine": 52, "10": 65, "9": 75, "8.5": 85, "8": 95}, "sports": {"10 Pristine": 54.5, "10": 70, "9": 90, "8.5": 95}}
 
 # Card styles: how centering / corners are judged. No grader publishes a die-cut or full-art centering rule;
 # the approach below is the common practice (measure to the printed frame; don't penalise the cut shape).
@@ -138,7 +138,7 @@ def _centering_cap(company: str, front_worst, back_worst, tcg: bool = True) -> f
 
 def _bgs_centering_sub(front_worst, back_worst) -> float:
     """BGS centering subgrade: 10 = 50/50 front + 55/45 back ... (Beckett's published centering table)."""
-    rows = [(10, 50, 60), (9.5, 55, 60), (9, 55, 70), (8.5, 60, 80), (8, 60, 80), (7, 65, 90), (6, 70, 95), (5, 75, 95), (4, 80, 100)]
+    rows = [(10, 50, 55), (9.5, 55, 60), (9, 55, 70), (8.5, 60, 80), (8, 60, 80), (7, 65, 90), (6, 70, 95), (5, 75, 95), (4, 80, 100)]
     if front_worst is None:
         return 9.5
     for g, f, b in rows:
@@ -253,3 +253,33 @@ GUIDE = """
 Sources: psacard.com grading standards · cgccards.com grading scale · taggrading.com rubric · Beckett / SGC
 published scales (via collector guides) · psacard.com autograph grading standards.
 """
+
+
+# ---------------- measured damage -> subgrade ----------------
+# Thresholds set so the graded reference cards (data/tests/graded) land on their real grades; they follow the
+# published wording: 10 = no visible flaw, 9 = one minor flaw, 8 = slight wear on one or two corners / a minor
+# flaw, 6-7 = visible wear, 5 = minor rounding / chipping / several scratches, 4 and below = rounding, scuffing,
+# creases, heavy scratching.
+
+def surface_from_reference(sev: float) -> float:
+    """Surface subgrade from the comparison with a clean picture of the same card (core/refdiff.py)."""
+    for lim, g in ((0.15, 10.0), (0.25, 9.5), (0.4, 9.0), (0.55, 8.0), (0.7, 6.0), (0.85, 4.0)):
+        if sev <= lim:
+            return g
+    return 2.5
+
+
+def corners_from_wear(frac: float) -> float:
+    """Corner subgrade from the share of the worst corner that lost the border colour (above the set's own)."""
+    for lim, g in ((0.04, 10.0), (0.08, 9.0), (0.13, 8.0), (0.2, 7.0), (0.3, 6.0), (0.45, 5.0)):
+        if frac <= lim:
+            return g
+    return 4.0
+
+
+def edges_from_wear(frac: float) -> float:
+    """Edge subgrade from the share of the worst edge's outer millimetre that lost the border colour."""
+    for lim, g in ((0.03, 10.0), (0.06, 9.0), (0.1, 8.0), (0.15, 7.0), (0.22, 6.0), (0.3, 5.0)):
+        if frac <= lim:
+            return g
+    return 4.0

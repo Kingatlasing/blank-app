@@ -38,6 +38,10 @@ _lock = threading.Lock()
 
 def _fetch(img_id: str) -> bytes | None:
     import requests
+    if ":" in img_id:  # eBay listing / WaifuCards / CardToad / narutocards photos: the catalog knows the link
+        from . import catalog, databases
+        url = catalog.image_url(catalog.Card("", "", "", "", None, None, None, None, "", img_id), 1600)[0]
+        return databases.fetch_image(url) if url else None
     for size in ("1600", "240"):
         for _ in range(3):
             try:
@@ -144,8 +148,19 @@ def measure(data: bytes) -> dict:
         "sub": {k: float(v) for k, v in insp.subgrades.items()},
         "m": {k: m.get(k) for k in ("specks", "scratches", "stains", "creases", "edge_chips", "flat_pct", "sharpness", "glare_pct")},
         "cs": m.get("corner_severity"),
+        "wear": _wear(tight),
         "w": img.width,
     }
+
+
+def _wear(card: Image.Image) -> dict | None:
+    """How much 'wear' the border-wear check reads on a clean card of this set (pale or foil borders, printed
+    edge lines): the set's baseline, so only wear above it counts on a scan."""
+    try:
+        from .gradebench import border_wear
+        return border_wear(card)
+    except Exception:
+        return None
 
 
 def outline_job_one(img_ids: list[str]) -> dict | None:

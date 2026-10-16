@@ -30,7 +30,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile  # noqa: E402
 from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
 
 import ui.common as common  # noqa: E402
-from core import autograph, catalog, colour, community, condition, grading, identify, ocr, pipeline, slab, vision  # noqa: E402
+from core import autograph, catalog, colour, community, condition, gradebench, grading, identify, ocr, pipeline, refdiff, slab, vision  # noqa: E402
 
 # Shared corrections + community cards when the Supabase keys are set (same as the web app), else a local file
 _store = None
@@ -131,6 +131,34 @@ def _grade(res: dict, x: dict | None) -> dict:
     fi = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=style == "full_art")
     sp = catalog.set_profile(sid) if sid else None
     condition.apply_baseline(fi, (sp or {}).get("sub"))  # this set's design, learned from clean photos
+    # the card against a clean picture of the same card: scratches / scuffs anywhere (artwork and foil too), and the
+    # border's last millimetre against the border just inside it (wear / whitening), above this set's own baseline
+    tight = vision.tight_card(f["card"], L)
+    ref_cmp, wear = None, None
+    try:
+        ref = scan._ref_image(x) if x else None
+        if ref is not None:
+            ref_cmp = refdiff.compare(tight, ref)
+    except Exception:
+        ref_cmp = None
+    try:
+        wear = gradebench.border_wear(tight)
+    except Exception:
+        wear = None
+    if ref_cmp and ref_cmp.get("ok") and ref_cmp.get("agree", 0) >= 0.5 and ref_cmp.get("glare_pct", 0) < 8:
+        sg = grading.surface_from_reference(ref_cmp["surface_sev"])
+        if sg < fi.subgrades["surface"]:
+            fi.findings.append(condition.Finding("surface", "front", f"Compared with a clean copy of this card: {ref_cmp['scratch_mm']:.0f} mm of "
+                                                 f"scratch lines, {ref_cmp['damage_pct']:.1f}% of the surface marked, {ref_cmp['scuff_pct']:.1f}% scuffed / dulled",
+                                                 ref_cmp["surface_sev"]))
+        fi.subgrades["surface"] = min(fi.subgrades["surface"], sg)
+    if wear:
+        base = (sp or {}).get("wear") or {}
+        cw = max(max(0.0, wear.get(k, 0) - base.get(k, 0)) for k in ("tl", "tr", "bl", "br"))
+        ew = max(max(0.0, wear.get(k, 0) - base.get(k, 0)) for k in ("top", "bottom", "left", "right"))
+        fi.subgrades["corners"] = min(fi.subgrades["corners"], grading.corners_from_wear(cw))
+        fi.subgrades["edges"] = min(fi.subgrades["edges"], grading.edges_from_wear(ew))
+        fi.metrics["border_wear"] = wear
     dco = catalog.die_cut_outline(x["card"]) if x and x["kind"] == "catalog" else None
     if dco:  # die-cut: the points of the shape are the corners; compare the outline with the set's cut
         dcr = condition.die_cut_check(vision.tight_card(f["card"], L), dco["mask"], dco.get("agree", 1.0))
@@ -172,6 +200,9 @@ def _grade(res: dict, x: dict | None) -> dict:
     issues = sum([not f.get("found"), not fi.photo_ok, min(f["full"].size) < 700, not b])
     g["confidence"] = "high" if issues == 0 else "medium" if issues == 1 else "low"
     g["sharpness"] = fi.metrics.get("sharpness")
+    g["border_wear"] = fi.metrics.get("border_wear")
+    if ref_cmp and ref_cmp.get("ok"):
+        g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
     return g
 
 
@@ -265,6 +296,21 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
             out["slab"]["grade_text"] = slab.grade_text(sl)
             if top:
                 out["slab"]["price_at_grade"] = _num(scan._slab_price(top, sl))
+            if grade and top:
+                # the card inside the slab, graded as a raw card would be (what another company might give it)
+                try:
+                    ref = scan._ref_image(top)
+                    r = vision.recut_with_reference(f["full"], ref) if ref is not None else None
+                    if r is not None:
+                        card, info = r
+                        L = vision.find_lines(card, True)
+                        inner = {**f, "card": card, "found": True, "edges": L,
+                                 "centering": vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])}
+                        gi = _grade({**res, "front": inner}, top)
+                        gi["note"] = "Estimated from the card inside the slab (the label grade above is the official one)."
+                        out["grade"] = gi
+                except Exception as e:
+                    out["grade"] = {"error": f"couldn't grade the card inside the slab: {e}"}
         elif grade and not res.get("is_back"):
             try:
                 out["grade"] = _grade(res, top)
