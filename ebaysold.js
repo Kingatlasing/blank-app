@@ -6,7 +6,7 @@
 const LIST = window.__ELIST;
 const ACTIVE = !!window.__EACTIVE;  // listings still for sale (photos only), not sold ones
 const KEY = window.__EKEY || (ACTIVE ? 'slabscout-ebay-active' : 'slabscout-ebay-ns');
-const FILE = ACTIVE ? 'slabscout-ebay-active-' : 'slabscout-ebay-ns-';
+const FILE = window.__EFILE || (ACTIVE ? 'slabscout-ebay-active-' : 'slabscout-ebay-ns-');
 // pauses run in a small worker: a background tab slows its own timers to once a minute, a worker's are not slowed
 const SW = new Worker(URL.createObjectURL(new Blob(['onmessage=e=>setTimeout(()=>postMessage(e.data[0]),e.data[1])'], {type: 'text/javascript'})));
 const waits = {}; let wid = 0;
