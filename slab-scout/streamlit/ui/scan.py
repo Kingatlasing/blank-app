@@ -19,6 +19,22 @@ GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi
          "Non-sport (history, music…)", "Other"]
 
 
+def _name_pool(parsed: dict) -> list:
+    """The cards of the name read: those with the printed number and those from the printed year first (a star
+    has thousands of cards, and a plain name search keeps only the most valuable ones)."""
+    name = parsed.get("name") or ""
+    num = (parsed.get("number") or "").split("/")[0].strip().lstrip("#")
+    year = str(parsed.get("year") or "")
+    out, seen = [], set()
+    queries = ([f"{name} {num}"] if num and len(num) <= 8 else []) + ([f"{name} {year}"] if year else []) + [name]
+    for q in queries:
+        for c in catalog.search(q, limit=1500):
+            if c.key not in seen:
+                seen.add(c.key)
+                out.append(c)
+    return out
+
+
 def _narrow(parsed: dict, cards: list) -> list:
     """A player's / subject's cards ordered by how well they fit what's printed on this one: the card number
     (or code), the year, the brand and set-name words, and parallel words. Used to choose which price-guide
@@ -151,7 +167,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                 pool += [x["card"]] + catalog.siblings(x["card"])
         if parsed.get("name"):
             # narrow the player's / subject's cards with what's printed on this one before comparing photos
-            near = _narrow(parsed, catalog.search(parsed["name"], limit=1500))
+            near = _narrow(parsed, _name_pool(parsed))
             have_p = {c.key for c in pool}
             pool = near[:16] + [c for c in pool if c.key not in {n.key for n in near[:16]}] + \
                 [c for c in near[16:] if c.key not in have_p]
