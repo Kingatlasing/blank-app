@@ -3,4 +3,5 @@
 data/catalog/remote/
 data/raw/
 data/tests/real_scans/images/
+data/tests/graded/images/
 data/catalog/photo_conflicts.json

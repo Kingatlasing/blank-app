@@ -1,0 +1,46 @@
+{
+ "scans": [
+  {
+   "file": "bgs95-charizard-shadowless.jpg",
+   "company": "BGS",
+   "grade": 9.5,
+   "sub": {
+    "centering": 9.5,
+    "corners": 9.5,
+    "edges": 9.5,
+    "surface": 9
+   },
+   "card": "Charizard 4/102 Base Shadowless",
+   "note": "slab held in hand"
+  },
+  {
+   "file": "psa5-charizard-1st.jpg",
+   "company": "PSA",
+   "grade": 5,
+   "card": "Charizard 4/102 Base 1st Edition",
+   "note": "slab, flat"
+  },
+  {
+   "file": "psa9-charizard-shadowless.jpg",
+   "company": "PSA",
+   "grade": 9,
+   "card": "Charizard 4/102 Base Shadowless",
+   "note": "slab, flat"
+  },
+  {
+   "file": "psa8-vulpix-1st.jpg",
+   "company": "PSA",
+   "grade": 8,
+   "card": "Vulpix 68/102 Base 1st Edition",
+   "note": "slab, flat"
+  },
+  {
+   "file": "psa2mk-charizard-shadowless.jpg",
+   "company": "PSA",
+   "grade": 2,
+   "qualifier": "MK",
+   "card": "Charizard 4/102 Base Shadowless",
+   "note": "slab held, marked/scratched surface"
+  }
+ ]
+}
