@@ -274,11 +274,37 @@ async def bench_stop(request: Request):
     return JSONResponse(bench.stop())
 
 
+async def gb_start(request: Request):
+    from core import gradebench
+    await run_in_threadpool(engine)
+    q = request.query_params
+    return JSONResponse(gradebench.start(q.get("list") or gradebench.LIST_URL, min(max(int(q.get("limit") or 600), 1), 3000)))
+
+
+async def gb_status(request: Request):
+    from core import gradebench
+    return JSONResponse(gradebench.status())
+
+
+async def gb_stop(request: Request):
+    from core import gradebench
+    return JSONResponse(gradebench.stop())
+
+
+async def gb_result(request: Request):
+    from core import gradebench
+    from starlette.responses import Response
+    data = await run_in_threadpool(gradebench.result_gz)
+    return Response(data, media_type="application/gzip", headers={"Content-Disposition": 'attachment; filename="slabscout-gradebench.json.gz"'})
+
+
 app = st.App(
     "scan_page.py",
     routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/grades", grades), Route("/api/ocr", read, methods=["POST"]),
             Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
             Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
+            Route("/api/gradebench/start", gb_start), Route("/api/gradebench/status", gb_status), Route("/api/gradebench/stop", gb_stop),
+            Route("/api/gradebench/result", gb_result),
             Route("/api/bench/start", bench_start), Route("/api/bench/status", bench_status), Route("/api/bench/stop", bench_stop),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],
     middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
