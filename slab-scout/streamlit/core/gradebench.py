@@ -80,7 +80,8 @@ def measure_raw(photo: bytes) -> dict:
     return {"card": f"{top.get('name')} #{top.get('number')} {top.get('set', '')}", "est": {k: v.get("grade") for k, v in (g.get("graders") or {}).items()},
             "sub": g.get("sub"), "centering": g.get("centering"), "reference_check": g.get("reference_check"),
             "wear": g.get("border_wear"), "confidence": g.get("confidence"),
-            "recut": g.get("recut"), "style": g.get("style"), "label_read": label, "in_slab": bool(out.get("slab"))}
+            "recut": g.get("recut"), "style": g.get("style"), "label_read": label, "in_slab": bool(out.get("slab")),
+            "metrics": g.get("metrics"), "front": g.get("front"), "back": g.get("back"), "lines": g.get("lines")}
 
 
 def border_wear(card, radius: int | None = None, ref=None) -> dict:

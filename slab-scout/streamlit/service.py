@@ -103,6 +103,11 @@ def _centering_json(c) -> dict | None:
     return {"left": int(c.left), "right": int(c.right), "top": int(c.top), "bottom": int(c.bottom), "text": c.text(), "worst": int(c.worst())}
 
 
+REF_SURFACE_LIVE = False  # turned on once fitted against real grades (core/gradebench results)
+REF_WEAR_LIVE = False
+REF_MIN_PX = 600  # clean picture at least this many pixels on its short side to judge surface against it
+
+
 def _grade(res: dict, x: dict | None) -> dict:
     """Grade estimate with no person in the loop: same steps as the Scan page (card style, this set's border
     widths, corner shape, inspection of front and back), minus the manual line and checklist adjustments."""
@@ -151,7 +156,10 @@ def _grade(res: dict, x: dict | None) -> dict:
     # slab plastic (reflections read as scuffs), and the clean picture lined up well
     sharp = fi.metrics.get("sharpness")
     can_see = min(tight.size) >= 450 and (sharp is None or sharp >= 60) and not res.get("_in_slab")
-    if can_see and ref_cmp and ref_cmp.get("ok") and ref_cmp.get("agree", 0) >= 0.5 and ref_cmp.get("glare_pct", 0) < 8:
+    # calibration on 200+ graded cards showed the whole-card scuff / scratch numbers track lighting and print
+    # differences, not damage (PSA 10s at 27% "scuffed"), so they are recorded but don't lower the grade yet
+    ref_hi = ref is not None and min(ref.size) >= REF_MIN_PX  # small price-guide pictures can't show fine surface
+    if (REF_SURFACE_LIVE or ref_hi) and can_see and ref_cmp and ref_cmp.get("ok") and ref_cmp.get("agree", 0) >= 0.5 and ref_cmp.get("glare_pct", 0) < 8:
         sg = grading.surface_from_reference(ref_cmp["surface_sev"])
         if sg < fi.subgrades["surface"]:
             fi.findings.append(condition.Finding("surface", "front", f"Compared with a clean copy of this card: {ref_cmp['scratch_mm']:.0f} mm of "
@@ -159,7 +167,7 @@ def _grade(res: dict, x: dict | None) -> dict:
                                                  ref_cmp["surface_sev"]))
         fi.subgrades["surface"] = min(fi.subgrades["surface"], sg)
     usable = wear and min(tight.size) >= 300 and (
-        ((wear.get("plain_sides") or 0) >= 2 and style in ("standard", "vintage")) or wear.get("vs_reference"))
+        ((wear.get("plain_sides") or 0) >= 2 and style in ("standard", "vintage")) or ((REF_WEAR_LIVE or (ref is not None and min(ref.size) >= REF_MIN_PX)) and wear.get("vs_reference")))
     if usable:
         base = (sp or {}).get("wear") or {}
         cks = [k for k in ("tl", "tr", "bl", "br") if k in wear]
@@ -213,6 +221,11 @@ def _grade(res: dict, x: dict | None) -> dict:
     issues = sum([not f.get("found"), not fi.photo_ok, min(f["full"].size) < 700, not b])
     g["confidence"] = "high" if issues == 0 else "medium" if issues == 1 else "low"
     g["sharpness"] = fi.metrics.get("sharpness")
+    g["metrics"] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in fi.metrics.items()
+                    if isinstance(v, (int, float, str, bool)) or v is None}
+    g["metrics"]["photo_px"] = list(f["full"].size)
+    g["metrics"]["ref_px"] = list(ref.size) if ref is not None else None
+    g["subgrades_inspect"] = dict(fi.subgrades)
     g["border_wear"] = fi.metrics.get("border_wear")
     if ref_cmp and ref_cmp.get("ok"):
         g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
