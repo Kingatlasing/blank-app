@@ -8,6 +8,7 @@ GET  /api/scan_url?url=&back=&game=&grade=   same, from photo links (testing wit
 POST /api/ocr   form: photo, lang (auto | ja | ko)                    -> text lines on the card
 GET  /api/health
 GET  /api/learn/start | status | stop | result   learn each set's clean-card baseline (core/learn.py)
+GET  /api/bench/start?n=100&seed=1 | status[?full=1] | stop   accuracy + speed test on N catalog cards (core/bench.py)
 GET  /web/index.html  the phone app in a browser (mobile-web build), already pointed at this server
 """
 from __future__ import annotations
@@ -256,11 +257,29 @@ async def learn_result(request: Request):
                     headers={"Content-Disposition": 'attachment; filename="slabscout-learn-1.json.gz"'})
 
 
+async def bench_start(request: Request):
+    from core import bench
+    await run_in_threadpool(engine)
+    q = request.query_params
+    return JSONResponse(bench.start(min(max(int(q.get("n") or 100), 1), 500), int(q.get("seed") or 1)))
+
+
+async def bench_status(request: Request):
+    from core import bench
+    return JSONResponse(bench.status(full=request.query_params.get("full") in ("1", "true")))
+
+
+async def bench_stop(request: Request):
+    from core import bench
+    return JSONResponse(bench.stop())
+
+
 app = st.App(
     "scan_page.py",
     routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/grades", grades), Route("/api/ocr", read, methods=["POST"]),
             Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
             Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
+            Route("/api/bench/start", bench_start), Route("/api/bench/status", bench_status), Route("/api/bench/stop", bench_stop),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],
     middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
 )

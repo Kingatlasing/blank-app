@@ -19,9 +19,26 @@ GAMES = ["Auto", "Graded slab", "Pokémon", "Pokémon Japanese / Korean", "Yu-Gi
          "Non-sport (history, music…)", "Other"]
 
 
+class _Timer:
+    """Seconds spent in each step of a scan (returned as 'timing', used by the speed test)."""
+
+    def __init__(self):
+        import time
+        self._time = time.perf_counter
+        self.t = self._time()
+        self.steps: dict[str, float] = {}
+
+    def mark(self, step: str) -> None:
+        now = self._time()
+        self.steps[step] = round(self.steps.get(step, 0) + now - self.t, 3)
+        self.t = now
+
+
 def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
+    tm = _Timer()
     f = pipeline.analyze_photo(front)
     b = pipeline.analyze_photo(back) if back else None
+    tm.mark("read photo + text")
     sl = _read_slab(f, game)
     if sl:
         return _analyze_slab(front, f, b, sl, game)
@@ -32,11 +49,13 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     f["inspect"] = condition.inspect_card(vision.tight_card(f["card"], f["edges"]))
     if b:
         b["inspect"] = condition.inspect_card(vision.tight_card(b["card"], b["edges"]), is_back=True)
+    tm.mark("condition")
     parsed = ocr.parse(f["lines"], "" if game in ("Auto", "Sports", "Kakawow / Disney / Marvel", "Non-sport (history, music…)", "Other", "Pokémon Japanese / Korean") else game)
     if (parsed.get("game") or g0(game)) not in identify.TCG_GAMES:
         pn = _player_name(f["lines"])
         if pn and not all(w.lower() in (parsed.get("name") or "").lower() for w in pn.split()):
             parsed = {**parsed, "name": pn}
+    tm.mark("text cross-check")
     store = get_store()
     comm = pipeline.community_matches(store, f["phash"])
     cands: list[dict] = []
@@ -65,6 +84,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                     (6 if lang in catalog.sets().get(c.set_id, {}).get("name", "") else 0)
                 cands.append({"kind": "catalog", "card": c, "score": sc,
                               "why": [f"reads {jp['name']} ({lang} text)"] + ([f"number {jp['number']} ✓"] if num_ok else [])})
+    tm.mark("japanese / korean")
     # 1. Kakawow-style card codes pin the exact card + parallel in the built-in database
     code_hit = bool(catalog.CODE_RE.search(parsed["raw_text"].upper()))
     text_n = " " + identify.norm(parsed["raw_text"]) + " "
@@ -85,6 +105,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                 num_ok = bool(parsed.get("number")) and c.number.lower().lstrip("0").endswith(parsed["number"].split("/")[0].lstrip("#0").lower())
                 cands.append({"kind": "catalog", "card": c, "score": (52 if tcg else 58) + (10 if num_ok else 0),
                               "why": [f"closest name to the text read ({parsed['name']} → {c.name})"] + (["number ✓"] if num_ok else [])})
+    tm.mark("catalog text search")
     # 1b. Photo match against the price-guide photos (sports / non-sport cards): picks the exact card and
     #     parallel among the name matches, or among the player's cards when only the name was read
     if not code_hit and (parsed.get("game") or "") not in identify.TCG_GAMES and g not in identify.TCG_GAMES:
@@ -107,6 +128,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                     by_key[r["card"].key]["why"].append(why)
                 else:
                     cands.append({"kind": "catalog", "card": r["card"], "score": 50 + bonus, "why": [why]})
+    tm.mark("price-guide photo compare")
     # 1c. Picture alone: the scan's fingerprint against every price-guide photo (works with no readable text)
     if not code_hit:
         have = {x["card"].key for x in cands if x["kind"] == "catalog"}
@@ -130,6 +152,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             elif dist <= 6:
                 cands.append({"kind": "catalog", "card": c, "score": 80 - dist * 3, "why": [why]})
                 have.add(c.key)
+    tm.mark("fingerprint lookup")
     # 2. Community fingerprint matches (cards people confirmed before)
     for m in comm:
         if not m.get("is_fake"):
@@ -161,6 +184,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             elif d is not None and d > 26:
                 sc -= 12
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
+    tm.mark("official databases")
     try:
         _xref_check(cands, parsed)
     except Exception:
@@ -179,11 +203,13 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
         _colour_check(cands, vision.tight_card(f["card"], f["edges"]))
     except Exception:
         pass
+    tm.mark("ranking checks")
     try:
         _recut(f, cands[0] if cands else None)
     except Exception:
         pass
-    return {"front": f, "back": b, "parsed": parsed, "cands": cands, "fakes": [c for c in comm if c.get("is_fake") and c["distance"] <= pipeline.MATCH_STRONG],
+    tm.mark("exact edges")
+    return {"timing": tm.steps, "front": f, "back": b, "parsed": parsed, "cands": cands, "fakes": [c for c in comm if c.get("is_fake") and c["distance"] <= pipeline.MATCH_STRONG],
             "id": hashlib.sha1(front).hexdigest()[:12], "ai": None, "game": g}
 
 

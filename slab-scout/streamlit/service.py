@@ -253,6 +253,7 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
             "matches": [_match(x) for x in cands[:8]],
             "fakes": [{"name": r.get("name", ""), "reasons": r.get("fake_reasons", ""), "distance": r.get("distance")} for r in res.get("fakes", [])],
             "card_jpeg": _b64(f["card"], 420),
+            "timing": res.get("timing", {}),
         }
         try:
             out["colours"] = colour.describe(colour.signature(vision.tight_card(f["card"], f["edges"])))
