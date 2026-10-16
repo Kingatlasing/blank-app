@@ -196,8 +196,17 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
     for m in comm:
         if not m.get("is_fake"):
             cands.append({"kind": "community", "row": m, "score": 90 - m["distance"] * 3, "why": [f"photo matches a confirmed scan ({m['distance']}/64)"]})
+    # the card's attacks / description matched real printings (core/crossref.py): favour them now, and when that
+    # already pins the card in the catalog, the slower online database lookup below isn't needed
+    try:
+        _xref_check(cands, parsed)
+    except Exception:
+        pass
+    xm = (parsed.get("xref") or {}).get("pokemon") or {}
+    pinned = bool(xm.get("moves_matched")) and len(xm.get("printings") or []) <= 2 and any(
+        x["kind"] == "catalog" and "attacks and card text match this printing ✓" in x["why"] for x in cands)
     # 3. Official databases: name + number + set size + HP/ATK/DEF + attacks
-    if not code_hit and g in ("", "Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana"):
+    if not code_hit and not pinned and g in ("", "Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering", "Lorcana"):
         dbc = identify.identify(f["lines"], parsed, g)[:6]
         if not dbc or dbc[0].get("score", 0) < 60:
             # the crop may have missed text (busy photo, card in hand): read the whole photo too
@@ -225,7 +234,7 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
     tm.mark("official databases")
     try:
-        _xref_check(cands, parsed)
+        _xref_check(cands, parsed, only_tcgdb=True)
     except Exception:
         pass
     try:
@@ -342,7 +351,7 @@ def _same_set(a: str, b: str) -> bool:
     return bool(wa and wb) and (wa <= wb or wb <= wa)
 
 
-def _xref_check(cands: list, parsed: dict) -> None:
+def _xref_check(cands: list, parsed: dict, only_tcgdb: bool = False) -> None:
     """The card's attacks, abilities and description words were matched to real printings (core/crossref.py).
     A candidate that is one of those printings (same set, same number) gains +14; when the description pins the
     card down to a few printings, a candidate of the same name from another set loses 8. The printings are added
@@ -356,7 +365,7 @@ def _xref_check(cands: list, parsed: dict) -> None:
         return  # the printed number belongs to none of them: that card isn't in the text data, so don't steer
     sure = len(prs) <= 4
     have = {x["card"].key for x in cands if x["kind"] == "catalog"}
-    for p in prs[:4]:
+    for p in ([] if only_tcgdb else prs[:4]):
         for c in catalog.search(f"{m['name']} {p['number']}", limit=10):
             s = catalog.sets().get(c.set_id, {})
             if c.key not in have and _same_set(p["set_name"], s.get("name", "")) and \
@@ -365,7 +374,7 @@ def _xref_check(cands: list, parsed: dict) -> None:
                 have.add(c.key)
     base = re.sub(r"\s+(gx|ex|v|vmax|vstar)$", "", m["name"].lower())
     for x in cands:
-        if x["kind"] == "catalog":
+        if x["kind"] == "catalog" and not only_tcgdb:
             c = x["card"]
             sname, num, cname = catalog.sets().get(c.set_id, {}).get("name", ""), c.number or "", c.name or ""
         elif x["kind"] == "tcgdb":
