@@ -162,6 +162,10 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
                 sc -= 12
             cands.append({"kind": "tcgdb", "c": c, "score": sc, "why": why})
     try:
+        _xref_check(cands, parsed)
+    except Exception:
+        pass
+    try:
         _text_check(cands, parsed)
     except Exception:
         pass
@@ -260,6 +264,57 @@ def _player_name(lines) -> str:
 
 _SET_STOP = {"the", "and", "of", "a", "cards", "card", "trading", "series", "set", "edition", "pokemon", "pokémon",
              "japanese", "english", "promo", "base", "collection", "checklist", "topps", "panini", "upper", "deck"}
+
+
+def _set_words(name: str) -> set:
+    return {w for w in re.findall(r"[a-z0-9]+", (name or "").lower().replace("é", "e").replace("&", " "))
+            if w not in _SET_STOP and w not in ("black", "star", "promos", "promo")}
+
+
+def _same_set(a: str, b: str) -> bool:
+    """'Hidden Fates Shiny Vault' vs 'Pokémon Hidden Fates', '30th Celebration' vs 'Pokémon 30th Celebration'."""
+    wa, wb = _set_words(a), _set_words(b)
+    return bool(wa and wb) and (wa <= wb or wb <= wa)
+
+
+def _xref_check(cands: list, parsed: dict) -> None:
+    """The card's attacks, abilities and description words were matched to real printings (core/crossref.py).
+    A candidate that is one of those printings (same set, same number) gains +14; when the description pins the
+    card down to a few printings, a candidate of the same name from another set loses 8. The printings are added
+    from the catalog when the photo search missed them."""
+    m = (parsed.get("xref") or {}).get("pokemon")
+    if not m or not m.get("moves_matched") or not m.get("printings"):
+        return
+    prs = m["printings"]
+    read = re.sub(r"/.*", "", parsed.get("number") or "").lstrip("#").lstrip("0").upper()
+    if read and not any(p["number"].lstrip("0").upper() == read for p in prs):
+        return  # the printed number belongs to none of them: that card isn't in the text data, so don't steer
+    sure = len(prs) <= 4
+    have = {x["card"].key for x in cands if x["kind"] == "catalog"}
+    for p in prs[:4]:
+        for c in catalog.search(f"{m['name']} {p['number']}", limit=10):
+            s = catalog.sets().get(c.set_id, {})
+            if c.key not in have and _same_set(p["set_name"], s.get("name", "")) and \
+                    (c.number or "").lstrip("0").upper() == p["number"].lstrip("0").upper():
+                cands.append({"kind": "catalog", "card": c, "score": 55, "why": [f"attacks and text match {p['set_name']} #{p['number']}"]})
+                have.add(c.key)
+    base = re.sub(r"\s+(gx|ex|v|vmax|vstar)$", "", m["name"].lower())
+    for x in cands:
+        if x["kind"] == "catalog":
+            c = x["card"]
+            sname, num, cname = catalog.sets().get(c.set_id, {}).get("name", ""), c.number or "", c.name or ""
+        elif x["kind"] == "tcgdb":
+            sname, num, cname = x["c"].get("set", ""), x["c"].get("number", ""), x["c"].get("name", "")
+        else:
+            continue
+        num = re.sub(r"/.*", "", num).lstrip("#").lstrip("0").upper()
+        hit = any(_same_set(p["set_name"], sname) and p["number"].lstrip("0").upper() == num for p in prs)
+        if hit:
+            x["score"] += 14
+            x["why"].append("attacks and card text match this printing ✓")
+        elif sure and base and base in cname.lower():
+            x["score"] -= 8
+            x["why"].append("attacks / text belong to a different printing")
 
 
 def _text_check(cands: list, parsed: dict) -> None:

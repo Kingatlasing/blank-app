@@ -447,7 +447,7 @@ def parse(lines: list[tuple[str, float, float]], game_hint: str = "Auto") -> dic
     for a, b in SERIAL.findall(blob):
         if int(b) in (5, 10, 25, 49, 50, 75, 99, 100, 149, 150, 199, 249, 250, 299, 499) and int(a) <= int(b):
             serial = f"{a}/{b}"
-    return {
+    out = {
         "game": game,
         "name": name,
         "number": number,
@@ -457,3 +457,10 @@ def parse(lines: list[tuple[str, float, float]], game_hint: str = "Auto") -> dic
         "serial": serial,
         "raw_text": blob,
     }
+    # cross-check against real cards: attack / ability names, description words, HP, number, set total, rarity
+    try:
+        from . import crossref
+        crossref.refine(lines, out)
+    except Exception:
+        pass
+    return out
