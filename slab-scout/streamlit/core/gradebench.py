@@ -83,12 +83,15 @@ def measure_raw(photo: bytes) -> dict:
             "recut": g.get("recut"), "style": g.get("style"), "label_read": label, "in_slab": bool(out.get("slab"))}
 
 
-def border_wear(card) -> dict:
+def border_wear(card, radius: int | None = None, ref=None) -> dict:
     """Share of the outer border (the last ~1 mm) that has lost the border's colour compared with the border just
     inside it: wear / whitening, measured against the card's own border so the lighting doesn't matter."""
     import numpy as np
     import cv2
-    W, H, R = 630, 880, 32  # card at 10 px/mm; standard corner radius ~3.2 mm
+    # corner shape: this set's own radius (0 = square-cut vintage / some sports; ~32 = standard 3.2 mm round)
+    W, H = 630, 880
+    R = 32 if radius is None else max(0, int(radius))
+    R = R + 5 if R else 0  # slack: photos and scans are a little rounder at the cut than the spec
     a = np.asarray(card.convert("RGB").resize((W, H)))
     lab = cv2.cvtColor(a, cv2.COLOR_RGB2LAB).astype(np.float32)
     Lc, C = lab[..., 0], np.hypot(lab[..., 1] - 128, lab[..., 2] - 128)
@@ -96,8 +99,11 @@ def border_wear(card) -> dict:
     shape = np.zeros((H, W), np.uint8)
     cv2.rectangle(shape, (R, 0), (W - 1 - R, H - 1), 1, -1)
     cv2.rectangle(shape, (0, R), (W - 1, H - 1 - R), 1, -1)
-    for cx, cy in ((R, R), (W - 1 - R, R), (R, H - 1 - R), (W - 1 - R, H - 1 - R)):
-        cv2.circle(shape, (cx, cy), R, 1, -1)
+    if R > 0:
+        for cx, cy in ((R, R), (W - 1 - R, R), (R, H - 1 - R), (W - 1 - R, H - 1 - R)):
+            cv2.circle(shape, (cx, cy), R, 1, -1)
+    else:
+        shape[:] = 1
     inner = cv2.erode(shape, np.ones((3, 3), np.uint8), iterations=3)  # skip the cut line itself (blur / shadow)
     rim = inner & (1 - cv2.erode(shape, np.ones((3, 3), np.uint8), iterations=10))  # last ~0.7 mm on the card
     c0 = 60
@@ -129,6 +135,29 @@ def border_wear(card) -> dict:
         out[k] = round(float(worn[m].mean()) if m.any() else 0.0, 4)
     out["colourful"] = bool(np.mean([ref[k][0] for k in plain]) > 18) if plain else None
     out["plain_sides"] = len(plain)
+    out["radius"] = R
+    # full art / borderless: no plain border to compare with, so compare the card's rim with the same rim on a
+    # clean picture of the same card (lined up by the recut): whitening = lighter and less colourful than it should be
+    if ref is not None and len(plain) < 4:
+        b = np.asarray(ref.convert("RGB").resize((W, H)))
+        lb = cv2.cvtColor(b, cv2.COLOR_RGB2LAB).astype(np.float32)
+        Lr, Cr = lb[..., 0], np.hypot(lb[..., 1] - 128, lb[..., 2] - 128)
+        body = (inner.astype(bool)) & ~(rim.astype(bool))
+        # tone match: the photo's lighting vs the scan's, from the card body
+        k = float(np.median(Lc[body]) - np.median(Lr[body]))
+        cs = float(np.median(C[body]) / max(1.0, np.median(Cr[body])))
+        wornr = ((Lc - k) > Lr + 22) & (C < 0.6 * cs * Cr + 4)
+        for kk, (o, _) in bands.items():
+            if kk in plain:
+                continue
+            m = rim[o].astype(bool)
+            out[kk] = round(float(wornr[o][m].mean()) if m.any() else 0.0, 4)
+        for kk, (sl, _) in corners.items():
+            if kk in out:
+                continue
+            m = rim[sl].astype(bool)
+            out[kk] = round(float(wornr[sl][m].mean()) if m.any() else 0.0, 4)
+        out["vs_reference"] = True
     return out
 
 

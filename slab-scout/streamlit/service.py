@@ -134,7 +134,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     # the card against a clean picture of the same card: scratches / scuffs anywhere (artwork and foil too), and the
     # border's last millimetre against the border just inside it (wear / whitening), above this set's own baseline
     tight = vision.tight_card(f["card"], L)
-    ref_cmp, wear = None, None
+    ref_cmp, wear, ref = None, None, None
     try:
         ref = scan._ref_image(x) if x else None
         if ref is not None:
@@ -142,7 +142,9 @@ def _grade(res: dict, x: dict | None) -> dict:
     except Exception:
         ref_cmp = None
     try:
-        wear = gradebench.border_wear(tight)
+        # against the clean picture too when the card was lined up with it (full art / borderless have no plain border)
+        aligned = ref_cmp is not None and bool(f.get("recut")) and ref is not None
+        wear = gradebench.border_wear(tight, radius=rad, ref=ref if aligned else None)
     except Exception:
         wear = None
     # surface against the clean picture only when the photo can show it: big and sharp enough, card not behind
@@ -156,7 +158,9 @@ def _grade(res: dict, x: dict | None) -> dict:
                                                  f"scratch lines, {ref_cmp['damage_pct']:.1f}% of the surface marked, {ref_cmp['scuff_pct']:.1f}% scuffed / dulled",
                                                  ref_cmp["surface_sev"]))
         fi.subgrades["surface"] = min(fi.subgrades["surface"], sg)
-    if wear and (wear.get("plain_sides") or 0) >= 2 and style in ("standard", "vintage") and min(tight.size) >= 300:
+    usable = wear and min(tight.size) >= 300 and (
+        ((wear.get("plain_sides") or 0) >= 2 and style in ("standard", "vintage")) or wear.get("vs_reference"))
+    if usable:
         base = (sp or {}).get("wear") or {}
         cks = [k for k in ("tl", "tr", "bl", "br") if k in wear]
         eks = [k for k in ("top", "bottom", "left", "right") if k in wear]
