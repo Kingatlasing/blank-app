@@ -111,13 +111,13 @@ def border_wear(card, radius: int | None = None, ref=None) -> dict:
              "left": (np.s_[c0:-c0, 0:14], np.s_[c0:-c0, 16:30]), "right": (np.s_[c0:-c0, -14:], np.s_[c0:-c0, -30:-16])}
     corners = {"tl": (np.s_[0:48, 0:48], ("top", "left")), "tr": (np.s_[0:48, -48:], ("top", "right")),
                "bl": (np.s_[-48:, 0:48], ("bottom", "left")), "br": (np.s_[-48:, -48:], ("bottom", "right"))}
-    out, ref = {}, {}
+    out, side = {}, {}
     plain = []
     for k, (o, i) in bands.items():
         ci, li = float(np.median(C[i])), float(np.median(Lc[i]))
         # a side counts only when the band just inside is a plain border (one even colour), not artwork / borderless
         flat = float(np.std(Lc[i])) < 14 and float(np.std(C[i])) < 12
-        ref[k] = (ci, li, flat)
+        side[k] = (ci, li, flat)
         if not flat:
             continue
         plain.append(k)
@@ -125,7 +125,7 @@ def border_wear(card, radius: int | None = None, ref=None) -> dict:
         worn = ((C[o] < 0.6 * ci) & (Lc[o] > li - 10)) if ci > 18 else (np.abs(Lc[o] - li) > 25)
         out[k] = round(float(worn[m].mean()) if m.any() else 0.0, 4)
     for k, (s, sides) in corners.items():
-        use = [ref[sd] for sd in sides if ref[sd][2]]
+        use = [side[sd] for sd in sides if side[sd][2]]
         if not use:
             continue
         ci = float(np.mean([u[0] for u in use]))
@@ -133,7 +133,7 @@ def border_wear(card, radius: int | None = None, ref=None) -> dict:
         m = rim[s].astype(bool)
         worn = ((C[s] < 0.6 * ci) & (Lc[s] > li - 10)) if ci > 18 else (np.abs(Lc[s] - li) > 25)
         out[k] = round(float(worn[m].mean()) if m.any() else 0.0, 4)
-    out["colourful"] = bool(np.mean([ref[k][0] for k in plain]) > 18) if plain else None
+    out["colourful"] = bool(np.mean([side[k][0] for k in plain]) > 18) if plain else None
     out["plain_sides"] = len(plain)
     out["radius"] = R
     # full art / borderless: no plain border to compare with, so compare the card's rim with the same rim on a

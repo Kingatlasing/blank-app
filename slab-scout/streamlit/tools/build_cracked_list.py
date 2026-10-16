@@ -18,6 +18,9 @@ CASE = re.compile(r"crack(ed)?\s*(slab|case|holder|label)|slab\s*crack|case\s*cr
                   r"\b(lot|lots|bundle|set of|you pick|choose)\b|\bor better\b|regrade|re-?holder|\band\s+raw\b|\+\s*raw", re.I)
 
 
+BIG = re.compile(r"/s-l\d+\.")  # eBay thumbnails (s-l140) -> the full-size photo
+
+
 def main(out: str, files: list[str]) -> None:
     items, seen = [], set()
     for f in files:
@@ -31,7 +34,7 @@ def main(out: str, files: list[str]) -> None:
                     continue
                 comp, g = gs.pop()
                 seen.add(iid)
-                items.append({"img": img, "company": comp, "grade": g, "title": t[:160], "raw": True, "id": iid})
+                items.append({"img": BIG.sub("/s-l1600.", img), "company": comp, "grade": g, "title": t[:160], "raw": True, "id": iid})
     json.dump(items, open(out, "w"))
     counts: dict[str, int] = {}
     for it in items:

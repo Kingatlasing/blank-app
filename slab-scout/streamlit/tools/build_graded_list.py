@@ -19,6 +19,9 @@ BAD = re.compile(r"\b(lot|lots|bundle|set of|cards\b.*\bcards|or better|crossove
                  r"empty|case only|slab only|label only|sticker|you pick|choose|pick your)\b", re.I)
 
 
+BIG = re.compile(r"/s-l\d+\.")  # eBay thumbnails (s-l140) -> the full-size photo
+
+
 def main(out: str, files: list[str], per: int = 30, seed: int = 7) -> None:
     rng = random.Random(seed)
     buckets: dict[tuple, list] = {}
@@ -38,7 +41,7 @@ def main(out: str, files: list[str], per: int = 30, seed: int = 7) -> None:
                 gs = {(a.upper(), float(b)) for a, b in GRADE.findall(t)}
                 if gs != {(comp, want)}:
                     continue
-                buckets.setdefault((comp, want, cat), []).append({"img": img, "company": comp, "grade": want, "title": t[:160],
+                buckets.setdefault((comp, want, cat), []).append({"img": BIG.sub("/s-l1600.", img), "company": comp, "grade": want, "title": t[:160],
                                                                    "cat": cat, "id": iid})
     items = []
     for k, v in sorted(buckets.items()):
