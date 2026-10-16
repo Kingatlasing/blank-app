@@ -278,7 +278,8 @@ async def gb_start(request: Request):
     from core import gradebench
     await run_in_threadpool(engine)
     q = request.query_params
-    return JSONResponse(gradebench.start(q.get("list") or gradebench.LIST_URL, min(max(int(q.get("limit") or 600), 1), 3000)))
+    return JSONResponse(gradebench.start(q.get("list") or gradebench.LIST_URL, min(max(int(q.get("limit") or 600), 1), 3000),
+                                         max(int(q.get("offset") or 0), 0)))
 
 
 async def gb_status(request: Request):

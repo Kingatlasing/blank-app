@@ -322,19 +322,24 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
             out["slab"]["grade_text"] = slab.grade_text(sl)
             if top:
                 out["slab"]["price_at_grade"] = _num(scan._slab_price(top, sl))
-            if grade and top:
-                # the card inside the slab, graded as a raw card would be (what another company might give it)
+            if grade:
+                # the card inside the slab, graded as a raw card would be (what another company might give it); cut out
+                # by matching a clean picture when there is one, otherwise from the card outline found in the photo
                 try:
-                    ref = scan._ref_image(top)
+                    ref = scan._ref_image(top) if top else None
                     r = vision.recut_with_reference(f["full"], ref) if ref is not None else None
                     if r is not None:
                         card, info = r
                         L = vision.find_lines(card, True)
                         inner = {**f, "card": card, "found": True, "edges": L,
                                  "centering": vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"])}
-                        gi = _grade({**res, "front": inner, "_in_slab": True}, top)
-                        gi["note"] = "Estimated from the card inside the slab (the label grade above is the official one)."
-                        out["grade"] = gi
+                    else:
+                        inner = f
+                    gi = _grade({**res, "front": inner, "_in_slab": True}, top)
+                    gi["note"] = "Estimated from the card inside the slab (the label grade above is the official one)."
+                    if r is None:
+                        gi["confidence"] = "low"
+                    out["grade"] = gi
                 except Exception as e:
                     out["grade"] = {"error": f"couldn't grade the card inside the slab: {e}"}
         elif grade and not res.get("is_back"):

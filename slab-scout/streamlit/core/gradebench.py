@@ -162,12 +162,12 @@ def border_wear(card, radius: int | None = None, ref=None) -> dict:
     return out
 
 
-def _run(url: str, limit: int) -> None:
+def _run(url: str, limit: int, offset: int = 0) -> None:
     import requests
     from . import databases, catalog
     STATE.update(state="loading list", done=0, results=[], started=time.time())
     try:
-        items = requests.get(url, timeout=60).json()[:limit]
+        items = requests.get(url, timeout=60).json()[offset:offset + limit]
     except Exception as e:
         STATE.update(state="error", error=f"list: {e}")
         return
@@ -190,14 +190,14 @@ def _run(url: str, limit: int) -> None:
     STATE["state"] = "done"
 
 
-def start(url: str = LIST_URL, limit: int = 600) -> dict:
+def start(url: str = LIST_URL, limit: int = 600, offset: int = 0) -> dict:
     global _thread
     if _thread and _thread.is_alive():
         return status()
     _stop.clear()
-    _thread = threading.Thread(target=_run, args=(url, limit), daemon=True)
+    _thread = threading.Thread(target=_run, args=(url, limit, offset), daemon=True)
     _thread.start()
-    return {"state": "starting", "list": url, "limit": limit}
+    return {"state": "starting", "list": url, "limit": limit, "offset": offset}
 
 
 def stop() -> dict:
