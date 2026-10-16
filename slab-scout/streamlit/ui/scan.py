@@ -97,8 +97,9 @@ def _analyze(front: bytes, back: bytes | None, game: str) -> dict:
 
     g = "" if game == "Auto" else game
     # Japanese / Korean cards: read the Asian text with the multilingual reader, map the Pokémon name to English
+    # (only when Asian characters were seen, or almost no English was read: the second readers are slow)
     if g in ("", "Pokémon", "Pokémon Japanese / Korean") and (g == "Pokémon Japanese / Korean" or ocr.has_cjk(f["lines"])
-                                                           or len(re.findall(r"[A-Za-z]{4,}", parsed["raw_text"])) < 5):
+                                                           or len(re.findall(r"[A-Za-z]{4,}", parsed["raw_text"])) < 2):
         jl = ocr.read_text_cjk(f["card"])
         jp = identify.cjk_pokemon(jl)
         lang = "Japanese"
