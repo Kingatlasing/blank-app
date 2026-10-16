@@ -33,7 +33,7 @@ const todo = (await fetch(LIST).then(r => r.json())).filter(x => !store[x.set] &
 window.__es = {state: 'running', todo: todo.length, done: 0, items: 0};
 for (const x of todo) {
   const items = {};
-  for (let pg = 1; pg <= 3; pg++) {
+  for (let pg = 1; pg <= (window.__EPAGES || 3); pg++) {
     const url = '/sch/i.html?_nkw=' + encodeURIComponent(x.q) + (ACTIVE ? '' : '&LH_Sold=1&LH_Complete=1') + '&_ipg=240&_pgn=' + pg;
     let h = '';
     try { const r = await fetch(url, {credentials: 'include'}); h = await r.text(); } catch (e) { await sleep(30000); continue; }
