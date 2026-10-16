@@ -72,16 +72,15 @@ def measure_raw(photo: bytes) -> dict:
     """A photo of a card out of its slab, graded exactly as the app grades any raw card."""
     import service
     out = service.do_scan(photo, None, "Auto", True)
-    if out.get("slab"):
-        return {"error": "still in the slab (label read)"}
     g = out.get("grade") or {}
+    label = (out.get("slab") or {}).get("grade_text")
     if not g or g.get("error"):
         return {"error": f"no grade: {g.get('error', '')}"[:120]}
     top = (out.get("matches") or [{}])[0]
     return {"card": f"{top.get('name')} #{top.get('number')} {top.get('set', '')}", "est": {k: v.get("grade") for k, v in (g.get("graders") or {}).items()},
             "sub": g.get("sub"), "centering": g.get("centering"), "reference_check": g.get("reference_check"),
             "wear": g.get("border_wear"), "confidence": g.get("confidence"),
-            "recut": g.get("recut"), "style": g.get("style")}
+            "recut": g.get("recut"), "style": g.get("style"), "label_read": label, "in_slab": bool(out.get("slab"))}
 
 
 def border_wear(card) -> dict:
