@@ -103,6 +103,30 @@ def _centering_json(c) -> dict | None:
     return {"left": int(c.left), "right": int(c.right), "top": int(c.top), "bottom": int(c.bottom), "text": c.text(), "worst": int(c.worst())}
 
 
+def photo_check(f: dict, fi, res: dict, rc: dict | None = None) -> dict:
+    """Can this photo show the card's condition well enough for an accurate grade? If not, what to fix. The grade is
+    still worked out (best effort) for anyone who wants it anyway."""
+    reasons = []
+    if not f.get("found"):
+        reasons.append("The card's edges weren't found. Lay it flat on a plain, darker background with all four corners in the frame.")
+    if min(f["full"].size) < 700:
+        reasons.append("The photo is too small to see corners and edges. Use the camera (no zoom, no screenshot) with the card filling most of the frame.")
+    sharp = fi.metrics.get("sharpness")
+    if sharp is not None and sharp < 60:
+        reasons.append("The photo is blurry. Hold the phone steady, add light, and tap the card to focus.")
+    if (fi.metrics.get("glare_pct") or 0) > 3:
+        reasons.append("There's glare on the card. Tilt it slightly away from the light so reflections don't hide the surface.")
+    if res.get("_in_slab"):
+        reasons.append("The card is inside a slab, so the plastic hides wear. The label grade is the official one; take the card out for a raw grade.")
+    hidden = [k for k in ("left", "right", "top", "bottom") if rc and k not in rc.get("measured", [])]
+    if hidden:
+        reasons.append(f"The {', '.join(hidden)} edge is covered (fingers, sleeve or glare). Show the whole card.")
+    ok = not reasons
+    return {"ok": ok, "reasons": reasons,
+            "message": "" if ok else "This photo can't show the card's condition clearly, so a grade from it may be off. "
+                                     "Take a better photo for an accurate grade, or grade it anyway for a best guess."}
+
+
 REF_SURFACE_LIVE = False  # turned on once fitted against real grades (core/gradebench results)
 REF_WEAR_LIVE = False
 REF_MIN_PX = 600  # clean picture at least this many pixels on its short side to judge surface against it
@@ -220,6 +244,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     # how much to trust it: the four things that most often make a photo grade wrong
     issues = sum([not f.get("found"), not fi.photo_ok, min(f["full"].size) < 700, not b])
     g["confidence"] = "high" if issues == 0 else "medium" if issues == 1 else "low"
+    g["photo_check"] = photo_check(f, fi, res, rc)
     g["sharpness"] = fi.metrics.get("sharpness")
     g["metrics"] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in fi.metrics.items()
                     if isinstance(v, (int, float, str, bool)) or v is None}

@@ -113,6 +113,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [refineNote, setRefineNote] = useState(''); // serial / back / correction that picked the match
   const [srv, setSrv] = useState<ServerScan | null>(null); // the scan server's answer (full engine)
   const [useSrvGrade, setUseSrvGrade] = useState(true);
+  const [gradeAnyway, setGradeAnyway] = useState(false); // the person chose a best-effort grade from a weak photo
+  useEffect(() => setGradeAnyway(false), [srv]); // a new photo gets checked again
   const [corners, setCorners] = useState('');
   const [edges, setEdges] = useState('');
   const [surface, setSurface] = useState('');
@@ -679,6 +681,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   }, [phase, fields.game, fields.name, fields.set, fields.number, fields.variant, store]);
 
   function reset() {
+    setGradeAnyway(false);
     abort.current?.abort();
     curItem.current = null;
     setFront(null);
@@ -1386,6 +1389,36 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                   </View>
                 );
               })}
+            {(() => {
+              // a photo that can't show the condition: say what to fix first; a best-effort grade only if they ask
+              const pc = sg && useSrvGrade && !(useAiGrade && aiRes?.psa) ? sg.photo_check : undefined;
+              const local = !sg && insp ? [...insp.photoNotes, ...(inspBack?.photoNotes || [])] : [];
+              const reasons = pc && !pc.ok ? pc.reasons : local;
+              if (!reasons.length) return null;
+              return (
+                <View style={[S.banner, { gap: 6 }]}>
+                  <Text style={[S.body, { fontWeight: '800', color: C.warn }]}>
+                    {gradeAnyway ? 'Best-effort grade: this photo may hide some wear' : 'Take a better photo for an accurate grade'}
+                  </Text>
+                  {!gradeAnyway ? <Text style={S.muted}>{(pc && pc.message) || "This photo can't show the card's condition clearly, so a grade from it may be off. Take a better photo for an accurate grade, or grade it anyway for a best guess."}</Text> : null}
+                  {reasons.map((r) => <Text key={r} style={S.muted}>• {r}</Text>)}
+                  {!gradeAnyway ? (
+                    <View style={[S.row, { gap: 8 }]}>
+                      <Btn label="Retake photo" onPress={() => { setSide('front'); setPhase('capture'); }} />
+                      <Pressable onPress={() => setGradeAnyway(true)} style={[S.chip, { paddingVertical: 8 }]}>
+                        <Text style={S.chipText}>Grade it anyway</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              );
+            })()}
+            {(() => {
+              const pc = sg && useSrvGrade && !(useAiGrade && aiRes?.psa) ? sg.photo_check : undefined;
+              const local = !sg && insp ? [...insp.photoNotes, ...(inspBack?.photoNotes || [])] : [];
+              const weak = (pc ? !pc.ok : local.length > 0) && !gradeAnyway;
+              return weak ? null : (
+                <>
             <View style={S.row}>
               <Slab who="PSA · estimate" grade={grade.psa} label={grade.psa_label} sub={grade.psa_range ? `Likely ${grade.psa_range}` : undefined} />
               <Slab who="TAG-style · est." grade={grade.tag_grade} label={grade.tag_label} sub={grade.tag_score ? `Score ${grade.tag_score} / 1000` : undefined} />
@@ -1407,6 +1440,9 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               {Object.entries(grade.sub || {}).filter(([, v]) => v != null).map(([k, v]) => `${k} ${v}`).join(' · ')}
               {est.centering_cap && est.centering_cap < 10 ? ` · centering alone caps PSA at ${est.centering_cap}` : ''}
             </Text>
+                </>
+              );
+            })()}
             {grade.notes ? <Text style={S.muted}>AI noted: {grade.notes}</Text> : null}
             {sg && !(useAiGrade && aiRes?.psa) ? (
               <View style={{ gap: 6, backgroundColor: C.surface2, borderRadius: 10, padding: 10 }}>

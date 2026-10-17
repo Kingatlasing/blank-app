@@ -66,6 +66,8 @@ export interface ServerGrade {
   straightened: boolean;
   tips: string[];
   confidence: 'high' | 'medium' | 'low';
+  /** whether the photo can show the condition well enough for an accurate grade, and what to fix if not */
+  photo_check?: { ok: boolean; reasons: string[]; message: string };
 }
 
 export interface ServerScan {

@@ -1068,6 +1068,18 @@ def _details(scan: dict, x: dict, grade: dict, auth: dict):
     key = scan["id"]
     bg, fg, label = VERDICTS.get(auth["verdict"], VERDICTS["not_checked"])
     with st.expander(f"Grade estimate: PSA {grade.get('psa','—')} · TAG-style {grade.get('tag_grade','—')}   |   Authenticity: {label}"):
+        # a photo that can't show the condition: say what to fix; a best-effort grade only when asked for
+        weak = _photo_reasons(scan, x)
+        if weak:
+            if not st.session_state.get(f"gradeany_{key}"):
+                st.warning("**Take a better photo for an accurate grade.** This photo can't show the card's condition clearly, so a grade "
+                           "from it may be off. Retake it (upload a new photo above), or grade it anyway for a best guess.\n\n"
+                           + "\n".join(f"- {r}" for r in weak))
+                if st.button("Grade it anyway", key=f"gradeany_btn_{key}"):
+                    st.session_state[f"gradeany_{key}"] = True
+                    st.rerun()
+                return
+            st.info("Best-effort grade: this photo may hide some wear.\n\n" + "\n".join(f"- {r}" for r in weak))
         c = st.columns(2)
         c[0].markdown(f"<div class='slab'><div class='slab-in'><div class='slab-who'>PSA · estimate</div><div class='slab-grade' style='color:{grade_color(grade.get('psa'))}'>{esc(grade.get('psa','—'))}</div>"
                       f"<div class='slab-lbl'>{esc(grade.get('psa_label',''))}</div><div class='slab-sub'>Likely {esc(grade.get('psa_range',''))}</div></div></div>", unsafe_allow_html=True)
@@ -1148,6 +1160,23 @@ def _worst_of(text: str) -> float | None:
     """'52/48 · 55/45' -> 55 (the larger side of the worse split)."""
     nums = [int(n) for n in re.findall(r"(\d+)\s*/\s*\d+", text or "")]
     return float(max(nums)) if nums else None
+
+
+def _photo_reasons(scan: dict, x: dict) -> list[str]:
+    """What keeps this photo from showing the card's condition (empty = good enough for an accurate grade)."""
+    f = scan["front"]
+    out = []
+    if not f.get("found"):
+        out.append("The card's edges weren't found. Lay it flat on a plain, darker background with all four corners in the frame.")
+    if min(f["full"].size) < 700:
+        out.append("The photo is too small to see corners and edges. Use the camera (no zoom, no screenshot) with the card filling most of the frame.")
+    try:
+        fi = _inspection(scan, x)
+        bi = (scan.get("back") or {}).get("inspect")
+        out += list(fi.photo_notes) + (list(bi.photo_notes) if bi else [])
+    except Exception:
+        pass
+    return list(dict.fromkeys(out))
 
 
 def _inspection_panel(scan: dict, x: dict, key: str):
