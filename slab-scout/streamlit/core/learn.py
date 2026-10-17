@@ -264,6 +264,23 @@ def status() -> dict:
     return s
 
 
+def seed(data: bytes) -> dict:
+    """Put back sets learned before a restart (the gzip from result_gz), so the next start() skips them."""
+    try:
+        d = json.loads(gzip.decompress(data) if data[:2] == b"\x1f\x8b" else data)
+    except Exception as e:
+        return {"error": f"bad seed: {e}"}
+    have = _done()
+    n = 0
+    with _lock:
+        with open(STATE, "a") as fh:
+            for k, v in d.items():
+                if k not in have:
+                    fh.write(json.dumps([k, v], separators=(",", ":")) + "\n")
+                    n += 1
+    return {"seeded": n, "total_done": len(have) + n}
+
+
 def result_gz() -> bytes:
     buf = io.BytesIO()
     with gzip.GzipFile(fileobj=buf, mode="wb") as gz:

@@ -249,6 +249,12 @@ async def learn_stop(request: Request):
     return JSONResponse(learn.stop())
 
 
+async def learn_seed(request: Request):
+    from core import learn
+    body = await request.body()
+    return JSONResponse(await run_in_threadpool(learn.seed, body))
+
+
 async def learn_result(request: Request):
     from core import learn
     from starlette.responses import Response
@@ -304,6 +310,7 @@ app = st.App(
     routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/grades", grades), Route("/api/ocr", read, methods=["POST"]),
             Route("/api/learn/status", learn_status), Route("/api/learn/start", learn_start, methods=["GET", "POST"]),
             Route("/api/learn/stop", learn_stop, methods=["GET", "POST"]), Route("/api/learn/result", learn_result),
+            Route("/api/learn/seed", learn_seed, methods=["POST"]),
             Route("/api/gradebench/start", gb_start), Route("/api/gradebench/status", gb_status), Route("/api/gradebench/stop", gb_stop),
             Route("/api/gradebench/result", gb_result),
             Route("/api/bench/start", bench_start), Route("/api/bench/status", bench_status), Route("/api/bench/stop", bench_stop),

@@ -225,7 +225,25 @@ def inspect_card(card: Image.Image, official: Image.Image | None = None, is_back
         run = (x1 - x0) if name in ("top", "bottom") else (y1 - y0)
         along = cv2.CC_STAT_WIDTH if name in ("top", "bottom") else cv2.CC_STAT_HEIGHT
         # a mark running along much of the edge is a strip of background left by the crop, not a chip
-        chips = [s for s in stats[1:] if s[cv2.CC_STAT_AREA] >= 4 and s[along] < 0.2 * run]
+        # real edge wear starts at the cut: a light mark that doesn't reach the outer side of the band is artwork /
+        # print (full-art cards, light borders), not a chip
+        bw, bh = x1 - x0, y1 - y0
+
+        def at_cut(s_):
+            if name == "top":
+                return s_[cv2.CC_STAT_TOP] <= 2
+            if name == "bottom":
+                return s_[cv2.CC_STAT_TOP] + s_[cv2.CC_STAT_HEIGHT] >= bh - 2
+            if name == "left":
+                return s_[cv2.CC_STAT_LEFT] <= 2
+            return s_[cv2.CC_STAT_LEFT] + s_[cv2.CC_STAT_WIDTH] >= bw - 2
+        min_area = 10 if foil_border else 4
+        chips = [s for s in stats[1:] if s[cv2.CC_STAT_AREA] >= min_area and s[along] < 0.2 * run and at_cut(s)]
+        inner_marks = [s for s in stats[1:] if s[along] < 0.2 * run and not at_cut(s)]
+        if inner_marks:  # don't let artwork away from the cut count towards the whitened share either
+            wm = wm.copy()
+            for s_ in inner_marks:
+                wm[s_[cv2.CC_STAT_TOP]:s_[cv2.CC_STAT_TOP] + s_[cv2.CC_STAT_HEIGHT], s_[cv2.CC_STAT_LEFT]:s_[cv2.CC_STAT_LEFT] + s_[cv2.CC_STAT_WIDTH]] = 0
         strip = [s for s in stats[1:] if s[along] >= 0.2 * run]
         if strip:
             wm = wm.copy()

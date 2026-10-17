@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import gzip
 import json
+import io
 import re
 import threading
 import time
@@ -68,10 +69,25 @@ def measure(photo: bytes) -> dict:
     return out
 
 
-def measure_raw(photo: bytes) -> dict:
+def _shrink(data: bytes | None, long_side: int = 3000) -> bytes | None:
+    """Grader scans (TAG: 4453 x 6156) down to about a phone photo's size, so a test card costs what a scan does."""
+    if not data:
+        return data
+    from PIL import Image
+    im = Image.open(io.BytesIO(data))
+    if max(im.size) <= long_side:
+        return data
+    im = im.convert("RGB")
+    im.thumbnail((long_side, long_side))
+    buf = io.BytesIO()
+    im.save(buf, "JPEG", quality=92)
+    return buf.getvalue()
+
+
+def measure_raw(photo: bytes, back: bytes | None = None) -> dict:
     """A photo of a card out of its slab, graded exactly as the app grades any raw card."""
     import service
-    out = service.do_scan(photo, None, "Auto", True)
+    out = service.do_scan(_shrink(photo), _shrink(back), "Auto", True)
     g = out.get("grade") or {}
     label = (out.get("slab") or {}).get("grade_text")
     if not g or g.get("error"):
@@ -176,11 +192,12 @@ def _run(url: str, limit: int, offset: int = 0) -> None:
         if _stop.is_set():
             STATE["state"] = "stopped"
             return
-        row = {k: it.get(k) for k in ("img", "company", "grade", "title", "cat", "raw")}
+        row = {k: it.get(k) for k in ("img", "company", "grade", "title", "cat", "raw", "tag")}
         t = time.time()
         try:
             raw = databases.fetch_image(re.sub(r"/s-l\d+\.", "/s-l1600.", it["img"]))
-            row.update((measure_raw(raw) if it.get("raw") else measure(raw)) if raw else {"error": "no photo"})
+            back = databases.fetch_image(it["back"]) if it.get("back") else None
+            row.update((measure_raw(raw, back) if it.get("raw") else measure(raw)) if raw else {"error": "no photo"})
         except Exception as e:
             row["error"] = f"{type(e).__name__}: {e}"[:200]
         row["seconds"] = round(time.time() - t, 1)
