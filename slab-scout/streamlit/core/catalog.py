@@ -422,10 +422,66 @@ def _corners() -> dict:
     return json.load(open(p)) if p and os.path.exists(p) else {}
 
 
+# Corner shapes confirmed by published sources; they win over photo measurements. (pattern on "year set name",
+# category or None, shape, radius mm or None, source)
+CORNER_RULES = [
+    (r"limited edition alpha|\balpha\b.*magic|magic.*\balpha\b", "Magic: The Gathering", "rounded_large", None,
+     "Wikipedia, Limited Edition (Magic): Alpha has steeply rounded corners; Beta and later use a less rounded die"),
+    (None, "Magic: The Gathering", "rounded", 3.0, "Draftsim, MTG card size: corner radius about 1/8 in (3 mm)"),
+    (r"^1951 topps (red|blue)", None, "rounded", None, "T206cards size guide / Beckett: 1951 Topps Red and Blue Backs have rounded, playing-card corners"),
+    (r"^197[01] topps super", None, "rounded", None, "T206cards size guide: 1970-71 Topps Super are thick, rounded-corner oversized cards"),
+    (r"^(195[2-9]|196\d|197\d) topps(?! super| chrome| finest| heritage)", None, "square", 0.0,
+     "Beckett forums: Topps switched to square corners in 1952 (after the rounded 1951 issues)"),
+]
+_SHAPE_TEXT = {"square": "square-cut corners", "rounded_small": "slightly rounded corners", "rounded": "rounded corners",
+               "rounded_large": "very rounded corners", "die_cut": "die-cut (shaped) outline"}
+
+
+def corner_shape(set_id: str) -> dict | None:
+    """The set's corner shape: {"shape": square / rounded_small / rounded / rounded_large / die_cut, "radius_mm",
+    "source", "n"}. Published rules first (CORNER_RULES), then this set's own price-guide photos."""
+    import re as _re
+    st = sets().get(set_id, {})
+    nm = str(st.get("name", ""))
+    title = (nm if nm[:4].isdigit() else f"{st.get('year', '')} {nm}").strip().lower()
+    cat = st.get("category", "")
+    for pat, c, shape, mm, src in CORNER_RULES:
+        if c and c != cat:
+            continue
+        if pat and not _re.search(pat, title):
+            continue
+        out = {"shape": shape, "radius_mm": mm, "source": src, "text": _SHAPE_TEXT[shape], "n": None}
+        # checked against this set's own photo measurement (blurry scans read small radii too large, so a
+        # disagreement is shown, not acted on)
+        v = _corners().get(set_id)
+        if v and v[1] >= 2:
+            from .condition import CORNER_SPEC
+            meas = round(v[0] / 1000 * CORNER_SPEC.get(cat, CORNER_SPEC["sports"])[1], 2)
+            out["measured_mm"] = meas
+            exp = mm if mm is not None else (3.0 if shape == "rounded" else 4.0 if shape == "rounded_large" else None)
+            out["agrees"] = None if exp is None else (meas < 1.5 if shape == "square" else abs(meas - exp) <= 1.0 if shape == "rounded" else meas >= 3.0)
+            if out["radius_mm"] is None and shape != "square":
+                out["radius_mm"] = meas
+        return out
+    v = _corners().get(set_id)
+    if not v or v[1] < 2:
+        return None
+    from .condition import CORNER_SPEC
+    wmm = CORNER_SPEC.get(cat, CORNER_SPEC["sports"])[1]
+    mm = round(v[0] / 1000 * wmm, 2)
+    shape = "square" if mm < 0.75 else "rounded_small" if mm < 2.2 else "rounded" if mm < 4.0 else "rounded_large"
+    return {"shape": shape, "radius_mm": mm, "source": f"measured on {v[1]} corners of this set's photos", "text": _SHAPE_TEXT[shape], "n": v[1]}
+
+
 def corner_radius_px(set_id: str, width_px: int = 630) -> int | None:
     """This set's factory corner radius in pixels on a card `width_px` wide, as measured on its price-guide photos
     (None when it wasn't measured). Lets the corner check tell a square-cut vintage card or a set with tighter
     corners from wear."""
+    cs = corner_shape(set_id)
+    if cs and cs.get("n") is None and cs.get("radius_mm") is not None:  # a published rule
+        from .condition import CORNER_SPEC
+        wmm = CORNER_SPEC.get(sets().get(set_id, {}).get("category", ""), CORNER_SPEC["sports"])[1]
+        return int(round(cs["radius_mm"] / wmm * width_px))
     v = _corners().get(set_id)
     if not v or v[1] < 2:
         return None
