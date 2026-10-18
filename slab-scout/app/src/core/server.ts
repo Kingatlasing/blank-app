@@ -68,6 +68,11 @@ export interface ServerGrade {
   confidence: 'high' | 'medium' | 'low';
   /** whether the photo can show the condition well enough for an accurate grade, and what to fix if not */
   photo_check?: { ok: boolean; reasons: string[]; message: string };
+  /** card format (standard, square, die_cut, mini, relic, plate, metal, acetate, ...) and what it changes */
+  format?: string;
+  format_notes?: string[];
+  /** each company's estimate from the server, including "doesn't grade this kind of card" */
+  graders?: Record<string, { grade: string; label: string; note?: string }>;
 }
 
 export interface ServerScan {

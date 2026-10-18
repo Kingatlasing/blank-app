@@ -1436,12 +1436,15 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                 {Object.entries(allGraders({ corners: grade.sub.corners ?? autoSub.corners, edges: grade.sub.edges ?? autoSub.edges, surface: grade.sub.surface ?? autoSub.surface },
                   sg && useSrvGrade && sg.centering.front ? sg.centering.front.worst : centeringWorst(cen),
                   sg && useSrvGrade && sg.centering.back ? sg.centering.back.worst : backCen ? centeringWorst(backCen) : null,
-                  !SPORTS_GAMES.includes(fields.game))).map(([k, v]) => (
+                  !SPORTS_GAMES.includes(fields.game))).map(([k, v0]) => {
+                  // a company that doesn't grade this kind of card (TAG: die-cuts, relics, acetate...) says so
+                  const v = sg && useSrvGrade && sg.graders?.[k] && !sg.graders[k].grade ? { grade: '—', label: sg.graders[k].label } : v0;
+                  return (
                   <View key={k} style={{ backgroundColor: C.surface2, borderRadius: 10, paddingVertical: 6, paddingHorizontal: 10 }}>
                     <Text style={S.eyebrow}>{k}</Text>
                     <Text style={{ color: C.ink, fontWeight: '800', fontSize: 16 }}>{v.grade} <Text style={[S.muted, { fontWeight: '600' }]}>{v.label}</Text></Text>
                   </View>
-                ))}
+                ); })}
               </View>
             ) : null}
             <Text style={S.muted}>
@@ -1468,6 +1471,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                   <Text key={i} style={S.muted}>• {x.where}: {x.what}</Text>
                 ))}
                 {sg.tips.map((t) => <Text key={t} style={[S.muted, { color: C.warn }]}>{t}</Text>)}
+                {(sg.format_notes || []).map((t) => <Text key={t} style={S.muted}>• {t}</Text>)}
               </View>
             ) : null}
             {autoRes && (autoRes.found || autoRes.certified || signedByType) ? (

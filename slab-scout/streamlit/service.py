@@ -219,6 +219,15 @@ def _grade(res: dict, x: dict | None) -> dict:
     g = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs["corners"], subs["edges"], subs["surface"],
                          tcg=game not in SPORTS)
     g = {k: (_num(v) if isinstance(v, float) else v) for k, v in g.items()}
+    # the card's format (die-cut, relic, mini, plate, square corners...) changes what is judged and who grades it
+    fmt = grading.card_format(variant, name, style, rad)
+    fd = grading.CARD_FORMATS.get(fmt, {})
+    g["format"] = fmt
+    g["format_notes"] = list(fd.get("notes", []))
+    for comp in fd.get("not_graded_by", []):
+        if comp in (g.get("graders") or {}):
+            g["graders"][comp] = {"grade": "", "label": f"{comp} doesn't grade {fd['what'].split(' (')[0]} cards", "note": "not eligible"}
+    g["game_profile"] = grading.game_profile(game, year, variant, style)
     g["corner_radius_px"] = rad
     g["method"] = "automatic inspection"
     g["style"] = style

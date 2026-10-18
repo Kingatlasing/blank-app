@@ -11,6 +11,7 @@ Gem Mint ~55/45, 9 ~60/40, 8.5 ~62.5/37.5, 8 ~65/35, then +2.5 per half grade. H
 from __future__ import annotations
 
 import math
+import re
 
 PSA_CENTER = [(10, 55, 75), (9, 60, 90), (8, 65, 90), (7, 70, 90), (6, 80, 90), (5, 85, 90), (4, 85, 90), (3, 90, 90), (2, 90, 90), (1, 100, 100)]
 PSA_LABELS = {10: "GEM MT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1.5: "FAIR", 1: "POOR"}
@@ -431,3 +432,72 @@ def game_profile(game: str, year: str | int | None = None, variant: str = "", st
             return "sports_chrome"
         return "sports_paper"
     return "nonsport"
+
+
+# Card formats: what changes in grading for each, and which companies grade it at all.
+CARD_FORMATS: dict[str, dict] = {
+    "standard":    {"what": "standard card (2.5 x 3.5 in / 63 x 88 mm), rounded corners", "notes": []},
+    "square":      {"what": "square-cut corners (many vintage and tobacco sets, some modern inserts)",
+                    "notes": ["square corners are how the set was cut, not wear; corners are judged on sharpness and fraying only"]},
+    "die_cut":     {"what": "die-cut (shaped outline)", "not_graded_by": ["TAG"],
+                    "notes": ["the points of the shape are judged as corners and the cut sides as edges", "die-cut points chip easily; any missing tip is a corner defect"]},
+    "mini":        {"what": "mini (e.g. Allen & Ginter / T206 size)",
+                    "notes": ["same grading scale; borders are thinner so centering shifts show more", "measured relative to the card's own size"]},
+    "relic":       {"what": "patch / jersey / relic / memorabilia card (thick stock with a window)", "not_graded_by": ["TAG"],
+                    "notes": ["card stock graded as usual; thick edges show chipping and dings easily", "a cloudy or scratched window lowers the surface grade",
+                              "frayed, loose or damaged swatch counts against the card", "a tampered / replaced patch is returned ungraded (altered)"]},
+    "thick":       {"what": "thick card (over 35pt, not a relic)", "notes": ["TAG grades up to 50pt only", "edges get extra attention: thick stock chips"]},
+    "autograph":   {"what": "autographed card",
+                    "notes": ["the card gets its normal grade; the signature gets its own 1-10 grade (PSA/DNA, BGS auto subgrade, CGC)",
+                              "Beckett's autograph grade does not change the card's overall grade",
+                              "on-card autographs are judged on the signature itself; sticker autos also on how the sticker sits"]},
+    "plate":       {"what": "printing plate (metal 1 of 1)",
+                    "notes": ["usually authenticated and encapsulated rather than given a numeric card grade",
+                              "scratches, dents and bent corners on the metal are what reduce value; the estimate here is condition only"]},
+    "metal":       {"what": "metal / steel card",
+                    "notes": ["eligibility and holders vary by company; surface scratches and dented corners are the main defects"]},
+    "acetate":     {"what": "acetate / clear / lenticular card", "not_graded_by": ["TAG"],
+                    "notes": ["clear plastic shows every scratch; scratches count as surface defects", "lenticular cards are judged on the lens surface"]},
+    "rounded":     {"what": "fully rounded corners (e.g. some oddball or kids' sets)", "not_graded_by": ["TAG"], "notes": []},
+    "oversized":   {"what": "oversized / jumbo card", "notes": ["same scale; needs a larger holder (extra fee at most companies)"]},
+    "sticker":     {"what": "sticker / collectible card", "notes": ["same scale; peeled or lifted backing counts like a lifted edge"]},
+}
+
+
+def card_format(variant: str = "", name: str = "", style: str = "", corner_radius_px: int | None = None, aspect: float | None = None) -> str:
+    """Best guess at the card's format from what the catalog says about it and what the photo shows."""
+    t = f"{variant} {name}".lower()
+    if style == "die_cut" or "die-cut" in t or "die cut" in t or "diecut" in t:
+        return "die_cut"
+    if "printing plate" in t or re.search(r"\bplate\b.*\b(cyan|magenta|yellow|black)\b", t):
+        return "plate"
+    if re.search(r"\b(patch|jersey|relic|memorabilia|swatch|bat knob|game[- ]used|game[- ]worn|nameplate|laundry tag)\b", t):
+        return "relic"
+    if re.search(r"\b(acetate|clear|lenticular)\b", t):
+        return "acetate"
+    if re.search(r"\b(steel|metal card|metal\b(?! universe))", t):
+        return "metal"
+    if re.search(r"\bmini\b", t) or (aspect is not None and aspect < 0.62):
+        return "mini"
+    if re.search(r"\b(jumbo|oversized|box topper|5x7)\b", t):
+        return "oversized"
+    if re.search(r"\bsticker\b", t):
+        return "sticker"
+    if corner_radius_px is not None and corner_radius_px <= 2:
+        return "square"
+    return "standard"
+
+
+# PSA/DNA autograph grades (the scale BGS and CGC follow closely)
+AUTO_GRADES = {
+    10: "bold, clear, complete; no skips, fading or retracing; ideal placement",
+    9: "very bold; at most one minor flaw such as a very light skip",
+    8: "slightly less bold; fully legible; very slight fading; a light skip, bleed or retrace",
+    7: "fully visible; minor even fading; more skipping or bleeding that doesn't hurt the look",
+    6: "fully legible; more fading; more skipping or bleeding",
+    5: "has lost its boldness; advanced fading; small smudged area; up to ~25% retraced",
+    4: "about 75% visible; noticeable fading in areas",
+    3: "about 50% visible; faded throughout",
+    2: "much of it lost; still identifiable",
+    1: "barely readable",
+}
