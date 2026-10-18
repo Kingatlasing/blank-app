@@ -340,6 +340,14 @@ DEFECTS: dict[str, dict] = {
     "hole":              {"what": "pinhole / staple hole", "levels": {"pinhole": 2, "staple holes": 1.5}},
     "writing":           {"what": "writing / ink / pencil marks", "levels": {"any": 1}, "note": "PSA adds the MK qualifier; the others usually return it ungraded / Authentic"},
     "focus":             {"what": "out of focus / out of register print", "levels": {"subtle": 8.5, "noticeable": 6}},
+    "foil_clouding":     {"what": "hazy / clouded foil (reverse holos, Enchanted, old foils)", "levels": {"slight": 9, "noticeable": 8, "widespread": 7}},
+    "foil_peeling":      {"what": "foil / refractor lifting or peeling (chrome, Prizm, foil edges)", "levels": {"micro, at an edge": 8, "visible lifting / bubbling": 6}},
+    "holo_bleed":        {"what": "holo bleed / foil misregistration (factory)", "levels": {"slight": 9, "obvious": 8}},
+    "wax_stain":         {"what": "wax stain (pack wax, 1970s-early 1990s)", "levels": {"very slight, back": 9, "slight": 8, "heavy": 6, "into the stock": 5}},
+    "pitting":           {"what": "surface pitting (coating breaking down)", "levels": {"light, small area": 8.5, "widespread": 7}},
+    "fingerprint":       {"what": "fingerprint / oil residue (glossy chrome / Prizm)", "levels": {"light": 9.5, "heavy / etched": 8}},
+    "yellowing":         {"what": "yellowed / faded borders or colour", "levels": {"slight": 8, "noticeable": 7, "severe": 5}},
+    "curl":              {"what": "curled / warped card (humidity, foils)", "levels": {"slight": 9, "noticeable": 7, "warped": 5}},
 }
 
 
@@ -364,3 +372,62 @@ def apply_defect_caps(grade: float, defects: list[tuple[str, str, str]], whole: 
     if whole:
         out = float(math.floor(out))
     return out, reasons
+
+
+# How each kind of card in the app is graded differently: what shows up most, what graders forgive, and what the
+# inspection has to watch for. The per-set baselines (border colour / width, corner shape, normal wear on clean
+# copies) come from set learning (core/learn.py); this is the game-level layer above them.
+GAME_PROFILES: dict[str, dict] = {
+    "pokemon_vintage": {"match": "Pokémon, 1999-2003 (WOTC)", "watch": ["back (blue) edge and corner whitening", "holo scratches", "yellow border wear", "print spots on thin stock", "wax / pack marks"],
+                        "forgiven": ["Shadowless / 1st Edition print quality is often off-centre: graders hold the same standard but many copies only reach 7-8"],
+                        "extra": ["holo_bleed", "wax_stain", "foil_clouding"], "back_whitening_visible": True},
+    "pokemon_modern":  {"match": "Pokémon, 2003 on", "watch": ["centering (the most common reason a modern card misses a 10)", "back edge whitening", "full art / textured surface wear", "reverse holo clouding"],
+                        "forgiven": ["intended texture on full arts / illustration rares is not damage"], "extra": ["foil_clouding", "holo_bleed"],
+                        "note": "Japanese prints usually have tighter centering and better print quality than English"},
+    "yugioh":          {"match": "Yu-Gi-Oh!", "watch": ["silver border / dark back edge whitening", "holo, secret and ultimate rare scratches", "foil chipping where the foil reaches the edge (Ultimate / Ghost rares)", "corner fuzzing from loose sleeves"],
+                        "extra": ["foil_peeling", "foil_clouding"], "back_whitening_visible": True, "note": "OCG (Japanese) and TCG stock and foils differ: compare with the same print"},
+    "mtg":             {"match": "Magic: The Gathering", "watch": ["black border corner / edge whitening (shows very easily)", "foil curl and clouding", "narrow borders make centering errors obvious", "edge wear on 1993-94 thin stock"],
+                        "forgiven": ["Alpha corners are rounder by design", "some edge wear expected on 1993 stock (back judged a little more leniently)"],
+                        "extra": ["curl", "foil_clouding"], "back_whitening_visible": True},
+    "lorcana":         {"match": "Disney Lorcana", "watch": ["Enchanted foil micro-scratches and clouding", "narrow borders: centering", "thick stock shows corner dings / edge chips", "foil curl"],
+                        "forgiven": ["full-bleed Enchanted art: centering judged by art alignment"], "extra": ["foil_clouding", "curl"]},
+    "onepiece":        {"match": "One Piece Card Game", "watch": ["print lines (factory, still cap at 9)", "Manga / Alt Art foil scratches", "corner whitening / chipping", "edge nicks from sleeving"],
+                        "extra": ["foil_clouding"]},
+    "sports_chrome":   {"match": "Sports, chrome / refractor / Prizm / Select", "watch": ["surface scratches and fingerprints on gloss", "print and roller lines", "refractor / foil peeling at edges", "corner and edge chipping on dark parallels"],
+                        "extra": ["foil_peeling", "fingerprint", "pitting"], "note": "TAG holds sports backs to a looser centering limit than TCG backs"},
+    "sports_paper":    {"match": "Sports, paper stock (modern base, 1980s-90s)", "watch": ["corner wear / fuzzing", "wax stains (junk wax era)", "print spots and focus", "border yellowing"],
+                        "extra": ["wax_stain", "yellowing", "focus"]},
+    "sports_vintage":  {"match": "Sports, pre-1980 and tobacco", "watch": ["centering (often poor from the factory)", "rounded corners", "creases", "staining and yellowing", "writing on the back"],
+                        "forgiven": ["some sets were cut square or to odd sizes: square corners are not a flaw there", "some age toning is tolerated"],
+                        "extra": ["yellowing", "wax_stain", "writing"]},
+    "nonsport":        {"match": "Non-sport and other trading cards", "watch": ["corner wear", "surface scratches", "print defects", "centering"], "extra": ["yellowing", "wax_stain"]},
+}
+
+
+def game_profile(game: str, year: str | int | None = None, variant: str = "", style: str = "") -> str:
+    """Which GAME_PROFILES entry a card falls under (game name as the app stores it)."""
+    g = (game or "").lower()
+    try:
+        y = int(str(year)[:4]) if year else None
+    except ValueError:
+        y = None
+    v = (variant or "").lower()
+    if "pok" in g:
+        return "pokemon_vintage" if y and y <= 2003 else "pokemon_modern"
+    if "yu-gi" in g or "yugioh" in g:
+        return "yugioh"
+    if "magic" in g or g == "mtg":
+        return "mtg"
+    if "lorcana" in g:
+        return "lorcana"
+    if "one piece" in g:
+        return "onepiece"
+    if "non-sport" in g or "nonsport" in g or "non sport" in g:
+        return "nonsport"
+    if any(k in g for k in ("baseball", "basketball", "football", "soccer", "hockey", "sport")):
+        if y and y < 1980:
+            return "sports_vintage"
+        if any(k in v for k in ("chrome", "refractor", "prizm", "select", "optic", "finest", "mosaic")):
+            return "sports_chrome"
+        return "sports_paper"
+    return "nonsport"
