@@ -143,15 +143,18 @@ function bgsCentering(front: number | null, back: number | null): number {
   return 3;
 }
 /** Beckett: Black Label = four 10s; Pristine = all 9.5+ with three 10s; Gem Mint 9.5 = all 9+ with three 9.5+;
- * otherwise the lowest subgrade sets the floor and the second-lowest caps it (at most half a grade above the lowest). */
+ * otherwise the lowest subgrade anchors it and strong others lift it, at most a full grade and never above the
+ * second-lowest (Beckett's examples: 9.5/9.5/9/8 -> 8.5, 9.5/9.5/8.5/9 -> 9, 10/6/10/10 -> 7). */
 export function bgsOverall(sub: Record<string, number>): [number, string] {
   const v = Object.values(sub).sort((a, b) => a - b);
   if (v.every((x) => x >= 10)) return [10, 'Pristine (Black Label)'];
   if (v[0] >= 9.5 && v.filter((x) => x >= 10).length >= 3) return [10, 'Pristine'];
   if (v[0] >= 9 && v.filter((x) => x >= 9.5).length >= 3) return [9.5, 'Gem Mint'];
-  const g = half(Math.min(v[1], v[0] + 0.5));
+  const lift = Math.min(1, Math.max(0, ((v[1] + v[2] + v[3]) / 3 - v[0]) * 0.65));
+  const g = half(Math.min(v[1], v[0] + Math.floor(lift * 2) / 2));
   return [g, HALF.BGS[String(g)] || ''];
 }
+const ACE_LABELS: Record<number, string> = { 10: 'GEM MINT', 9: 'MINT', 8: 'NM-MT', 7: 'NM', 6: 'EX-MT', 5: 'EX', 4: 'VG-EX', 3: 'VG', 2: 'GOOD', 1: 'POOR' };
 export function allGraders(sub: { corners: number; edges: number; surface: number }, front: number | null, back: number | null, tcg = true): Record<string, CompanyGrade> {
   const cond = [sub.corners, sub.edges, sub.surface];
   const worst = Math.min(...cond);
@@ -168,6 +171,10 @@ export function allGraders(sub: { corners: number; edges: number; surface: numbe
     const g = Math.min(blended, Math.min(c, 10));
     out[comp] = g >= 10 && c >= 10.5 && worst >= 10 ? { grade: '10', label: 'Pristine' } : { grade: String(g), label: HALF[comp][String(g)] || '', note: `centering allows up to ${c >= 10 ? 10 : c}` };
   }
+  // ACE (UK): whole-number subgrades; overall = their average rounded (.5 down), at most one above the lowest
+  const as = [psaCenteringCap(front, back), Math.floor(sub.corners), Math.floor(sub.edges), Math.floor(sub.surface)];
+  const ag = Math.max(1, Math.min(Math.min(...as) + 1, Math.ceil(as.reduce((a, b) => a + b, 0) / 4 - 0.5)));
+  out.ACE = { grade: String(ag), label: ACE_LABELS[ag] || '', sub: { centering: as[0], corners: as[1], edges: as[2], surface: as[3] } };
   const t = estimate(front, back, sub.corners, sub.edges, sub.surface);
   out.TAG = { grade: t.tag_grade || '', label: t.tag_label || '', note: `score ${t.tag_score} / 1000` };
   return out;

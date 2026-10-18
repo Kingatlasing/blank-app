@@ -10,6 +10,8 @@ Gem Mint ~55/45, 9 ~60/40, 8.5 ~62.5/37.5, 8 ~65/35, then +2.5 per half grade. H
 """
 from __future__ import annotations
 
+import math
+
 PSA_CENTER = [(10, 55, 75), (9, 60, 90), (8, 65, 90), (7, 70, 90), (6, 80, 90), (5, 85, 90), (4, 85, 90), (3, 90, 90), (2, 90, 90), (1, 100, 100)]
 PSA_LABELS = {10: "GEM MT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1.5: "FAIR", 1: "POOR"}
 
@@ -158,8 +160,24 @@ def bgs_overall(subs: dict[str, float]) -> tuple[float, str]:
         return 10.0, "Pristine"
     if v[0] >= 9 and sum(x >= 9.5 for x in v) >= 3:
         return 9.5, "Gem Mint"
-    g = _half(min(v[1], v[0] + 0.5))
+    # the lowest subgrade anchors the grade; strong other subgrades lift it, at most a full grade (Beckett's own
+    # examples: 9.5/9.5/9/8 -> 8.5, 9.5/9.5/8.5/9 -> 9, 10/6/10/10 -> 7), never above the second-lowest
+    lift = min(1.0, max(0.0, (sum(v[1:]) / 3 - v[0]) * 0.65))
+    g = min(v[1], v[0] + math.floor(lift * 2) / 2)
+    g = _half(g)
     return g, HALF_LABELS["BGS"].get(g, "")
+
+
+ACE_LABELS = {10: "GEM MINT", 9: "MINT", 8: "NM-MT", 7: "NM", 6: "EX-MT", 5: "EX", 4: "VG-EX", 3: "VG", 2: "GOOD", 1: "POOR"}
+
+
+def ace_overall(subs: dict[str, float]) -> int:
+    """ACE (UK): whole-number subgrades; the overall is their average rounded (a .5 rounds down), never more than one
+    above the lowest. Matches every published ACE cert checked (e.g. 10/10/10/9 -> 10, 10/10/9/9 -> 9, 9/10/8/7 -> 8,
+    7/10/10/9 -> 8)."""
+    v = [int(round(x)) for x in subs.values()]
+    avg = sum(v) / len(v)
+    return int(max(1, min(min(v) + 1, math.ceil(avg - 0.5))))
 
 
 def all_graders(subs: dict[str, float], front_worst, back_worst, tcg: bool = True) -> dict[str, dict]:
@@ -186,6 +204,9 @@ def all_graders(subs: dict[str, float], front_worst, back_worst, tcg: bool = Tru
             out[comp] = {"grade": "10", "label": "Pristine", "note": ""}
         else:
             out[comp] = {"grade": f"{g:g}", "label": HALF_LABELS[comp].get(g, ""), "note": f"centering allows up to {'10' if c >= 10 else f'{c:g}'}"}
+    asub = {"centering": float(psa_centering_cap(front_worst, back_worst)), **{k: float(math.floor(v)) for k, v in cond.items()}}
+    ag = ace_overall(asub)
+    out["ACE"] = {"grade": f"{ag}", "label": ACE_LABELS.get(ag, ""), "sub": asub}
     score, tg, tl = tag_from_subs({"centering": centering_subgrade(front_worst, back_worst), **cond})
     out["TAG"] = {"grade": tg, "label": tl, "note": f"score {score} / 1000"}
     return out

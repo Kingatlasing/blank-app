@@ -14,4 +14,6 @@ export interface Settings {
   priceMode?: 'raw' | 'psa9' | 'psa10';
   /** Scan server address (free Streamlit app running the web app's engine (streamlit/api_app.py)); empty = phone only. */
   scanServer?: string;
+  /** The grading company the grade estimate is shown for first (each company has its own rules). */
+  gradingCompany?: 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG' | 'ACE';
 }

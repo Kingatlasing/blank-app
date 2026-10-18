@@ -1420,7 +1420,15 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               return weak ? null : (
                 <>
             <View style={S.row}>
-              <Slab who="PSA · estimate" grade={grade.psa} label={grade.psa_label} sub={grade.psa_range ? `Likely ${grade.psa_range}` : undefined} />
+              {(() => {
+                const co = settings.gradingCompany || 'PSA';
+                if (co === 'PSA' || grade.method === 'ai') return <Slab who="PSA · estimate" grade={grade.psa} label={grade.psa_label} sub={grade.psa_range ? `Likely ${grade.psa_range}` : undefined} />;
+                const G = allGraders({ corners: grade.sub.corners ?? autoSub.corners, edges: grade.sub.edges ?? autoSub.edges, surface: grade.sub.surface ?? autoSub.surface },
+                  sg && useSrvGrade && sg.centering.front ? sg.centering.front.worst : centeringWorst(cen),
+                  sg && useSrvGrade && sg.centering.back ? sg.centering.back.worst : backCen ? centeringWorst(backCen) : null,
+                  !SPORTS_GAMES.includes(fields.game))[co];
+                return <Slab who={`${co} · estimate`} grade={G?.grade} label={G?.label} sub={G?.note} />;
+              })()}
               <Slab who="TAG-style · est." grade={grade.tag_grade} label={grade.tag_label} sub={grade.tag_score ? `Score ${grade.tag_score} / 1000` : undefined} />
             </View>
             {grade.method !== 'ai' ? (

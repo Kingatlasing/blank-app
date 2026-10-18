@@ -106,6 +106,19 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
       </View>
       <Text style={S.muted}>Graded views show the PSA price when the card has graded sales, otherwise its raw price marked "raw".</Text>
 
+      <Text style={[S.h2, { marginTop: 8 }]}>Grade for</Text>
+      <View style={[S.row, { gap: 6, flexWrap: 'wrap' }]}>
+        {(['PSA', 'BGS', 'CGC', 'SGC', 'TAG', 'ACE'] as const).map((id) => {
+          const on = (settings.gradingCompany || 'PSA') === id;
+          return (
+            <Pressable key={id} onPress={() => onChange({ ...settings, gradingCompany: id })} style={[S.chip, { paddingVertical: 8, paddingHorizontal: 12 }, on && { backgroundColor: C.accent }]}>
+              <Text style={[S.chipText, on && { color: C.accentInk }]}>{id}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={S.muted}>The grade estimate is shown first for this company, using its own centering limits and how it combines corners, edges and surface. The other companies are listed under it.</Text>
+
       <OfflineCatalog />
 
       <Text style={[S.h2, { marginTop: 8 }]}>Vault & community</Text>
