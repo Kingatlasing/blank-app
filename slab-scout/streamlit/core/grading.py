@@ -304,3 +304,63 @@ def edges_from_wear(frac: float) -> float:
         if frac <= lim:
             return g
     return 4.0
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Defect rulebook: the highest grade a card can get with each defect, from the companies' published standards
+# (TAG's per-grade rubric for corners / edges / surface, PSA's grade definitions and deduction guides, Beckett's
+# subgrade descriptions). Whole numbers follow PSA; the halves are TAG / BGS / CGC / SGC steps. Back defects are
+# held to a slightly looser standard by TAG (and in practice by the others), so `back` caps are half a grade higher
+# where the rubric says so.
+DEFECTS: dict[str, dict] = {
+    # corners
+    "corner_touch":      {"what": "light touch / fray on a corner (magnification)", "front": [(1, 10), (2, 9), (4, 8.5)], "back": [(2, 10), (4, 9)]},
+    "corner_whitening":  {"what": "whitening on a corner", "levels": {"under 1 mm": 8.5, "over 1 mm": 7, "several corners, visible": 6}},
+    "corner_soft":       {"what": "corner losing its point (soft / slightly rounded)", "levels": {"one corner": 6, "two corners": 5, "all four": 3.5}},
+    "corner_rounded":    {"what": "clearly rounded corner", "levels": {"one corner": 4.5, "two or three": 4, "all four": 3.5, "extreme": 2.5}},
+    "corner_ding":       {"what": "bent / dinged corner", "levels": {"slight": 6, "several": 4.5}},
+    "corner_lifted":     {"what": "lifted / layered corner (surface separating from the core)", "levels": {"slight": 6, "clear": 5}},
+    "corner_missing":    {"what": "missing stock at a corner", "levels": {"small, back": 8.5, "small, front": 7, "large": 4}},
+    # edges
+    "edge_wear":         {"what": "edge wear / whitening along an edge", "levels": {"one or two edges, minor": 9, "multiple edges, light": 8.5, "all four": 8}},
+    "edge_chipping":     {"what": "chipping along an edge", "levels": {"under 1 mm": 8.5, "1-2 mm": 7, "over 2 mm or many": 5.5}},
+    "edge_lifting":      {"what": "lifted / peeling edge (layer separating)", "levels": {"minor, one edge": 7.5, "all four": 7, "significant": 6}},
+    "edge_notch":        {"what": "notch in an edge", "levels": {"minor, one": 7, "two edges": 6.5, "three or more / severe": 6, "severe on two": 5.5}},
+    "edge_tear":         {"what": "tear in an edge", "levels": {"minor": 2, "larger / several": 1.5}},
+    # surface
+    "print_spot":        {"what": "print spot / speck / dot", "levels": {"one, under magnification": 10, "a few": 9, "several": 8, "many / obvious": 7}},
+    "print_line":        {"what": "print / refractor line", "levels": {"one": 9, "several": 8.5, "roller line": 8}},
+    "scratch":           {"what": "scratch", "levels": {"light, not through gloss": 10, "longer, not through gloss": 9, "through the gloss": 8.5, "several deep": 7}},
+    "scuff":             {"what": "scuffing / loss of gloss", "levels": {"minor": 8.5, "significant in one area": 6, "multiple / gloss gone": 5}},
+    "dent":              {"what": "dent / indentation (dimple)", "levels": {"very minor, front": 7.5, "minor": 7, "larger or several": 6}},
+    "wrinkle":           {"what": "wrinkle (soft crease that hasn't broken the stock)", "levels": {"very short, back": 6.5, "longer, back": 6, "small, front": 5.5, "several": 5, "across half the card": 4, "3/4 across": 3.5}},
+    "crease":            {"what": "crease (breaks the stock)", "levels": {"minor": 4.5, "on both sides": 4, "several": 3.5, "heavy": 3, "full length": 2.5, "multiple full length": 2}},
+    "stain":             {"what": "stain / discoloration", "levels": {"light, back": 6, "light, front": 5.5, "larger": 5, "large area": 4, "tape / glue residue": 1.5}},
+    "water_damage":      {"what": "water damage", "levels": {"small, back": 6.5, "small, front": 5.5, "larger area": 4}},
+    "hole":              {"what": "pinhole / staple hole", "levels": {"pinhole": 2, "staple holes": 1.5}},
+    "writing":           {"what": "writing / ink / pencil marks", "levels": {"any": 1}, "note": "PSA adds the MK qualifier; the others usually return it ungraded / Authentic"},
+    "focus":             {"what": "out of focus / out of register print", "levels": {"subtle": 8.5, "noticeable": 6}},
+}
+
+
+def defect_cap(kind: str, level: str, side: str = "front") -> float:
+    """Highest grade possible with this defect at this severity (10 = no limit)."""
+    d = DEFECTS.get(kind) or {}
+    cap = float((d.get("levels") or {}).get(level, 10))
+    if side == "back" and kind not in ("crease", "hole", "writing", "edge_tear"):
+        cap = min(10.0, cap + 0.5)  # TAG's rubric gives back corners / edges / surface more tolerance
+    return cap
+
+
+def apply_defect_caps(grade: float, defects: list[tuple[str, str, str]], whole: bool = False) -> tuple[float, list[str]]:
+    """Lower a grade to the worst defect's limit. defects = [(kind, level, side)]. Returns (grade, reasons)."""
+    reasons, out = [], grade
+    for kind, level, side in defects:
+        c = defect_cap(kind, level, side)
+        if c < out:
+            out = c
+        if c < 10:
+            reasons.append(f"{DEFECTS[kind]['what']} ({level}, {side}) limits the grade to {c:g}")
+    if whole:
+        out = float(math.floor(out))
+    return out, reasons
