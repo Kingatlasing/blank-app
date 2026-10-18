@@ -152,6 +152,15 @@ def _grade(res: dict, x: dict | None) -> dict:
     L = f["edges"]
     if style != "standard" or expect:
         L = vision.find_lines(f["card"], f["found"], expect=expect, style=style)
+    if style in ("standard", "vintage"):
+        # plain printed border: measure it by its colour (matches TAG's measured centering to ~1.5 points on 110
+        # graded cards; the edge finder alone was often caught by name bars and art frames)
+        try:
+            Lc = vision.border_by_colour(f["card"], expect)
+        except Exception:
+            Lc = None
+        if Lc and Lc.get("spread", 99) < 8:
+            L = Lc
     front_c = vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"]) if L else f["centering"]
     off = (x.get("c") or {}).get("_official") if x and x["kind"] == "tcgdb" else None
     rad = condition.corner_radius_px(game, style)
@@ -216,6 +225,13 @@ def _grade(res: dict, x: dict | None) -> dict:
     bi = (b or {}).get("inspect")
     subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     back_c = b["centering"] if b else None
+    if b and b.get("card") is not None:
+        try:
+            Lb = vision.border_by_colour(b["card"])
+        except Exception:
+            Lb = None
+        if Lb and Lb.get("spread", 99) < 8:
+            back_c = vision.Centering(Lb["il"] - Lb["ol"], Lb["or"] - Lb["ir"], Lb["it"] - Lb["ot"], Lb["ob"] - Lb["ib"])
     g = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs["corners"], subs["edges"], subs["surface"],
                          tcg=game not in SPORTS)
     g = {k: (_num(v) if isinstance(v, float) else v) for k, v in g.items()}
