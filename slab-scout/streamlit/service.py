@@ -223,6 +223,18 @@ def _grade(res: dict, x: dict | None) -> dict:
         fi.metrics["die_cut"] = dcr
         style = "die_cut"
     bi = (b or {}).get("inspect")
+    # back edge whitening on dark-bordered backs: the strongest single predictor of TAG's grade on 110 graded cards
+    bw = None
+    if b and b.get("card") is not None:
+        try:
+            bw = gradebench.back_edge_whitening(b["card"])
+        except Exception:
+            bw = None
+        if bw:
+            cap = gradebench.back_whitening_cap(bw["sum"])
+            if bi and cap < bi.subgrades.get("edges", 10):
+                bi.subgrades["edges"] = cap
+                bi.findings.append(condition.Finding("edges", "back edges", f"Whitening along the back edges ({bw['sum']:.0f}/1000 of the edge band)", min(1.0, bw["sum"] / 500)))
     subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     back_c = b["centering"] if b else None
     if b and b.get("card") is not None:
@@ -284,6 +296,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     g["metrics"]["ref_px"] = list(ref.size) if ref is not None else None
     g["subgrades_inspect"] = dict(fi.subgrades)
     g["border_wear"] = fi.metrics.get("border_wear")
+    g["back_whitening"] = bw
     if ref_cmp and ref_cmp.get("ok"):
         g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
     return g

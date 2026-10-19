@@ -247,3 +247,32 @@ def status() -> dict:
 
 def result_gz() -> bytes:
     return gzip.compress(json.dumps(STATE.get("results", []), default=str).encode())
+
+
+def back_edge_whitening(card) -> dict | None:
+    """Whitening along the edges of a dark-bordered back (Pokémon's blue back, Yu-Gi-Oh!'s brown, MTG's): the share
+    of the outer ~1 mm band, corners left out, that is much lighter than the border. Per 1000, summed over the four
+    edges. Fitted on 110 TAG-graded Base Set holos (back scans): above 60 TAG gave at most a 6, above 150 at most
+    a 4, above 500 at most 2.5. None for light borders (whitening can't be seen by colour there)."""
+    import numpy as np
+    W, H = 630, 880
+    a = np.asarray(card.convert("RGB").resize((W, H))).astype(np.float32)
+    lum = 0.3 * a[..., 0] + 0.59 * a[..., 1] + 0.11 * a[..., 2]
+    bg = a[H // 2, 2]
+    o = 1
+    while o < 30 and np.linalg.norm(a[H // 2, o] - bg) < 60:
+        o += 1
+    o = 0 if o >= 30 else o + 1
+    ref = float(np.median(lum[200:680:20, min(W - 1, o + 18)]))
+    if ref > 150:
+        return None
+    c, e = 40, o + 8
+    bands = {"top": lum[o:e, o + c:W - o - c], "bottom": lum[H - e:H - o, o + c:W - o - c],
+             "left": lum[o + c:H - o - c, o:e], "right": lum[o + c:H - o - c, W - e:W - o]}
+    per = {k: round(float((v > ref + 45).mean()) * 1000, 1) for k, v in bands.items()}
+    return {"edges": per, "sum": round(sum(per.values()), 1), "border_lum": round(ref, 1)}
+
+
+def back_whitening_cap(total: float) -> float:
+    """Highest grade the back's edge whitening allows (fitted on TAG grades, see back_edge_whitening)."""
+    return 2.5 if total > 500 else 4.0 if total > 150 else 6.0 if total > 60 else 10.0
