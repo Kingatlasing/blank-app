@@ -236,6 +236,11 @@ def _grade(res: dict, x: dict | None) -> dict:
                 bi.subgrades["edges"] = cap
                 bi.findings.append(condition.Finding("edges", "back edges", f"Whitening along the back edges ({bw['sum']:.0f}/1000 of the edge band)", min(1.0, bw["sum"] / 500)))
     subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
+    # the companies' defect rubric (grading.DEFECTS): each likely defect caps its subgrade at the rubric's limit
+    defects = grading.findings_to_defects(fi.findings, "front") + (grading.findings_to_defects(bi.findings, "back") if bi else [])
+    for d in defects:
+        if d["sure"] == "likely" and d["cap"] < subs.get(d["area"], 10):
+            subs[d["area"]] = d["cap"]
     back_c = b["centering"] if b else None
     if b and b.get("card") is not None:
         try:
@@ -297,6 +302,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     g["subgrades_inspect"] = dict(fi.subgrades)
     g["border_wear"] = fi.metrics.get("border_wear")
     g["back_whitening"] = bw
+    g["defects"] = [d for d in defects if d["cap"] < 10]
     if ref_cmp and ref_cmp.get("ok"):
         g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
     return g

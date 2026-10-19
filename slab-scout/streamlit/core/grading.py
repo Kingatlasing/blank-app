@@ -501,3 +501,40 @@ AUTO_GRADES = {
     2: "much of it lost; still identifiable",
     1: "barely readable",
 }
+
+
+def findings_to_defects(findings, side: str = "front") -> list[dict]:
+    """Name what the inspection found in the graders' own terms (DEFECTS) with the level it reaches, so the grade
+    can be capped the way the companies' rubrics cap it and the person sees why. Only 'likely' findings cap a
+    subgrade; 'possible' ones are listed but don't lower the grade (the detectors over-call them on photos)."""
+    out: list[dict] = []
+    corners_white, edges = [], set()
+    for f in findings or []:
+        what = f.what.lower()
+        if f.area == "corners" and "whitening" in what:
+            m = re.search(r"([\d.]+)% of the corner", what)
+            corners_white.append(float(m.group(1)) if m else 0.0)
+        elif f.area == "corners" and ("rounded" in what or "dinged" in what):
+            out.append({"kind": "corner_ding", "level": "slight", "side": side, "sure": f.sure, "area": "corners"})
+        elif f.area == "edges" and ("chip" in what or "white spot" in what or "whitening" in what):
+            edges.add(f.where)
+        elif f.area == "surface" and "scratch" in what:
+            n = int((re.match(r"(\d+)", what) or [0, "1"])[1])
+            out.append({"kind": "scratch", "level": "several deep" if n >= 6 else "longer, not through gloss", "side": side, "sure": f.sure, "area": "surface"})
+        elif f.area == "surface" and "crease" in what:
+            out.append({"kind": "crease", "level": "minor", "side": side, "sure": f.sure, "area": "surface"})
+        elif f.area == "surface" and ("stain" in what or "discoloured" in what):
+            out.append({"kind": "stain", "level": f"light, {side}", "side": side, "sure": f.sure, "area": "surface"})
+        elif f.area == "surface" and "speck" in what:
+            n = int((re.match(r"(\d+)", what) or [0, "1"])[1])
+            out.append({"kind": "print_spot", "level": "many / obvious" if n > 12 else "several" if n > 5 else "a few", "side": side, "sure": f.sure, "area": "surface"})
+    if corners_white:
+        lvl = "several corners, visible" if sum(w >= 5 for w in corners_white) >= 3 else "over 1 mm" if max(corners_white) >= 8 else "under 1 mm"
+        out.append({"kind": "corner_whitening", "level": lvl, "side": side, "sure": "likely", "area": "corners"})
+    if edges:
+        lvl = "all four" if len(edges) >= 4 else "multiple edges, light" if len(edges) == 3 else "one or two edges, minor"
+        out.append({"kind": "edge_wear", "level": lvl, "side": side, "sure": "likely", "area": "edges"})
+    for d in out:
+        d["cap"] = defect_cap(d["kind"], d["level"], side)
+        d["what"] = DEFECTS[d["kind"]]["what"]
+    return out
