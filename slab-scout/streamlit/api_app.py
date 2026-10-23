@@ -99,13 +99,20 @@ async def scan(request: Request):
     try:
         form = await request.form()
         front, back = await _photo(form, "front"), await _photo(form, "back")
+        # extra grading photos: each side tilted toward one light, and close-ups of the corners
+        extras = {}
+        for k in ("tilt_front", "tilt_back", "corner_tl", "corner_tr", "corner_bl", "corner_br",
+                  "back_corner_tl", "back_corner_tr", "back_corner_bl", "back_corner_br"):
+            v = await _photo(form, k)
+            if v:
+                extras[k] = v
     except ValueError as e:
         return JSONResponse({"detail": str(e)}, status_code=413)
     if not front:
         return JSONResponse({"detail": "No photo of the front"}, status_code=400)
     grade = str(form.get("grade", "true")).lower() not in ("false", "0", "no")
     svc = await run_in_threadpool(engine)
-    out = await run_in_threadpool(svc.do_scan, front, back, str(form.get("game") or "Auto"), grade)
+    out = await run_in_threadpool(svc.do_scan, front, back, str(form.get("game") or "Auto"), grade, extras or None)
     return JSONResponse(out)
 
 

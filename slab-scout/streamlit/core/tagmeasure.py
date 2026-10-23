@@ -410,55 +410,67 @@ def tilt_defects(t: dict | None, side: str = "front") -> list[dict]:
     return out
 
 
-def corner_closeup(full_img: Image.Image, close_img: Image.Image, which: str, radius_px_630: int | None = 30) -> dict | None:
+def corner_closeup(full_img: Image.Image, close_img: Image.Image, which: str, radius_mm: float | None = 3.0) -> dict | None:
     """A close-up photo of one corner, measured at its own (much higher) resolution. The close-up is lined up with
     the full photo of the card by matching the printed detail near the corner, which gives its scale in mm."""
     import cv2
-    full = card_with_margin(full_img, None, margin=0.06, width=1000)
+    mg = 0.06
+    full = card_with_margin(full_img, None, margin=mg, width=1000)
     if full is None:
         return None
     fa = np.asarray(full.convert("RGB")).astype(np.float32)
     H, Wd = fa.shape[:2]
-    # the corner region of the full photo (about a quarter of the card each way)
     cx, cy = (0 if which[1] == "l" else Wd // 2), (0 if which[0] == "t" else H // 2)
     region = fa[cy:cy + H // 2, cx:cx + Wd // 2]
     ca = np.asarray(close_img.convert("RGB")).astype(np.float32)
-    s = 1600 / max(ca.shape[:2])
-    if s < 1:
-        ca = cv2.resize(ca, (int(ca.shape[1] * s), int(ca.shape[0] * s)), interpolation=cv2.INTER_AREA)
+    sc = 2000 / max(ca.shape[:2])
+    if sc < 1:
+        ca = cv2.resize(ca, (int(ca.shape[1] * sc), int(ca.shape[0] * sc)), interpolation=cv2.INTER_AREA)
     g1 = cv2.cvtColor(ca.astype(np.uint8), cv2.COLOR_RGB2GRAY)
     g2 = cv2.cvtColor(region.astype(np.uint8), cv2.COLOR_RGB2GRAY)
-    orb = cv2.ORB_create(5000)
-    k1, d1 = orb.detectAndCompute(g1, None)
-    k2, d2 = orb.detectAndCompute(g2, None)
-    if d1 is None or d2 is None:
+    # SIFT copes with the large scale difference between a close-up and the whole card (ORB doesn't past ~3x)
+    sift = cv2.SIFT_create(8000)
+    k1, d1 = sift.detectAndCompute(g1, None)
+    k2, d2 = sift.detectAndCompute(g2, None)
+    if d1 is None or d2 is None or len(k1) < 10 or len(k2) < 10:
         return {"matched": False}
-    m = sorted(cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True).match(d1, d2), key=lambda x: x.distance)[:500]
-    if len(m) < 20:
+    pairs = cv2.BFMatcher(cv2.NORM_L2).knnMatch(d1, d2, k=2)
+    m = [a for a, b in (p for p in pairs if len(p) == 2) if a.distance < 0.75 * b.distance]
+    if len(m) < 12:
         return {"matched": False}
     p1 = np.float32([k1[x.queryIdx].pt for x in m])
     p2 = np.float32([k2[x.trainIdx].pt for x in m]) + np.float32([cx, cy])
-    Hm, inl = cv2.findHomography(p2, p1, cv2.RANSAC, 4.0)   # full-card coords -> close-up coords
+    Hm, inl = cv2.findHomography(p2, p1, cv2.RANSAC, 4.0)   # full-card px -> close-up px
     if Hm is None or inl.sum() < 15:
         return {"matched": False}
-    # warp the corner of the full-card frame (with margin) out of the close-up at 4x the full photo's resolution
     k = 4
-    box = int(0.16 * Wd)
+    card_w = Wd / (1 + 2 * mg)
+    box = int(mg * card_w + 0.2 * card_w)          # the margin plus ~12.6 mm of card
     x0 = 0 if which[1] == "l" else Wd - box
     y0 = 0 if which[0] == "t" else H - box
-    S = np.array([[1 / k, 0, x0], [0, 1 / k, y0], [0, 0, 1]], dtype=np.float64)  # patch px -> full-card px
-    patch = cv2.warpPerspective(ca, Hm @ S, (box * k, box * k), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP * 0, borderMode=cv2.BORDER_REPLICATE) \
-        if False else cv2.warpPerspective(ca, np.linalg.inv(Hm @ S), (box * k, box * k), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
-    # measure the corner patch as if it were a whole card's corner: build a frame where this corner sits where it
-    # belongs and the rest is card (the card body beyond the patch is not judged)
-    card_w_px = (Wd / 1.12) * k   # margin 0.06 each side
-    pad_frame = np.empty((box * k, box * k, 3), np.float32)
-    pad_frame[:] = patch
-    m_out = measure(Image.fromarray(pad_frame.astype(np.uint8)).resize((box * k, box * k)), None)
-    res = {"matched": True, "inliers": int(inl.sum()), "px_per_mm": round(card_w_px / CARD_MM, 1)}
-    c = m_out.get("corners", {}).get(which)
-    if c:
-        res.update(c)
+    S = np.array([[1 / k, 0, x0], [0, 1 / k, y0], [0, 0, 1]], dtype=np.float64)   # patch px -> full-card px
+    patch = cv2.warpPerspective(ca, Hm @ S, (box * k, box * k), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP,
+                                borderMode=cv2.BORDER_REPLICATE)
+    # parts of the patch the close-up doesn't cover: fill with the background colour seen in it, so they read as
+    # "outside the card" rather than as a dark band
+    valid = cv2.warpPerspective(np.ones(ca.shape[:2], np.float32), Hm @ S, (box * k, box * k), flags=cv2.INTER_NEAREST | cv2.WARP_INVERSE_MAP,
+                                borderMode=cv2.BORDER_CONSTANT, borderValue=0) > 0.5
+    if (~valid).any() and valid.any():
+        n = box * k
+        band = np.zeros((n, n), bool)
+        e = max(4, n // 7)
+        band[:e] |= which[0] == "t"
+        band[-e:] |= which[0] == "b"
+        band[:, :e] |= which[1] == "l"
+        band[:, -e:] |= which[1] == "r"
+        src = patch[band & valid]
+        if len(src):
+            patch[~valid] = np.median(src, axis=0)
+    px_mm = k * card_w / CARD_MM
+    # how much real detail the close-up carries per mm (its own scale) - beyond that the warp only interpolates
+    own = float(np.sqrt(abs(np.linalg.det(Hm[:2, :2])))) * card_w / CARD_MM
+    res = corner_patch(Image.fromarray(np.clip(patch, 0, 255).astype(np.uint8)), which, px_mm, radius_mm)
+    res.update({"matched": True, "inliers": int(inl.sum()), "photo_px_per_mm": round(own, 1)})
     return res
 
 
@@ -573,4 +585,24 @@ def scan_features(data: bytes, radius_mm: float | None = 3.0) -> dict:
         out["blur_px"] = whole.get("blur_px")
     except Exception as e:
         out["edges"] = {"error": str(e)[:80]}
+    return out
+
+
+def corner_defects(c: dict, side: str = "front") -> list[dict]:
+    """One measured corner in the graders' terms (grading.DEFECTS levels). Sizes follow the companies' rubrics:
+    whitening under / over 1 mm, rounding beyond the factory curve, missing stock (a chip / ding)."""
+    out = []
+    if not c or not c.get("outline"):
+        return out
+    fray, rnd, miss = c.get("fray_mm2") or 0, c.get("rounding_mm") or 0, c.get("missing_mm2") or 0
+    # whitening: area of whitened stock at the rim; ~0.4 mm rim, so 0.4 mm2 ~ 1 mm along the outline
+    if fray >= 0.05:
+        out.append({"kind": "corner_whitening", "level": "over 1 mm" if fray >= 0.4 else "under 1 mm"})
+    if rnd >= 0.25:
+        out.append({"kind": "corner_rounded" if rnd >= 0.8 else "corner_soft", "level": "one corner"})
+    if miss >= 0.08:
+        out.append({"kind": "corner_missing", "level": "large" if miss >= 1.0 else f"small, {side}"})
+    for d in out:
+        d["side"] = side
+        d["source"] = "corner close-up"
     return out

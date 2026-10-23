@@ -132,6 +132,61 @@ REF_WEAR_LIVE = False
 REF_MIN_PX = 600  # clean picture at least this many pixels on its short side to judge surface against it
 
 
+def _grade_extras(res: dict, f: dict, b: dict | None, subs: dict, defects: list, rad: int) -> dict | None:
+    """Use the optional grading photos: each finding becomes a named defect at the companies' rubric level and caps
+    its subgrade. Corner close-ups replace the whole-card corner reading for that corner (they see far more)."""
+    import io
+    from PIL import Image
+    from core import tagmeasure
+    ex = res.get("_extras") or {}
+    if not ex:
+        return None
+    out: dict = {}
+    def img(k):
+        try:
+            return Image.open(io.BytesIO(ex[k])).convert("RGB")
+        except Exception:
+            return None
+    # surface from tilted photos
+    for side, key, base in (("front", "tilt_front", f), ("back", "tilt_back", b)):
+        if key in ex and base and base.get("full") is not None:
+            t = tagmeasure.tilt_surface(base["full"], img(key)) if img(key) else None
+            out[f"tilt_{side}"] = t
+            for d in tagmeasure.tilt_defects(t, side):
+                d["cap"] = grading.defect_cap(d["kind"], d["level"], side)
+                d["what"] = grading.DEFECTS[d["kind"]]["what"]
+                d["sure"] = "likely"
+                d["area"] = "surface"
+                defects.append(d)
+                subs["surface"] = min(subs["surface"], d["cap"])
+    # corners from close-ups
+    rmm = rad / 630 * 63.0 if rad is not None else 3.0
+    cl = []
+    for side, prefix, base in (("front", "corner_", f), ("back", "back_corner_", b)):
+        for c in ("tl", "tr", "bl", "br"):
+            k = prefix + c
+            if k in ex and base and base.get("full") is not None and img(k):
+                r = tagmeasure.corner_closeup(base["full"], img(k), c, rmm)
+                out[k] = r
+                if r and r.get("matched") and r.get("outline"):
+                    cl.append((side, c, r))
+    if cl:
+        caps = []
+        for side, c, r in cl:
+            for d in tagmeasure.corner_defects(r, side):
+                d["cap"] = grading.defect_cap(d["kind"], d["level"], side)
+                d["what"] = grading.DEFECTS[d["kind"]]["what"]
+                d["sure"] = "likely"
+                d["area"] = "corners"
+                d["where"] = f"{side} {c}"
+                defects.append(d)
+                caps.append(d["cap"])
+        # close-ups seen and clean: the corner reading comes from them, not from the whole-card photo
+        subs["corners"] = min(caps) if caps else max(subs["corners"], 9.5)
+        out["corners_from_closeups"] = len(cl)
+    return out
+
+
 def _tm_slim(m: dict | None) -> dict | None:
     """The TAG-style measurement without bulky per-pixel detail."""
     if not m:
@@ -256,6 +311,8 @@ def _grade(res: dict, x: dict | None) -> dict:
     for d in defects:
         if d["sure"] == "likely" and d["cap"] < subs.get(d["area"], 10):
             subs[d["area"]] = d["cap"]
+    # extra grading photos: tilted toward one light (surface relief) and corner close-ups (grader-level corners)
+    extra_out = _grade_extras(res, f, b, subs, defects, rad)
     # how much the photo inspection is trusted (grading.EVIDENCE): on 159 TAG-graded cards its corner / edge / surface
     # readings barely tracked the real grade, so they only nudge a typical grade; measured whitening still caps
     subs = {k: grading.weigh_evidence(v) for k, v in subs.items()}
@@ -333,6 +390,8 @@ def _grade(res: dict, x: dict | None) -> dict:
     g["back_whitening"] = bw
     g["subs_raw"] = subs_raw  # before the back-whitening and defect-rubric caps (for tuning them)
     g["defects"] = [d for d in defects if d["cap"] < 10]
+    if extra_out:
+        g["extra_photos"] = extra_out
     if ref_cmp and ref_cmp.get("ok"):
         g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
     return g
@@ -396,12 +455,15 @@ def _plain(v):
     return v
 
 
-def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade: bool = True) -> dict:
-    """Everything the Scan page works out for a photo, as plain JSON."""
+def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade: bool = True, extras: dict | None = None) -> dict:
+    """Everything the Scan page works out for a photo, as plain JSON. extras: optional grading photos
+    (tilt_front / tilt_back: the side tilted toward one light; corner_xx / back_corner_xx: corner close-ups)."""
     t = time.time()
     with _lock:
         catalog.trim()  # free the previous scans' downloaded card lists if they've grown large
         res = scan._analyze(fdata, bdata, game or "Auto")
+        if extras:
+            res["_extras"] = extras
         f = res["front"]
         cands = res.get("cands", [])
         top = cands[0] if cands else None
