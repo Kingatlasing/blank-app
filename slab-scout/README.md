@@ -33,9 +33,11 @@ There are two versions. They share the same community catalog and the same vault
 
 ## Part 1 · Streamlit app (free hosting, works on iPhone)
 
+**Quickest:** deploy `Kingatlasing/blank-app` itself on share.streamlit.io with branch `main` and the default main file `streamlit_app.py`. It runs this app, so you can skip steps 1 and 2 below.
+
 1. Make a free account at **github.com**, then create a new repository called `slab-scout`.
 2. Upload everything inside the `streamlit/` folder to it: `app.py`, `requirements.txt`, and the `core/`, `ui/`, `catalog/` and `.streamlit/` folders. On github.com: **Add file → Upload files**, then drag them in.
-3. Go to **share.streamlit.io**, sign in with GitHub, and choose **Create app → Deploy a public app from GitHub**. Pick your repo, set the main file to `app.py`, open **Advanced settings** and choose **Python 3.12** (the text reader does not support 3.13 yet), then tap **Deploy**. The first build takes a few minutes.
+3. Go to **share.streamlit.io**, sign in with GitHub, and choose **Create app → Deploy a public app from GitHub**. Pick your repo, set the main file to `app.py`, then tap **Deploy**. Any Python version works (3.12 and older use `rapidocr-onnxruntime`, 3.13 and newer use `rapidocr`). The first build takes a few minutes.
 4. On your iPhone, open the app link in Safari, then tap **Share → Add to Home Screen**. It now opens like an app.
 5. In the app's left menu (the **»** button), set a private **vault code**.
 

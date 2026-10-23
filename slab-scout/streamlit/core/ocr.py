@@ -34,11 +34,33 @@ GAME_HINTS = {
 }
 
 
+def _rapid(rec_model: str | None = None, rec_keys: str | None = None):
+    """A RapidOCR reader called like rapidocr_onnxruntime's: reader(arr) -> ([[box, text, score], ...] or None, elapse).
+    rapidocr_onnxruntime only installs on Python <= 3.12, so newer Pythons (Streamlit Cloud's default) use the
+    rapidocr package, whose result object is turned back into that list here."""
+    try:
+        from rapidocr_onnxruntime import RapidOCR
+    except ImportError:
+        from rapidocr import RapidOCR
+
+        params = {"Global.log_level": "error"}
+        if rec_model:
+            params.update({"Rec.model_path": rec_model, "Rec.rec_keys_path": rec_keys})
+        eng = RapidOCR(params=params)
+
+        def read(arr):
+            out = eng(arr)
+            if out.boxes is None or not out.txts:
+                return None, out.elapse
+            return [[b.tolist(), t, float(c)] for b, t, c in zip(out.boxes, out.txts, out.scores)], out.elapse
+
+        return read
+    return RapidOCR(rec_model_path=rec_model, rec_keys_path=rec_keys) if rec_model else RapidOCR()
+
+
 @lru_cache(maxsize=1)
 def _engine():
-    from rapidocr_onnxruntime import RapidOCR
-
-    return RapidOCR()
+    return _rapid()
 
 
 _MODELS = os.path.join(os.path.dirname(__file__), "..", "models")
@@ -48,20 +70,16 @@ CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7a3]")
 @lru_cache(maxsize=1)
 def _engine_cjk():
     """PP-OCRv5 reader: English + Japanese (kana and kanji) + Chinese. Used for Asian-language cards."""
-    from rapidocr_onnxruntime import RapidOCR
-
-    return RapidOCR(rec_model_path=os.path.join(_MODELS, "ppocrv5_rec.onnx"), rec_keys_path=os.path.join(_MODELS, "ppocrv5_dict.txt"))
+    return _rapid(os.path.join(_MODELS, "ppocrv5_rec.onnx"), os.path.join(_MODELS, "ppocrv5_dict.txt"))
 
 
 @lru_cache(maxsize=1)
 def _engine_ko():
     """PP-OCRv5 Korean reader (Hangul + English + digits)."""
-    from rapidocr_onnxruntime import RapidOCR
-
     m = os.path.join(_MODELS, "korean_ppocrv5_rec.onnx")
     if not os.path.exists(m):
         return None
-    return RapidOCR(rec_model_path=m, rec_keys_path=os.path.join(_MODELS, "ppocrv5_korean_dict.txt"))
+    return _rapid(m, os.path.join(_MODELS, "ppocrv5_korean_dict.txt"))
 
 
 def read_text_ko(img: Image.Image) -> list[tuple[str, float, float]]:
