@@ -226,7 +226,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     subs_raw = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     # back edge whitening on dark-bordered backs: the strongest single predictor of TAG's grade on 110 graded cards
     bw = None
-    if b and b.get("card") is not None:
+    if b and b.get("card") is not None and not res.get("_in_slab"):  # through slab plastic the edge band isn't the card's
         try:
             bw = gradebench.back_edge_whitening(b["card"])
         except Exception:
