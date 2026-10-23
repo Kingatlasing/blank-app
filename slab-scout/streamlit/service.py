@@ -224,24 +224,29 @@ def _grade(res: dict, x: dict | None) -> dict:
         style = "die_cut"
     bi = (b or {}).get("inspect")
     subs_raw = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
-    # back edge whitening on dark-bordered backs: the strongest single predictor of TAG's grade on 110 graded cards
+    # back edge whitening: measured on Pokemon's blue back only - fitted there on TAG grades; MTG's brown back and
+    # printed sports backs read as "whitening" even on clean cards (tested on 99 TAG-graded MTG / sports cards)
     bw = None
-    if b and b.get("card") is not None and not res.get("_in_slab"):  # through slab plastic the edge band isn't the card's
+    wb_cap = 10.0
+    if b and b.get("card") is not None and not res.get("_in_slab") and "pok" in (game or "").lower():
         try:
             bw = gradebench.back_edge_whitening(b["card"])
         except Exception:
             bw = None
         if bw:
-            cap = gradebench.back_whitening_cap(bw["sum"])
-            if bi and cap < bi.subgrades.get("edges", 10):
-                bi.subgrades["edges"] = cap
-                bi.findings.append(condition.Finding("edges", "back edges", f"Whitening along the back edges ({bw['sum']:.0f}/1000 of the edge band)", min(1.0, bw["sum"] / 500)))
-    subs = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
+            wb_cap = gradebench.back_whitening_cap(bw["sum"])
+            if bi and wb_cap < 10:
+                bi.findings.append(condition.Finding("edges", "back edges", f"Whitening along the back edges ({bw['sum']:.0f}/1000 of the edge band)", min(1.0, bw["sum"] / 600)))
+    subs = dict(subs_raw)
     # the companies' defect rubric (grading.DEFECTS): each likely defect caps its subgrade at the rubric's limit
     defects = grading.findings_to_defects(fi.findings, "front") + (grading.findings_to_defects(bi.findings, "back") if bi else [])
     for d in defects:
         if d["sure"] == "likely" and d["cap"] < subs.get(d["area"], 10):
             subs[d["area"]] = d["cap"]
+    # how much the photo inspection is trusted (grading.EVIDENCE): on 159 TAG-graded cards its corner / edge / surface
+    # readings barely tracked the real grade, so they only nudge a typical grade; measured whitening still caps
+    subs = {k: grading.weigh_evidence(v) for k, v in subs.items()}
+    subs["edges"] = min(subs["edges"], wb_cap)
     back_c = b["centering"] if b else None
     if b and b.get("card") is not None:
         try:

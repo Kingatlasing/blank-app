@@ -214,6 +214,19 @@ def all_graders(subs: dict[str, float], front_worst, back_worst, tcg: bool = Tru
     return out
 
 
+# How far the photo inspection's corner / edge / surface subgrades are trusted. Fitted on 159 TAG-graded cards
+# (60 Pokemon Base Set, 99 MTG and sports) measured by the server from TAG's own scans: the readings barely tracked
+# TAG's grade (correlation ~0 on MTG / sports), so a typical grade nudged by them beat taking them at face value
+# (average miss 1.50 vs 2.8-3.9). Raise "weight" as the detectors improve and re-test.
+EVIDENCE = {"prior": 8.5, "weight": 0.1}
+
+
+def weigh_evidence(sub: float) -> float:
+    """A detector subgrade (1-10) pulled toward a typical grade by how much the detectors are trusted."""
+    x = EVIDENCE["prior"] + EVIDENCE["weight"] * (float(sub) - 10.0)
+    return max(1.0, min(10.0, round(x * 2) / 2))
+
+
 def estimate(front_worst: int | None, back_worst: int | None, corners, edges, surface, tcg: bool = True) -> dict:
     """corners / edges / surface: a checklist answer ("Light wear") or a measured subgrade (8.0)."""
     val = lambda v: float(v) if isinstance(v, (int, float)) else CONDITION_OPTIONS.get(v, 9.0)

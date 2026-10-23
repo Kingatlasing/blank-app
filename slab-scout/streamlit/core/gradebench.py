@@ -278,5 +278,5 @@ def back_edge_whitening(card) -> dict | None:
 
 def back_whitening_cap(total: float) -> float:
     """Highest grade the back's edge whitening allows (fitted on TAG grades, see back_edge_whitening)."""
-    # thresholds on this function's own scale, refitted on the server's measurements of 60 TAG-graded backs
-    return 2.5 if total > 500 else 4.0 if total > 300 else 6.0 if total > 200 else 10.0
+    # thresholds on this function's own scale, fitted on the server's measurements of TAG-graded Pokemon backs
+    return 3.0 if total > 600 else 4.5 if total > 400 else 6.0 if total > 250 else 10.0
