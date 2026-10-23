@@ -132,6 +132,14 @@ REF_WEAR_LIVE = False
 REF_MIN_PX = 600  # clean picture at least this many pixels on its short side to judge surface against it
 
 
+def _tm_slim(m: dict | None) -> dict | None:
+    """The TAG-style measurement without bulky per-pixel detail."""
+    if not m:
+        return None
+    return {"outline": m.get("outline"), "px_per_mm": m.get("px_per_mm"), "summary": m.get("summary"),
+            "corners": m.get("corners"), "edges": m.get("edges")}
+
+
 def _grade(res: dict, x: dict | None) -> dict:
     """Grade estimate with no person in the loop: same steps as the Scan page (card style, this set's border
     widths, corner shape, inspection of front and back), minus the manual line and checklist adjustments."""
@@ -280,6 +288,15 @@ def _grade(res: dict, x: dict | None) -> dict:
         g["format_notes"].insert(0, f"This set has {cs['text']}" + (f" (about {cs['radius_mm']:g} mm)" if cs.get("radius_mm") else "") +
                                  ": the corner check judges wear against that shape, not against a standard corner.")
     g["corner_radius_px"] = rad
+    # TAG's own corner / edge attributes (Angle, Residual, Fill, Fray; edge Residual, Fray, Colour), measured the way
+    # their patent describes, front and back - recorded for calibration against TAG's grades
+    try:
+        from core import tagmeasure
+        g["tag_measure"] = {"front": _tm_slim(tagmeasure.measure_photo(f["full"], rad))}
+        if b and b.get("full") is not None:
+            g["tag_measure"]["back"] = _tm_slim(tagmeasure.measure_photo(b["full"], rad))
+    except Exception as e:
+        g["tag_measure"] = {"error": str(e)[:120]}
     g["corner_factory"] = {"shape": corner_kind, "source": corner_src, "measured_per_mille": corner_meas}
     g["method"] = "automatic inspection"
     g["style"] = style

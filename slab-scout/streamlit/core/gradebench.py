@@ -101,7 +101,8 @@ def measure_raw(photo: bytes, back: bytes | None = None) -> dict:
             "wear": g.get("border_wear"), "confidence": g.get("confidence"),
             "recut": g.get("recut"), "style": g.get("style"), "label_read": label, "in_slab": bool(out.get("slab")),
             "metrics": g.get("metrics"), "front": g.get("front"), "back": g.get("back"), "lines": g.get("lines"),
-            "back_whitening": g.get("back_whitening"), "subs_raw": g.get("subs_raw"), "defects": g.get("defects")}
+            "back_whitening": g.get("back_whitening"), "subs_raw": g.get("subs_raw"), "defects": g.get("defects"),
+            "tag_measure": g.get("tag_measure"), "corner_factory": g.get("corner_factory")}
 
 
 def border_wear(card, radius: int | None = None, ref=None) -> dict:
