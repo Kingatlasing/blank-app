@@ -17,10 +17,15 @@ import requests
 UA = {"User-Agent": "SlabScout/1.0 (personal card scanner)", "Accept": "application/json"}
 TIMEOUT = 12
 
+# One shared session keeps connections to the card databases and image hosts open between requests, so a scan's
+# dozen or so lookups and official-image downloads skip a fresh TLS handshake each time.
+_http = requests.Session()
+_http.mount("https://", requests.adapters.HTTPAdapter(pool_connections=16, pool_maxsize=16))
+
 
 def _get(url: str, params: dict | None = None) -> Any:
     try:
-        r = requests.get(url, params=params, headers=UA, timeout=TIMEOUT)
+        r = _http.get(url, params=params, headers=UA, timeout=TIMEOUT)
         if r.status_code == 200:
             return r.json()
     except Exception:
@@ -214,7 +219,7 @@ def search_all(parsed: dict, game: str) -> list[dict]:
 
 def fetch_image(url: str) -> bytes | None:
     try:
-        r = requests.get(url, headers={"User-Agent": UA["User-Agent"]}, timeout=TIMEOUT)
+        r = _http.get(url, headers={"User-Agent": UA["User-Agent"]}, timeout=TIMEOUT)
         if r.status_code == 200:
             return r.content
     except Exception:
