@@ -146,13 +146,15 @@ export const scanServer = () => base;
 export const serverApi = (timeoutMs = 30000) => apiRoot(timeoutMs);
 export const serverOn = () => !!base;
 
-/** A photo as an upload: big camera shots shrunk to 2000 px on the long side (plenty for grading, quick to send). */
-async function upload(uri: string, field: string, form: FormData) {
+/** A photo as an upload: camera shots shrunk to `maxLong` px on the long side. Identification needs ~2000 px; grading
+ * keeps up to 4000 px, because corner and edge wear are measured in tenths of a millimetre (graders scan at ~1200 ppi,
+ * about 47 px per mm; a card filling a 4000 px frame is ~45 px per mm). */
+async function upload(uri: string, field: string, form: FormData, maxLong = 2000) {
   let u = uri;
   try {
     const ref = await ImageManipulator.manipulate(uri).renderAsync();
     const long = Math.max(ref.width, ref.height);
-    const out = long > 2000 ? await ImageManipulator.manipulate(uri).resize(ref.width >= ref.height ? { width: 2000 } : { height: 2000 }).renderAsync() : ref;
+    const out = long > maxLong ? await ImageManipulator.manipulate(uri).resize(ref.width >= ref.height ? { width: maxLong } : { height: maxLong }).renderAsync() : ref;
     u = (await out.saveAsync({ compress: 0.9, format: SaveFormat.JPEG })).uri;
   } catch {
     /* send as is */
@@ -191,15 +193,20 @@ const cache = new Map<string, Promise<ServerScan | null>>();
 
 /** Full scan on the server. `photo` is the best photo of the front (the original camera shot when there is one);
  * `key` is the card crop's address, so readText(crop) reuses this answer instead of sending the photo again. */
-export function serverScan(photo: string, opts: { back?: string | null; game?: string; grade?: boolean; key?: string; timeoutMs?: number } = {}): Promise<ServerScan | null> {
+export function serverScan(photo: string, opts: { back?: string | null; game?: string; grade?: boolean; key?: string; timeoutMs?: number;
+  /** optional grading photos: tilt_front / tilt_back (tilted toward one light) and corner_tl.. / back_corner_tl.. close-ups */
+  extras?: Record<string, string | null | undefined> } = {}): Promise<ServerScan | null> {
   if (!base) return Promise.resolve(null);
-  const k = `${opts.key || photo}|${opts.back || ''}|${opts.grade !== false}`;
+  const ex = Object.entries(opts.extras || {}).filter((e): e is [string, string] => !!e[1]);
+  const k = `${opts.key || photo}|${opts.back || ''}|${opts.grade !== false}|${ex.map((e) => e.join('=')).join(',')}`;
   const hit = cache.get(k);
   if (hit) return hit;
   const p = (async () => {
     const form = new FormData();
-    await upload(photo, 'front', form);
-    if (opts.back) await upload(opts.back, 'back', form);
+    const big = opts.grade === false ? 2000 : 4000;
+    await upload(photo, 'front', form, big);
+    if (opts.back) await upload(opts.back, 'back', form, big);
+    for (const [field, uri] of ex) await upload(uri, field, form, big);
     form.append('game', opts.game || 'Auto');
     form.append('grade', opts.grade === false ? 'false' : 'true');
     return post<ServerScan>('/scan', form, opts.timeoutMs ?? 120000);

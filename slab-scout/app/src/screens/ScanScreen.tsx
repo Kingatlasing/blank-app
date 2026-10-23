@@ -80,7 +80,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [phase, setPhase] = useState<Phase>('capture');
   const [side, setSide] = useState<GradeSide>('front');
   // optional extra grading photos: the card tilted toward one light, so scratches / dents / print lines catch it
-  const [extras, setExtras] = useState<{ tiltF: Shot | null; tiltB: Shot | null }>({ tiltF: null, tiltB: null });
+  const [extras, setExtras] = useState<Partial<Record<ExtraSide, Shot | null>>>({});
   const [inspTilt, setInspTilt] = useState<{ f: Inspection | null; b: Inspection | null }>({ f: null, b: null });
   // live scanner: the next tap scans the back of this result (the front alone wasn't enough)
   const [backFor, setBackFor] = useState<string | null>(null);
@@ -205,7 +205,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       analyze(s);
       return;
     }
-    if (side === 'tiltF' || side === 'tiltB') {
+    if (side !== 'front' && side !== 'back') {
       setExtras((x) => ({ ...x, [side]: s }));
       setPhase('review');
       return;
@@ -362,7 +362,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     curItem.current = it.id;
     setShowHistory(false);
     setFront(shot);
-    setExtras({ tiltF: null, tiltB: null });
+    setExtras({});
     // grading looks at both sides: use the back already scanned, else ask for it next
     const b = shots.current.get(`${it.id}:back`) || null;
     setBack(b);
@@ -424,7 +424,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setSrv(null);
     setUseSrvGrade(true);
     // full engine on the scan server, in parallel with the phone's own checks (text reading waits for it)
-    const srvP = serverOn() ? serverScan(front.orig || front.uri, { back: back ? back.orig || back.uri : null, game, key: front.uri }) : null;
+    const extraPhotos = Object.fromEntries(Object.entries(extras).filter(([, v]) => !!v).map(([k, v]) => [EXTRA_FIELD[k as ExtraSide], (v as Shot).orig || (v as Shot).uri]));
+    const srvP = serverOn() ? serverScan(front.orig || front.uri, { back: back ? back.orig || back.uri : null, game, key: front.uri, extras: extraPhotos }) : null;
     try {
       setProgress(srvP ? 'Sending to the scan server and measuring…' : 'Fingerprinting and measuring centering…');
       const [ph, th, ac, bc] = await Promise.all([fingerprintCard(front.uri), thumbnail(front.uri, 180), measureCentering(front.uri), back ? measureCentering(back.uri) : Promise.resolve(null)]);
@@ -687,7 +688,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setFront(null);
     setBack(null);
     setSide('front');
-    setExtras({ tiltF: null, tiltB: null });
+    setExtras({});
     setInspTilt({ f: null, b: null });
     setCandidates([]);
     setSlab(null);
@@ -1046,7 +1047,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       <View style={S.screen} onLayout={(e) => setCamBox(e.nativeEvent.layout)}>
         <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" />
         {shade}
-        {frame(bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'Front · step 1 of 2' : side === 'back' ? 'Back · step 2 of 2' : side === 'tiltF' ? 'Extra · front tilted to the light' : 'Extra · back tilted to the light')}
+        {frame(bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'Front · step 1 of 2' : side === 'back' ? 'Back · step 2 of 2' : side === 'tiltF' ? 'Extra · front tilted to the light' : side === 'tiltB' ? 'Extra · back tilted to the light' : `Close-up · ${(GRADE_STEPS.find((g) => g.id === side)?.title || '').toLowerCase()}`)}
         <View pointerEvents="box-none" style={{ position: 'absolute', left: L.gutter, right: L.gutter, top: L.top + L.sp(6), gap: L.sp(8) }}>
           <View style={[S.row, { gap: L.sp(8) }]}>
             <RoundBtn icon="back" onPress={() => setMode('live')} label="Back to the live scanner" />
@@ -1122,8 +1123,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
           ) : null}
           <Text style={S.eyebrow}>Sharper surface grade (optional)</Text>
           <Text style={S.muted}>Flat photos hide fine scratches and dents. One extra photo per side, tilted toward a single light, shows them the way a grader's lamp does.</Text>
-          {GRADE_STEPS.filter((g) => g.optional).map((g) => {
-            const shotX = extras[g.id as 'tiltF' | 'tiltB'];
+          {GRADE_STEPS.filter((g) => g.optional && !g.corner).map((g) => {
+            const shotX = extras[g.id as ExtraSide];
             return (
               <View key={g.id} style={[S.card, S.row, { gap: 12, alignItems: 'flex-start' }]}>
                 {shotX ? <Image source={{ uri: shotX.uri }} style={{ width: 84, height: 84, borderRadius: 12 }} /> : <GuidePic step={g.id} size={84} />}
@@ -1138,6 +1139,31 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               </View>
             );
           })}
+          <Text style={S.eyebrow}>Grader-level corners (optional)</Text>
+          <Text style={S.muted}>Graders photograph corners at about 1200 dots per inch. A close-up of each corner gets the phone there: whitening, fraying and small dings that a whole-card photo can't show. Tap a corner to take it; any you skip are judged from the full photo.</Text>
+          {(['c', 'b'] as const).map((sd) => (
+            <View key={sd} style={[S.card, { gap: 8 }]}>
+              <Text style={[S.body, { fontWeight: '800' }]}>{sd === 'c' ? 'Front corners' : 'Back corners'}</Text>
+              <View style={[S.row, { gap: 8, flexWrap: 'wrap' }]}>
+                {(['TL', 'TR', 'BL', 'BR'] as const).map((c) => {
+                  const id = `${sd}${c}` as ExtraSide;
+                  const shotX = extras[id];
+                  return (
+                    <Pressable key={id} onPress={() => { setSide(id as GradeSide); setPhase('capture'); }} onLongPress={() => setExtras((x) => ({ ...x, [id]: null }))}
+                      style={{ width: 72, height: 72, borderRadius: 12, borderWidth: 1, borderColor: shotX ? C.accent : C.line, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: '#0B0C12' }}>
+                      {shotX ? <Image source={{ uri: shotX.uri }} style={{ width: 72, height: 72 }} /> : (
+                        <View style={{ width: 34, height: 34, borderColor: C.ink2,
+                          borderTopWidth: c[0] === 'T' ? 3 : 0, borderBottomWidth: c[0] === 'B' ? 3 : 0, borderLeftWidth: c[1] === 'L' ? 3 : 0, borderRightWidth: c[1] === 'R' ? 3 : 0,
+                          borderTopLeftRadius: c === 'TL' ? 8 : 0, borderTopRightRadius: c === 'TR' ? 8 : 0, borderBottomLeftRadius: c === 'BL' ? 8 : 0, borderBottomRightRadius: c === 'BR' ? 8 : 0 }} />
+                      )}
+                      <Text style={{ position: 'absolute', bottom: 2, color: shotX ? C.accent : C.ink2, fontSize: L.fs(10), fontWeight: '800' }}>{shotX ? '✓ ' : ''}{CORNER_NAME[c]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={S.muted}>Long-press a taken corner to remove it.</Text>
+            </View>
+          ))}
           <Btn primary label={back ? 'Scan and grade' : 'Scan card'} onPress={() => analyze()} />
           <Btn label="Start over" onPress={reset} />
           {!aiOn ? (
@@ -1713,7 +1739,13 @@ const st = StyleSheet.create({
   big: { color: C.ink, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });
 
-type GradeSide = 'front' | 'back' | 'tiltF' | 'tiltB';
+type GradeSide = 'front' | 'back' | 'tiltF' | 'tiltB' | CornerSide;
+type CornerSide = 'cTL' | 'cTR' | 'cBL' | 'cBR' | 'bTL' | 'bTR' | 'bBL' | 'bBR';
+type ExtraSide = Exclude<GradeSide, 'front' | 'back'>;
+/** Server field for each extra grading photo. */
+const EXTRA_FIELD: Record<ExtraSide, string> = { tiltF: 'tilt_front', tiltB: 'tilt_back', cTL: 'corner_tl', cTR: 'corner_tr', cBL: 'corner_bl', cBR: 'corner_br',
+  bTL: 'back_corner_tl', bTR: 'back_corner_tr', bBL: 'back_corner_bl', bBR: 'back_corner_br' };
+const CORNER_NAME: Record<string, string> = { TL: 'top-left', TR: 'top-right', BL: 'bottom-left', BR: 'bottom-right' };
 
 /** Surface subgrade from the tilted (raking-light) photos: they show scratches, dents and print lines that flat photos
  * miss. Only photos without large glare count, and they can lower the flat-photo surface grade by at most one step
@@ -1726,11 +1758,17 @@ function tiltSurfaceGrade(flat: number, f: Inspection | null, b: Inspection | nu
 }
 
 /** What each grading photo should look like: a small drawing of the card on the table, flat or tilted toward a lamp. */
-export const GRADE_STEPS: { id: GradeSide; title: string; how: string; finds: string; optional?: boolean }[] = [
+export const GRADE_STEPS: { id: GradeSide; title: string; how: string; finds: string; optional?: boolean; corner?: boolean }[] = [
   { id: 'front', title: 'Front, flat', how: 'Card out of its sleeve, face up, flat on a plain dark surface. Phone straight above it, card filling the frame, even light with no reflections.', finds: 'Centering, corners, edges and surface' },
   { id: 'back', title: 'Back, flat', how: 'Flip it over in the same spot and the same light. Same distance, straight above.', finds: 'Back centering, back corners and edges, back surface' },
   { id: 'tiltF', title: 'Front, tilted to one light', how: 'One lamp or window to the side. Tilt the card about 30° toward it so the light skims across the face: scratches, dents and print lines light up as bright lines. Keep the whole card in the frame.', finds: 'Scratches, dents, print lines, indentations', optional: true },
   { id: 'tiltB', title: 'Back, tilted to one light', how: 'Same as the front: back facing up, tilted about 30° toward the light, whole card in the frame.', finds: 'Back scratches and dents', optional: true },
+  // corner close-ups: graders scan at ~1200 ppi; a phone close to one corner (2x lens, or as close as it focuses)
+  // sees whitening, fraying and dings a whole-card photo can't. Matched to the full photo for their scale.
+  ...(['TL', 'TR', 'BL', 'BR'] as const).flatMap((c) => [
+    { id: `c${c}` as GradeSide, title: `Front ${CORNER_NAME[c]} corner, close up`, how: `Same flat spot and light. Move in on the ${CORNER_NAME[c]} corner until it fills about a third of the screen, with some of the table beyond it and some of the picture inside it showing. Hold still until it's sharp.`, finds: 'Corner whitening, fraying, dings and rounding at grader resolution', optional: true, corner: true },
+    { id: `b${c}` as GradeSide, title: `Back ${CORNER_NAME[c]} corner, close up`, how: `Card face down. Close in on the back's ${CORNER_NAME[c]} corner the same way: corner, a little table, some of the back's design.`, finds: 'Back corner whitening (the most common reason for a lower grade)', optional: true, corner: true },
+  ]),
 ];
 
 /** Example drawing for a grading step: dark table, the card (flat or tilted in perspective) and the lamp. */
