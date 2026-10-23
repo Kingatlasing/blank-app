@@ -606,3 +606,18 @@ def corner_defects(c: dict, side: str = "front") -> list[dict]:
         d["side"] = side
         d["source"] = "corner close-up"
     return out
+
+
+# Corner whitening against TAG's grades, measured with corner_patch on TAG's own scans (~68 px/mm) of 116 Pokemon
+# Base Set cards: total whitened stock at the corner rims (front + back, 8 corners). Below ~10 mm2 cards reached
+# every grade up to 10; above it the best grade TAG gave fell fast (90th percentile 5 at 10-15 mm2, 3 at 15-20,
+# 3 above 20). Used as a cap (the worst grade a card with that much whitening can still get), like a rubric line.
+WHITENING_CAPS = [(20.0, 3.0), (15.0, 3.5), (10.0, 5.0)]
+MIN_PX_PER_MM = 30.0   # below this the rim whitening can't be measured reliably
+
+
+def whitening_cap(total_mm2: float) -> float:
+    for t, cap in WHITENING_CAPS:
+        if total_mm2 >= t:
+            return cap
+    return 10.0

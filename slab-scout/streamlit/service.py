@@ -171,7 +171,14 @@ def _grade_extras(res: dict, f: dict, b: dict | None, subs: dict, defects: list,
                 if r and r.get("matched") and r.get("outline"):
                     cl.append((side, c, r))
     if cl:
-        caps = []
+        # whitening over all close-up corners, scaled to eight corners, against the caps fitted on TAG's grades
+        tot = sum((r.get("fray_mm2") or 0) for _, _, r in cl) * 8 / len(cl)
+        wcap = tagmeasure.whitening_cap(tot)
+        out["corner_whitening_mm2"] = round(tot, 2)
+        if wcap < 10:
+            defects.append({"kind": "corner_whitening", "level": "several corners, visible", "side": "both", "cap": wcap,
+                            "what": f"whitening at the corners ({tot:.1f} mm2 over eight corners)", "sure": "likely", "area": "corners", "source": "corner close-ups"})
+        caps = [wcap] if wcap < 10 else []
         for side, c, r in cl:
             for d in tagmeasure.corner_defects(r, side):
                 d["cap"] = grading.defect_cap(d["kind"], d["level"], side)
