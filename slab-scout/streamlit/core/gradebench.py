@@ -281,3 +281,58 @@ def back_whitening_cap(total: float) -> float:
     """Highest grade the back's edge whitening allows (fitted on TAG grades, see back_edge_whitening)."""
     # thresholds on this function's own scale, fitted on the server's measurements of TAG-graded Pokemon backs
     return 3.0 if total > 600 else 4.5 if total > 400 else 6.0 if total > 250 else 10.0
+
+
+# ---- calibration against TAG: TAG-style attributes measured on TAG's own scans (cheap: no identification) ----
+CAL: dict = {"state": "idle", "done": 0, "results": []}
+_cal_thread = None
+
+
+def _cal_run(url: str, limit: int, offset: int) -> None:
+    import requests
+    from . import databases, tagmeasure
+    CAL.update(state="loading list", done=0, results=[], started=time.time())
+    try:
+        items = requests.get(url, timeout=60).json()[offset:offset + limit]
+    except Exception as e:
+        CAL.update(state="error", error=str(e))
+        return
+    CAL.update(state="running", n=len(items))
+    for it in items:
+        if _stop.is_set():
+            CAL["state"] = "stopped"
+            return
+        cat = (it.get("cat") or "pokemon").lower()
+        rmm = 3.175 if cat in ("sports", "baseball", "basketball", "football", "hockey") else 3.0
+        row = {k: it.get(k) for k in ("company", "grade", "title", "cat", "tag")}
+        t = time.time()
+        try:
+            for side in ("img", "back"):
+                if it.get(side):
+                    data = databases.fetch_image(it[side])
+                    row["front" if side == "img" else "back"] = tagmeasure.scan_features(data, rmm) if data else {"error": "no photo"}
+        except Exception as e:
+            row["error"] = f"{type(e).__name__}: {e}"[:200]
+        row["seconds"] = round(time.time() - t, 1)
+        CAL["results"].append(row)
+        CAL["done"] += 1
+    CAL["state"] = "done"
+
+
+def cal_start(url: str, limit: int = 600, offset: int = 0) -> dict:
+    global _cal_thread
+    if _cal_thread and _cal_thread.is_alive():
+        return {k: v for k, v in CAL.items() if k != "results"}
+    _stop.clear()
+    _cal_thread = threading.Thread(target=_cal_run, args=(url, limit, offset), daemon=True)
+    _cal_thread.start()
+    return {"state": "starting"}
+
+
+def cal_status() -> dict:
+    return {k: v for k, v in CAL.items() if k != "results"}
+
+
+def cal_result_gz() -> bytes:
+    import gzip, json
+    return gzip.compress(json.dumps(CAL.get("results", []), default=float).encode())

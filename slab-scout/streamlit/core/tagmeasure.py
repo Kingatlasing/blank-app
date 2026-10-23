@@ -59,10 +59,30 @@ def measure(card: Image.Image, radius_px_630: int | None = 30) -> dict:
     inset = int(0.04 * W)
     border = np.median(np.concatenate([a[H // 2 - 50:H // 2 + 50, inset], a[H // 2 - 50:H // 2 + 50, W - 1 - inset],
                                        a[inset, W // 2 - 50:W // 2 + 50], a[H - 1 - inset, W // 2 - 50:W // 2 + 50]]), axis=0)
-    sep = float(np.linalg.norm(border - bg))
-    dist_bg = np.linalg.norm(a - bg, axis=2)
-    has_outline = sep >= 40
-    mask = dist_bg > sep * 0.5 if has_outline else np.ones((H, W), bool)
+    # what lies outside the card can be several colours (a table, a holder's frame, a sleeve's rim): take the main
+    # colours of the outer ring of the photo and call a pixel card when it is nearer the card's border colour than
+    # any of them
+    ring = np.concatenate([a[: int(0.02 * H)].reshape(-1, 3), a[-int(0.02 * H):].reshape(-1, 3),
+                           a[:, : int(0.02 * W)].reshape(-1, 3), a[:, -int(0.02 * W):].reshape(-1, 3)])
+    outs = _main_colours(ring, 3)
+    outs = [o for o in outs if np.linalg.norm(border - o) >= 40]
+    sep = min([float(np.linalg.norm(border - o)) for o in outs], default=0.0)
+    has_outline = bool(outs)
+    if has_outline:
+        import cv2
+        d_border = np.linalg.norm(a - border, axis=2)
+        d_out = np.min(np.stack([np.linalg.norm(a - o, axis=2) for o in outs]), axis=0)
+        cardlike = d_border < d_out
+        # whitened / frayed stock at the rim is still card: light pixels next to the border colour
+        cardlike |= (_lum(a) > float(_lum(border[None, None])[0, 0]) + 30) & (d_out > 40)
+        # the background is what is not card-like AND connects to the photo's edge; the art inside the card is card
+        bgc = (~cardlike).astype(np.uint8)
+        n, lab = cv2.connectedComponents(bgc, connectivity=4)
+        edge_labels = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
+        outside = np.isin(lab, list(edge_labels)) if edge_labels else np.zeros((H, W), bool)
+        mask = ~outside
+    else:
+        mask = np.ones((H, W), bool)
     border_l = float(_lum(border[None, None])[0, 0])
     out: dict = {"outline": bool(has_outline), "bg_sep": round(sep, 1), "px_per_mm": round(px_mm, 2), "edges": {}, "corners": {}}
 
@@ -127,6 +147,11 @@ def measure(card: Image.Image, radius_px_630: int | None = 30) -> dict:
         px_mm = card_w / CARD_MM
         out["px_per_mm"] = round(px_mm, 2)
     R = int(round((radius_px_630 if radius_px_630 is not None else 30) * card_w / 630))
+    # how soft the photo is at the outline: the width of the background -> border transition on the straight edges.
+    # A soft photo rounds every corner a little; that much rounding is the photo, not wear.
+    blur = _edge_blur(a, bg, border, pos, H)
+    out["blur_px"] = round(blur, 2)
+    out["blur_mm"] = round(blur / px_mm, 3)
     box = int(0.12 * W)
     names = {"tl": ("top", "left"), "tr": ("top", "right"), "bl": ("bottom", "left"), "br": ("bottom", "right")}
     for name, (hs, vs) in names.items():
@@ -143,37 +168,88 @@ def measure(card: Image.Image, radius_px_630: int | None = 30) -> dict:
         ang = abs(np.degrees(np.arctan(m1)) - np.degrees(np.arctan(-m2)))
         cnr["angle_deg"] = round(float(ang), 2)
         cnr["angle"] = _score(float(ang), 0.5)
-        # local frame: u along the horizontal edge into the card, v along the vertical edge into the card
         su = 1 if "l" in name[1] else -1
         sv = 1 if name[0] == "t" else -1
         ys, xs = np.mgrid[0:box, 0:box]
         X = np.clip(np.round(x0 + su * xs), 0, W - 1).astype(int)
         Y = np.clip(np.round(y0 + sv * ys), 0, H - 1).astype(int)
         u, v = xs.astype(float), ys.astype(float)
-        ideal = np.ones((box, box), bool)
-        if R > 0:
-            inside_r = (u < R) & (v < R)
-            ideal &= ~(inside_r & ((u - R) ** 2 + (v - R) ** 2 > R * R))
         real = mask[Y, X]
-        # signed distance from the ideal outline (+ inside the card): edges of a straight cut or the factory curve
-        dist_out = np.where((u < R) & (v < R), R - np.hypot(u - R, v - R), np.minimum(u, v)) if R > 0 else np.minimum(u, v)
-        tol = 1.5  # px: a pixel either side of the ideal outline is the photo's own sampling, not the card
-        near = (dist_out >= tol) & (dist_out < max(R, 1) + 0.6 * px_mm)
-        missing = near & ~real
-        cnr["missing_mm2"] = round(float(missing.sum()) / px_mm ** 2, 3)
-        cnr["fill"] = _score(cnr["missing_mm2"], 0.1)
-        extra = (dist_out <= -tol) & real
-        cnr["residual_mm2"] = round(float(missing.sum() + extra.sum()) / px_mm ** 2, 3)
-        cnr["residual"] = _score(cnr["residual_mm2"], 0.15)
-        rim = ideal & real & (dist_out >= 0) & (dist_out < 0.4 * px_mm + 1)
-        L = lum[Y, X]
-        inner_ref = np.median(L[ideal & (dist_out > 0.8 * px_mm) & (dist_out < 1.6 * px_mm)]) if (ideal & (dist_out > 0.8 * px_mm)).any() else border_l
-        white = rim & (L > inner_ref + 35)
-        cnr["fray_mm2"] = round(float(white.sum()) / px_mm ** 2, 3)
-        cnr["fray_share"] = round(float(white.sum() / max(1, rim.sum())), 4)
-        cnr["fray"] = _score(cnr["fray_mm2"], 0.03)
+        cnr.update(_corner_attrs(real, lum[Y, X], u, v, R, px_mm, blur, border_l))
         out["corners"][name] = cnr
     return out
+
+
+def _main_colours(px: np.ndarray, k: int = 3) -> list[np.ndarray]:
+    """The k main colours of a set of pixels (k-means), most common first."""
+    import cv2
+    px = px[:: max(1, len(px) // 20000)].astype(np.float32)
+    if len(px) < k:
+        return [px.mean(axis=0)] if len(px) else []
+    _, lab, cen = cv2.kmeans(px, k, None, (cv2.TERM_CRITERIA_EPS + cv2.TERM_CRITERIA_MAX_ITER, 20, 1.0), 2, cv2.KMEANS_PP_CENTERS)
+    counts = np.bincount(lab.ravel(), minlength=k)
+    return [cen[i] for i in np.argsort(-counts) if counts[i] > 0.05 * len(px)]
+
+
+def _edge_blur(a, bg, border, pos, H) -> float:
+    """Average width (px) of the background -> card transition across the straight left / right edges (10-90%)."""
+    widths = []
+    lum = _lum(a)
+    bl, cl = float(_lum(bg[None, None])[0, 0]), float(_lum(border[None, None])[0, 0])
+    if abs(cl - bl) < 25:
+        return 1.5
+    for side, sgn in (("left", 1), ("right", -1)):
+        p = pos[side]
+        for y in range(int(0.3 * H), int(0.7 * H), max(1, H // 60)):
+            if np.isnan(p[y]):
+                continue
+            x = int(p[y])
+            prof = lum[y, max(0, x - 12 * sgn) if sgn > 0 else x - 12: x + 13] if sgn > 0 else lum[y, x - 12: x + 13][::-1]
+            if len(prof) < 20:
+                continue
+            f = (prof - bl) / (cl - bl)
+            try:
+                i10 = int(np.argmax(f > 0.1))
+                i90 = int(np.argmax(f > 0.9))
+            except ValueError:
+                continue
+            if i90 > i10:
+                widths.append(i90 - i10)
+    return float(np.median(widths)) if widths else 1.5
+
+
+def _corner_attrs(real, L, u, v, R, px_mm, blur, border_l) -> dict:
+    """Fill / residual / fray of one corner in its own frame (u, v = px along the two edges into the card, measured
+    from where the fitted edge lines meet). R = the factory radius in px (0 = square-cut)."""
+    c: dict = {}
+    zone = (u < max(R, 1) + 3 * px_mm) & (v < max(R, 1) + 3 * px_mm)
+    gone = zone & ~real
+    # the rounding actually there, as the radius of a circle that would leave the same area outside it
+    r_fit = float(np.sqrt(gone.sum() / (1 - np.pi / 4)))
+    allow = R + 0.8 * blur + 1.0      # factory rounding + what the photo's softness adds
+    c["radius_mm"] = round(r_fit / px_mm, 3)
+    c["rounding_mm"] = round(max(0.0, r_fit - allow) / px_mm, 3)   # rounding beyond factory = wear
+    # chunks: stock missing inside the shape the fitted rounding would leave (a chip, a ding, a torn tip)
+    rr = max(r_fit, R)
+    ideal = ~((u < rr) & (v < rr) & ((u - rr) ** 2 + (v - rr) ** 2 > rr * rr))
+    dist_out = np.where((u < rr) & (v < rr), rr - np.hypot(u - rr, v - rr), np.minimum(u, v)) if rr > 0 else np.minimum(u, v)
+    tol = 1.0 + 0.8 * blur
+    near = (dist_out >= tol) & (dist_out < rr + 1.0 * px_mm)
+    chunk = near & ~real
+    c["missing_mm2"] = round(float(chunk.sum()) / px_mm ** 2, 3)
+    c["fill"] = _score(c["rounding_mm"] * 1.0 + c["missing_mm2"], 0.1)
+    extra = (dist_out <= -tol) & real
+    c["residual_mm2"] = round(float(chunk.sum() + extra.sum()) / px_mm ** 2, 3)
+    c["residual"] = _score(c["residual_mm2"], 0.15)
+    # fray: whitening in the outermost ~0.4 mm of the corner's outline, against the border just inside it
+    rim = ideal & real & (dist_out >= tol) & (dist_out < tol + 0.4 * px_mm + 1)
+    inner = ideal & real & (dist_out > 0.9 * px_mm + tol) & (dist_out < 1.8 * px_mm + tol)
+    ref = float(np.median(L[inner])) if inner.any() else border_l
+    white = rim & (L > ref + 35)
+    c["fray_mm2"] = round(float(white.sum()) / px_mm ** 2, 3)
+    c["fray_share"] = round(float(white.sum() / max(1, rim.sum())), 4)
+    c["fray"] = _score(c["fray_mm2"], 0.03)
+    return c
 
 
 def summary(m: dict) -> dict:
@@ -237,3 +313,264 @@ def measure_photo(img: Image.Image, radius_px_630: int | None = 30, pts=None) ->
     m = measure(c, radius_px_630)
     m["summary"] = summary(m)
     return m
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Extra photos, the phone's version of the graders' imaging: TAG photographs each side under 7-9 light angles
+# (photometric stereo) at ~1200 ppi; PSA (Collectors' patent US12141817) adds a backlight so the outline stands out.
+# A tilted photo toward one light shows what a flat photo hides (scratches, dents, print lines, wrinkles), and a
+# close-up of a corner gives grader-level resolution of the corner itself.
+
+def _flat(img: Image.Image, width: int = 1000) -> np.ndarray | None:
+    from . import vision
+    c = card_with_margin(img, None, margin=0.0, width=width)
+    return None if c is None else np.asarray(c.convert("RGB")).astype(np.float32)
+
+
+def _align(src: np.ndarray, dst: np.ndarray) -> np.ndarray | None:
+    """src warped onto dst (both flattened cards) by feature matching, so the same spot lines up in both."""
+    import cv2
+    g1 = cv2.cvtColor(src.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    g2 = cv2.cvtColor(dst.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    orb = cv2.ORB_create(4000)
+    k1, d1 = orb.detectAndCompute(g1, None)
+    k2, d2 = orb.detectAndCompute(g2, None)
+    if d1 is None or d2 is None or len(k1) < 30 or len(k2) < 30:
+        return None
+    m = sorted(cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True).match(d1, d2), key=lambda x: x.distance)[:600]
+    if len(m) < 30:
+        return None
+    p1 = np.float32([k1[x.queryIdx].pt for x in m])
+    p2 = np.float32([k2[x.trainIdx].pt for x in m])
+    Hm, inl = cv2.findHomography(p1, p2, cv2.RANSAC, 3.0)
+    if Hm is None or inl.sum() < 25:
+        return None
+    return cv2.warpPerspective(src, Hm, (dst.shape[1], dst.shape[0]), borderMode=cv2.BORDER_REPLICATE)
+
+
+def tilt_surface(flat_img: Image.Image, tilt_img: Image.Image) -> dict | None:
+    """Surface defects from a photo tilted toward one light, against the flat photo of the same side: what lights
+    up (or darkens) only under the raking light is relief on the surface, not print. Lines = scratches / print lines,
+    compact spots = dents / pits, long faint lines across the card = wrinkles / creases."""
+    import cv2
+    a = _flat(flat_img)
+    b = _flat(tilt_img)
+    if a is None or b is None:
+        return None
+    b = _align(b, a)
+    if b is None:
+        return {"aligned": False}
+    H, Wd = a.shape[:2]
+    px_mm = Wd / CARD_MM
+    la, lb = _lum(a), _lum(b)
+    hp = lambda L: L - cv2.GaussianBlur(L, (0, 0), 6)
+    # relief: local detail present under the raking light but not in the flat photo (print detail is in both)
+    rel = np.abs(hp(lb)) - np.abs(hp(la))
+    rel[: int(0.02 * H)] = rel[-int(0.02 * H):] = 0
+    rel[:, : int(0.02 * Wd)] = rel[:, -int(0.02 * Wd):] = 0
+    thr = max(12.0, float(np.percentile(rel, 99.5)))
+    m = (rel > thr).astype(np.uint8)
+    m = cv2.morphologyEx(m, cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))
+    n, lab, stats, _ = cv2.connectedComponentsWithStats(m, 8)
+    lines, spots = [], []
+    for i in range(1, n):
+        x, y, w, h, area = stats[i]
+        length = float(np.hypot(w, h)) / px_mm
+        if area < 6:
+            continue
+        if length >= 2.0 and area / max(1.0, np.hypot(w, h)) < 4:   # thin and long
+            lines.append(round(length, 1))
+        elif area / px_mm ** 2 >= 0.15:
+            spots.append(round(area / px_mm ** 2, 2))
+    lines.sort(reverse=True)
+    spots.sort(reverse=True)
+    long_lines = [l for l in lines if l >= 0.5 * 88]  # half the card's length: wrinkle / crease territory
+    return {"aligned": True, "px_per_mm": round(px_mm, 2), "lines_mm": lines[:20], "line_total_mm": round(sum(lines), 1),
+            "spots_mm2": spots[:20], "long_lines": len(long_lines)}
+
+
+def tilt_defects(t: dict | None, side: str = "front") -> list[dict]:
+    """The tilted-photo findings in the graders' terms (grading.DEFECTS) with the rubric level they reach."""
+    if not t or not t.get("aligned"):
+        return []
+    out = []
+    lines, spots = t.get("lines_mm") or [], t.get("spots_mm2") or []
+    if t.get("long_lines"):
+        out.append({"kind": "wrinkle" if t["long_lines"] == 1 else "crease", "level": "across half the card" if t["long_lines"] == 1 else "several"})
+    if lines:
+        L = lines[0]
+        lvl = "several deep" if len(lines) >= 6 and L >= 10 else "through the gloss" if L >= 15 else "longer, not through gloss" if L >= 5 else "light, not through gloss"
+        out.append({"kind": "scratch", "level": lvl})
+    if spots:
+        lvl = "larger or several" if (len(spots) >= 3 or spots[0] >= 1.0) else "minor" if spots[0] >= 0.4 else ("very minor, front" if side == "front" else "minor")
+        out.append({"kind": "dent", "level": lvl})
+    for d in out:
+        d["side"] = side
+        d["source"] = "tilted photo"
+    return out
+
+
+def corner_closeup(full_img: Image.Image, close_img: Image.Image, which: str, radius_px_630: int | None = 30) -> dict | None:
+    """A close-up photo of one corner, measured at its own (much higher) resolution. The close-up is lined up with
+    the full photo of the card by matching the printed detail near the corner, which gives its scale in mm."""
+    import cv2
+    full = card_with_margin(full_img, None, margin=0.06, width=1000)
+    if full is None:
+        return None
+    fa = np.asarray(full.convert("RGB")).astype(np.float32)
+    H, Wd = fa.shape[:2]
+    # the corner region of the full photo (about a quarter of the card each way)
+    cx, cy = (0 if which[1] == "l" else Wd // 2), (0 if which[0] == "t" else H // 2)
+    region = fa[cy:cy + H // 2, cx:cx + Wd // 2]
+    ca = np.asarray(close_img.convert("RGB")).astype(np.float32)
+    s = 1600 / max(ca.shape[:2])
+    if s < 1:
+        ca = cv2.resize(ca, (int(ca.shape[1] * s), int(ca.shape[0] * s)), interpolation=cv2.INTER_AREA)
+    g1 = cv2.cvtColor(ca.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    g2 = cv2.cvtColor(region.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    orb = cv2.ORB_create(5000)
+    k1, d1 = orb.detectAndCompute(g1, None)
+    k2, d2 = orb.detectAndCompute(g2, None)
+    if d1 is None or d2 is None:
+        return {"matched": False}
+    m = sorted(cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True).match(d1, d2), key=lambda x: x.distance)[:500]
+    if len(m) < 20:
+        return {"matched": False}
+    p1 = np.float32([k1[x.queryIdx].pt for x in m])
+    p2 = np.float32([k2[x.trainIdx].pt for x in m]) + np.float32([cx, cy])
+    Hm, inl = cv2.findHomography(p2, p1, cv2.RANSAC, 4.0)   # full-card coords -> close-up coords
+    if Hm is None or inl.sum() < 15:
+        return {"matched": False}
+    # warp the corner of the full-card frame (with margin) out of the close-up at 4x the full photo's resolution
+    k = 4
+    box = int(0.16 * Wd)
+    x0 = 0 if which[1] == "l" else Wd - box
+    y0 = 0 if which[0] == "t" else H - box
+    S = np.array([[1 / k, 0, x0], [0, 1 / k, y0], [0, 0, 1]], dtype=np.float64)  # patch px -> full-card px
+    patch = cv2.warpPerspective(ca, Hm @ S, (box * k, box * k), flags=cv2.INTER_CUBIC | cv2.WARP_INVERSE_MAP * 0, borderMode=cv2.BORDER_REPLICATE) \
+        if False else cv2.warpPerspective(ca, np.linalg.inv(Hm @ S), (box * k, box * k), flags=cv2.INTER_CUBIC, borderMode=cv2.BORDER_REPLICATE)
+    # measure the corner patch as if it were a whole card's corner: build a frame where this corner sits where it
+    # belongs and the rest is card (the card body beyond the patch is not judged)
+    card_w_px = (Wd / 1.12) * k   # margin 0.06 each side
+    pad_frame = np.empty((box * k, box * k, 3), np.float32)
+    pad_frame[:] = patch
+    m_out = measure(Image.fromarray(pad_frame.astype(np.uint8)).resize((box * k, box * k)), None)
+    res = {"matched": True, "inliers": int(inl.sum()), "px_per_mm": round(card_w_px / CARD_MM, 1)}
+    c = m_out.get("corners", {}).get(which)
+    if c:
+        res.update(c)
+    return res
+
+
+def corner_patch(patch: Image.Image, which: str, px_mm: float, radius_mm: float | None = 3.0) -> dict:
+    """One corner measured on a high-resolution patch (a grader scan, or a phone close-up whose scale is known):
+    the corner sits at the patch's `which` corner ('tl', 'tr', 'bl', 'br') with background beyond the card."""
+    img = patch.convert("RGB")
+    if which != "tl":  # flip so the corner is top-left
+        if "r" in which[1]:
+            img = img.transpose(Image.FLIP_LEFT_RIGHT)
+        if which[0] == "b":
+            img = img.transpose(Image.FLIP_TOP_BOTTOM)
+    a = np.asarray(img).astype(np.float32)
+    H, Wp = a.shape[:2]
+    # card border colour: well inside both edges; outside colours: the patch's top and left strips
+    inn = int(min(H, Wp) * 0.55)
+    border = np.median(a[inn - 10:inn + 10, int(1.2 * px_mm):int(2.0 * px_mm)].reshape(-1, 3), axis=0)
+    strip = np.concatenate([a[:3].reshape(-1, 3), a[:, :3].reshape(-1, 3)])
+    outs = [o for o in _main_colours(strip, 3) if np.linalg.norm(border - o) >= 40]
+    if not outs:
+        return {"outline": False}
+    import cv2
+    d_border = np.linalg.norm(a - border, axis=2)
+    d_out = np.min(np.stack([np.linalg.norm(a - o, axis=2) for o in outs]), axis=0)
+    cardlike = (d_border < d_out) | ((_lum(a) > float(_lum(border[None, None])[0, 0]) + 30) & (d_out > 40))
+    n, lab = cv2.connectedComponents((~cardlike).astype(np.uint8), connectivity=4)
+    edge_labels = set(np.unique(np.concatenate([lab[0], lab[:, 0]]))) - {0}
+    mask = ~np.isin(lab, list(edge_labels)) if edge_labels else np.ones((H, Wp), bool)
+    R = (radius_mm or 0.0) * px_mm
+    # the two edges, fitted beyond the factory rounding (from R + 1 mm to the patch's far side)
+    lo = int(R + 1.0 * px_mm)
+    cols = np.arange(lo, Wp - 2)
+    top = np.array([np.argmax(mask[:, x]) if mask[:, x].any() else np.nan for x in cols], float)
+    rows = np.arange(lo, H - 2)
+    left = np.array([np.argmax(mask[y, :]) if mask[y].any() else np.nan for y in rows], float)
+    ft = _fit(cols[~np.isnan(top)].astype(float), top[~np.isnan(top)])
+    fl = _fit(rows[~np.isnan(left)].astype(float), left[~np.isnan(left)])
+    if ft is None or fl is None:
+        return {"outline": False}
+    m1, c1 = ft
+    m2, c2 = fl
+    y0 = (m1 * c2 + c1) / (1 - m1 * m2)
+    x0 = m2 * y0 + c2
+    c = {"outline": True, "angle_deg": round(float(abs(np.degrees(np.arctan(m1)) - np.degrees(np.arctan(-m2)))), 2)}
+    c["angle"] = _score(c["angle_deg"], 0.5)
+    # edge straightness next to the corner (peaks and valleys), in the corner's own frame
+    dt = top[~np.isnan(top)] - (m1 * cols[~np.isnan(top)] + c1)
+    dl = left[~np.isnan(left)] - (m2 * rows[~np.isnan(left)] + c2)
+    c["edge_residual_mm2"] = round(float(np.abs(dt).sum() + np.abs(dl).sum()) / px_mm ** 2, 3)
+    box = int(min(H - y0, Wp - x0) - 2)
+    ys, xs = np.mgrid[0:box, 0:box]
+    X = np.clip(np.round(x0 + xs), 0, Wp - 1).astype(int)
+    Y = np.clip(np.round(y0 + ys), 0, H - 1).astype(int)
+    # blur: transition width across the straight top edge
+    bl = []
+    lum = _lum(a)
+    ol = float(_lum(outs[0][None, None])[0, 0])
+    cl = float(_lum(border[None, None])[0, 0])
+    for x in cols[:: max(1, len(cols) // 40)]:
+        e = int(m1 * x + c1)
+        prof = lum[max(0, e - 10): e + 11, x]
+        if len(prof) < 15 or abs(cl - ol) < 25:
+            continue
+        f = (prof - ol) / (cl - ol)
+        i10, i90 = int(np.argmax(f > 0.1)), int(np.argmax(f > 0.9))
+        if i90 > i10:
+            bl.append(i90 - i10)
+    blur = float(np.median(bl)) if bl else 1.5
+    c["blur_px"] = round(blur, 2)
+    c.update(_corner_attrs(mask[Y, X], lum[Y, X], xs.astype(float), ys.astype(float), R, px_mm, blur, cl))
+    return c
+
+
+def scan_features(data: bytes, radius_mm: float | None = 3.0) -> dict:
+    """All TAG-style attributes from a grader's scan of one side (card on a plain background, ~1200 ppi): the four
+    corners measured on native-resolution patches, the edges and colour on the whole card. For calibration."""
+    import io
+    import cv2
+    im = Image.open(io.BytesIO(data))
+    im.draft("RGB", (3000, 3000))
+    im = im.convert("RGB")
+    a = np.asarray(im)
+    h, w = a.shape[:2]
+    s = 600 / w
+    small = cv2.resize(a, (600, int(h * s))).astype(np.float32)
+    bg = np.median(np.concatenate([small[:5, :5].reshape(-1, 3), small[:5, -5:].reshape(-1, 3), small[-5:, :5].reshape(-1, 3), small[-5:, -5:].reshape(-1, 3)]), axis=0)
+    fg = (np.linalg.norm(small - bg, axis=2) > 60).astype(np.uint8)
+    n, lab, st, _ = cv2.connectedComponentsWithStats(fg, 8)
+    if n < 2:
+        return {"error": "card not found"}
+    i = 1 + int(np.argmax(st[1:, cv2.CC_STAT_AREA]))
+    x, y, bw, bh = (st[i, :4] / s).astype(int)
+    px_mm = bw / CARD_MM
+    out = {"px_per_mm": round(px_mm, 1), "bbox": [int(x), int(y), int(bw), int(bh)], "corners": {}}
+    P = int(12 * px_mm)
+    m = int(1.5 * px_mm)
+    for name, (cx, cy) in {"tl": (x, y), "tr": (x + bw, y), "bl": (x, y + bh), "br": (x + bw, y + bh)}.items():
+        x0 = cx - m if name[1] == "l" else cx - P
+        y0 = cy - m if name[0] == "t" else cy - P
+        x0, y0 = max(0, x0), max(0, y0)
+        patch = Image.fromarray(a[y0:y0 + P + m, x0:x0 + P + m])
+        try:
+            out["corners"][name] = corner_patch(patch, name, px_mm, radius_mm)
+        except Exception as e:
+            out["corners"][name] = {"error": str(e)[:80]}
+    # edges and colour on the whole card with its background margin
+    mg = int(0.04 * bw)
+    crop = Image.fromarray(a[max(0, y - mg): y + bh + mg, max(0, x - mg): x + bw + mg])
+    try:
+        whole = measure(crop, int(round((radius_mm or 0) / CARD_MM * 630)))
+        out["edges"] = whole.get("edges")
+        out["blur_px"] = whole.get("blur_px")
+    except Exception as e:
+        out["edges"] = {"error": str(e)[:80]}
+    return out

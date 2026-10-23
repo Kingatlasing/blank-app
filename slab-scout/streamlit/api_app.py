@@ -305,6 +305,23 @@ async def gb_result(request: Request):
     return Response(data, media_type="application/gzip", headers={"Content-Disposition": 'attachment; filename="slabscout-gradebench.json.gz"'})
 
 
+async def cal_start(request: Request):
+    from core import gradebench
+    q = request.query_params
+    return JSONResponse(gradebench.cal_start(q.get("list") or "", min(max(int(q.get("limit") or 600), 1), 3000), max(int(q.get("offset") or 0), 0)))
+
+
+async def cal_status(request: Request):
+    from core import gradebench
+    return JSONResponse(gradebench.cal_status())
+
+
+async def cal_result(request: Request):
+    from core import gradebench
+    from starlette.responses import Response
+    return Response(await run_in_threadpool(gradebench.cal_result_gz), media_type="application/gzip")
+
+
 app = st.App(
     "scan_page.py",
     routes=[Route("/api/health", health), Route("/api/scan", scan, methods=["POST"]), Route("/api/scan_url", scan_url), Route("/api/grades", grades), Route("/api/ocr", read, methods=["POST"]),
@@ -313,6 +330,7 @@ app = st.App(
             Route("/api/learn/seed", learn_seed, methods=["POST"]),
             Route("/api/gradebench/start", gb_start), Route("/api/gradebench/status", gb_status), Route("/api/gradebench/stop", gb_stop),
             Route("/api/gradebench/result", gb_result),
+            Route("/api/cal/start", cal_start), Route("/api/cal/status", cal_status), Route("/api/cal/result", cal_result),
             Route("/api/bench/start", bench_start), Route("/api/bench/status", bench_status), Route("/api/bench/stop", bench_stop),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],
     middleware=[Middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])],
