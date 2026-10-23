@@ -77,6 +77,9 @@ def _shrink(data: bytes | None, long_side: int = 3000) -> bytes | None:
     im = Image.open(io.BytesIO(data))
     if max(im.size) <= long_side:
         return data
+    # decode JPEGs at a reduced scale straight away: a 27 MP scan decoded in full is ~80 MB per side and was
+    # running the server out of memory
+    im.draft("RGB", (long_side, long_side))
     im = im.convert("RGB")
     im.thumbnail((long_side, long_side))
     buf = io.BytesIO()
