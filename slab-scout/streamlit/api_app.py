@@ -101,7 +101,8 @@ async def scan(request: Request):
         front, back = await _photo(form, "front"), await _photo(form, "back")
         # extra grading photos: each side tilted toward one light, and close-ups of the corners
         extras = {}
-        for k in ("tilt_front", "tilt_back", "corner_tl", "corner_tr", "corner_bl", "corner_br",
+        for k in ("tilt_front", "tilt_front_2", "tilt_front_3", "tilt_front_4", "tilt_back", "tilt_back_2",
+                  "corner_tl", "corner_tr", "corner_bl", "corner_br",
                   "back_corner_tl", "back_corner_tr", "back_corner_bl", "back_corner_br"):
             v = await _photo(form, k)
             if v:

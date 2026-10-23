@@ -22,6 +22,7 @@ import { Card as CatCard, closestRemote, GRADE_OPTIONS, GRADE_SUB, gradedPrice, 
 import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip, Sheet, SheetOption } from '../components/cards';
 import { Icon } from '../components/visual';
+import GraderGuide, { aimText, lightFrom, type ShotAim } from '../components/GraderGuide';
 import { useLayout } from '../layout';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
@@ -81,6 +82,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const [side, setSide] = useState<GradeSide>('front');
   // optional extra grading photos: the card tilted toward one light, so scratches / dents / print lines catch it
   const [extras, setExtras] = useState<Partial<Record<ExtraSide, Shot | null>>>({});
+  const [queue, setQueue] = useState<GradeSide[]>([]); // guided set of grading photos still to take
   const [inspTilt, setInspTilt] = useState<{ f: Inspection | null; b: Inspection | null }>({ f: null, b: null });
   // live scanner: the next tap scans the back of this result (the front alone wasn't enough)
   const [backFor, setBackFor] = useState<string | null>(null);
@@ -176,6 +178,30 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   const lastRef = useRef<ScanItem | null>(null);
   lastRef.current = last;
   const camOn = phase === 'capture' && !!perm?.granted && !showHistory;
+  // light check for grading photos: a tiny picture every ~1.5 s, too dark / glare called out before the shot
+  const [light, setLight] = useState<'ok' | 'dark' | 'glare' | 'unknown'>('unknown');
+  useEffect(() => {
+    if (!(camOn && mode === 'grade')) return;
+    let alive = true;
+    let busyL = false;
+    const t = setInterval(async () => {
+      if (busyL || !cam.current || busy) return;
+      busyL = true;
+      try {
+        const pic: any = await cam.current.takePictureAsync({ quality: 0.05, skipProcessing: true, shutterSound: false } as any);
+        const px = await pixels(pic.uri, 24, 32);
+        if (alive) setLight(lightFrom(px.data));
+      } catch {
+        /* camera busy: try next time */
+      } finally {
+        busyL = false;
+      }
+    }, 1500);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [camOn, mode, side]);
   useEffect(() => {
     onImmersive?.(camOn);
   }, [camOn]);
@@ -207,6 +233,11 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     }
     if (side !== 'front' && side !== 'back') {
       setExtras((x) => ({ ...x, [side]: s }));
+      if (queue.length) {  // guided set: straight on to the next angle
+        setSide(queue[0]);
+        setQueue(queue.slice(1));
+        return;
+      }
       setPhase('review');
       return;
     }
@@ -363,6 +394,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setShowHistory(false);
     setFront(shot);
     setExtras({});
+    setQueue([]);
     // grading looks at both sides: use the back already scanned, else ask for it next
     const b = shots.current.get(`${it.id}:back`) || null;
     setBack(b);
@@ -689,6 +721,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
     setBack(null);
     setSide('front');
     setExtras({});
+    setQueue([]);
     setInspTilt({ f: null, b: null });
     setCandidates([]);
     setSlab(null);
@@ -1062,12 +1095,23 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
                 <GuidePic step={g.id} size={L.sp(74)} />
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={{ color: '#fff', fontSize: L.fs(12), lineHeight: L.fs(16) }}>{g.how}</Text>
+                  <Text style={{ color: C.lime, fontSize: L.fs(11), lineHeight: L.fs(15) }}>{aimText(AIM[g.id])}</Text>
                   <Text style={{ color: C.ink2, fontSize: L.fs(11), fontWeight: '700' }}>Checks: {g.finds}</Text>
                 </View>
               </View>
             );
           })()}
         </View>
+        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: L.bottom + L.sp(120), alignItems: 'center' }}>
+          <GraderGuide aim={AIM[side]} light={light} />
+        </View>
+        {(queue.length || (side !== 'front' && side !== 'back')) ? (
+          <View style={{ position: 'absolute', right: L.gutter, bottom: L.bottom + L.sp(120) }}>
+            <Btn label={queue.length ? `Skip (${queue.length} left)` : 'Done'} onPress={() => {
+              if (queue.length) { setSide(queue[0]); setQueue(queue.slice(1)); } else setPhase('review');
+            }} />
+          </View>
+        ) : null}
         <View style={[S.row, { position: 'absolute', left: 0, right: 0, bottom: 0, justifyContent: 'space-around', paddingTop: L.sp(16), paddingBottom: L.bottom + L.sp(20), backgroundColor: 'rgba(10,11,16,0.7)' }]}>
           <Pressable style={st.side} onPress={pick}>
             <Icon name="photo" size={L.fs(22)} color="#fff" />
@@ -1139,6 +1183,14 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
               </View>
             );
           })}
+          <Btn label="Guided grader photos: all angles + corners" onPress={() => {
+            const all = GRADE_STEPS.filter((g) => g.optional).map((g) => g.id).filter((id) => !extras[id as ExtraSide]);
+            if (!all.length) return;
+            setQueue(all.slice(1));
+            setSide(all[0]);
+            setPhase('capture');
+          }} />
+          <Text style={S.muted}>Like a grader's imaging box: the card stays flat, the phone takes it from each side at an angle and every corner up close. The camera shows where to hold the phone and checks the light; you can skip any shot.</Text>
           <Text style={S.eyebrow}>Grader-level corners (optional)</Text>
           <Text style={S.muted}>Graders photograph corners at about 1200 dots per inch. A close-up of each corner gets the phone there: whitening, fraying and small dings that a whole-card photo can't show. Tap a corner to take it; any you skip are judged from the full photo.</Text>
           {(['c', 'b'] as const).map((sd) => (
@@ -1739,12 +1791,18 @@ const st = StyleSheet.create({
   big: { color: C.ink, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
 });
 
-type GradeSide = 'front' | 'back' | 'tiltF' | 'tiltB' | CornerSide;
+type GradeSide = 'front' | 'back' | 'tiltF' | 'tiltF2' | 'tiltF3' | 'tiltF4' | 'tiltB' | 'tiltB2' | CornerSide;
 type CornerSide = 'cTL' | 'cTR' | 'cBL' | 'cBR' | 'bTL' | 'bTR' | 'bBL' | 'bBR';
 type ExtraSide = Exclude<GradeSide, 'front' | 'back'>;
 /** Server field for each extra grading photo. */
-const EXTRA_FIELD: Record<ExtraSide, string> = { tiltF: 'tilt_front', tiltB: 'tilt_back', cTL: 'corner_tl', cTR: 'corner_tr', cBL: 'corner_bl', cBR: 'corner_br',
+const EXTRA_FIELD: Record<ExtraSide, string> = { tiltF: 'tilt_front', tiltF2: 'tilt_front_2', tiltF3: 'tilt_front_3', tiltF4: 'tilt_front_4', tiltB: 'tilt_back', tiltB2: 'tilt_back_2', cTL: 'corner_tl', cTR: 'corner_tr', cBL: 'corner_bl', cBR: 'corner_br',
   bTL: 'back_corner_tl', bTR: 'back_corner_tr', bBL: 'back_corner_bl', bBR: 'back_corner_br' };
+/** Where the phone should be for each grading photo (shown live by GraderGuide). Tilted shots look back across the
+ * card from one side at ~30 degrees, like the low-angle lights in a grader's imaging box. */
+const AIM: Record<GradeSide, ShotAim> = { front: { kind: 'flat' }, back: { kind: 'flat' },
+  tiltF: { kind: 'tilt', from: 'bottom', deg: 30 }, tiltF2: { kind: 'tilt', from: 'top', deg: 30 }, tiltF3: { kind: 'tilt', from: 'left', deg: 30 }, tiltF4: { kind: 'tilt', from: 'right', deg: 30 },
+  tiltB: { kind: 'tilt', from: 'bottom', deg: 30 }, tiltB2: { kind: 'tilt', from: 'top', deg: 30 },
+  cTL: { kind: 'closeup' }, cTR: { kind: 'closeup' }, cBL: { kind: 'closeup' }, cBR: { kind: 'closeup' }, bTL: { kind: 'closeup' }, bTR: { kind: 'closeup' }, bBL: { kind: 'closeup' }, bBR: { kind: 'closeup' } };
 const CORNER_NAME: Record<string, string> = { TL: 'top-left', TR: 'top-right', BL: 'bottom-left', BR: 'bottom-right' };
 
 /** Surface subgrade from the tilted (raking-light) photos: they show scratches, dents and print lines that flat photos
@@ -1761,8 +1819,14 @@ function tiltSurfaceGrade(flat: number, f: Inspection | null, b: Inspection | nu
 export const GRADE_STEPS: { id: GradeSide; title: string; how: string; finds: string; optional?: boolean; corner?: boolean }[] = [
   { id: 'front', title: 'Front, flat', how: 'Card out of its sleeve, face up, flat on a plain dark surface. Phone straight above it, card filling the frame, even light with no reflections.', finds: 'Centering, corners, edges and surface' },
   { id: 'back', title: 'Back, flat', how: 'Flip it over in the same spot and the same light. Same distance, straight above.', finds: 'Back centering, back corners and edges, back surface' },
-  { id: 'tiltF', title: 'Front, tilted to one light', how: 'One lamp or window to the side. Tilt the card about 30° toward it so the light skims across the face: scratches, dents and print lines light up as bright lines. Keep the whole card in the frame.', finds: 'Scratches, dents, print lines, indentations', optional: true },
-  { id: 'tiltB', title: 'Back, tilted to one light', how: 'Same as the front: back facing up, tilted about 30° toward the light, whole card in the frame.', finds: 'Back scratches and dents', optional: true },
+  // angled shots, like the several light angles in a grader's imaging box: the card stays flat, the phone moves to
+  // one side and looks back across it at ~30 degrees (the guide shows the angle live)
+  { id: 'tiltF', title: 'Front, angled from below', how: 'Card flat, one lamp or window beyond its top edge. Phone at the bottom edge, tipped about 30° to look back across the card.', finds: 'Scratches, dents, print lines, wrinkles', optional: true },
+  { id: 'tiltF2', title: 'Front, angled from above', how: 'Phone at the top edge, tipped about 30° back across the card, light from beyond the bottom edge.', finds: 'Scratches and dents that run the other way', optional: true },
+  { id: 'tiltF3', title: 'Front, angled from the left', how: 'Phone at the left edge, tipped about 30°, light from the right.', finds: 'Vertical scratches, edge dents', optional: true },
+  { id: 'tiltF4', title: 'Front, angled from the right', how: 'Phone at the right edge, tipped about 30°, light from the left.', finds: 'Vertical scratches, edge dents', optional: true },
+  { id: 'tiltB', title: 'Back, angled from below', how: 'Back facing up. Phone at the bottom edge, tipped about 30° back across the card.', finds: 'Back scratches, dents, wrinkles', optional: true },
+  { id: 'tiltB2', title: 'Back, angled from above', how: 'Phone at the top edge, tipped about 30° back across the card.', finds: 'Back scratches and dents', optional: true },
   // corner close-ups: graders scan at ~1200 ppi; a phone close to one corner (2x lens, or as close as it focuses)
   // sees whitening, fraying and dings a whole-card photo can't. Matched to the full photo for their scale.
   ...(['TL', 'TR', 'BL', 'BR'] as const).flatMap((c) => [
@@ -1773,8 +1837,8 @@ export const GRADE_STEPS: { id: GradeSide; title: string; how: string; finds: st
 
 /** Example drawing for a grading step: dark table, the card (flat or tilted in perspective) and the lamp. */
 export function GuidePic({ step, size = 120 }: { step: GradeSide; size?: number }) {
-  const tilt = step === 'tiltF' || step === 'tiltB';
-  const back = step === 'back' || step === 'tiltB';
+  const tilt = step.startsWith('tilt');
+  const back = step === 'back' || step.startsWith('tiltB') || step.startsWith('b');
   const w = size * 0.5;
   const h = w * (88 / 63);
   return (
@@ -1787,7 +1851,7 @@ export function GuidePic({ step, size = 120 }: { step: GradeSide; size?: number 
           {tilt ? <View style={{ position: 'absolute', left: '15%', top: '30%', width: '70%', height: 2, backgroundColor: '#fff', opacity: 0.9, transform: [{ rotateZ: '-20deg' }] }} /> : null}
         </View>
       </View>
-      <Text style={{ position: 'absolute', bottom: 4, color: C.ink2, fontSize: size * 0.085, fontWeight: '700' }}>{tilt ? '~30° toward the light' : 'flat · straight above'}</Text>
+      <Text style={{ position: 'absolute', bottom: 4, color: C.ink2, fontSize: size * 0.085, fontWeight: '700' }}>{tilt ? '~30° from one side' : 'flat · straight above'}</Text>
     </View>
   );
 }

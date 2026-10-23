@@ -148,10 +148,12 @@ def _grade_extras(res: dict, f: dict, b: dict | None, subs: dict, defects: list,
         except Exception:
             return None
     # surface from tilted photos
-    for side, key, base in (("front", "tilt_front", f), ("back", "tilt_back", b)):
+    tilts = [("front", k, f) for k in ("tilt_front", "tilt_front_2", "tilt_front_3", "tilt_front_4")] + \
+            [("back", k, b) for k in ("tilt_back", "tilt_back_2")]
+    for side, key, base in tilts:
         if key in ex and base and base.get("full") is not None:
             t = tagmeasure.tilt_surface(base["full"], img(key)) if img(key) else None
-            out[f"tilt_{side}"] = t
+            out[key] = t
             for d in tagmeasure.tilt_defects(t, side):
                 d["cap"] = grading.defect_cap(d["kind"], d["level"], side)
                 d["what"] = grading.DEFECTS[d["kind"]]["what"]
