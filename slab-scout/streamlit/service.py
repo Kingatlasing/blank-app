@@ -163,9 +163,14 @@ def _grade(res: dict, x: dict | None) -> dict:
             L = Lc
     front_c = vision.Centering(L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"]) if L else f["centering"]
     off = (x.get("c") or {}).get("_official") if x and x["kind"] == "tcgdb" else None
-    rad = condition.corner_radius_px(game, style)
-    if sid and style != "vintage":
-        rad = catalog.corner_radius_px(sid) or rad  # this set's own corner shape, measured on its photos
+    # factory corner shape: the set's own (published / measured on its clean photos), else what this photo clearly
+    # shows, else the game's / era's standard - a square-cut card is never judged as rounded, nor the reverse
+    try:
+        from core import learn
+        corner_meas = learn.corner_radius(f["card"])
+    except Exception:
+        corner_meas = None
+    rad, corner_kind, corner_src = condition.factory_corner(catalog.corner_radius_px(sid) if sid else None, corner_meas, game, style)
     fi = condition.inspect_card(vision.tight_card(f["card"], L), official=off, corner_radius=rad, foil_border=style == "full_art")
     sp = catalog.set_profile(sid) if sid else None
     condition.apply_baseline(fi, (sp or {}).get("sub"))  # this set's design, learned from clean photos
@@ -261,7 +266,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     # the card's format (die-cut, relic, mini, plate, square corners...) changes what is judged and who grades it
     cs = catalog.corner_shape(sid) if sid else None
     fmt = grading.card_format(variant, name, style, rad)
-    if fmt == "standard" and cs and cs.get("shape") == "square":
+    if fmt == "standard" and (corner_kind == "square" or (cs and cs.get("shape") == "square")):
         fmt = "square"
     fd = grading.CARD_FORMATS.get(fmt, {})
     g["format"] = fmt
@@ -275,6 +280,7 @@ def _grade(res: dict, x: dict | None) -> dict:
         g["format_notes"].insert(0, f"This set has {cs['text']}" + (f" (about {cs['radius_mm']:g} mm)" if cs.get("radius_mm") else "") +
                                  ": the corner check judges wear against that shape, not against a standard corner.")
     g["corner_radius_px"] = rad
+    g["corner_factory"] = {"shape": corner_kind, "source": corner_src, "measured_per_mille": corner_meas}
     g["method"] = "automatic inspection"
     g["style"] = style
     g["centering"] = {"front": _centering_json(front_c), "back": _centering_json(back_c)}

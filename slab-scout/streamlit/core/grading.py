@@ -214,11 +214,10 @@ def all_graders(subs: dict[str, float], front_worst, back_worst, tcg: bool = Tru
     return out
 
 
-# How far the photo inspection's corner / edge / surface subgrades are trusted. Fitted on 159 TAG-graded cards
-# (60 Pokemon Base Set, 99 MTG and sports) measured by the server from TAG's own scans: the readings barely tracked
-# TAG's grade (correlation ~0 on MTG / sports), so a typical grade nudged by them beat taking them at face value
-# (average miss 1.50 vs 2.8-3.9). Raise "weight" as the detectors improve and re-test.
-EVIDENCE = {"prior": 8.5, "weight": 0.1}
+# How far the photo inspection's corner / edge / surface subgrades are trusted. A "typical grade" prior fitted on
+# 159 TAG-graded cards lowered the average miss (1.50 vs 2.8-3.9) but guessed rather than graded, so it is switched
+# off: the grade comes from what is measured, by each company's standards.
+EVIDENCE = {"prior": 10.0, "weight": 1.0}  # off: grades follow the inspection and the companies' rules as measured
 
 
 def weigh_evidence(sub: float) -> float:

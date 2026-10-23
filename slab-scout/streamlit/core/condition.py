@@ -112,6 +112,26 @@ def corner_radius_px(game: str = "", style: str = "", width_px: int = 630) -> in
     return int(round(mm / wmm * width_px))
 
 
+def factory_corner(set_radius_px: int | None, measured_per_mille: list[int] | None, game: str = "", style: str = "",
+                   width_px: int = 630) -> tuple[int, str, str]:
+    """The card's factory corner shape, so a square-cut card is never judged as a worn rounded one and a rounded card
+    is never marked down for its factory rounding. Returns (radius px on a `width_px` card, 'square' / 'rounded', source).
+    1. The set's own shape (a published rule, or measured on that set's clean photos) wins.
+    2. Otherwise the photo decides when it is clear: three or more corners sharp (under ~0.75 mm) = square-cut, the
+       other corners' rounding is wear; or the corners all showing the same factory curve (none sharp) = rounded.
+    3. Otherwise the game's / era's standard."""
+    if set_radius_px is not None:
+        return int(set_radius_px), ("square" if set_radius_px <= 2 else "rounded"), "set"
+    v = sorted(m for m in (measured_per_mille or []) if m is not None and m >= 0)
+    if len(v) >= 3:
+        if sum(m < 12 for m in v) >= 3:  # three sharp corners: square-cut (a tight crop can fake one or two)
+            return 0, "square", "photo"
+        if v[0] >= 15 and 25 <= v[0] <= 80 and v[1] - v[0] <= 10:
+            return int(round(v[0] / 1000 * width_px)), "rounded", "photo"  # wear only adds rounding: the smallest is factory
+    r = corner_radius_px(game, style, width_px)
+    return r, ("square" if r == 0 else "rounded"), "standard"
+
+
 def _rounding_expected(c: int, radius_px: int = 32) -> np.ndarray:
     """Mask of the area outside the factory rounded corner, for the top-left box (plus slack for the crop)."""
     r = radius_px + 6 if radius_px else 0
