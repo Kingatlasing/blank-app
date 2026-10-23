@@ -1,0 +1,3035 @@
+{
+ "id": "2026-historic-autographs-1963",
+ "name": "2026 Historic Autographs 1963: Moments That Became History",
+ "year": "2026",
+ "brand": "Historic Autographs",
+ "category": "Non-sport",
+ "release_date": "2026-05-06",
+ "box": "Hobby: 8 packs x 4 cards; about 3 relics/inserts per box",
+ "odds": [
+  {
+   "type": "Cut Signatures",
+   "odds": "1:4 boxes"
+  },
+  {
+   "type": "Silver Half Dollars (Coin)",
+   "odds": "1:33 boxes"
+  },
+  {
+   "type": "Historic DNA",
+   "odds": "1:25 boxes"
+  },
+  {
+   "type": "Vintage Fashion Relic",
+   "odds": "1:3 boxes"
+  },
+  {
+   "type": "Original Comic Book Relics",
+   "odds": "1:1 boxes"
+  },
+  {
+   "type": "Icon Worn Fabric Relic",
+   "odds": "1:1 boxes"
+  },
+  {
+   "type": "Film Clip Relic",
+   "odds": "1:1.67 boxes"
+  },
+  {
+   "type": "Year in Review Metal Insert",
+   "odds": "1-2 per box"
+  }
+ ],
+ "notes": "Autographs (200+ signers, most 1-11 copies) are not all listed here; see the official checklist PDF.",
+ "sources": [
+  "https://www.historicautographcompany.com/_files/ugd/296681_bb7cea5b8c874d538bbf9549a951d746.pdf",
+  "https://gogts.net/2026-historic-autographs-1963-trading-cards/"
+ ],
+ "cards": [
+  {
+   "number": "1",
+   "name": "The 49th Rose Bowl, New Year's Day, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "1",
+   "name": "The 49th Rose Bowl, New Year's Day, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "1",
+   "name": "The 49th Rose Bowl, New Year's Day, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "1",
+   "name": "The 49th Rose Bowl, New Year's Day, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "2",
+   "name": "Battle of Ap Bac, January 2, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "2",
+   "name": "Battle of Ap Bac, January 2, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "2",
+   "name": "Battle of Ap Bac, January 2, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "2",
+   "name": "Battle of Ap Bac, January 2, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "3",
+   "name": "Rogers Hornsby, January 5, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "3",
+   "name": "Rogers Hornsby, January 5, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "3",
+   "name": "Rogers Hornsby, January 5, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "3",
+   "name": "Rogers Hornsby, January 5, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "4",
+   "name": "George Wallace, January 14, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "4",
+   "name": "George Wallace, January 14, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "4",
+   "name": "George Wallace, January 14, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "4",
+   "name": "George Wallace, January 14, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "5",
+   "name": "Bill Russell, Wins the NBA MVP Award",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "5",
+   "name": "Bill Russell, Wins the NBA MVP Award",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "5",
+   "name": "Bill Russell, Wins the NBA MVP Award",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "5",
+   "name": "Bill Russell, Wins the NBA MVP Award",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "6",
+   "name": "Colt .45 Malt Liquor, \"The Power of the West\"",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "6",
+   "name": "Colt .45 Malt Liquor, \"The Power of the West\"",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "6",
+   "name": "Colt .45 Malt Liquor, \"The Power of the West\"",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "6",
+   "name": "Colt .45 Malt Liquor, \"The Power of the West\"",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "7",
+   "name": "The First Pro Football HoF Class, January 29, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "7",
+   "name": "The First Pro Football HoF Class, January 29, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "7",
+   "name": "The First Pro Football HoF Class, January 29, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "7",
+   "name": "The First Pro Football HoF Class, January 29, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "8",
+   "name": "Ball Chair by Eero Aarnio, A Swiveling Spherical Cocoon",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "8",
+   "name": "Ball Chair by Eero Aarnio, A Swiveling Spherical Cocoon",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "8",
+   "name": "Ball Chair by Eero Aarnio, A Swiveling Spherical Cocoon",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "8",
+   "name": "Ball Chair by Eero Aarnio, A Swiveling Spherical Cocoon",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "9",
+   "name": "Embargo on Cuba, July 8, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "9",
+   "name": "Embargo on Cuba, July 8, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "9",
+   "name": "Embargo on Cuba, July 8, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "9",
+   "name": "Embargo on Cuba, July 8, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "10",
+   "name": "Michael Jordan is Born, February 17, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "10",
+   "name": "Michael Jordan is Born, February 17, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "10",
+   "name": "Michael Jordan is Born, February 17, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "10",
+   "name": "Michael Jordan is Born, February 17, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "11",
+   "name": "Thomas Pynchon's V. is Published, March 18, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "11",
+   "name": "Thomas Pynchon's V. is Published, March 18, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "11",
+   "name": "Thomas Pynchon's V. is Published, March 18, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "11",
+   "name": "Thomas Pynchon's V. is Published, March 18, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "12",
+   "name": "How the West Was Won, #2 Box Office Film of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "12",
+   "name": "How the West Was Won, #2 Box Office Film of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "12",
+   "name": "How the West Was Won, #2 Box Office Film of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "12",
+   "name": "How the West Was Won, #2 Box Office Film of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "13",
+   "name": "Kessler Twins, February 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "13",
+   "name": "Kessler Twins, February 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "13",
+   "name": "Kessler Twins, February 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "13",
+   "name": "Kessler Twins, February 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "14",
+   "name": "Tiny Lund Wins Daytona 500, February 24, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "14",
+   "name": "Tiny Lund Wins Daytona 500, February 24, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "14",
+   "name": "Tiny Lund Wins Daytona 500, February 24, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "14",
+   "name": "Tiny Lund Wins Daytona 500, February 24, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "15",
+   "name": "Patsy Cline Airplane Crash, March 5, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "15",
+   "name": "Patsy Cline Airplane Crash, March 5, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "15",
+   "name": "Patsy Cline Airplane Crash, March 5, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "15",
+   "name": "Patsy Cline Airplane Crash, March 5, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "16",
+   "name": "Hula Hoop Patent, March 5, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "16",
+   "name": "Hula Hoop Patent, March 5, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "16",
+   "name": "Hula Hoop Patent, March 5, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "16",
+   "name": "Hula Hoop Patent, March 5, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "17",
+   "name": "Beatlemania, Phenomena in the UK",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "17",
+   "name": "Beatlemania, Phenomena in the UK",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "17",
+   "name": "Beatlemania, Phenomena in the UK",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "17",
+   "name": "Beatlemania, Phenomena in the UK",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "18",
+   "name": "Loyola Chicago, March 23, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "18",
+   "name": "Loyola Chicago, March 23, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "18",
+   "name": "Loyola Chicago, March 23, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "18",
+   "name": "Loyola Chicago, March 23, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "19",
+   "name": "\"Surfin' U.S.A.\", March 4, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "19",
+   "name": "\"Surfin' U.S.A.\", March 4, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "19",
+   "name": "\"Surfin' U.S.A.\", March 4, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "19",
+   "name": "\"Surfin' U.S.A.\", March 4, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "20",
+   "name": "Janet Leigh, Moving Away from Psycho",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "20",
+   "name": "Janet Leigh, Moving Away from Psycho",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "20",
+   "name": "Janet Leigh, Moving Away from Psycho",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "20",
+   "name": "Janet Leigh, Moving Away from Psycho",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "21",
+   "name": "The Kingsmen's \"Louie Louie\", No. 2 on the Billboard Singles Chart",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "21",
+   "name": "The Kingsmen's \"Louie Louie\", No. 2 on the Billboard Singles Chart",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "21",
+   "name": "The Kingsmen's \"Louie Louie\", No. 2 on the Billboard Singles Chart",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "21",
+   "name": "The Kingsmen's \"Louie Louie\", No. 2 on the Billboard Singles Chart",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "22",
+   "name": "Jack Nicklaus Wins Masters, April 7, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "22",
+   "name": "Jack Nicklaus Wins Masters, April 7, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "22",
+   "name": "Jack Nicklaus Wins Masters, April 7, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "22",
+   "name": "Jack Nicklaus Wins Masters, April 7, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "23",
+   "name": "Pete Rose Debut, April 8, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "23",
+   "name": "Pete Rose Debut, April 8, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "23",
+   "name": "Pete Rose Debut, April 8, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "23",
+   "name": "Pete Rose Debut, April 8, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "24",
+   "name": "Lawrence of Arabia, April 8, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "24",
+   "name": "Lawrence of Arabia, April 8, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "24",
+   "name": "Lawrence of Arabia, April 8, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "24",
+   "name": "Lawrence of Arabia, April 8, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "25",
+   "name": "USS Thresher, April 10, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "25",
+   "name": "USS Thresher, April 10, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "25",
+   "name": "USS Thresher, April 10, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "25",
+   "name": "USS Thresher, April 10, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "26",
+   "name": "Letter from a Birmingham Jail, April 16, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "26",
+   "name": "Letter from a Birmingham Jail, April 16, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "26",
+   "name": "Letter from a Birmingham Jail, April 16, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "26",
+   "name": "Letter from a Birmingham Jail, April 16, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "27",
+   "name": "Elvis Presley, Movies and Music",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "27",
+   "name": "Elvis Presley, Movies and Music",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "27",
+   "name": "Elvis Presley, Movies and Music",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "27",
+   "name": "Elvis Presley, Movies and Music",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "28",
+   "name": "Boston Celtics, Sixth consecutive NBA Championship",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "28",
+   "name": "Boston Celtics, Sixth consecutive NBA Championship",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "28",
+   "name": "Boston Celtics, Sixth consecutive NBA Championship",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "28",
+   "name": "Boston Celtics, Sixth consecutive NBA Championship",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "29",
+   "name": "Buddy Rogers, April 11, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "29",
+   "name": "Buddy Rogers, April 11, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "29",
+   "name": "Buddy Rogers, April 11, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "29",
+   "name": "Buddy Rogers, April 11, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "30",
+   "name": "TaB Soda, \"Keep Tabs on Your Weight\"",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "30",
+   "name": "TaB Soda, \"Keep Tabs on Your Weight\"",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "30",
+   "name": "TaB Soda, \"Keep Tabs on Your Weight\"",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "30",
+   "name": "TaB Soda, \"Keep Tabs on Your Weight\"",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "31",
+   "name": "Mercury-Atlas 9, May 15, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "31",
+   "name": "Mercury-Atlas 9, May 15, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "31",
+   "name": "Mercury-Atlas 9, May 15, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "31",
+   "name": "Mercury-Atlas 9, May 15, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "32",
+   "name": "Earl Warren, May 20, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "32",
+   "name": "Earl Warren, May 20, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "32",
+   "name": "Earl Warren, May 20, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "32",
+   "name": "Earl Warren, May 20, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "33",
+   "name": "Mickey Mantle Hits HR off Facade, May 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "33",
+   "name": "Mickey Mantle Hits HR off Facade, May 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "33",
+   "name": "Mickey Mantle Hits HR off Facade, May 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "33",
+   "name": "Mickey Mantle Hits HR off Facade, May 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "34",
+   "name": "Woolworth's Sit-In, May 28, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "34",
+   "name": "Woolworth's Sit-In, May 28, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "34",
+   "name": "Woolworth's Sit-In, May 28, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "34",
+   "name": "Woolworth's Sit-In, May 28, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "35",
+   "name": "Parnelli Jones Wins Indianapolis 500, May 30, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "35",
+   "name": "Parnelli Jones Wins Indianapolis 500, May 30, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "35",
+   "name": "Parnelli Jones Wins Indianapolis 500, May 30, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "35",
+   "name": "Parnelli Jones Wins Indianapolis 500, May 30, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "36",
+   "name": "First NHL Entry Draft, June 11, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "36",
+   "name": "First NHL Entry Draft, June 11, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "36",
+   "name": "First NHL Entry Draft, June 11, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "36",
+   "name": "First NHL Entry Draft, June 11, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "37",
+   "name": "The Feminine Mystique, February 19, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "37",
+   "name": "The Feminine Mystique, February 19, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "37",
+   "name": "The Feminine Mystique, February 19, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "37",
+   "name": "The Feminine Mystique, February 19, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "38",
+   "name": "First Lung Transplant, June 11, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "38",
+   "name": "First Lung Transplant, June 11, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "38",
+   "name": "First Lung Transplant, June 11, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "38",
+   "name": "First Lung Transplant, June 11, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "39",
+   "name": "Elizabeth Taylor, Cleopatra",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "39",
+   "name": "Elizabeth Taylor, Cleopatra",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "39",
+   "name": "Elizabeth Taylor, Cleopatra",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "39",
+   "name": "Elizabeth Taylor, Cleopatra",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "40",
+   "name": "Activist Medgar Evers Murdered, June 12, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "40",
+   "name": "Activist Medgar Evers Murdered, June 12, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "40",
+   "name": "Activist Medgar Evers Murdered, June 12, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "40",
+   "name": "Activist Medgar Evers Murdered, June 12, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "41",
+   "name": "Cleopatra, Top Box Office Film of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "41",
+   "name": "Cleopatra, Top Box Office Film of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "41",
+   "name": "Cleopatra, Top Box Office Film of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "41",
+   "name": "Cleopatra, Top Box Office Film of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "42",
+   "name": "John Wayne in Donovan's Reef, June 12, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "42",
+   "name": "John Wayne in Donovan's Reef, June 12, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "42",
+   "name": "John Wayne in Donovan's Reef, June 12, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "42",
+   "name": "John Wayne in Donovan's Reef, June 12, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "43",
+   "name": "Abington School District v. Schempp, June 17, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "43",
+   "name": "Abington School District v. Schempp, June 17, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "43",
+   "name": "Abington School District v. Schempp, June 17, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "43",
+   "name": "Abington School District v. Schempp, June 17, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "44",
+   "name": "ASCII, June 17, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "44",
+   "name": "ASCII, June 17, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "44",
+   "name": "ASCII, June 17, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "44",
+   "name": "ASCII, June 17, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "45",
+   "name": "Executive Order 11114 Issued, June 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "45",
+   "name": "Executive Order 11114 Issued, June 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "45",
+   "name": "Executive Order 11114 Issued, June 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "45",
+   "name": "Executive Order 11114 Issued, June 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "46",
+   "name": "Julius Boros Wins US Open, June 23, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "46",
+   "name": "Julius Boros Wins US Open, June 23, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "46",
+   "name": "Julius Boros Wins US Open, June 23, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "46",
+   "name": "Julius Boros Wins US Open, June 23, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "47",
+   "name": "Ich Bin Ein Berliner, June 26, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "47",
+   "name": "Ich Bin Ein Berliner, June 26, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "47",
+   "name": "Ich Bin Ein Berliner, June 26, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "47",
+   "name": "Ich Bin Ein Berliner, June 26, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "48",
+   "name": "Frank \"Home Run\" Baker, June 28, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "48",
+   "name": "Frank \"Home Run\" Baker, June 28, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "48",
+   "name": "Frank \"Home Run\" Baker, June 28, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "48",
+   "name": "Frank \"Home Run\" Baker, June 28, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "49",
+   "name": "ZIP Codes, July 1, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "49",
+   "name": "ZIP Codes, July 1, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "49",
+   "name": "ZIP Codes, July 1, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "49",
+   "name": "ZIP Codes, July 1, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "50",
+   "name": "The Great Escape Released, July 4, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "50",
+   "name": "The Great Escape Released, July 4, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "50",
+   "name": "The Great Escape Released, July 4, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "50",
+   "name": "The Great Escape Released, July 4, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "51",
+   "name": "American Wins Wimbledon!, July 6, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "51",
+   "name": "American Wins Wimbledon!, July 6, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "51",
+   "name": "American Wins Wimbledon!, July 6, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "51",
+   "name": "American Wins Wimbledon!, July 6, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "52",
+   "name": "Juan Marichal Throws a No-Hitter, June 15, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "52",
+   "name": "Juan Marichal Throws a No-Hitter, June 15, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "52",
+   "name": "Juan Marichal Throws a No-Hitter, June 15, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "52",
+   "name": "Juan Marichal Throws a No-Hitter, June 15, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "53",
+   "name": "Jack Nicklaus Wins PGA Championship, July 21, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "53",
+   "name": "Jack Nicklaus Wins PGA Championship, July 21, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "53",
+   "name": "Jack Nicklaus Wins PGA Championship, July 21, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "53",
+   "name": "Jack Nicklaus Wins PGA Championship, July 21, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "54",
+   "name": "Liston Defeats Patterson, July 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "54",
+   "name": "Liston Defeats Patterson, July 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "54",
+   "name": "Liston Defeats Patterson, July 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "54",
+   "name": "Liston Defeats Patterson, July 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "55",
+   "name": "Willie Mays, July 24, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "55",
+   "name": "Willie Mays, July 24, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "55",
+   "name": "Willie Mays, July 24, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "55",
+   "name": "Willie Mays, July 24, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "56",
+   "name": "I Have a Dream Speech, August 28, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "56",
+   "name": "I Have a Dream Speech, August 28, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "56",
+   "name": "I Have a Dream Speech, August 28, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "56",
+   "name": "I Have a Dream Speech, August 28, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "57",
+   "name": "Marvel Comics Releases Avengers #1, September 10, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "57",
+   "name": "Marvel Comics Releases Avengers #1, September 10, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "57",
+   "name": "Marvel Comics Releases Avengers #1, September 10, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "57",
+   "name": "Marvel Comics Releases Avengers #1, September 10, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "58",
+   "name": "The NFL Hall of Fame Opens, September 7, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "58",
+   "name": "The NFL Hall of Fame Opens, September 7, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "58",
+   "name": "The NFL Hall of Fame Opens, September 7, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "58",
+   "name": "The NFL Hall of Fame Opens, September 7, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "59",
+   "name": "16th Street Baptist Church, September 15, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "59",
+   "name": "16th Street Baptist Church, September 15, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "59",
+   "name": "16th Street Baptist Church, September 15, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "59",
+   "name": "16th Street Baptist Church, September 15, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "60",
+   "name": "Cap'n Crunch, Crunchy Even in Milk!",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "60",
+   "name": "Cap'n Crunch, Crunchy Even in Milk!",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "60",
+   "name": "Cap'n Crunch, Crunchy Even in Milk!",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "60",
+   "name": "Cap'n Crunch, Crunchy Even in Milk!",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "61",
+   "name": "Lava Lamp, Mesmerizing and Groovy",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "61",
+   "name": "Lava Lamp, Mesmerizing and Groovy",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "61",
+   "name": "Lava Lamp, Mesmerizing and Groovy",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "61",
+   "name": "Lava Lamp, Mesmerizing and Groovy",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "62",
+   "name": "Stan Musial, September 29, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "62",
+   "name": "Stan Musial, September 29, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "62",
+   "name": "Stan Musial, September 29, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "62",
+   "name": "Stan Musial, September 29, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "63",
+   "name": "Hank Aaron, Led the NL in HRs & RBIs",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "63",
+   "name": "Hank Aaron, Led the NL in HRs & RBIs",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "63",
+   "name": "Hank Aaron, Led the NL in HRs & RBIs",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "63",
+   "name": "Hank Aaron, Led the NL in HRs & RBIs",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "64",
+   "name": "Warren Spahn, Thirteenth 20-Win Season",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "64",
+   "name": "Warren Spahn, Thirteenth 20-Win Season",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "64",
+   "name": "Warren Spahn, Thirteenth 20-Win Season",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "64",
+   "name": "Warren Spahn, Thirteenth 20-Win Season",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "65",
+   "name": "Los Angeles Dodgers, World Series 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "65",
+   "name": "Los Angeles Dodgers, World Series 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "65",
+   "name": "Los Angeles Dodgers, World Series 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "65",
+   "name": "Los Angeles Dodgers, World Series 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "66",
+   "name": "Tom Jones, #4 Box Office Film of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "66",
+   "name": "Tom Jones, #4 Box Office Film of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "66",
+   "name": "Tom Jones, #4 Box Office Film of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "66",
+   "name": "Tom Jones, #4 Box Office Film of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "67",
+   "name": "Partial Nuclear Test Ban Treaty, October 10, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "67",
+   "name": "Partial Nuclear Test Ban Treaty, October 10, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "67",
+   "name": "Partial Nuclear Test Ban Treaty, October 10, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "67",
+   "name": "Partial Nuclear Test Ban Treaty, October 10, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "68",
+   "name": "Froot Loops, \"Follow your nose! It always knows!\"",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "68",
+   "name": "Froot Loops, \"Follow your nose! It always knows!\"",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "68",
+   "name": "Froot Loops, \"Follow your nose! It always knows!\"",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "68",
+   "name": "Froot Loops, \"Follow your nose! It always knows!\"",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "69",
+   "name": "The Philadelphia 76ers, August 6, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "69",
+   "name": "The Philadelphia 76ers, August 6, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "69",
+   "name": "The Philadelphia 76ers, August 6, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "69",
+   "name": "The Philadelphia 76ers, August 6, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "70",
+   "name": "Freedom Day School Boycott, October 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "70",
+   "name": "Freedom Day School Boycott, October 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "70",
+   "name": "Freedom Day School Boycott, October 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "70",
+   "name": "Freedom Day School Boycott, October 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "71",
+   "name": "Sandy Koufax, National League MVP 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "71",
+   "name": "Sandy Koufax, National League MVP 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "71",
+   "name": "Sandy Koufax, National League MVP 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "71",
+   "name": "Sandy Koufax, National League MVP 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "72",
+   "name": "Easy Bake Oven, The Hottest Toy of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "72",
+   "name": "Easy Bake Oven, The Hottest Toy of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "72",
+   "name": "Easy Bake Oven, The Hottest Toy of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "72",
+   "name": "Easy Bake Oven, The Hottest Toy of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "73",
+   "name": "It's a Mad, Mad, Mad, Mad World, Third Highest-Grossing Film of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "73",
+   "name": "It's a Mad, Mad, Mad, Mad World, Third Highest-Grossing Film of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "73",
+   "name": "It's a Mad, Mad, Mad, Mad World, Third Highest-Grossing Film of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "73",
+   "name": "It's a Mad, Mad, Mad, Mad World, Third Highest-Grossing Film of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "74",
+   "name": "Elston Howard, American League MVP 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "74",
+   "name": "Elston Howard, American League MVP 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "74",
+   "name": "Elston Howard, American League MVP 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "74",
+   "name": "Elston Howard, American League MVP 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "75",
+   "name": "Andy Warhol's Silver Factory, Artists, Socialites, Celebrities, and Fame",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "75",
+   "name": "Andy Warhol's Silver Factory, Artists, Socialites, Celebrities, and Fame",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "75",
+   "name": "Andy Warhol's Silver Factory, Artists, Socialites, Celebrities, and Fame",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "75",
+   "name": "Andy Warhol's Silver Factory, Artists, Socialites, Celebrities, and Fame",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "76",
+   "name": "\"Message to the Grass Roots\" Speech, November 10, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "76",
+   "name": "\"Message to the Grass Roots\" Speech, November 10, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "76",
+   "name": "\"Message to the Grass Roots\" Speech, November 10, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "76",
+   "name": "\"Message to the Grass Roots\" Speech, November 10, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "77",
+   "name": "Push Button Telephone, November 18, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "77",
+   "name": "Push Button Telephone, November 18, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "77",
+   "name": "Push Button Telephone, November 18, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "77",
+   "name": "Push Button Telephone, November 18, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "78",
+   "name": "John F. Kennedy, Public Service and Civic Responsibility",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "78",
+   "name": "John F. Kennedy, Public Service and Civic Responsibility",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "78",
+   "name": "John F. Kennedy, Public Service and Civic Responsibility",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "78",
+   "name": "John F. Kennedy, Public Service and Civic Responsibility",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "79",
+   "name": "Lee Harvey Oswald, November 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "79",
+   "name": "Lee Harvey Oswald, November 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "79",
+   "name": "Lee Harvey Oswald, November 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "79",
+   "name": "Lee Harvey Oswald, November 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "80",
+   "name": "John F. Kennedy Assassinated, November 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "80",
+   "name": "John F. Kennedy Assassinated, November 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "80",
+   "name": "John F. Kennedy Assassinated, November 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "80",
+   "name": "John F. Kennedy Assassinated, November 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "81",
+   "name": "Jacqueline Kennedy, November 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "81",
+   "name": "Jacqueline Kennedy, November 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "81",
+   "name": "Jacqueline Kennedy, November 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "81",
+   "name": "Jacqueline Kennedy, November 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "82",
+   "name": "Lyndon Baines Johnson, November 22, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "82",
+   "name": "Lyndon Baines Johnson, November 22, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "82",
+   "name": "Lyndon Baines Johnson, November 22, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "82",
+   "name": "Lyndon Baines Johnson, November 22, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "83",
+   "name": "Jack Ruby, November 24, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "83",
+   "name": "Jack Ruby, November 24, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "83",
+   "name": "Jack Ruby, November 24, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "83",
+   "name": "Jack Ruby, November 24, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "84",
+   "name": "John F. Kennedy Funeral, November 25, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "84",
+   "name": "John F. Kennedy Funeral, November 25, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "84",
+   "name": "John F. Kennedy Funeral, November 25, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "84",
+   "name": "John F. Kennedy Funeral, November 25, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "85",
+   "name": "Roger Staubach, The Heisman Trophy",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "85",
+   "name": "Roger Staubach, The Heisman Trophy",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "85",
+   "name": "Roger Staubach, The Heisman Trophy",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "85",
+   "name": "Roger Staubach, The Heisman Trophy",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "86",
+   "name": "The Warren Commission, November 29, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "86",
+   "name": "The Warren Commission, November 29, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "86",
+   "name": "The Warren Commission, November 29, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "86",
+   "name": "The Warren Commission, November 29, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "87",
+   "name": "1963 Gibson Les Paul SG guitar, The Rebel Guitar",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "87",
+   "name": "1963 Gibson Les Paul SG guitar, The Rebel Guitar",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "87",
+   "name": "1963 Gibson Les Paul SG guitar, The Rebel Guitar",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "87",
+   "name": "1963 Gibson Les Paul SG guitar, The Rebel Guitar",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "88",
+   "name": "Harvey Ball, The Round Yellow Smiley Face",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "88",
+   "name": "Harvey Ball, The Round Yellow Smiley Face",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "88",
+   "name": "Harvey Ball, The Round Yellow Smiley Face",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "88",
+   "name": "Harvey Ball, The Round Yellow Smiley Face",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "89",
+   "name": "Instant Replay in Army/Navy Game, December 7, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "89",
+   "name": "Instant Replay in Army/Navy Game, December 7, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "89",
+   "name": "Instant Replay in Army/Navy Game, December 7, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "89",
+   "name": "Instant Replay in Army/Navy Game, December 7, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "90",
+   "name": "Pan Am Flight 214 Crashes, December 8, 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "90",
+   "name": "Pan Am Flight 214 Crashes, December 8, 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "90",
+   "name": "Pan Am Flight 214 Crashes, December 8, 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "90",
+   "name": "Pan Am Flight 214 Crashes, December 8, 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "91",
+   "name": "Jim Brown, Led the NFL in Rushing Yards",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "91",
+   "name": "Jim Brown, Led the NFL in Rushing Yards",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "91",
+   "name": "Jim Brown, Led the NFL in Rushing Yards",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "91",
+   "name": "Jim Brown, Led the NFL in Rushing Yards",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "92",
+   "name": "Y.A. Tittle, The 1963 NFL MVP",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "92",
+   "name": "Y.A. Tittle, The 1963 NFL MVP",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "92",
+   "name": "Y.A. Tittle, The 1963 NFL MVP",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "92",
+   "name": "Y.A. Tittle, The 1963 NFL MVP",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "93",
+   "name": "Bobby Mitchell, NFL Leader in Receiving Yards",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "93",
+   "name": "Bobby Mitchell, NFL Leader in Receiving Yards",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "93",
+   "name": "Bobby Mitchell, NFL Leader in Receiving Yards",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "93",
+   "name": "Bobby Mitchell, NFL Leader in Receiving Yards",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "94",
+   "name": "Johnny Unitas, Led the NFL in Passing Yards",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "94",
+   "name": "Johnny Unitas, Led the NFL in Passing Yards",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "94",
+   "name": "Johnny Unitas, Led the NFL in Passing Yards",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "94",
+   "name": "Johnny Unitas, Led the NFL in Passing Yards",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "95",
+   "name": "Irma la Douce, Fifth Highest-Grossing Movie of 1963",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "95",
+   "name": "Irma la Douce, Fifth Highest-Grossing Movie of 1963",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "95",
+   "name": "Irma la Douce, Fifth Highest-Grossing Movie of 1963",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "95",
+   "name": "Irma la Douce, Fifth Highest-Grossing Movie of 1963",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "96",
+   "name": "Chicago Bears, The 1963 NFL Championship",
+   "type": "Base",
+   "print_run": null
+  },
+  {
+   "number": "96",
+   "name": "Chicago Bears, The 1963 NFL Championship",
+   "type": "Colorful Parallel",
+   "print_run": 199
+  },
+  {
+   "number": "96",
+   "name": "Chicago Bears, The 1963 NFL Championship",
+   "type": "Remembrance Parallel",
+   "print_run": 63
+  },
+  {
+   "number": "96",
+   "name": "Chicago Bears, The 1963 NFL Championship",
+   "type": "Foil Parallel",
+   "print_run": 25
+  },
+  {
+   "number": "MI1",
+   "name": "Rogers Hornsby RIP January 5 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI2",
+   "name": "Stork Delivers Michael Jordan February 17 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI3",
+   "name": "Patsy Cline Airplane crash March 5 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI4",
+   "name": "Wilt Chamberlain 70-point game March 10 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI5",
+   "name": "Pete Rose Debut April 8 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI6",
+   "name": "Submarine USS Thresher Sinks April 10 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI7",
+   "name": "Martin Luther King Jr. Writes Letter from a Birmingham Jail April 16 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI8",
+   "name": "Elizabeth Taylor #1 Box Office draw 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI9",
+   "name": "Steve McQueen's \"The Great Escape\" released July 4 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI10",
+   "name": "Willie Mays Receives First of two All-Star Game MVP awards July 9 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI11",
+   "name": "Martin Luther King Jr. Gives \"I have a Dream\" speech August 28 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI12",
+   "name": "Football HOF opens At Canton, Ohio September 7 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI13",
+   "name": "Hank Aaron led The NL in HRs & RBIs 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI14",
+   "name": "Sandy Koufax WINS Pitching Triple Crown 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI15",
+   "name": "Roberto Clemente 194 hits .320 batting average 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI16",
+   "name": "HOFER Stan Musial retires September 29 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI17",
+   "name": "John F. Kennedy Assassinated November 22 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI18",
+   "name": "Lyndon B. Johnson Becomes President November 22 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI19",
+   "name": "Jim Brown Rushed a record-breaking 1,863 yards December 8 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "MI20",
+   "name": "Johnny Unitas Leads the NFL with 3,481 passing yards 1963",
+   "type": "Year in Review Metal Insert",
+   "print_run": 250
+  },
+  {
+   "number": "FC1A",
+   "name": "Gordon Cooper",
+   "type": "Film Clip Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "FC1B",
+   "name": "Gordon Cooper",
+   "type": "Film Clip Relic B",
+   "print_run": 40
+  },
+  {
+   "number": "FC1C",
+   "name": "Gordon Cooper",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FC2A",
+   "name": "The Nutty Professor",
+   "type": "Film Clip Relic A",
+   "print_run": 300
+  },
+  {
+   "number": "FC2B",
+   "name": "The Nutty Professor",
+   "type": "Film Clip Relic B",
+   "print_run": 63
+  },
+  {
+   "number": "FC2C",
+   "name": "The Nutty Professor",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FC3A",
+   "name": "Cleopatra",
+   "type": "Film Clip Relic A",
+   "print_run": 300
+  },
+  {
+   "number": "FC3B",
+   "name": "Cleopatra",
+   "type": "Film Clip Relic B",
+   "print_run": 63
+  },
+  {
+   "number": "FC3C",
+   "name": "Cleopatra",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FC4A",
+   "name": "Donovan's Reef",
+   "type": "Film Clip Relic A",
+   "print_run": 300
+  },
+  {
+   "number": "FC4B",
+   "name": "Donovan's Reef",
+   "type": "Film Clip Relic B",
+   "print_run": 63
+  },
+  {
+   "number": "FC4C",
+   "name": "Donovan's Reef",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FC5A",
+   "name": "Tom Jones",
+   "type": "Film Clip Relic A",
+   "print_run": 300
+  },
+  {
+   "number": "FC5B",
+   "name": "Tom Jones",
+   "type": "Film Clip Relic B",
+   "print_run": 63
+  },
+  {
+   "number": "FC5C",
+   "name": "Tom Jones",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FC6A",
+   "name": "Frank Sinatra's Christmas Special",
+   "type": "Film Clip Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "FC6B",
+   "name": "Frank Sinatra's Christmas Special",
+   "type": "Film Clip Relic B",
+   "print_run": 40
+  },
+  {
+   "number": "FC6C",
+   "name": "Frank Sinatra's Christmas Special",
+   "type": "Film Clip Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "63H1",
+   "name": "John F. Kennedy",
+   "type": "Historic DNA",
+   "print_run": 24
+  },
+  {
+   "number": "63H2",
+   "name": "Lyndon B. Johnson",
+   "type": "Historic DNA",
+   "print_run": 8
+  },
+  {
+   "number": "63H3",
+   "name": "Marilyn Monroe",
+   "type": "Historic DNA",
+   "print_run": 24
+  },
+  {
+   "number": "63H4",
+   "name": "John F. Kennedy / Lyndon B. Johnson",
+   "type": "Historic DNA",
+   "print_run": 52
+  },
+  {
+   "number": "63H5",
+   "name": "John F. Kennedy / Marilyn Monroe",
+   "type": "Historic DNA",
+   "print_run": 72
+  },
+  {
+   "number": "NR1A",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "NR1B",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic B",
+   "print_run": 50
+  },
+  {
+   "number": "NR2A",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "NR2B",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic B",
+   "print_run": 50
+  },
+  {
+   "number": "NR3A",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "NR3B",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic B",
+   "print_run": 50
+  },
+  {
+   "number": "NR4A",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic A",
+   "print_run": 200
+  },
+  {
+   "number": "NR4B",
+   "name": "Vintage Nylons",
+   "type": "Vintage Nylons Relic B",
+   "print_run": 50
+  },
+  {
+   "number": "63C1",
+   "name": "Silver Half Dollar (JFK)",
+   "type": "Coin",
+   "print_run": 50
+  },
+  {
+   "number": "63C2",
+   "name": "Silver Half Dollar (MLK)",
+   "type": "Coin",
+   "print_run": 50
+  },
+  {
+   "number": "CR1",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR2",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 240
+  },
+  {
+   "number": "CR3",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 600
+  },
+  {
+   "number": "CR4",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR5",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR6",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR7",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR8",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 300
+  },
+  {
+   "number": "CR9",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 360
+  },
+  {
+   "number": "CR10",
+   "name": "Original comic book relic",
+   "type": "Comic Relic",
+   "print_run": 320
+  },
+  {
+   "number": "FR1A",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR1B",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR1C",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR1D",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR1E",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR1F",
+   "name": "Michael Jordan",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR2A",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR2B",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR2C",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR2D",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR2E",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR2F",
+   "name": "John F Kennedy",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR3A",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR3B",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR3C",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR3D",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR3E",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR3F",
+   "name": "Dorothy Lamour",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR4A",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR4B",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR4C",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR4D",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR4E",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR4F",
+   "name": "Mickey Mantle",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR5A",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR5B",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR5C",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR5D",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR5E",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR5F",
+   "name": "Willie Mays",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR6A",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR6B",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR6C",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR6D",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR6E",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR6F",
+   "name": "Elvis Presley",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR7A",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR7B",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR7C",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR7D",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR7E",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR7F",
+   "name": "Elizabeth Taylor",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  },
+  {
+   "number": "FR8A",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic A",
+   "print_run": 125
+  },
+  {
+   "number": "FR8B",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic B",
+   "print_run": 75
+  },
+  {
+   "number": "FR8C",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic C",
+   "print_run": 10
+  },
+  {
+   "number": "FR8D",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic D",
+   "print_run": 125
+  },
+  {
+   "number": "FR8E",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic E",
+   "print_run": 75
+  },
+  {
+   "number": "FR8F",
+   "name": "Spencer Tracy",
+   "type": "Celebrity Fabric Relic F",
+   "print_run": 10
+  }
+ ],
+ "estimates": {
+  "source": "Google AI Mode summary of eBay/Steel City listings, 2026-09-29 (estimates, not individual sales)",
+  "Base": "$0.50 \u2013 $6.00 (key figures like JFK, MLK, Jordan, Mantle at the top)",
+  "Colorful Parallel": "$1.50 \u2013 $5.00",
+  "Remembrance Parallel": "$3.00 \u2013 $12.00",
+  "Foil Parallel": "$8.00 \u2013 $25.00+",
+  "Celebrity Fabric Relic": "$40 \u2013 $120+ (Jordan highest)",
+  "Historic DNA": "$75 \u2013 $200",
+  "Comic Relic": "$15 \u2013 $35",
+  "Coin": "$35 \u2013 $60",
+  "Film Clip Relic": "$8 \u2013 $18",
+  "Vintage Nylons Relic": "$6.99 \u2013 $23",
+  "Year in Review Metal Insert": "$5 \u2013 $12",
+  "Cut Autographs": "$150 \u2013 $1,000+ depending on the signer"
+ }
+}

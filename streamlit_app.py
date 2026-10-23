@@ -1,30 +1,14 @@
+"""Slab Scout, the trading card scanner (slab-scout/streamlit/app.py), as the repo's default Streamlit app.
+
+Deploying this repo on share.streamlit.io with the default main file opens the scanner. The app itself lives in
+slab-scout/streamlit; this file only puts that folder on the import path and runs it.
+"""
+import runpy
+import sys
 from pathlib import Path
 
-import streamlit as st
-import streamlit.components.v1 as components
+APP_DIR = Path(__file__).parent / "slab-scout" / "streamlit"
+if str(APP_DIR) not in sys.path:
+    sys.path.insert(0, str(APP_DIR))
 
-st.set_page_config(page_title="Lemonade Stand Tycoon", page_icon="🍋", layout="wide")
-
-# Streamlit adds default padding/whitespace around the page; strip it so the
-# embedded game fills the frame like a real full-screen web app.
-st.markdown(
-    """
-    <style>
-        .block-container {padding: 0 !important; max-width: 100% !important;}
-        header[data-testid="stHeader"] {display:none;}
-        iframe {border: none;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-
-ROOT = Path(__file__).parent
-TEMPLATE_PATH = ROOT / "app" / "index.html"
-
-
-@st.cache_data
-def load_html() -> str:
-    return TEMPLATE_PATH.read_text(encoding="utf-8")
-
-
-components.html(load_html(), height=1300, scrolling=True)
+runpy.run_path(str(APP_DIR / "app.py"), run_name="__main__")

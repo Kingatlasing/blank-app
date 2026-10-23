@@ -1,0 +1,132 @@
+{
+ "about": "Real photos with the right answer, for measuring how well scanning works (python streamlit/tools/eval_scans.py). Photos go in images/ (kept out of git: they are people's own photos). expect.kind: front | back | unknown (a custom / fan-made card that should NOT get a confident match). name / number / set / variant are matched loosely (case-insensitive, contained in the match).",
+ "scans": [
+  {
+   "file": "2b2ac00f-image.png",
+   "note": "phone screenshot, PSA 10 example",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Pikachu ex",
+    "number": "238"
+   }
+  },
+  {
+   "file": "2c05143b-image.webp",
+   "note": "custom grey back, yellow border",
+   "expect": {
+    "kind": "back"
+   }
+  },
+  {
+   "file": "2ec1c6f1-image.jpg",
+   "note": "sleeve, held in hand, angled",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charizard GX",
+    "number": "SV49"
+   }
+  },
+  {
+   "file": "6f5497fa-image.jpg",
+   "note": "sleeve, held in hand",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charizard GX",
+    "number": "SV49"
+   }
+  },
+  {
+   "file": "64f29a79-image.png",
+   "note": "magnetic holder, held, video screenshot",
+   "expect": {
+    "kind": "front",
+    "game": "Baseball",
+    "name": "Mike Trout"
+   }
+  },
+  {
+   "file": "6b28c476-image.jpg",
+   "note": "Japanese SAR, flat scan",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charizard",
+    "number": "110"
+   }
+  },
+  {
+   "file": "85457f49-image.png",
+   "note": "flat, black background",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charizard",
+    "number": "4"
+   }
+  },
+  {
+   "file": "8e9648fc-image.jpg",
+   "note": "flat scan",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charizard",
+    "number": "4"
+   }
+  },
+  {
+   "file": "8e7be3d2-image.jpg",
+   "note": "sleeve, held in hand",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charmander"
+   }
+  },
+  {
+   "file": "b9fbbabf-image.jpg",
+   "note": "sleeve, held in hand, outdoors",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Charmander"
+   }
+  },
+  {
+   "file": "dee8ebb8-image.png",
+   "note": "slab on a stand, livestream screenshot",
+   "expect": {
+    "kind": "front",
+    "game": "Pokémon",
+    "name": "Gengar ex"
+   }
+  },
+  {
+   "file": "b225bd02-image.png",
+   "note": "back in a sleeve",
+   "expect": {
+    "kind": "back"
+   }
+  },
+  {
+   "file": "c31d98f3-image.jpg",
+   "note": "back held in hand, angled",
+   "expect": {
+    "kind": "back"
+   }
+  },
+  {
+   "file": "ec99ae5b-image.png",
+   "note": "fan-made Pikachu (not a real card)",
+   "expect": {
+    "kind": "unknown"
+   }
+  }
+ ],
+ "reference": {
+  "e195b942-image.png": "clean Pokémon card back: its fingerprint is the reference in core/identify.py BACK_PHASH, so it is not used as a test"
+ }
+}

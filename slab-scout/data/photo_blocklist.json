@@ -1,0 +1,9 @@
+{
+  "about": "Price-guide photos that show the wrong card. paths: card pages whose photo is wrong (reason after each); images: photo ids wrong everywhere. Read by build_catalog.py.",
+  "paths": {
+    "pokemon-japanese-mega-starter-deck-gengar-ex/basic-darkness-energy-dar": "user photo of a different card (Eternatus-like art), not a Darkness Energy; reported 2026-10-09"
+  },
+  "images": {
+    "ke7wfi7hk43fljjc": "blurry phone photo of a different card, used for Basic Darkness Energy #DAR"
+  }
+}
