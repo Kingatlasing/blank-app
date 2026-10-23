@@ -53,7 +53,7 @@ export function estimate(front: number | null, back: number | null, corners: str
   const low = Math.max(1, psa - 1);
   const high = Math.min(10, psa + (cond >= 9 && cap > psa ? 1 : 0));
   const avg = subs.centering * 0.2 + subs.corners * 0.3 + subs.edges * 0.2 + subs.surface * 0.3;
-  const score = Math.max(100, Math.min(1000, Math.round((0.7 * avg + 0.3 * Math.min(...Object.values(subs))) * 100)));
+  const score = Math.max(100, Math.min(1000, Math.round((0.3 * avg + 0.7 * Math.min(...Object.values(subs))) * 100)));
   const band = TAG_BANDS.find((b) => score >= b[0])!;
   return {
     method: 'checklist', sub: subs, psa, psa_label: PSA_LABELS[psa], psa_range: low !== high ? `${low}-${high}` : String(psa),

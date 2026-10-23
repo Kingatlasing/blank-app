@@ -253,8 +253,7 @@ def result_gz() -> bytes:
 def back_edge_whitening(card) -> dict | None:
     """Whitening along the edges of a dark-bordered back (Pokémon's blue back, Yu-Gi-Oh!'s brown, MTG's): the share
     of the outer ~1 mm band, corners left out, that is much lighter than the border. Per 1000, summed over the four
-    edges. Fitted on 110 TAG-graded Base Set holos (back scans): above 60 TAG gave at most a 6, above 150 at most
-    a 4, above 500 at most 2.5. None for light borders (whitening can't be seen by colour there)."""
+    edges. Correlates about -0.55 with TAG's grade on TAG-graded Base Set holos (back scans); see back_whitening_cap. None for light borders (whitening can't be seen by colour there)."""
     import numpy as np
     W, H = 630, 880
     a = np.asarray(card.convert("RGB").resize((W, H))).astype(np.float32)
@@ -276,4 +275,5 @@ def back_edge_whitening(card) -> dict | None:
 
 def back_whitening_cap(total: float) -> float:
     """Highest grade the back's edge whitening allows (fitted on TAG grades, see back_edge_whitening)."""
-    return 2.5 if total > 500 else 4.0 if total > 150 else 6.0 if total > 60 else 10.0
+    # thresholds on this function's own scale, refitted on the server's measurements of 60 TAG-graded backs
+    return 2.5 if total > 500 else 4.0 if total > 300 else 6.0 if total > 200 else 10.0

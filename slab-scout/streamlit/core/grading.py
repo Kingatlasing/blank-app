@@ -100,11 +100,12 @@ def centering_subgrade(front_worst: int | None, back_worst: int | None) -> float
 
 
 def tag_from_subs(subs: dict[str, float]) -> tuple[int, str, str]:
-    # Weighted: surface and corners matter most, the weakest area pulls the score down.
+    # TAG's score follows the weakest area closely: on 60 TAG-graded cards the best fit was 70% weakest area,
+    # 30% weighted average (surface and corners count most in the average).
     w = {"centering": 0.2, "corners": 0.3, "edges": 0.2, "surface": 0.3}
     avg = sum(subs[k] * w[k] for k in w)
     low = min(subs.values())
-    score = int(round((0.7 * avg + 0.3 * low) * 100))
+    score = int(round((0.3 * avg + 0.7 * low) * 100))
     score = max(100, min(1000, score))
     for floor, grade, label in TAG_BANDS:
         if score >= floor:
