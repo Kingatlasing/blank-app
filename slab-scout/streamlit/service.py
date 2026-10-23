@@ -223,6 +223,7 @@ def _grade(res: dict, x: dict | None) -> dict:
         fi.metrics["die_cut"] = dcr
         style = "die_cut"
     bi = (b or {}).get("inspect")
+    subs_raw = {k: min(fi.subgrades[k], bi.subgrades[k]) if bi else fi.subgrades[k] for k in ("corners", "edges", "surface")}
     # back edge whitening on dark-bordered backs: the strongest single predictor of TAG's grade on 110 graded cards
     bw = None
     if b and b.get("card") is not None:
@@ -302,6 +303,7 @@ def _grade(res: dict, x: dict | None) -> dict:
     g["subgrades_inspect"] = dict(fi.subgrades)
     g["border_wear"] = fi.metrics.get("border_wear")
     g["back_whitening"] = bw
+    g["subs_raw"] = subs_raw  # before the back-whitening and defect-rubric caps (for tuning them)
     g["defects"] = [d for d in defects if d["cap"] < 10]
     if ref_cmp and ref_cmp.get("ok"):
         g["reference_check"] = {k: v for k, v in ref_cmp.items() if k != "maps"}
