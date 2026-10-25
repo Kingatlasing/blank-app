@@ -31,6 +31,13 @@ function useTilt(active: boolean) {
     (async () => {
       try {
         if (!(await DeviceMotion.isAvailableAsync())) return;
+        try {
+          // iPhone browsers ask before sharing motion; the native app may too
+          const p = await DeviceMotion.requestPermissionsAsync();
+          if (p && p.granted === false) return;
+        } catch {
+          /* no permission API here: just listen */
+        }
         DeviceMotion.setUpdateInterval(120);
         sub = DeviceMotion.addListener((m) => {
           if (!alive || !m.rotation) return;
