@@ -323,7 +323,10 @@ def detect_and_crop(img: Image.Image) -> tuple[Image.Image, bool]:
     s = scale if scale < 1 else 1.0
     sh, sw = small.shape[:2]
     frame = np.array([[0, 0], [sw - 1, 0], [sw - 1, sh - 1], [0, sh - 1]], dtype="float32")
-    if abs(min(w, h) / max(w, h) - CARD_W / CARD_H) < 0.025 and _rounded_corner_score(small, frame) >= 100:
+    ratio_err = abs(min(w, h) / max(w, h) - CARD_W / CARD_H)
+    # (a scanner bed close to the border colour - TAG's orange against Pokemon yellow - shows weaker corner tips;
+    # when the photo has the card's exact proportions, a weaker difference is still a card filling the frame)
+    if ratio_err < 0.025 and _rounded_corner_score(small, frame) >= (60 if ratio_err < 0.012 else 100):
         # a scan / cut-out image where the card fills the whole frame (background only in the rounded corner
         # tips): the photo's own border IS the card edge
         return (img.resize((CARD_W, CARD_H)) if w <= h else img.rotate(90, expand=True).resize((CARD_W, CARD_H))), True
@@ -1162,15 +1165,33 @@ def border_by_colour(card: Image.Image, expect: dict | None = None, T: float = 4
         lo, hi = 0.025, 0.11
     mn, mx = int(round(W * lo)), int(round(W * hi))
 
+    # the background's colour, from the crop's four corner tips (a card's rounded corners leave background there)
+    cs_ = 4
+    bgc = np.median(np.concatenate([a[:cs_, :cs_].reshape(-1, 3), a[:cs_, -cs_:].reshape(-1, 3),
+                                    a[-cs_:, :cs_].reshape(-1, 3), a[-cs_:, -cs_:].reshape(-1, 3)]), axis=0)
+
     def side(get, span):
         res = []
         for t in range(int(span * 0.2), int(span * 0.8), 3):
-            bg = get(0, t)
-            o = 1
-            while o < 30 and np.linalg.norm(get(o, t) - bg) < 60:
-                o += 1
-            # no background before the card (tight crop): the card starts at the edge
-            o = 0 if o >= 30 else o + 2
+            # the card's own border colour a little way in, then the cut edge = where the colour leaves the
+            # background's and gets (at least half way) to the border's. A fixed colour distance missed backgrounds
+            # close to the border colour (TAG's orange scanner bed against Pokemon yellow).
+            deep = np.median(np.stack([get(k, t) for k in range(18, 26, 2)]), axis=0)
+            # this scan line's own background (lighting varies around the card), if its first pixels are background
+            loc = np.mean(np.stack([get(j, t) for j in range(1, 4)]), axis=0)
+            bgl = loc if np.linalg.norm(loc - bgc) < np.linalg.norm(loc - deep) else bgc
+            sep_ = float(np.linalg.norm(deep - bgl))
+            o = 0
+            if sep_ >= 20 and np.linalg.norm(loc - bgc) < np.linalg.norm(loc - deep):
+                for k in range(0, 30):
+                    win = np.mean(np.stack([get(k + j, t) for j in range(3)]), axis=0)
+                    if np.linalg.norm(win - bgl) > 0.5 * sep_ and np.linalg.norm(win - deep) < 0.5 * sep_:
+                        o = k + 1
+                        break
+                else:
+                    o = 0
+            if o >= 30:
+                o = 0
             bc = np.median(np.stack([get(o + k, t) for k in (3, 5, 7, 9)]), axis=0)
             bad, hit = 0, None
             for k in range(o + mn, o + mx):
