@@ -295,6 +295,7 @@ def card_with_margin(img: Image.Image, pts=None, margin: float = 0.04, width: in
     tl, tr, br, bl = pts
     wide = max(np.linalg.norm(tr - tl), np.linalg.norm(br - bl))
     tall = max(np.linalg.norm(bl - tl), np.linalg.norm(br - tr))
+    card_with_margin.photo_card_px = float(min(wide, tall))   # the card's width in the original photo
     if wide > tall:  # landscape: measure it as it lies
         width = int(width * tall / wide) if tall else width
     big = vision._expand(pts, margin)
@@ -312,6 +313,9 @@ def measure_photo(img: Image.Image, radius_px_630: int | None = 30, pts=None) ->
         return None
     m = measure(c, radius_px_630)
     m["summary"] = summary(m)
+    # real resolution: the card's width in the original photo (the measured crop is resampled to a fixed size)
+    w = getattr(card_with_margin, "photo_card_px", None)
+    m["photo_px_per_mm"] = round(w / CARD_MM, 1) if w else None
     return m
 
 

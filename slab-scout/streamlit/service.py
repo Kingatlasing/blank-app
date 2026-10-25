@@ -103,7 +103,10 @@ def _centering_json(c) -> dict | None:
     return {"left": int(c.left), "right": int(c.right), "top": int(c.top), "bottom": int(c.bottom), "text": c.text(), "worst": int(c.worst())}
 
 
-def photo_check(f: dict, fi, res: dict, rc: dict | None = None) -> dict:
+MIN_PX_PER_MM = 15.0   # below this, edge chipping and fine scratches can't be told from the photo's own grain
+
+
+def photo_check(f: dict, fi, res: dict, rc: dict | None = None, px_mm: float | None = None) -> dict:
     """Can this photo show the card's condition well enough for an accurate grade? If not, what to fix. The grade is
     still worked out (best effort) for anyone who wants it anyway."""
     reasons = []
@@ -111,6 +114,9 @@ def photo_check(f: dict, fi, res: dict, rc: dict | None = None) -> dict:
         reasons.append("The card's edges weren't found. Lay it flat on a plain, darker background with all four corners in the frame.")
     if min(f["full"].size) < 700:
         reasons.append("The photo is too small to see corners and edges. Use the camera (no zoom, no screenshot) with the card filling most of the frame.")
+    if px_mm is not None and px_mm < MIN_PX_PER_MM and min(f["full"].size) >= 700:
+        reasons.append(f"The card is too small in the photo ({px_mm:.0f} px per mm; grading needs {MIN_PX_PER_MM:.0f}+): fine edge wear and "
+                       "scratches can't be seen. Move closer so the card fills the outline, full camera resolution, no zoom or screenshot.")
     sharp = fi.metrics.get("sharpness")
     if sharp is not None and sharp < 60:
         reasons.append("The photo is blurry. Hold the phone steady, add light, and tap the card to focus.")
@@ -200,7 +206,7 @@ def _tm_slim(m: dict | None) -> dict | None:
     """The TAG-style measurement without bulky per-pixel detail."""
     if not m:
         return None
-    return {"outline": m.get("outline"), "px_per_mm": m.get("px_per_mm"), "summary": m.get("summary"),
+    return {"outline": m.get("outline"), "px_per_mm": m.get("px_per_mm"), "photo_px_per_mm": m.get("photo_px_per_mm"), "summary": m.get("summary"),
             "corners": m.get("corners"), "edges": m.get("edges")}
 
 
@@ -388,7 +394,9 @@ def _grade(res: dict, x: dict | None) -> dict:
     # how much to trust it: the four things that most often make a photo grade wrong
     issues = sum([not f.get("found"), not fi.photo_ok, min(f["full"].size) < 700, not b])
     g["confidence"] = "high" if issues == 0 else "medium" if issues == 1 else "low"
-    g["photo_check"] = photo_check(f, fi, res, rc)
+    pxmm = ((g.get("tag_measure") or {}).get("front") or {}).get("photo_px_per_mm")
+    g["photo_check"] = photo_check(f, fi, res, rc, pxmm)
+    g["metrics_px_per_mm"] = pxmm
     g["sharpness"] = fi.metrics.get("sharpness")
     g["metrics"] = {k: (round(float(v), 4) if isinstance(v, (int, float)) else v) for k, v in fi.metrics.items()
                     if isinstance(v, (int, float, str, bool)) or v is None}
