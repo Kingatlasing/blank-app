@@ -135,3 +135,18 @@ def name_guess(s: dict) -> str:
     t = re.sub(r"\b\d{1,3}/\d{2,3}\b", " ", t)
     t = re.sub(r"\b(POKEMON|POKÉMON|JAPANESE|ENGLISH|TOPPS|PANINI|PRIZM|BOWMAN|UPPER DECK|DONRUSS|KAKAWOW|YU-GI-OH!?|MAGIC|HOLO|REV(ERSE)?\.?\s*HOLO|1ST EDITION|SPECIAL ILLUSTRATION RARE|ILLUSTRATION RARE|FULL ART|SECRET|PROMO)\b", " ", t, flags=re.I)
     return re.sub(r"\s+", " ", t).strip()
+
+
+def label_company_by_colour(top_img) -> str:
+    """Company from the label's printed colours when its logo isn't read as text (PSA's logo is a graphic).
+    PSA labels have a solid red frame; nobody else uses one. Returns "" when the colours don't settle it."""
+    import numpy as np
+    a = np.asarray(top_img.convert("RGB").resize((300, max(1, int(300 * top_img.height / max(1, top_img.width)))))).astype(int)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    red = (r > 150) & (g < 90) & (b < 100) & (r - g > 90)
+    return "PSA" if red.mean() > 0.02 else ""
+
+
+def is_label(sl: dict | None) -> bool:
+    """A grade word plus a cert number is a grading label even when the company's logo can't be read."""
+    return bool(sl and sl.get("grade") is not None and sl.get("label") and sl.get("cert"))

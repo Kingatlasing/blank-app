@@ -1200,3 +1200,63 @@ def border_by_colour(card: Image.Image, expect: dict | None = None, T: float = 4
            "found": {"left": True, "right": True, "top": True, "bottom": True}, "method": "border colour",
            "spread": round(max(L[2], R[2], Tp[2], B[2]), 1)}
     return out
+
+
+def _slab_peaks(p, n=12, gap=6):
+    idx = np.argsort(p)[::-1]
+    out = []
+    for i in idx:
+        if all(abs(i - j) > gap for j in out):
+            out.append(int(i))
+        if len(out) >= n:
+            break
+    return out
+
+def card_in_slab(img, top_frac=0.15):
+    """The card inside a slab photo, found as the card-shaped (63:88) rectangle of long straight edges below the
+    label. Returns (card 630x880, box in photo coords) or None."""
+    rgb = np.asarray(img.convert("RGB"))
+    H, W = rgb.shape[:2]
+    s = 1000 / max(H, W)
+    sm = cv2.resize(rgb, (int(W * s), int(H * s)), interpolation=cv2.INTER_AREA)
+    g = cv2.GaussianBlur(cv2.cvtColor(sm, cv2.COLOR_RGB2GRAY).astype(np.float32), (3, 3), 0)
+    h, w = g.shape
+    y0 = int(h * top_frac)
+    gx = np.abs(cv2.Sobel(g, cv2.CV_32F, 1, 0, ksize=3))
+    gy = np.abs(cv2.Sobel(g, cv2.CV_32F, 0, 1, ksize=3))
+    cands = []
+    colp = gx[y0:].mean(axis=0)
+    rowp = gy[y0:].mean(axis=1)
+    cols = _slab_peaks(colp, 14)
+    rows = [r + y0 for r in _slab_peaks(rowp, 14)]
+    for l in cols:
+        for r in cols:
+            if r - l < 0.3 * w:
+                continue
+            for t in rows:
+                for b in rows:
+                    if b - t < 0.3 * h:
+                        continue
+                    ratio = (r - l) / (b - t)
+                    if abs(ratio - CARD_W / CARD_H) > 0.025:
+                        continue
+                    # support: each side's edge strength along its own span (a real card edge runs the full length)
+                    sl = gx[t:b, max(0, l - 1):l + 2].max(axis=1)
+                    sr = gx[t:b, max(0, r - 1):r + 2].max(axis=1)
+                    st = gy[max(0, t - 1):t + 2, l:r].max(axis=0)
+                    sb = gy[max(0, b - 1):b + 2, l:r].max(axis=0)
+                    sup = [float((x > 25).mean()) for x in (sl, sr, st, sb)]
+                    if min(sup) < 0.6:
+                        continue
+                    cands.append((sum(sup), abs(ratio - CARD_W / CARD_H), l, r, t, b, sup))
+    if not cands:
+        return None
+    # the slab's own window is a long-edged rectangle too, and the card sits inside it: among outlines with good
+    # edge support, take the one that has the card's exact proportions; ties go to the one nested inside the others
+    top = max(c[0] for c in cands)
+    pool = [c for c in cands if c[0] >= top - 0.15]
+    pool.sort(key=lambda c: (c[1] > 0.012, -(c[0]), (c[3] - c[2])))
+    _, _, l, r, t, b, sup = pool[0]
+    box = np.array([[l, t], [r, t], [r, b], [l, b]], dtype="float32") / s
+    M = cv2.getPerspectiveTransform(box, np.array([[0, 0], [CARD_W - 1, 0], [CARD_W - 1, CARD_H - 1], [0, CARD_H - 1]], dtype="float32"))
+    return Image.fromarray(cv2.warpPerspective(rgb, M, (CARD_W, CARD_H), flags=cv2.INTER_CUBIC)), box, sup

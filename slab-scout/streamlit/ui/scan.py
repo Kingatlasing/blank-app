@@ -611,9 +611,14 @@ def _read_slab(f: dict, game: str) -> dict | None:
             top = top.resize((1100, int(top.height * 1100 / top.width)))
         tl = ocr.read_text(top)
         s2 = slab.read_label(tl)
-        if s2 and (s2["company"] != "Unknown" or game == "Graded slab"):
+        if s2 and (s2["company"] != "Unknown" or game == "Graded slab" or (slab.is_label(s2) and not slab.is_label(sl))):
             sl, lines = s2, tl
-    if sl and (sl["company"] != "Unknown" or game == "Graded slab"):
+        if sl and sl["company"] == "Unknown" and slab.is_label(sl):
+            # the label was read but its logo wasn't (PSA's is a graphic): name the company from the label colours
+            sl["company"] = slab.label_company_by_colour(top) or "Unknown"
+            if sl["company"] in slab.CERT_LOOKUP and sl.get("cert"):
+                sl["lookup"] = slab.CERT_LOOKUP[sl["company"]].format(c=sl["cert"])
+    if sl and (sl["company"] != "Unknown" or game == "Graded slab" or slab.is_label(sl)):
         sl["lines"] = lines
         return sl
     return None
