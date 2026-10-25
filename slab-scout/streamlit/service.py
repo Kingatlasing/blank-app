@@ -529,7 +529,18 @@ def do_scan(fdata: bytes, bdata: bytes | None = None, game: str = "Auto", grade:
                             r = (card, {"slab_window": True})
                         else:
                             inner = f
-                    gi = _grade({**res, "front": inner, "_in_slab": True}, top)
+                    # the back of the slab: the same cut-out, so its centering is the card's, not the holder's
+                    bres = res.get("back")
+                    if bres and bres.get("full") is not None:
+                        try:
+                            cb = vision.card_in_slab(bres["full"])
+                        except Exception:
+                            cb = None
+                        if cb is not None:
+                            Lb_ = vision.find_lines(cb[0], True)
+                            bres = {**bres, "card": cb[0], "found": True, "edges": Lb_,
+                                    "centering": vision.Centering(Lb_["il"] - Lb_["ol"], Lb_["or"] - Lb_["ir"], Lb_["it"] - Lb_["ot"], Lb_["ob"] - Lb_["ib"])}
+                    gi = _grade({**res, "front": inner, "back": bres, "_in_slab": True}, top)
                     gi["note"] = "Estimated from the card inside the slab (the label grade above is the official one)."
                     if r is None:
                         gi["confidence"] = "low"
