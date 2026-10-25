@@ -647,6 +647,14 @@ def _analyze_slab(front: bytes, f: dict, b, sl: dict, game: str) -> dict:
             sc = 70 + (10 if c.number and identify._num(c.number.split("-")[-1]) == identify._num(parsed["number"].split("/")[0]) else 0)
             if c.variant and all(w in text_n for w in identify.norm(c.variant).split()):
                 sc += 10
+            # the label names the year and brand: the set they point to wins over a same-name, same-number card
+            # from another year ("1983 TOPPS ... #630" is the 1983 Topps card, not 1998 Upper Deck #630)
+            sid = c.set_id.replace("-", " ")
+            if sl.get("year") and sl["year"] in sid:
+                sc += 8
+            elif sl.get("year") and re.search(r"\b(19|20)\d\d\b", sid):
+                sc -= 8
+            sc += 3 * sum(1 for w in set(identify.norm(sid).split()) if len(w) >= 4 and not w.isdigit() and w not in ("cards", "card") and f" {w} " in text_n)
             cands.append({"kind": "catalog", "card": c, "score": sc, "why": [f"label names {c.name} ✓"] + ([f"parallel {c.variant} ✓"] if c.variant and sc >= 80 else [])})
     if g in ("", "Pokémon", "Yu-Gi-Oh!", "Magic: The Gathering"):
         for c in identify.identify(lines, parsed, g)[:5]:
