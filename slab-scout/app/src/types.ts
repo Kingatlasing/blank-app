@@ -16,4 +16,6 @@ export interface Settings {
   scanServer?: string;
   /** The grading company the grade estimate is shown for first (each company has its own rules). */
   gradingCompany?: 'PSA' | 'BGS' | 'CGC' | 'SGC' | 'TAG' | 'ACE';
+  /** see-through outline in the grading camera showing where to put the card (default on) */
+  positionGuide?: boolean;
 }

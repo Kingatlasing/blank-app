@@ -23,6 +23,8 @@ import { recordFromCatalog } from '../core/portfolio';
 import { RarityChip, Sheet, SheetOption } from '../components/cards';
 import { Icon } from '../components/visual';
 import GraderGuide, { aimText, lightFrom, type ShotAim } from '../components/GraderGuide';
+import PositionOverlay from '../components/PositionOverlay';
+import { saveSettings } from '../storage';
 import { useLayout } from '../layout';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
@@ -83,6 +85,8 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
   // optional extra grading photos: the card tilted toward one light, so scratches / dents / print lines catch it
   const [extras, setExtras] = useState<Partial<Record<ExtraSide, Shot | null>>>({});
   const [queue, setQueue] = useState<GradeSide[]>([]); // guided set of grading photos still to take
+  // see-through outline of where the card goes for each grading photo (Settings, or the button in the camera)
+  const [overlayOn, setOverlayOn] = useState(settings.positionGuide !== false);
   const [inspTilt, setInspTilt] = useState<{ f: Inspection | null; b: Inspection | null }>({ f: null, b: null });
   // live scanner: the next tap scans the back of this result (the front alone wasn't enough)
   const [backFor, setBackFor] = useState<string | null>(null);
@@ -1081,12 +1085,23 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
         <CameraView ref={cam} style={StyleSheet.absoluteFill} facing="back" />
         {shade}
         {frame(bulk ? `BULK SCAN${tally.n ? ` · ${tally.n} added · ${money(tally.value)}` : ''}` : side === 'front' ? 'Front · step 1 of 2' : side === 'back' ? 'Back · step 2 of 2' : side === 'tiltF' ? 'Extra · front tilted to the light' : side === 'tiltB' ? 'Extra · back tilted to the light' : `Close-up · ${(GRADE_STEPS.find((g) => g.id === side)?.title || '').toLowerCase()}`)}
+        {overlayOn && !bulk ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: fr.x, top: fr.y, width: fr.w, height: fr.h }}>
+            <PositionOverlay aim={AIM[side]} width={fr.w} height={fr.h}
+              corner={/^[cb](TL|TR|BL|BR)$/.test(side) ? (side.slice(1) as 'TL' | 'TR' | 'BL' | 'BR') : undefined} />
+          </View>
+        ) : null}
         <View pointerEvents="box-none" style={{ position: 'absolute', left: L.gutter, right: L.gutter, top: L.top + L.sp(6), gap: L.sp(8) }}>
           <View style={[S.row, { gap: L.sp(8) }]}>
             <RoundBtn icon="back" onPress={() => setMode('live')} label="Back to the live scanner" />
             <View style={{ flex: 1, height: L.sp(40), borderRadius: 999, backgroundColor: 'rgba(16,18,28,0.78)', justifyContent: 'center', paddingHorizontal: L.sp(14) }}>
               <Text style={{ color: C.lime, fontWeight: '800', letterSpacing: 1, fontSize: L.fs(12) }} numberOfLines={1}>GRADING · {(GRADE_STEPS.find((g) => g.id === side)?.title || '').toUpperCase()}</Text>
             </View>
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: overlayOn }} accessibilityLabel="Position outline"
+              onPress={() => { const v = !overlayOn; setOverlayOn(v); saveSettings({ ...settings, positionGuide: v }).catch(() => {}); }}
+              style={{ height: L.sp(40), borderRadius: 999, paddingHorizontal: L.sp(12), justifyContent: 'center', backgroundColor: overlayOn ? 'rgba(120,200,60,0.9)' : 'rgba(16,18,28,0.78)' }}>
+              <Text style={{ color: '#fff', fontWeight: '800', fontSize: L.fs(11) }}>Outline {overlayOn ? 'on' : 'off'}</Text>
+            </Pressable>
           </View>
           {(() => {
             const g = GRADE_STEPS.find((x) => x.id === side) || GRADE_STEPS[0];

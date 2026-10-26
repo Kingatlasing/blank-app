@@ -119,6 +119,19 @@ export default function SettingsScreen({ settings, onChange, onKeyChange }: { se
       </View>
       <Text style={S.muted}>The grade estimate is shown first for this company, using its own centering limits and how it combines corners, edges and surface. The other companies are listed under it.</Text>
 
+      <Text style={[S.h2, { marginTop: 8 }]}>Grading camera</Text>
+      <View style={[S.row, { gap: 6 }]}>
+        {([[true, 'Outline on'], [false, 'Outline off']] as const).map(([v, label]) => {
+          const on = (settings.positionGuide !== false) === v;
+          return (
+            <Pressable key={label} onPress={() => onChange({ ...settings, positionGuide: v })} style={[S.chip, { paddingVertical: 8, paddingHorizontal: 12 }, on && { backgroundColor: C.accent }]}>
+              <Text style={[S.chipText, on && { color: C.accentInk }]}>{label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={S.muted}>A see-through outline in the camera shows where to put the card for each grading photo: flat, angled from one side, or a corner close-up. You can also switch it from the button at the top of the camera.</Text>
+
       <OfflineCatalog />
 
       <Text style={[S.h2, { marginTop: 8 }]}>Vault & community</Text>
