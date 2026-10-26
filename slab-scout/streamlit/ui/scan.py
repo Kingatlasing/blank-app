@@ -611,6 +611,13 @@ def _read_slab(f: dict, game: str) -> dict | None:
             top = top.resize((1100, int(top.height * 1100 / top.width)))
         tl = ocr.read_text(top)
         s2 = slab.read_label(tl)
+        if not (s2 and s2["company"] != "Unknown") and top.width < 800:
+            # small photo: read the label again enlarged (its small print - cert, grade code - is easy to miss)
+            big = top.resize((1100, int(top.height * 1100 / top.width)), 1)  # 1 = LANCZOS
+            tl2 = ocr.read_text(big)
+            s3 = slab.read_label(tl2)
+            if s3 and (s3["company"] != "Unknown" or (slab.is_label(s3) and not slab.is_label(s2))):
+                s2, tl, top = s3, tl2, big
         if s2 and (s2["company"] != "Unknown" or game == "Graded slab" or (slab.is_label(s2) and not slab.is_label(sl))):
             sl, lines = s2, tl
         if sl and sl["company"] == "Unknown" and slab.is_label(sl):

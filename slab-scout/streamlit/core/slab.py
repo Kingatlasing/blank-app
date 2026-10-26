@@ -77,6 +77,19 @@ def read_label(lines: list[tuple[str, float, float]]) -> dict | None:
                 grade = nums[0] if nums else dflt
                 grade = int(grade) if grade == int(grade) else grade
                 break
+    if not company and grade is None:
+        # SGC's current label: the grade as a big number on its own, a small circled code (GM, MT, NM...) and the
+        # SGC logo too small to read; recognised by that layout: a lone grade number, a cert number and a dated
+        # card description on the same label
+        lone = [t.strip() for t, c, _ in lines if c > 0.45 and re.fullmatch(r"\s*(10|9\.5|[1-9](\.5)?)\s*", t)]
+        has_cert = re.search(r"(?<!\d)\d{7,10}(?!\d)", up.replace(" ", ""))
+        dated = re.search(r"\b(19[0-9]\d|20[0-3]\d)\b", up)
+        if lone and has_cert and dated:
+            g = float(lone[0])
+            grade = int(g) if g == int(g) else g
+            company = "SGC"
+            codes = {"PRI": "PRISTINE", "GM": "GEM MINT", "GH": "GEM MINT", "MT": "MINT", "NM": "NEAR MINT", "EX": "EXCELLENT", "VG": "VERY GOOD"}
+            label = next((v for k, v in codes.items() if re.search(rf"(?<![A-Z]){k}(?![A-Z])", up)), "")
     tag_score = None
     if company == "TAG":
         m = re.search(r"\b(\d{3,4})\s*(?:/\s*1000|PTS|SCORE)", up) or re.search(r"SCORE\s*(\d{3,4})", up)
