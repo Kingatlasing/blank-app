@@ -1000,6 +1000,8 @@ def build_set_profiles():
         if not good:
             continue
         sub = {k: st_.median(m["sub"][k] for m in good) for k in ("corners", "edges", "surface")}
+        if len(good) < 2:  # one photo can't tell the set's design from that photo's own flaws: no wear baseline
+            sub = {k: 10.0 for k in sub}
         bord = [m["border"] for m in good if m.get("found") and all(m["found"]) and 0.005 < m["border"][0] + m["border"][1] < 0.3]
         e = {"sub": sub, "n": len(good), "bc": good[0].get("bc", "")}
         if bord:

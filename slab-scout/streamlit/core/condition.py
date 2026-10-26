@@ -492,7 +492,9 @@ def apply_baseline(insp: Inspection, base: dict | None) -> Inspection:
         if b is None or b >= 10 or k not in insp.subgrades:
             continue
         before = insp.subgrades[k]
-        insp.subgrades[k] = float(min(10.0, before + (10.0 - b)))
+        # at most two grades: the baseline comes from one or two price-guide photos (their own compression and
+        # glare can read as wear), so it can soften the set's design but never wipe out real damage
+        insp.subgrades[k] = float(min(10.0, before + min(2.0, 10.0 - b)))
         if insp.subgrades[k] != before:
             notes.append(k)
     if notes:
