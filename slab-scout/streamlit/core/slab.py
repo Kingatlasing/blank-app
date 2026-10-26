@@ -18,6 +18,10 @@ COMPANIES = {
     "TAG": [r"\bTAG\b(?!\s*TEAM)", r"TAGGRADING", r"TAG GRADING"],
     "SGC": [r"\bSGC\b", r"SPORTSCARD GUARANTY"],
 }
+COMPACT_NAMES = {
+    "PSA": ("PSACARD", "PSA/DNA"), "CGC": ("CERTIFIEDGUARANTY", "CGCUNIVERSAL", "CGCCARDS"),
+    "BGS": ("BECKETT",), "TAG": ("TAGGRADING",), "SGC": ("SPORTSCARDGUARANTY",),
+}
 GRADE_WORDS = [
     (r"BLACK\s*LABEL|PRISTINE\s*10", 10, "PRISTINE"),
     (r"GEM\s*-?\s*M(IN)?T\.?\s*10|GEM\s*MINT\s*10|10\s*GEM\s*M(IN)?T", 10, "GEM MINT"),
@@ -50,8 +54,11 @@ def read_label(lines: list[tuple[str, float, float]]) -> dict | None:
     texts = [t for t, c, _ in lines if c > 0.45]
     up = "\n".join(texts).upper()
     company = ""
+    # OCR often splits label words ("CERTIFIED GU ARAN TY COMPANY", "CG CU NIV ERS AL GRADE"): also match with the
+    # spaces taken out
+    compact = re.sub(r"\s+", "", up)
     for name, pats in COMPANIES.items():
-        if any(re.search(p, up) for p in pats):
+        if any(re.search(p, up) for p in pats) or any(k in compact for k in COMPACT_NAMES.get(name, ())):
             company = name
             break
     # OCR often runs label words together or reads G as 6 ("6EMMT"): normalise before matching
@@ -69,7 +76,8 @@ def read_label(lines: list[tuple[str, float, float]]) -> dict | None:
         # grade words and the number are often separate lines: "GEM MT" … "10"
         words = [(r"PRISTINE", "PRISTINE", 10), (r"GEM\s*M(INT|T)", "GEM MINT", 10), (r"MINT\s*\+", "MINT+", 9.5),
                  (r"NM-MT\s*\+", "NM-MT+", 8.5), (r"NM-MT", "NM-MT", 8), (r"EX-MT", "EX-MT", 6), (r"VG-EX", "VG-EX", 4),
-                 (r"(?<![A-Z-])MINT(?![A-Z])", "MINT", 9), (r"\bNM\b|NEAR MINT", "NM", 7)]
+                 (r"NEAR\s*MINT\s*\+", "NEAR MINT+", 7.5), (r"NEAR\s*MINT", "NEAR MINT", 7),  # before plain MINT
+                 (r"(?<![A-Z-])MINT(?![A-Z])", "MINT", 9), (r"\bNM\b", "NM", 7)]
         for pat, lab, dflt in words:
             if re.search(pat, upn):
                 label = lab
@@ -104,7 +112,7 @@ def read_label(lines: list[tuple[str, float, float]]) -> dict | None:
             if grade == int(grade):
                 grade = int(grade)
     # cert number: the longest 7-10 digit run that isn't a year
-    certs = [c for c in re.findall(r"(?<!\d)(\d{7,10})(?!\d)", up.replace(" ", "")) if not re.fullmatch(r"(19|20)\d{2}", c)]
+    certs = [c for c in re.findall(r"(?<!\d)(\d{7,13})(?!\d)", up.replace(" ", "")) if not re.fullmatch(r"(19|20)\d{2}", c)]
     cert = max(certs, key=len) if certs else ""
     quals = [q for q in QUALIFIERS if re.search(rf"\b{q}\b", up) and company == "PSA"]
     subs = {}

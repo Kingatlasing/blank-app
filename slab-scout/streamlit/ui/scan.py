@@ -625,6 +625,24 @@ def _read_slab(f: dict, game: str) -> dict | None:
             sl["company"] = slab.label_company_by_colour(top) or "Unknown"
             if sl["company"] in slab.CERT_LOOKUP and sl.get("cert"):
                 sl["lookup"] = slab.CERT_LOOKUP[sl["company"]].format(c=sl["cert"])
+    if sl and sl["company"] != "Unknown" and sl.get("grade") is None and game in ("Auto", "Graded slab"):
+        # the grade is printed in a style OCR misses (CGC Pristine: gold on black): read the label again with the
+        # contrast stretched and inverted, and take a grade word / number from that
+        try:
+            from PIL import ImageOps
+            full = f["full"]
+            lab = full.crop((0, 0, full.width, int(full.height * 0.3))).convert("L")
+            if lab.width < 1100:
+                lab = lab.resize((1100, int(lab.height * 1100 / lab.width)), 1)
+            for im in (ImageOps.autocontrast(lab, cutoff=2), ImageOps.invert(ImageOps.autocontrast(lab, cutoff=2))):
+                extra = ocr.read_text(im.convert("RGB"))
+                s4 = slab.read_label(list(lines) + list(extra))
+                if s4 and s4.get("grade") is not None:
+                    s4["company"] = sl["company"]
+                    sl, lines = s4, list(lines) + list(extra)
+                    break
+        except Exception:
+            pass
     if sl and (sl["company"] != "Unknown" or game == "Graded slab" or slab.is_label(sl)):
         sl["lines"] = lines
         return sl

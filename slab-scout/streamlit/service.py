@@ -135,6 +135,7 @@ def photo_check(f: dict, fi, res: dict, rc: dict | None = None, px_mm: float | N
 
 REF_SURFACE_LIVE = False  # turned on once fitted against real grades (core/gradebench results)
 REF_WEAR_LIVE = False
+SURFACE_NEEDS_TILT = True  # scratches / print spots only lower the grade when an angled photo confirms them
 REF_MIN_PX = 600  # clean picture at least this many pixels on its short side to judge surface against it
 
 
@@ -332,6 +333,25 @@ def _grade(res: dict, x: dict | None) -> dict:
     # readings barely tracked the real grade, so they only nudge a typical grade; measured whitening still caps
     subs = {k: grading.weigh_evidence(v) for k, v in subs.items()}
     subs["edges"] = min(subs["edges"], wb_cap)
+    # Surface needs the angled photos to be trusted (SURFACE_NEEDS_TILT). From flat photos alone - and through slab
+    # plastic - glare, print texture and compression read as scratches and specks, and that was the main reason the
+    # estimates came out too low. Without angled photos only creases and stains (visible flat) lower the surface;
+    # scratches and print spots are shown as "possible, take the angled photos to confirm". The flat-photo reading
+    # is kept as subs_flat / graders_flat so the two can be compared on the grading tests.
+    subs_flat = dict(subs)
+    has_tilt = any(k.startswith("tilt_") for k in (res.get("_extras") or {}))
+    surface_note = None
+    if SURFACE_NEEDS_TILT and not has_tilt:
+        sure_caps = [d["cap"] for d in defects if d["area"] == "surface" and d["sure"] == "likely" and d["kind"] in ("crease", "stain")]
+        for d in defects:
+            if d["area"] == "surface" and d["kind"] not in ("crease", "stain") and d["sure"] == "likely":
+                d["sure"] = "possible"
+                d["confirm"] = "take the angled photos to confirm"
+        new_s = min(sure_caps) if sure_caps else 10.0
+        if new_s > subs["surface"]:
+            surface_note = (f"Surface from flat photos read {subs['surface']:g}; scratches / print spots need the angled photos "
+                            f"to confirm, so they don't lower this estimate yet.")
+        subs["surface"] = new_s
     back_c = b["centering"] if b else None
     if b and b.get("card") is not None:
         try:
@@ -343,6 +363,14 @@ def _grade(res: dict, x: dict | None) -> dict:
     g = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs["corners"], subs["edges"], subs["surface"],
                          tcg=game not in SPORTS)
     g = {k: (_num(v) if isinstance(v, float) else v) for k, v in g.items()}
+    if subs_flat != subs:
+        gf = grading.estimate(front_c.worst() if front_c else None, back_c.worst() if back_c else None, subs_flat["corners"], subs_flat["edges"],
+                              subs_flat["surface"], tcg=game not in SPORTS)
+        g["graders_flat"] = {k: v.get("grade") for k, v in (gf.get("graders") or {}).items()}
+        g["subs_flat"] = {k: _num(v) for k, v in subs_flat.items()}
+    g["surface_confirmed"] = has_tilt
+    if surface_note:
+        g["surface_note"] = surface_note
     # the card's format (die-cut, relic, mini, plate, square corners...) changes what is judged and who grades it
     cs = catalog.corner_shape(sid) if sid else None
     fmt = grading.card_format(variant, name, style, rad)
