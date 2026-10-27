@@ -1,0 +1,32 @@
+{
+  "note": "Raw-before / PSA-after pairs from YouTube 'guess the grade' videos. Times are seconds into the video where the raw card is shown. Grades checked against PSA cert pages where possible. Frames are used only for measurement; nothing from the videos is stored.",
+  "videos": [
+    {
+      "id": "l3YYrqucgyE", "channel": "SJC", "res": "2160p",
+      "cards": [
+        {"raw_t": [204, 234], "card": "Blastoise-Holo", "cert": "76476289", "psa": 8},
+        {"raw_t": [306, 330], "card": "Chansey", "cert": "76476290", "psa": 8},
+        {"raw_t": [372, 390], "card": "Dark Charizard 1st Edition", "cert": "76476291", "psa": 6},
+        {"raw_t": [456, 490], "card": "Dark Blastoise 1st Edition", "cert": "76476292", "psa": 7},
+        {"raw_t": [534, 552], "card": "Rocket's Hitmonchan 1st Edition", "cert": "76476293", "psa": 9, "source": "video label"}
+      ]
+    },
+    {
+      "id": "xM9ap8kLOIU", "channel": "Deep Pocket Monster", "res": "1080p",
+      "cards": [
+        {"raw_t": [96, 136], "card": "2002 Legendary Collection Spearow Reverse Foil #94", "cert": "5403066x", "psa": 9, "source": "video label"},
+        {"raw_t": [160, 208], "card": "2002 Legendary Collection Squirtle #95", "cert": "54030664", "psa": 10},
+        {"raw_t": [240, 300], "card": "2003 EX Ruby & Sapphire Lapras ex #99", "cert": "54030663", "psa": 9},
+        {"raw_t": [340, 388], "card": "2004 EX Team Rocket Returns Dark Houndoom Reverse Foil #5", "cert": "54030662", "psa": 10},
+        {"raw_t": [428, 444], "card": "2001 Neo Discovery Espeon 1st Edition #20", "cert": "54030661", "psa": 9},
+        {"raw_t": [492, 564], "card": "2001 Neo Discovery Wobbuffet Holo 1st Edition #16", "cert": "54030660", "psa": 9},
+        {"raw_t": [596, 652], "card": "2001 Neo Revelation Magneton Holo #10", "cert": "54030659", "psa": 8},
+        {"raw_t": [716, 748], "card": "1996 Japanese Base Machamp Holo #68", "cert": "54030658", "psa": 10},
+        {"raw_t": [796, 828], "card": "2019 Detective Pikachu Charizard Holo #5", "cert": "54030655", "psa": 9},
+        {"raw_t": [868, 908], "card": "2020 Vivid Voltage Oranguru Full Art #199", "cert": "54030654", "psa": 10},
+        {"raw_t": [948, 1012], "card": "2009 Supreme Victors Charizard G LV.X #143", "cert": "54030651", "psa": 7},
+        {"raw_t": [1052, 1084], "card": "2020 Vivid Voltage Pikachu V Full Art #170", "cert": "54030656", "psa": 10}
+      ]
+    }
+  ]
+}
