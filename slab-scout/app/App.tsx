@@ -139,6 +139,10 @@ function Main() {
       await store.vaultDelete(settings.vaultCode, id);
       await refreshVault();
     },
+    updateRecord: async (rec) => {
+      await store.vaultUpdate(settings.vaultCode, rec);
+      await refreshVault();
+    },
     openSet: (id) => setStack((s) => [...s, { kind: 'set', id }]),
     openCard: (key) => setStack((s) => [...s, { kind: 'card', key }]),
     goTab: (t) => {

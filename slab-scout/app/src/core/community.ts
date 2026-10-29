@@ -61,6 +61,10 @@ export interface VaultRecord {
   odds?: string;
   /** the text read on the card when it was scanned (front / back lines) */
   text?: { front: string[]; back: string[] };
+  /** full-resolution scan photos kept on this phone (file URIs), for checking our grade against a real one later */
+  photos?: { front?: string; back?: string };
+  /** sent off for grading: company, date, our estimate then, and the grade that came back */
+  submission?: import('./submissions').Submission;
 }
 
 export const cardKey = (c: Partial<CardFields>) =>

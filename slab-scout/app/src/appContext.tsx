@@ -15,6 +15,7 @@ export interface AppCtx {
   refreshVault: () => Promise<void>;
   addRecord: (rec: Omit<VaultRecord, 'id'>, list?: 'collection' | 'wishlist') => Promise<void>;
   removeRecord: (id: string) => Promise<void>;
+  updateRecord: (rec: VaultRecord) => Promise<void>;
   openSet: (id: string) => void;
   openCard: (key: string) => void;
   goTab: (t: Tab) => void;

@@ -27,6 +27,7 @@ import { useLayout } from '../layout';
 import { useApp } from '../appContext';
 import { quickIdentify, recordFromScan } from '../core/quickScan';
 import { serverOn, serverScan, type ServerScan } from '../core/server';
+import { keepPhotos } from '../core/submissions';
 import { playerName, refineMatches } from '../core/verify';
 import { addHistory, clearHistory, loadHistory, onHistory, removeHistory, ScanItem, updateHistory } from '../core/scanHistory';
 
@@ -893,6 +894,7 @@ export default function ScanScreen({ settings, apiKey, store, goSettings, onSave
       pricing: { raw, currency: cur, note: priceNote, graded_label: gradedLabel, graded_mid: gradedMid ?? catGraded, priced_at: now },
       match: { source, ref_id: chosen?.ref_id || '', image_url: chosen?.image_url || '', url: base?.match.url || chosen?.url || '', catalog_key: catPick?.key },
       thumb, phash, print_run: catPick?.printRun ?? null, odds: base?.odds || '',
+      ...(list === 'collection' ? { photos: await keepPhotos(front?.orig || front?.uri, back?.orig || back?.uri) } : {}),
     }, list);
     if (catPick && phash) store.addCorrection(phash, catPick.key).catch(() => {});
     if (list === 'wishlist') {
