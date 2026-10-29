@@ -1,0 +1,27 @@
+{
+  "note": "Lab run of the live /api/scan grader on single video frames (front only, no angled photos). Kept out of the app. pxmm = card pixels per mm; the app's photo check needs 15+.",
+  "run": "2026-10-29",
+  "results": [
+    {"video": "l3YYrqucgyE", "t": 214, "card": "Blastoise", "id_ok": true, "found": true, "pxmm": 25, "ours": 7, "psa": 8, "limit": "edges 7"},
+    {"video": "l3YYrqucgyE", "t": 470, "card": "Dark Blastoise 1st", "id_ok": true, "pxmm": 25, "ours": 6, "psa": 7, "limit": "edges 6"},
+    {"video": "l3YYrqucgyE", "t": 328, "card": "Chansey", "id_ok": true, "pxmm": 25, "ours": 6, "psa": 8, "limit": "centering 5 (crop lost the yellow border)"},
+    {"video": "l3YYrqucgyE", "t": 370, "card": "Dark Charizard 1st", "id_ok": true, "pxmm": 25, "ours": 9, "psa": 6, "limit": "none found"},
+    {"video": "xM9ap8kLOIU", "t": 120, "card": "Spearow Rev Foil", "id_ok": true, "found": true, "recut": false, "pxmm": 10.9, "ours": 3, "psa": 9, "note": "crop was hand + background"},
+    {"video": "xM9ap8kLOIU", "t": 168, "card": "Squirtle LC", "id_ok": true, "found": true, "recut": true, "pxmm": 10.8, "ours": 7, "psa": 10},
+    {"video": "xM9ap8kLOIU", "t": 292, "card": "Lapras ex", "id_ok": true, "found": true, "recut": true, "pxmm": 10.4, "ours": 4, "psa": 9},
+    {"video": "xM9ap8kLOIU", "t": 388, "card": "Dark Houndoom", "id_ok": true, "found": false, "ours": 5, "psa": 10},
+    {"video": "xM9ap8kLOIU", "t": 436, "card": "Espeon 1st", "id_ok": true, "found": false, "ours": 3, "psa": 9},
+    {"video": "xM9ap8kLOIU", "t": 556, "card": "Wobbuffet 1st", "id_ok": true, "found": true, "recut": true, "pxmm": 9, "ours": 9, "psa": 9},
+    {"video": "xM9ap8kLOIU", "t": 612, "card": "Magneton", "id_ok": true, "found": false, "ours": 3, "psa": 8},
+    {"video": "xM9ap8kLOIU", "t": 748, "card": "Machamp JP Base", "id_ok": false, "id_as": "Machoke", "found": true, "recut": true, "pxmm": 10.2, "ours": 9, "psa": 10},
+    {"video": "xM9ap8kLOIU", "t": 828, "card": "Charizard Det. Pikachu", "id_ok": true, "found": true, "recut": true, "ours": 10, "psa": 9},
+    {"video": "xM9ap8kLOIU", "t": 972, "card": "Charizard G LV.X", "id_ok": true, "found": true, "recut": true, "ours": 10, "psa": 7},
+    {"video": "xM9ap8kLOIU", "t": 1084, "card": "Pikachu V FA", "id_ok": true, "found": true, "recut": true, "ours": 4, "psa": 10, "limit": "corners 4"}
+  ],
+  "findings": [
+    "Identification: 14 of 15 right (Japanese Machamp read as Machoke).",
+    "Every Deep Pocket Monster frame is ~10 px/mm and fails the app's photo check, so the app would ask for a better photo instead of showing these grades.",
+    "Where the card outline was not found, the best-effort grade is meaningless (3 of 3 far too low).",
+    "Chansey (4K): crop cut inside the yellow border -> fake bad centering. Crop bug to fix in the lab."
+  ]
+}
