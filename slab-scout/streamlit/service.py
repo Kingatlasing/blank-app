@@ -228,6 +228,10 @@ def _grade(res: dict, x: dict | None) -> dict:
         sb = catalog.set_profile(sid)
         prof = {"l": sb["border"][0], "r": sb["border"][1], "t": sb["border"][2], "b": sb["border"][3], "n": sb.get("n", 1), "borderless": sb.get("borderless", 0)}
     expect = {k: prof[k] for k in ("l", "r", "t", "b")} if prof and prof.get("n", 0) >= 2 and (prof.get("borderless") or 0) < 0.5 else None
+    # learned border widths only when the border lines weren't found on their own (on 110 TAG scans, steering found
+    # lines with them moved centering from 1.4 to 7.9 points off TAG's measurement, median)
+    if expect and all((f.get("edges") or {}).get("found", {}).values()):
+        expect = None
     L = f["edges"]
     if style != "standard" or expect:
         L = vision.find_lines(f["card"], f["found"], expect=expect, style=style)
