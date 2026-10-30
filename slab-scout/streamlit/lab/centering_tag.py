@@ -23,7 +23,11 @@ def pct(L):
     return [round(100 * l / max(1, l + r), 1), round(100 * t / max(1, t + b), 1)], all(L["found"].values())
 
 
-def app_path(img):
+BP = json.load(open("../data/catalog/border_profiles.json"))
+SP = json.load(open("../data/catalog/set_profiles.json"))
+
+
+def app_path(img, set_id=None):
     card, found = vision.detect_and_crop(img)
     if found:
         try:
@@ -32,7 +36,15 @@ def app_path(img):
             pass
     L = vision.find_lines(card, found)
     p, ok = pct(L)
-    return {"lr_tb": p, "lines_found": ok, "card_found": found, "card_px": list(card.size)}
+    out = {"lr_tb": p, "lines_found": ok, "card_found": found, "card_px": list(card.size)}
+    # what the app does once it knows the set: steer the lines with the set's learned border widths
+    b = (BP.get(set_id) or {}).get("*") if set_id else None
+    if b and b[4] >= 2 and b[5] < 0.5:
+        out["with_border_profile"] = pct(vision.find_lines(card, found, expect={"l": b[0], "r": b[1], "t": b[2], "b": b[3]}))[0]
+    sp = (SP.get(set_id) or {}).get("border") if set_id else None
+    if sp:
+        out["with_set_profile"] = pct(vision.find_lines(card, found, expect={"l": sp[0], "r": sp[1], "t": sp[2], "b": sp[3]}))[0]
+    return out
 
 
 rows = []
@@ -42,27 +54,28 @@ for it in items:
         t0 = time.time()
         img = Image.open(io.BytesIO(requests.get(it["img"], timeout=60).content)).convert("RGB")
         row["scan_px"] = list(img.size)
-        row["app_3000"] = app_path(shrink(img))
-        row["app_full"] = app_path(img)
+        sid = "pokemon-base-set" if "Base Set" in it.get("title", "") else None
+        row["app_3000"] = app_path(shrink(img), sid)
         row["sec"] = round(time.time() - t0, 1)
     except Exception as e:
         row["error"] = f"{type(e).__name__}: {e}"[:200]
     rows.append(row)
 
 
-def err(key):
+def err(key, sub="lr_tb", only=None):
     e = []
     for r in rows:
-        v = r.get(key)
-        if not v:
+        v = (r.get(key) or {}).get(sub)
+        if not v or (only and not (r.get(key) or {}).get(only)):
             continue
         t = r["tag_front"]
-        e.append(max(abs(v["lr_tb"][0] - t[0]), abs(v["lr_tb"][1] - t[2])))
+        e.append(max(abs(v[0] - t[0]), abs(v[1] - t[2])))
     e = np.array(e)
     return {"n": len(e), "median": float(np.median(e)) if len(e) else None, "mean": round(float(e.mean()), 2) if len(e) else None,
             "within2": int((e <= 2).sum()), "over5": int((e > 5).sum())}
 
 
-summary = {k: err(k) for k in ("app_3000", "app_full")}
+summary = {"plain_all": err("app_3000"), "plain_base_set": err("app_3000", only="with_border_profile"),
+           "with_border_profile": err("app_3000", "with_border_profile"), "with_set_profile": err("app_3000", "with_set_profile")}
 json.dump({"summary": summary, "rows": rows, "at": time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime())}, open(out, "w"), indent=1)
 print(json.dumps(summary, indent=1))
