@@ -1,0 +1,46 @@
+# Copies Slab Scout's test data from the Streamlit server into the repo every 30 minutes, so nothing is lost when
+# the app sleeps or restarts. Also wakes the app if it's asleep and restarts an interrupted grading test where it
+# left off. Everything lands on the slab-scout-work branch under lab-data/.
+name: lab-backup
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: lab-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: slab-scout-work
+          fetch-depth: 1
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: _main
+          sparse-checkout: .github/scripts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Wake the app (opens it in a headless browser, like a visitor)
+        run: |
+          pip install -q playwright==1.48.0 requests
+          python -m playwright install --with-deps chromium > /dev/null
+          python _main/.github/scripts/wake_app.py
+      - name: Copy test data into lab-data/
+        run: python _main/.github/scripts/lab_backup.py
+      - name: Commit
+        run: |
+          git config user.name "slab-scout-backup"
+          git config user.email "slab-scout-backup@users.noreply.github.com"
+          git add lab-data
+          if git diff --cached --quiet; then echo "nothing new"; exit 0; fi
+          git commit -q -m "lab-data backup $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do git pull -q --rebase origin slab-scout-work && git push -q origin HEAD:slab-scout-work && exit 0; sleep 5; done
+          exit 1
