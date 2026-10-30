@@ -293,7 +293,7 @@ async def gb_start(request: Request):
     await run_in_threadpool(engine)
     q = request.query_params
     return JSONResponse(gradebench.start(q.get("list") or gradebench.LIST_URL, min(max(int(q.get("limit") or 600), 1), 3000),
-                                         max(int(q.get("offset") or 0), 0)))
+                                         max(int(q.get("offset") or 0), 0), q.get("resume") or ""))
 
 
 async def gb_status(request: Request):
@@ -311,6 +311,23 @@ async def gb_result(request: Request):
     from starlette.responses import Response
     data = await run_in_threadpool(gradebench.result_gz)
     return Response(data, media_type="application/gzip", headers={"Content-Disposition": 'attachment; filename="slabscout-gradebench.json.gz"'})
+
+
+async def labstore_put(request: Request):
+    from core import labstore
+    try:
+        body = await request.json()
+        key = str(body.get("key") or "")[:80]
+        if not key:
+            return JSONResponse({"detail": "key needed"}, status_code=400)
+        return JSONResponse(await run_in_threadpool(labstore.put, key, body.get("data")))
+    except Exception as e:
+        return JSONResponse({"detail": f"{type(e).__name__}: {e}"[:200]}, status_code=400)
+
+
+async def labstore_get(request: Request):
+    from core import labstore
+    return JSONResponse(await run_in_threadpool(labstore.dump))
 
 
 async def cal_start(request: Request):
@@ -338,6 +355,7 @@ app = st.App(
             Route("/api/learn/seed", learn_seed, methods=["POST"]),
             Route("/api/gradebench/start", gb_start), Route("/api/gradebench/status", gb_status), Route("/api/gradebench/stop", gb_stop),
             Route("/api/gradebench/result", gb_result),
+            Route("/api/labstore", labstore_get, methods=["GET"]), Route("/api/labstore/put", labstore_put, methods=["POST"]),
             Route("/api/cal/start", cal_start), Route("/api/cal/status", cal_status), Route("/api/cal/result", cal_result),
             Route("/api/bench/start", bench_start), Route("/api/bench/status", bench_status), Route("/api/bench/stop", bench_stop),
             Mount("/web", app=StaticFiles(directory=WEB_DIR, html=True, check_dir=False))],

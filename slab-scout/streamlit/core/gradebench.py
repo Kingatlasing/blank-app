@@ -185,16 +185,28 @@ def border_wear(card, radius: int | None = None, ref=None) -> dict:
     return out
 
 
-def _run(url: str, limit: int, offset: int = 0) -> None:
+def _run(url: str, limit: int, offset: int = 0, resume: str = "") -> None:
     import requests
     from . import databases, catalog
-    STATE.update(state="loading list", done=0, results=[], started=time.time())
+    STATE.update(state="loading list", done=0, results=[], started=time.time(), list=url)
     try:
         items = requests.get(url, timeout=60).json()[offset:offset + limit]
     except Exception as e:
         STATE.update(state="error", error=f"list: {e}")
         return
-    STATE.update(state="running", n=len(items))
+    # carry on from a saved run (e.g. lab-data/gradebench-*.json in the repo): those cards aren't measured again
+    if resume:
+        try:
+            prev = requests.get(resume, timeout=60).json()
+            prev = prev.get("results", prev) if isinstance(prev, dict) else prev
+            done = {r.get("img") for r in prev if not r.get("error")}
+            STATE["results"] = [r for r in prev if r.get("img") in done]
+            items = [it for it in items if it.get("img") not in done]
+            STATE["done"] = len(STATE["results"])
+            STATE["resumed"] = len(STATE["results"])
+        except Exception as e:
+            STATE["resume_error"] = f"{type(e).__name__}: {e}"[:200]
+    STATE.update(state="running", n=len(items) + STATE["done"])
     for it in items:
         if _stop.is_set():
             STATE["state"] = "stopped"
@@ -214,12 +226,12 @@ def _run(url: str, limit: int, offset: int = 0) -> None:
     STATE["state"] = "done"
 
 
-def start(url: str = LIST_URL, limit: int = 600, offset: int = 0) -> dict:
+def start(url: str = LIST_URL, limit: int = 600, offset: int = 0, resume: str = "") -> dict:
     global _thread
     if _thread and _thread.is_alive():
         return status()
     _stop.clear()
-    _thread = threading.Thread(target=_run, args=(url, limit, offset), daemon=True)
+    _thread = threading.Thread(target=_run, args=(url, limit, offset, resume), daemon=True)
     _thread.start()
     return {"state": "starting", "list": url, "limit": limit, "offset": offset}
 
