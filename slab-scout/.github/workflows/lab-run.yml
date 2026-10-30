@@ -1,0 +1,49 @@
+# Runs one lab test (streamlit/lab/job.json) on a GitHub machine whenever the lab-run branch is pushed, and saves
+# only the resulting numbers to slab-scout-work/lab-data/. Images are downloaded to the machine, measured, and
+# thrown away with it.
+name: lab-run
+on:
+  push:
+    branches: [lab-run]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: lab-run
+  cancel-in-progress: true
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: slab-scout-work
+          path: _work
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -q opencv-python-headless imagehash pillow numpy requests
+      - name: Run
+        working-directory: streamlit
+        run: |
+          python - <<'PY'
+          import json, subprocess, sys
+          j = json.load(open("lab/job.json"))
+          out = "../_work/lab-data/" + j["out"]
+          r = subprocess.run([sys.executable, j["script"], *j["args"], out])
+          sys.exit(r.returncode)
+          PY
+      - name: Save numbers
+        if: always()
+        working-directory: _work
+        run: |
+          git config user.name "slab-scout-lab"
+          git config user.email "slab-scout-lab@users.noreply.github.com"
+          git add lab-data
+          git diff --cached --quiet && exit 0
+          git commit -q -m "lab result $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do git pull -q --rebase origin slab-scout-work && git push -q origin HEAD:slab-scout-work && exit 0; sleep 5; done
+          exit 1
