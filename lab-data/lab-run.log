@@ -1,16 +1,30 @@
 {
- "app_3000": {
-  "n": 60,
+ "plain_all": {
+  "n": 120,
   "median": 1.6000000000000014,
-  "mean": 2.47,
-  "within2": 39,
-  "over5": 3
+  "mean": 3.07,
+  "within2": 77,
+  "over5": 11
  },
- "app_full": {
-  "n": 60,
-  "median": 1.5500000000000007,
-  "mean": 2.3,
-  "within2": 40,
-  "over5": 2
+ "plain_base_set": {
+  "n": 110,
+  "median": 1.4499999999999993,
+  "mean": 2.26,
+  "within2": 74,
+  "over5": 6
+ },
+ "with_border_profile": {
+  "n": 110,
+  "median": 7.849999999999998,
+  "mean": 8.73,
+  "within2": 3,
+  "over5": 92
+ },
+ "with_set_profile": {
+  "n": 110,
+  "median": 5.600000000000001,
+  "mean": 5.5,
+  "within2": 13,
+  "over5": 67
  }
 }
