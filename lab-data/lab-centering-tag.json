@@ -1,0 +1,2361 @@
+{
+ "summary": {
+  "app_3000": {
+   "n": 60,
+   "median": 1.6000000000000014,
+   "mean": 2.47,
+   "within2": 39,
+   "over5": 3
+  },
+  "app_full": {
+   "n": 60,
+   "median": 1.5500000000000007,
+   "mean": 2.3,
+   "within2": 40,
+   "over5": 2
+  }
+ },
+ "rows": [
+  {
+   "title": "TAG X8218196 Clefairy/5/102 Base Set",
+   "tag_front": [
+    53,
+    47,
+    46,
+    54
+   ],
+   "grade": 3,
+   "scan_px": [
+    4402,
+    6083
+   ],
+   "app_3000": {
+    "lr_tb": [
+     48.4,
+     44.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     48.4,
+     44.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 2.1
+  },
+  {
+   "title": "TAG U4565024 Clefairy/5/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    52,
+    48
+   ],
+   "grade": 3,
+   "scan_px": [
+    4395,
+    6070
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.9
+  },
+  {
+   "title": "TAG V6645348 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    47,
+    53
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4406,
+    6077
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     46.5
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     46.5
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG V8008537 Clefairy/5/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    50,
+    50
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4402,
+    6076
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.0,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.0,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG W4129580 Clefairy/5/102 Base Set",
+   "tag_front": [
+    50,
+    50,
+    47,
+    53
+   ],
+   "grade": 3,
+   "scan_px": [
+    4411,
+    6104
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.8,
+     45.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     45.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG V6702901 Chansey/3/102 Base Set",
+   "tag_front": [
+    55,
+    45,
+    52,
+    48
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4409,
+    6071
+   ],
+   "app_3000": {
+    "lr_tb": [
+     53.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     53.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG V3064813 Chansey/3/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    48,
+    52
+   ],
+   "grade": 3,
+   "scan_px": [
+    4335,
+    6001
+   ],
+   "app_3000": {
+    "lr_tb": [
+     61.2,
+     81.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     63.3,
+     81.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 4.8
+  },
+  {
+   "title": "TAG S4904773 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    54,
+    46,
+    50,
+    50
+   ],
+   "grade": 3,
+   "scan_px": [
+    4402,
+    6093
+   ],
+   "app_3000": {
+    "lr_tb": [
+     52.3,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     52.3,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG H6697591 Clefairy/5/102 Base Set",
+   "tag_front": [
+    57,
+    43,
+    47,
+    53
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4459,
+    6147
+   ],
+   "app_3000": {
+    "lr_tb": [
+     56.1,
+     46.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     56.1,
+     46.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG X2433568 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    56,
+    44,
+    52,
+    48
+   ],
+   "grade": 3,
+   "scan_px": [
+    4343,
+    5991
+   ],
+   "app_3000": {
+    "lr_tb": [
+     52.3,
+     52.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     52.3,
+     52.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG K4799621 Clefairy/5/102 Base Set",
+   "tag_front": [
+    47,
+    53,
+    49,
+    51
+   ],
+   "grade": 3,
+   "scan_px": [
+    4347,
+    5991
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.5,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.5,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG F8882687 Magneton/9/102 Base Set",
+   "tag_front": [
+    47,
+    53,
+    54,
+    46
+   ],
+   "grade": 3,
+   "scan_px": [
+    4417,
+    6085
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     52.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     52.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG T2295132 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    47,
+    53
+   ],
+   "grade": 4,
+   "scan_px": [
+    4399,
+    6091
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.0,
+     48.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.0,
+     48.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG Z9323261 Clefairy/5/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    55,
+    45
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4388,
+    6094
+   ],
+   "app_3000": {
+    "lr_tb": [
+     44.4,
+     52.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     44.4,
+     52.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG P3757824 Chansey/3/102 Base Set",
+   "tag_front": [
+    47,
+    53,
+    53,
+    47
+   ],
+   "grade": 3,
+   "scan_px": [
+    4412,
+    6085
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG Q5254691 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    47,
+    53,
+    44,
+    56
+   ],
+   "grade": 3.5,
+   "scan_px": [
+    4439,
+    6143
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     45.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     45.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG Y1075772 Clefairy/5/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    57,
+    43
+   ],
+   "grade": 4.5,
+   "scan_px": [
+    4345,
+    6005
+   ],
+   "app_3000": {
+    "lr_tb": [
+     52.4,
+     54.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     51.6,
+     54.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG L1681582 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    60,
+    40,
+    46,
+    54
+   ],
+   "grade": 4,
+   "scan_px": [
+    4341,
+    6000
+   ],
+   "app_3000": {
+    "lr_tb": [
+     55.6,
+     48.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     55.6,
+     48.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG S9646936 Chansey/3/102 Base Set",
+   "tag_front": [
+    50,
+    50,
+    47,
+    53
+   ],
+   "grade": 4,
+   "scan_px": [
+    4447,
+    6143
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     47.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     47.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG C4729468 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    43,
+    57
+   ],
+   "grade": 4,
+   "scan_px": [
+    4453,
+    6161
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     42.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     42.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG X2283620 Chansey/3/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    51,
+    49
+   ],
+   "grade": 4,
+   "scan_px": [
+    4349,
+    6004
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.8,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG K2483952 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    49,
+    51
+   ],
+   "grade": 4.5,
+   "scan_px": [
+    4438,
+    6119
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.8,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.8,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG N1087442 Chansey/3/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    39,
+    61
+   ],
+   "grade": 4.5,
+   "scan_px": [
+    4403,
+    6087
+   ],
+   "app_3000": {
+    "lr_tb": [
+     53.1,
+     37.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     53.1,
+     38.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG S7236700 Chansey/3/102 Base Set",
+   "tag_front": [
+    44,
+    56,
+    57,
+    43
+   ],
+   "grade": 4,
+   "scan_px": [
+    4354,
+    6017
+   ],
+   "app_3000": {
+    "lr_tb": [
+     46.0,
+     54.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     46.0,
+     54.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG D5773432 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    51,
+    49,
+    47,
+    53
+   ],
+   "grade": 4,
+   "scan_px": [
+    4415,
+    6108
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.8,
+     47.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     46.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG K2939354 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    51,
+    49,
+    45,
+    55
+   ],
+   "grade": 5,
+   "scan_px": [
+    4402,
+    6074
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     46.5
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     45.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG W9756737 Alakazam/1/102 Base Set",
+   "tag_front": [
+    53,
+    47,
+    49,
+    51
+   ],
+   "grade": 5.5,
+   "scan_px": [
+    4454,
+    6164
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.0,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.0,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG V9398090 Chansey/3/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    54,
+    46
+   ],
+   "grade": 5,
+   "scan_px": [
+    4412,
+    6097
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.7,
+     52.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.7,
+     52.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG Y9801137 Clefairy/5/102 Base Set",
+   "tag_front": [
+    55,
+    45,
+    50,
+    50
+   ],
+   "grade": 5,
+   "scan_px": [
+    4336,
+    5996
+   ],
+   "app_3000": {
+    "lr_tb": [
+     54.0,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     54.0,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG W3785749 Alakazam/1/102 Base Set",
+   "tag_front": [
+    42,
+    58,
+    49,
+    51
+   ],
+   "grade": 5.5,
+   "scan_px": [
+    4409,
+    6104
+   ],
+   "app_3000": {
+    "lr_tb": [
+     41.9,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     41.9,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.9
+  },
+  {
+   "title": "TAG S2985553 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    51,
+    49,
+    52,
+    48
+   ],
+   "grade": 5,
+   "scan_px": [
+    4394,
+    6082
+   ],
+   "app_3000": {
+    "lr_tb": [
+     48.4,
+     52.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     48.4,
+     52.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG Q4645748 Alakazam/1/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    50,
+    50
+   ],
+   "grade": 5.5,
+   "scan_px": [
+    4455,
+    6162
+   ],
+   "app_3000": {
+    "lr_tb": [
+     45.9,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     43.2,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 4.2
+  },
+  {
+   "title": "TAG M7723876 Clefairy/5/102 Base Set",
+   "tag_front": [
+    48,
+    52,
+    50,
+    50
+   ],
+   "grade": 5,
+   "scan_px": [
+    4332,
+    5998
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.5
+  },
+  {
+   "title": "TAG C7850631 Magneton/9/102 Base Set",
+   "tag_front": [
+    48,
+    52,
+    44,
+    56
+   ],
+   "grade": 6.5,
+   "scan_px": [
+    4403,
+    6092
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.0,
+     44.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.0,
+     44.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG G4203793 Clefairy/5/102 Base Set",
+   "tag_front": [
+    54,
+    46,
+    50,
+    50
+   ],
+   "grade": 6,
+   "scan_px": [
+    4366,
+    6011
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.8,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG T6447637 Chansey/3/102 Base Set",
+   "tag_front": [
+    48,
+    52,
+    48,
+    52
+   ],
+   "grade": 6.5,
+   "scan_px": [
+    4392,
+    6084
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.6,
+     47.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.6,
+     47.2
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.5
+  },
+  {
+   "title": "TAG T1867799 Alakazam/1/102 Base Set",
+   "tag_front": [
+    48,
+    52,
+    51,
+    49
+   ],
+   "grade": 6,
+   "scan_px": [
+    4411,
+    6086
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG T1270787 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    57,
+    43,
+    55,
+    45
+   ],
+   "grade": 6.5,
+   "scan_px": [
+    4397,
+    6072
+   ],
+   "app_3000": {
+    "lr_tb": [
+     53.1,
+     52.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     53.1,
+     52.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG M3721572 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    50,
+    50,
+    45,
+    55
+   ],
+   "grade": 6.5,
+   "scan_px": [
+    4393,
+    6085
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     45.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     45.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG Z2483170 Clefairy/5/102 Base Set",
+   "tag_front": [
+    53,
+    47,
+    49,
+    51
+   ],
+   "grade": 6,
+   "scan_px": [
+    4455,
+    6166
+   ],
+   "app_3000": {
+    "lr_tb": [
+     51.6,
+     48.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     51.6,
+     48.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG W5294641 Chansey/3/102 Base Set",
+   "tag_front": [
+    58,
+    42,
+    46,
+    54
+   ],
+   "grade": 6,
+   "scan_px": [
+    4392,
+    6082
+   ],
+   "app_3000": {
+    "lr_tb": [
+     56.2,
+     44.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     56.2,
+     44.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG N3394309 Mewtwo/10/102 Base Set",
+   "tag_front": [
+    48,
+    52,
+    45,
+    55
+   ],
+   "grade": 7,
+   "scan_px": [
+    4401,
+    6090
+   ],
+   "app_3000": {
+    "lr_tb": [
+     48.4,
+     44.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     48.4,
+     44.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG H8437205 Clefairy/5/102 Base Set",
+   "tag_front": [
+    51,
+    49,
+    51,
+    49
+   ],
+   "grade": 7.5,
+   "scan_px": [
+    4396,
+    6084
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.0,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     50.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG W5578576 Alakazam/1/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    51,
+    49
+   ],
+   "grade": 7.5,
+   "scan_px": [
+    4402,
+    6069
+   ],
+   "app_3000": {
+    "lr_tb": [
+     51.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     51.6,
+     51.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG R7057290 Mewtwo/10/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    50,
+    50
+   ],
+   "grade": 7.5,
+   "scan_px": [
+    4402,
+    6089
+   ],
+   "app_3000": {
+    "lr_tb": [
+     46.8,
+     43.5
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     46.8,
+     49.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG R8877138 Blastoise/2/102 Base Set",
+   "tag_front": [
+    50,
+    50,
+    43,
+    57
+   ],
+   "grade": 7.5,
+   "scan_px": [
+    4402,
+    6100
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.5,
+     43.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.5,
+     43.7
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG L2846778 Gyarados/6/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    40,
+    60
+   ],
+   "grade": 7,
+   "scan_px": [
+    4406,
+    6068
+   ],
+   "app_3000": {
+    "lr_tb": [
+     49.2,
+     40.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     40.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG Y3261494 Magneton/9/102 Base Set",
+   "tag_front": [
+    42,
+    58,
+    49,
+    51
+   ],
+   "grade": 7,
+   "scan_px": [
+    4399,
+    6082
+   ],
+   "app_3000": {
+    "lr_tb": [
+     42.2,
+     48.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     42.2,
+     48.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG U5241508 Magneton/9/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    53,
+    47
+   ],
+   "grade": 7.5,
+   "scan_px": [
+    4357,
+    6004
+   ],
+   "app_3000": {
+    "lr_tb": [
+     48.4,
+     53.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     49.2,
+     53.3
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG X6917756 Mewtwo/10/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    47,
+    53
+   ],
+   "grade": 7,
+   "scan_px": [
+    4394,
+    6092
+   ],
+   "app_3000": {
+    "lr_tb": [
+     46.8,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     46.8,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG W3591457 Chansey/3/102 Base Set",
+   "tag_front": [
+    53,
+    47,
+    44,
+    56
+   ],
+   "grade": 7,
+   "scan_px": [
+    4404,
+    6100
+   ],
+   "app_3000": {
+    "lr_tb": [
+     53.1,
+     44.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     53.1,
+     44.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG J2255621 Clefairy/5/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    46,
+    54
+   ],
+   "grade": 8.5,
+   "scan_px": [
+    4405,
+    6083
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.8,
+     45.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.8,
+     45.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG U7403474 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    47,
+    53
+   ],
+   "grade": 8,
+   "scan_px": [
+    4394,
+    6091
+   ],
+   "app_3000": {
+    "lr_tb": [
+     46.0,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     46.0,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG R4397350 Charizard/4/102 Base Set",
+   "tag_front": [
+    52,
+    48,
+    51,
+    49
+   ],
+   "grade": 8.5,
+   "scan_px": [
+    4412,
+    6077
+   ],
+   "app_3000": {
+    "lr_tb": [
+     50.0,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     50.0,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG M6386314 Blastoise/2/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    45,
+    55
+   ],
+   "grade": 8,
+   "scan_px": [
+    4400,
+    6092
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.5,
+     44.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.5,
+     44.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.7
+  },
+  {
+   "title": "TAG D8982517 Blastoise/2/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    54,
+    46
+   ],
+   "grade": 8.5,
+   "scan_px": [
+    4386,
+    6068
+   ],
+   "app_3000": {
+    "lr_tb": [
+     46.7,
+     53.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     46.7,
+     53.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG W5300828 Blastoise/2/102 Base Set",
+   "tag_front": [
+    54,
+    46,
+    47,
+    53
+   ],
+   "grade": 8.5,
+   "scan_px": [
+    4405,
+    6080
+   ],
+   "app_3000": {
+    "lr_tb": [
+     52.5,
+     47.8
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     52.5,
+     47.1
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  },
+  {
+   "title": "TAG H2940984 Blastoise/2/102 Base Set",
+   "tag_front": [
+    49,
+    51,
+    53,
+    47
+   ],
+   "grade": 8,
+   "scan_px": [
+    4332,
+    6001
+   ],
+   "app_3000": {
+    "lr_tb": [
+     61.0,
+     57.6
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     53.7,
+     50.0
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 4.2
+  },
+  {
+   "title": "TAG V7544911 Alakazam/1/102 Base Set",
+   "tag_front": [
+    46,
+    54,
+    48,
+    52
+   ],
+   "grade": 8,
+   "scan_px": [
+    4403,
+    6068
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.6,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.6,
+     47.9
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.8
+  },
+  {
+   "title": "TAG Q4480946 Hitmonchan/7/102 Base Set",
+   "tag_front": [
+    47,
+    53,
+    53,
+    47
+   ],
+   "grade": 9,
+   "scan_px": [
+    4399,
+    6081
+   ],
+   "app_3000": {
+    "lr_tb": [
+     47.6,
+     53.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "app_full": {
+    "lr_tb": [
+     47.6,
+     53.4
+    ],
+    "lines_found": true,
+    "card_found": true,
+    "card_px": [
+     630,
+     880
+    ]
+   },
+   "sec": 1.6
+  }
+ ],
+ "at": "2026-10-30T19:20Z"
+}
