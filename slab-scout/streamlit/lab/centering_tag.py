@@ -41,6 +41,16 @@ def app_path(img, set_id=None):
     b = (BP.get(set_id) or {}).get("*") if set_id else None
     if b and b[4] >= 2 and b[5] < 0.5:
         out["with_border_profile"] = pct(vision.find_lines(card, found, expect={"l": b[0], "r": b[1], "t": b[2], "b": b[3]}))[0]
+    try:
+        Lc = vision.border_by_colour(card, None)
+        if Lc and Lc.get("spread", 99) < 8:
+            out["colour_plain"] = pct(Lc)[0]
+        if b and b[4] >= 2 and b[5] < 0.5:
+            Le = vision.border_by_colour(card, {"l": b[0], "r": b[1], "t": b[2], "b": b[3]})
+            if Le and Le.get("spread", 99) < 8:
+                out["colour_with_profile"] = pct(Le)[0]
+    except Exception as e:
+        out["colour_err"] = str(e)[:100]
     sp = (SP.get(set_id) or {}).get("border") if set_id else None
     if sp:
         out["with_set_profile"] = pct(vision.find_lines(card, found, expect={"l": sp[0], "r": sp[1], "t": sp[2], "b": sp[3]}))[0]
@@ -76,6 +86,9 @@ def err(key, sub="lr_tb", only=None):
 
 
 summary = {"plain_all": err("app_3000"), "plain_base_set": err("app_3000", only="with_border_profile"),
-           "with_border_profile": err("app_3000", "with_border_profile"), "with_set_profile": err("app_3000", "with_set_profile")}
+           "with_border_profile": err("app_3000", "with_border_profile"), "with_set_profile": err("app_3000", "with_set_profile"),
+           "colour_plain": err("app_3000", "colour_plain"), "colour_with_profile": err("app_3000", "colour_with_profile"),
+           "plain_where_colour_with_profile": err("app_3000", only="colour_with_profile"),
+           "plain_where_colour_plain": err("app_3000", only="colour_plain")}
 json.dump({"summary": summary, "rows": rows, "at": time.strftime("%Y-%m-%dT%H:%MZ", time.gmtime())}, open(out, "w"), indent=1)
 print(json.dumps(summary, indent=1))
