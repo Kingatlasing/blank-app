@@ -27,6 +27,34 @@
    "mean": 5.5,
    "within2": 13,
    "over5": 67
+  },
+  "colour_plain": {
+   "n": 101,
+   "median": 1.3999999999999986,
+   "mean": 1.63,
+   "within2": 71,
+   "over5": 1
+  },
+  "colour_with_profile": {
+   "n": 91,
+   "median": 1.2999999999999972,
+   "mean": 1.63,
+   "within2": 64,
+   "over5": 1
+  },
+  "plain_where_colour_with_profile": {
+   "n": 91,
+   "median": 1.3999999999999986,
+   "mean": 1.85,
+   "within2": 63,
+   "over5": 3
+  },
+  "plain_where_colour_plain": {
+   "n": 101,
+   "median": 1.3999999999999986,
+   "mean": 1.88,
+   "within2": 69,
+   "over5": 4
   }
  },
  "rows": [
@@ -57,6 +85,14 @@
     "with_border_profile": [
      48.5,
      37.2
+    ],
+    "colour_plain": [
+     48.4,
+     44.4
+    ],
+    "colour_with_profile": [
+     48.4,
+     44.4
     ],
     "with_set_profile": [
      48.4,
@@ -93,12 +129,20 @@
      53.2,
      42.7
     ],
+    "colour_plain": [
+     49.2,
+     50.7
+    ],
+    "colour_with_profile": [
+     49.2,
+     50.7
+    ],
     "with_set_profile": [
      49.2,
      44.0
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG V6645348 Hitmonchan/7/102 Base Set",
@@ -128,12 +172,20 @@
      53.5,
      38.9
     ],
+    "colour_plain": [
+     50.0,
+     47.2
+    ],
+    "colour_with_profile": [
+     50.0,
+     47.2
+    ],
     "with_set_profile": [
      50.0,
      43.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG V8008537 Clefairy/5/102 Base Set",
@@ -162,6 +214,14 @@
     "with_border_profile": [
      52.1,
      39.8
+    ],
+    "colour_plain": [
+     47.1,
+     50.0
+    ],
+    "colour_with_profile": [
+     47.1,
+     50.0
     ],
     "with_set_profile": [
      46.3,
@@ -198,12 +258,20 @@
      46.7,
      38.6
     ],
+    "colour_plain": [
+     50.7,
+     45.3
+    ],
+    "colour_with_profile": [
+     50.7,
+     45.3
+    ],
     "with_set_profile": [
      50.0,
      40.0
     ]
    },
-   "sec": 1.4
+   "sec": 1.1
   },
   {
    "title": "TAG V6702901 Chansey/3/102 Base Set",
@@ -233,12 +301,20 @@
      36.1,
      36.3
     ],
+    "colour_plain": [
+     54.0,
+     50.0
+    ],
+    "colour_with_profile": [
+     54.0,
+     50.0
+    ],
     "with_set_profile": [
      53.1,
      44.0
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG V3064813 Chansey/3/102 Base Set",
@@ -273,7 +349,7 @@
      52.3
     ]
    },
-   "sec": 2.4
+   "sec": 2.8
   },
   {
    "title": "TAG S4904773 Hitmonchan/7/102 Base Set",
@@ -303,12 +379,16 @@
      55.2,
      46.3
     ],
+    "colour_plain": [
+     52.9,
+     48.1
+    ],
     "with_set_profile": [
      53.0,
      45.8
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG H6697591 Clefairy/5/102 Base Set",
@@ -338,12 +418,20 @@
      56.9,
      40.0
     ],
+    "colour_plain": [
+     56.1,
+     47.3
+    ],
+    "colour_with_profile": [
+     56.1,
+     47.3
+    ],
     "with_set_profile": [
      56.1,
      41.7
     ]
    },
-   "sec": 1.4
+   "sec": 1.1
   },
   {
    "title": "TAG X2433568 Hitmonchan/7/102 Base Set",
@@ -373,12 +461,20 @@
      54.9,
      43.2
     ],
+    "colour_plain": [
+     53.7,
+     53.3
+    ],
+    "colour_with_profile": [
+     53.7,
+     53.3
+    ],
     "with_set_profile": [
      52.3,
      47.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG K4799621 Clefairy/5/102 Base Set",
@@ -407,6 +503,14 @@
     "with_border_profile": [
      53.5,
      41.4
+    ],
+    "colour_plain": [
+     48.4,
+     49.3
+    ],
+    "colour_with_profile": [
+     48.4,
+     49.3
     ],
     "with_set_profile": [
      47.6,
@@ -443,12 +547,20 @@
      48.8,
      53.3
     ],
+    "colour_plain": [
+     49.2,
+     52.6
+    ],
+    "colour_with_profile": [
+     49.2,
+     51.9
+    ],
     "with_set_profile": [
      48.5,
      54.3
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG T2295132 Hitmonchan/7/102 Base Set",
@@ -483,7 +595,7 @@
      42.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Z9323261 Clefairy/5/102 Base Set",
@@ -513,12 +625,20 @@
      52.8,
      40.8
     ],
+    "colour_plain": [
+     44.4,
+     52.6
+    ],
+    "colour_with_profile": [
+     44.4,
+     52.6
+    ],
     "with_set_profile": [
      45.3,
      46.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG P3757824 Chansey/3/102 Base Set",
@@ -548,12 +668,20 @@
      53.2,
      54.2
     ],
+    "colour_plain": [
+     48.4,
+     51.4
+    ],
+    "colour_with_profile": [
+     48.4,
+     51.4
+    ],
     "with_set_profile": [
      48.4,
      45.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Q5254691 Hitmonchan/7/102 Base Set",
@@ -588,7 +716,7 @@
      41.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Y1075772 Clefairy/5/102 Base Set",
@@ -618,12 +746,20 @@
      34.7,
      45.5
     ],
+    "colour_plain": [
+     52.3,
+     54.1
+    ],
+    "colour_with_profile": [
+     52.3,
+     54.1
+    ],
     "with_set_profile": [
      52.3,
      46.5
     ]
    },
-   "sec": 1.1
+   "sec": 1.0
   },
   {
    "title": "TAG L1681582 Hitmonchan/7/102 Base Set",
@@ -653,12 +789,20 @@
      56.0,
      39.3
     ],
+    "colour_plain": [
+     54.7,
+     48.6
+    ],
+    "colour_with_profile": [
+     54.7,
+     48.6
+    ],
     "with_set_profile": [
      55.4,
      43.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG S9646936 Chansey/3/102 Base Set",
@@ -688,12 +832,20 @@
      53.5,
      39.5
     ],
+    "colour_plain": [
+     49.2,
+     47.2
+    ],
+    "colour_with_profile": [
+     49.2,
+     47.2
+    ],
     "with_set_profile": [
      49.2,
      40.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG C4729468 Hitmonchan/7/102 Base Set",
@@ -723,12 +875,20 @@
      52.9,
      36.0
     ],
+    "colour_plain": [
+     49.2,
+     42.5
+    ],
+    "colour_with_profile": [
+     49.2,
+     42.5
+    ],
     "with_set_profile": [
      48.4,
      39.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG X2283620 Chansey/3/102 Base Set",
@@ -758,12 +918,20 @@
      54.9,
      42.7
     ],
+    "colour_plain": [
+     50.8,
+     50.7
+    ],
+    "colour_with_profile": [
+     50.8,
+     50.7
+    ],
     "with_set_profile": [
      50.8,
      42.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG K2483952 Hitmonchan/7/102 Base Set",
@@ -828,12 +996,20 @@
      53.6,
      33.0
     ],
+    "colour_plain": [
+     53.0,
+     38.2
+    ],
+    "colour_with_profile": [
+     53.0,
+     38.2
+    ],
     "with_set_profile": [
      53.0,
      33.7
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG S7236700 Chansey/3/102 Base Set",
@@ -863,12 +1039,20 @@
      52.8,
      46.6
     ],
+    "colour_plain": [
+     46.2,
+     55.4
+    ],
+    "colour_with_profile": [
+     46.2,
+     55.4
+    ],
     "with_set_profile": [
      45.5,
      48.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG D5773432 Hitmonchan/7/102 Base Set",
@@ -903,7 +1087,7 @@
      40.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG K2939354 Hitmonchan/7/102 Base Set",
@@ -938,7 +1122,7 @@
      41.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG W9756737 Alakazam/1/102 Base Set",
@@ -968,12 +1152,20 @@
      54.2,
      50.0
     ],
+    "colour_plain": [
+     50.8,
+     49.3
+    ],
+    "colour_with_profile": [
+     50.8,
+     49.3
+    ],
     "with_set_profile": [
      51.6,
      54.9
     ]
    },
-   "sec": 1.1
+   "sec": 1.0
   },
   {
    "title": "TAG V9398090 Chansey/3/102 Base Set",
@@ -1003,12 +1195,20 @@
      32.0,
      37.5
     ],
+    "colour_plain": [
+     47.0,
+     53.3
+    ],
+    "colour_with_profile": [
+     47.0,
+     53.3
+    ],
     "with_set_profile": [
      47.0,
      47.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Y9801137 Clefairy/5/102 Base Set",
@@ -1038,12 +1238,20 @@
      51.9,
      38.2
     ],
+    "colour_plain": [
+     53.8,
+     50.7
+    ],
+    "colour_with_profile": [
+     53.8,
+     50.7
+    ],
     "with_set_profile": [
      53.8,
      43.0
     ]
    },
-   "sec": 1.1
+   "sec": 1.0
   },
   {
    "title": "TAG W3785749 Alakazam/1/102 Base Set",
@@ -1073,12 +1281,20 @@
      45.8,
      54.6
     ],
+    "colour_plain": [
+     42.2,
+     48.6
+    ],
+    "colour_with_profile": [
+     42.2,
+     48.6
+    ],
     "with_set_profile": [
      42.2,
      55.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG S2985553 Hitmonchan/7/102 Base Set",
@@ -1108,12 +1324,16 @@
      52.5,
      44.0
     ],
+    "colour_plain": [
+     48.5,
+     52.6
+    ],
     "with_set_profile": [
      48.4,
      47.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Q4645748 Alakazam/1/102 Base Set",
@@ -1148,7 +1368,7 @@
      55.6
     ]
    },
-   "sec": 2.2
+   "sec": 2.5
   },
   {
    "title": "TAG M7723876 Clefairy/5/102 Base Set",
@@ -1178,12 +1398,20 @@
      53.8,
      42.0
     ],
+    "colour_plain": [
+     49.2,
+     50.7
+    ],
+    "colour_with_profile": [
+     49.2,
+     50.7
+    ],
     "with_set_profile": [
      49.2,
      44.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG C7850631 Magneton/9/102 Base Set",
@@ -1213,12 +1441,20 @@
      53.5,
      47.2
     ],
+    "colour_plain": [
+     49.2,
+     44.2
+    ],
+    "colour_with_profile": [
+     49.2,
+     44.2
+    ],
     "with_set_profile": [
      50.0,
      44.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG G4203793 Clefairy/5/102 Base Set",
@@ -1248,12 +1484,20 @@
      34.7,
      42.7
     ],
+    "colour_plain": [
+     50.8,
+     50.0
+    ],
+    "colour_with_profile": [
+     50.8,
+     50.0
+    ],
     "with_set_profile": [
      50.8,
      43.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG T6447637 Chansey/3/102 Base Set",
@@ -1282,6 +1526,14 @@
     "with_border_profile": [
      53.2,
      40.7
+    ],
+    "colour_plain": [
+     47.6,
+     47.3
+    ],
+    "colour_with_profile": [
+     47.6,
+     47.3
     ],
     "with_set_profile": [
      47.7,
@@ -1318,12 +1570,20 @@
      48.9,
      55.8
     ],
+    "colour_plain": [
+     47.7,
+     51.4
+    ],
+    "colour_with_profile": [
+     47.7,
+     51.4
+    ],
     "with_set_profile": [
      47.7,
      54.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG T1270787 Hitmonchan/7/102 Base Set",
@@ -1353,12 +1613,20 @@
      56.3,
      38.8
     ],
+    "colour_plain": [
+     53.0,
+     53.9
+    ],
+    "colour_with_profile": [
+     53.0,
+     53.9
+    ],
     "with_set_profile": [
      53.8,
      46.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.0
   },
   {
    "title": "TAG M3721572 Hitmonchan/7/102 Base Set",
@@ -1388,12 +1656,20 @@
      53.9,
      32.0
     ],
+    "colour_plain": [
+     50.0,
+     46.6
+    ],
+    "colour_with_profile": [
+     50.0,
+     46.6
+    ],
     "with_set_profile": [
      50.0,
      39.3
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Z2483170 Clefairy/5/102 Base Set",
@@ -1423,12 +1699,20 @@
      54.5,
      42.7
     ],
+    "colour_plain": [
+     51.5,
+     48.6
+    ],
+    "colour_with_profile": [
+     51.5,
+     48.6
+    ],
     "with_set_profile": [
      52.2,
      43.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG W5294641 Chansey/3/102 Base Set",
@@ -1458,12 +1742,20 @@
      52.7,
      38.9
     ],
+    "colour_plain": [
+     55.4,
+     44.7
+    ],
+    "colour_with_profile": [
+     55.4,
+     44.7
+    ],
     "with_set_profile": [
      56.1,
      40.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG N3394309 Mewtwo/10/102 Base Set",
@@ -1493,12 +1785,20 @@
      53.5,
      41.2
     ],
+    "colour_plain": [
+     49.2,
+     45.1
+    ],
+    "colour_with_profile": [
+     49.2,
+     45.1
+    ],
     "with_set_profile": [
      49.2,
      45.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG H8437205 Clefairy/5/102 Base Set",
@@ -1528,12 +1828,20 @@
      50.0,
      42.7
     ],
+    "colour_plain": [
+     50.8,
+     50.7
+    ],
+    "colour_with_profile": [
+     50.8,
+     50.7
+    ],
     "with_set_profile": [
      50.0,
      42.7
     ]
    },
-   "sec": 1.7
+   "sec": 1.0
   },
   {
    "title": "TAG W5578576 Alakazam/1/102 Base Set",
@@ -1563,12 +1871,20 @@
      54.9,
      51.4
     ],
+    "colour_plain": [
+     50.8,
+     50.7
+    ],
+    "colour_with_profile": [
+     50.8,
+     50.7
+    ],
     "with_set_profile": [
      51.6,
      56.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG R7057290 Mewtwo/10/102 Base Set",
@@ -1598,12 +1914,20 @@
      52.5,
      30.6
     ],
+    "colour_plain": [
+     46.0,
+     49.3
+    ],
+    "colour_with_profile": [
+     46.0,
+     49.3
+    ],
     "with_set_profile": [
      46.2,
      40.3
     ]
    },
-   "sec": 1.3
+   "sec": 1.2
   },
   {
    "title": "TAG R8877138 Blastoise/2/102 Base Set",
@@ -1633,12 +1957,20 @@
      48.5,
      51.2
     ],
+    "colour_plain": [
+     47.6,
+     44.4
+    ],
+    "colour_with_profile": [
+     47.6,
+     44.4
+    ],
     "with_set_profile": [
      47.7,
      51.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG L2846778 Gyarados/6/102 Base Set",
@@ -1668,12 +2000,20 @@
      44.9,
      50.6
     ],
+    "colour_plain": [
+     48.4,
+     39.4
+    ],
+    "colour_with_profile": [
+     48.4,
+     39.4
+    ],
     "with_set_profile": [
      50.0,
      47.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG Y3261494 Magneton/9/102 Base Set",
@@ -1703,12 +2043,20 @@
      51.0,
      50.5
     ],
+    "colour_plain": [
+     42.4,
+     46.2
+    ],
+    "colour_with_profile": [
+     42.4,
+     45.6
+    ],
     "with_set_profile": [
      42.4,
      50.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG U5241508 Magneton/9/102 Base Set",
@@ -1738,12 +2086,20 @@
      53.1,
      51.0
     ],
+    "colour_plain": [
+     48.5,
+     53.2
+    ],
+    "colour_with_profile": [
+     48.5,
+     53.2
+    ],
     "with_set_profile": [
      48.5,
      52.1
     ]
    },
-   "sec": 1.3
+   "sec": 1.1
   },
   {
    "title": "TAG X6917756 Mewtwo/10/102 Base Set",
@@ -1773,12 +2129,20 @@
      53.5,
      42.9
     ],
+    "colour_plain": [
+     47.6,
+     48.6
+    ],
+    "colour_with_profile": [
+     47.6,
+     48.6
+    ],
     "with_set_profile": [
      46.9,
      48.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG W3591457 Chansey/3/102 Base Set",
@@ -1808,12 +2172,20 @@
      54.0,
      31.4
     ],
+    "colour_plain": [
+     53.8,
+     44.6
+    ],
+    "colour_with_profile": [
+     53.8,
+     44.6
+    ],
     "with_set_profile": [
      53.0,
      37.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG J2255621 Clefairy/5/102 Base Set",
@@ -1843,12 +2215,20 @@
      54.6,
      38.6
     ],
+    "colour_plain": [
+     50.8,
+     45.9
+    ],
+    "colour_with_profile": [
+     50.8,
+     45.9
+    ],
     "with_set_profile": [
      50.8,
      40.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG U7403474 Hitmonchan/7/102 Base Set",
@@ -1878,12 +2258,20 @@
      53.1,
      40.7
     ],
+    "colour_plain": [
+     47.0,
+     48.1
+    ],
+    "colour_with_profile": [
+     47.0,
+     48.1
+    ],
     "with_set_profile": [
      46.9,
      43.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG R4397350 Charizard/4/102 Base Set",
@@ -1913,12 +2301,20 @@
      54.5,
      52.9
     ],
+    "colour_plain": [
+     50.7,
+     50.7
+    ],
+    "colour_with_profile": [
+     50.7,
+     50.7
+    ],
     "with_set_profile": [
      50.8,
      49.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG M6386314 Blastoise/2/102 Base Set",
@@ -1948,12 +2344,20 @@
      47.7,
      56.0
     ],
+    "colour_plain": [
+     48.4,
+     45.1
+    ],
+    "colour_with_profile": [
+     48.4,
+     45.1
+    ],
     "with_set_profile": [
      47.7,
      45.9
     ]
    },
-   "sec": 1.3
+   "sec": 1.2
   },
   {
    "title": "TAG D8982517 Blastoise/2/102 Base Set",
@@ -1983,12 +2387,20 @@
      48.1,
      43.9
     ],
+    "colour_plain": [
+     46.8,
+     52.9
+    ],
+    "colour_with_profile": [
+     46.8,
+     52.9
+    ],
     "with_set_profile": [
      46.9,
      59.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG W5300828 Blastoise/2/102 Base Set",
@@ -2018,12 +2430,20 @@
      53.0,
      51.5
     ],
+    "colour_plain": [
+     53.2,
+     47.1
+    ],
+    "colour_with_profile": [
+     53.2,
+     47.1
+    ],
     "with_set_profile": [
      53.1,
      51.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG H2940984 Blastoise/2/102 Base Set",
@@ -2058,7 +2478,7 @@
      60.0
     ]
    },
-   "sec": 2.1
+   "sec": 2.4
   },
   {
    "title": "TAG V7544911 Alakazam/1/102 Base Set",
@@ -2087,6 +2507,14 @@
     "with_border_profile": [
      52.8,
      53.0
+    ],
+    "colour_plain": [
+     46.9,
+     47.9
+    ],
+    "colour_with_profile": [
+     46.9,
+     47.9
     ],
     "with_set_profile": [
      47.0,
@@ -2123,12 +2551,16 @@
      52.1,
      60.2
     ],
+    "colour_plain": [
+     47.7,
+     54.1
+    ],
     "with_set_profile": [
      47.7,
      47.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.1
   },
   {
    "title": "TAG J1561230 Blastoise/2/102 Base Set",
@@ -2158,12 +2590,20 @@
      45.9,
      55.7
     ],
+    "colour_plain": [
+     48.4,
+     50.7
+    ],
+    "colour_with_profile": [
+     48.4,
+     50.7
+    ],
     "with_set_profile": [
      48.4,
      50.7
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG D3885725 Gyarados/6/102 Base Set",
@@ -2193,12 +2633,20 @@
      54.6,
      46.4
     ],
+    "colour_plain": [
+     50.8,
+     56.3
+    ],
+    "colour_with_profile": [
+     50.8,
+     56.3
+    ],
     "with_set_profile": [
      51.6,
      58.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG C9210282 Charizard/4/102 Base Set",
@@ -2233,7 +2681,7 @@
      47.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG U3187786 Chansey/3/102 Base Set",
@@ -2263,12 +2711,20 @@
      55.2,
      46.7
     ],
+    "colour_plain": [
+     51.5,
+     56.0
+    ],
+    "colour_with_profile": [
+     51.5,
+     56.0
+    ],
     "with_set_profile": [
      51.5,
      46.6
     ]
    },
-   "sec": 1.1
+   "sec": 1.5
   },
   {
    "title": "TAG Q1633378 Charizard/4/102 Base Set",
@@ -2298,12 +2754,20 @@
      53.2,
      50.5
     ],
+    "colour_plain": [
+     48.4,
+     52.1
+    ],
+    "colour_with_profile": [
+     48.4,
+     52.1
+    ],
     "with_set_profile": [
      47.7,
      53.8
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG Q4549000 Blastoise/2/102 Base Set",
@@ -2333,12 +2797,20 @@
      67.0,
      53.6
     ],
+    "colour_plain": [
+     50.0,
+     54.9
+    ],
+    "colour_with_profile": [
+     50.0,
+     54.9
+    ],
     "with_set_profile": [
      50.0,
      54.1
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG N4680772 Charizard/4/102 Base Set",
@@ -2373,7 +2845,7 @@
      52.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG J9546426 Blastoise/2/102 Base Set",
@@ -2403,12 +2875,20 @@
      47.0,
      44.3
     ],
+    "colour_plain": [
+     47.6,
+     49.3
+    ],
+    "colour_with_profile": [
+     47.6,
+     49.3
+    ],
     "with_set_profile": [
      47.7,
      54.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG M8627323 Gyarados/6/102 Base Set",
@@ -2438,12 +2918,20 @@
      32.3,
      58.2
     ],
+    "colour_plain": [
+     48.4,
+     47.1
+    ],
+    "colour_with_profile": [
+     48.4,
+     47.1
+    ],
     "with_set_profile": [
      48.4,
      57.3
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG W8568297 Chansey/3/102 Base Set",
@@ -2473,12 +2961,20 @@
      55.2,
      39.2
     ],
+    "colour_plain": [
+     51.5,
+     51.4
+    ],
+    "colour_with_profile": [
+     51.5,
+     51.4
+    ],
     "with_set_profile": [
      51.5,
      43.5
     ]
    },
-   "sec": 1.1
+   "sec": 1.5
   },
   {
    "title": "TAG P6904174 Alakazam/1/102 Base Set",
@@ -2508,12 +3004,20 @@
      53.8,
      52.0
     ],
+    "colour_plain": [
+     50.8,
+     52.1
+    ],
+    "colour_with_profile": [
+     50.8,
+     52.1
+    ],
     "with_set_profile": [
      50.8,
      55.1
     ]
    },
-   "sec": 2.2
+   "sec": 3.0
   },
   {
    "title": "TAG G8839570 Mewtwo/10/102 Base Set",
@@ -2543,12 +3047,20 @@
      54.2,
      44.0
     ],
+    "colour_plain": [
+     50.0,
+     50.7
+    ],
+    "colour_with_profile": [
+     50.0,
+     50.7
+    ],
     "with_set_profile": [
      50.8,
      46.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG J1280597 Charizard/4/102 Base Set",
@@ -2583,7 +3095,7 @@
      52.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG J2531429 Mewtwo/10/102 Base Set",
@@ -2613,12 +3125,20 @@
      47.1,
      38.7
     ],
+    "colour_plain": [
+     53.1,
+     48.6
+    ],
+    "colour_with_profile": [
+     53.1,
+     48.6
+    ],
     "with_set_profile": [
      53.8,
      45.6
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG N3569934 Alakazam/1/102 Base Set",
@@ -2648,12 +3168,20 @@
      53.8,
      49.0
     ],
+    "colour_plain": [
+     49.2,
+     48.6
+    ],
+    "colour_with_profile": [
+     49.2,
+     48.6
+    ],
     "with_set_profile": [
      49.2,
      51.1
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG L8895361 Mewtwo/10/102 Base Set",
@@ -2683,12 +3211,20 @@
      52.1,
      33.0
     ],
+    "colour_plain": [
+     46.0,
+     46.5
+    ],
+    "colour_with_profile": [
+     46.0,
+     46.5
+    ],
     "with_set_profile": [
      46.2,
      43.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG F3701551 Magneton/9/102 Base Set",
@@ -2718,12 +3254,20 @@
      53.1,
      51.0
     ],
+    "colour_plain": [
+     47.0,
+     50.0
+    ],
+    "colour_with_profile": [
+     47.0,
+     50.0
+    ],
     "with_set_profile": [
      47.0,
      51.1
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG K9898759 Clefairy/5/102 Base Set",
@@ -2753,12 +3297,20 @@
      53.9,
      41.4
     ],
+    "colour_plain": [
+     49.2,
+     49.3
+    ],
+    "colour_with_profile": [
+     49.2,
+     49.3
+    ],
     "with_set_profile": [
      48.5,
      41.4
     ]
    },
-   "sec": 1.3
+   "sec": 1.7
   },
   {
    "title": "TAG T5881633 Clefairy/5/102 Base Set",
@@ -2788,12 +3340,20 @@
      54.2,
      47.1
     ],
+    "colour_plain": [
+     49.2,
+     56.2
+    ],
+    "colour_with_profile": [
+     49.2,
+     56.2
+    ],
     "with_set_profile": [
      48.5,
      49.4
     ]
    },
-   "sec": 1.3
+   "sec": 1.7
   },
   {
    "title": "TAG C1684466 Magneton/9/102 Base Set",
@@ -2823,12 +3383,20 @@
      53.5,
      50.5
     ],
+    "colour_plain": [
+     48.4,
+     50.6
+    ],
+    "colour_with_profile": [
+     48.4,
+     50.6
+    ],
     "with_set_profile": [
      47.7,
      53.3
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG K2139031 Magneton/9/102 Base Set",
@@ -2858,12 +3426,20 @@
      54.6,
      51.0
     ],
+    "colour_plain": [
+     50.8,
+     48.6
+    ],
+    "colour_with_profile": [
+     50.8,
+     48.6
+    ],
     "with_set_profile": [
      51.5,
      48.5
     ]
    },
-   "sec": 1.1
+   "sec": 1.6
   },
   {
    "title": "TAG U1858278 Hitmonchan/7/102 Base Set",
@@ -2898,7 +3474,7 @@
      40.5
     ]
    },
-   "sec": 1.3
+   "sec": 1.7
   },
   {
    "title": "TAG V5686466 Chansey/3/102 Base Set",
@@ -2928,12 +3504,20 @@
      52.1,
      37.1
     ],
+    "colour_plain": [
+     46.2,
+     51.4
+    ],
+    "colour_with_profile": [
+     46.2,
+     51.4
+    ],
     "with_set_profile": [
      47.0,
      44.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG W4495009 Hitmonchan/7/102 Base Set",
@@ -2963,12 +3547,20 @@
      54.0,
      38.9
     ],
+    "colour_plain": [
+     52.3,
+     48.0
+    ],
+    "colour_with_profile": [
+     52.3,
+     48.0
+    ],
     "with_set_profile": [
      51.6,
      40.0
     ]
    },
-   "sec": 1.3
+   "sec": 1.5
   },
   {
    "title": "TAG C6617332 Chansey/3/102 Base Set",
@@ -2998,12 +3590,20 @@
      49.2,
      43.2
     ],
+    "colour_plain": [
+     48.4,
+     50.7
+    ],
+    "colour_with_profile": [
+     48.4,
+     50.7
+    ],
     "with_set_profile": [
      48.4,
      44.7
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG E8150227 Chansey/3/102 Base Set",
@@ -3033,12 +3633,20 @@
      48.8,
      41.1
     ],
+    "colour_plain": [
+     48.5,
+     48.7
+    ],
+    "colour_with_profile": [
+     48.5,
+     48.7
+    ],
     "with_set_profile": [
      48.5,
      42.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG F7860874 Hitmonchan/7/102 Base Set",
@@ -3068,12 +3676,20 @@
      56.3,
      40.9
     ],
+    "colour_plain": [
+     54.5,
+     48.6
+    ],
+    "colour_with_profile": [
+     54.5,
+     48.6
+    ],
     "with_set_profile": [
      53.8,
      42.7
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG F6329456 Alakazam/1/102 Base Set",
@@ -3103,12 +3719,20 @@
      52.8,
      49.5
     ],
+    "colour_plain": [
+     48.4,
+     46.5
+    ],
+    "colour_with_profile": [
+     48.4,
+     46.5
+    ],
     "with_set_profile": [
      47.7,
      51.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG E9961589 Chansey/3/102 Base Set",
@@ -3138,12 +3762,20 @@
      54.5,
      45.6
     ],
+    "colour_plain": [
+     50.0,
+     53.3
+    ],
+    "colour_with_profile": [
+     50.0,
+     53.3
+    ],
     "with_set_profile": [
      50.8,
      46.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG Q8156925 Chansey/3/102 Base Set",
@@ -3173,12 +3805,20 @@
      55.9,
      34.0
     ],
+    "colour_plain": [
+     54.7,
+     47.9
+    ],
+    "colour_with_profile": [
+     54.7,
+     47.9
+    ],
     "with_set_profile": [
      54.7,
      43.8
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG D5422706 Hitmonchan/7/102 Base Set",
@@ -3208,12 +3848,20 @@
      56.3,
      45.5
     ],
+    "colour_plain": [
+     54.5,
+     56.2
+    ],
+    "colour_with_profile": [
+     54.5,
+     56.2
+    ],
     "with_set_profile": [
      55.4,
      47.1
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG G9324574 Chansey/3/102 Base Set",
@@ -3243,12 +3891,20 @@
      34.7,
      39.3
     ],
+    "colour_plain": [
+     50.8,
+     46.1
+    ],
+    "colour_with_profile": [
+     50.8,
+     46.1
+    ],
     "with_set_profile": [
      50.0,
      40.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG S9990914 Chansey/3/102 Base Set",
@@ -3278,12 +3934,20 @@
      48.5,
      40.4
     ],
+    "colour_plain": [
+     48.5,
+     47.3
+    ],
+    "colour_with_profile": [
+     48.5,
+     47.3
+    ],
     "with_set_profile": [
      48.5,
      41.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.5
   },
   {
    "title": "TAG L3798285 Chansey/3/102 Base Set",
@@ -3313,12 +3977,20 @@
      55.2,
      34.1
     ],
+    "colour_plain": [
+     51.6,
+     41.1
+    ],
+    "colour_with_profile": [
+     51.6,
+     41.1
+    ],
     "with_set_profile": [
      52.3,
      35.3
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG K1334366 Chansey/3/102 Base Set",
@@ -3348,12 +4020,20 @@
      55.3,
      33.7
     ],
+    "colour_plain": [
+     52.3,
+     46.7
+    ],
+    "colour_with_profile": [
+     52.3,
+     46.7
+    ],
     "with_set_profile": [
      52.3,
      42.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG S2894509 Clefairy/5/102 Base Set",
@@ -3383,12 +4063,20 @@
      56.3,
      43.2
     ],
+    "colour_plain": [
+     53.1,
+     52.1
+    ],
+    "colour_with_profile": [
+     53.1,
+     52.1
+    ],
     "with_set_profile": [
      53.8,
      44.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG U8629879 Hitmonchan/7/102 Base Set",
@@ -3418,12 +4106,20 @@
      53.8,
      34.3
     ],
+    "colour_plain": [
+     50.0,
+     48.1
+    ],
+    "colour_with_profile": [
+     50.0,
+     48.1
+    ],
     "with_set_profile": [
      49.2,
      41.2
     ]
    },
-   "sec": 1.3
+   "sec": 1.7
   },
   {
    "title": "TAG N8930207 Mewtwo/10/102 Base Set",
@@ -3453,12 +4149,20 @@
      52.5,
      36.5
     ],
+    "colour_plain": [
+     46.8,
+     51.4
+    ],
+    "colour_with_profile": [
+     46.8,
+     51.4
+    ],
     "with_set_profile": [
      46.9,
      47.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG P1212083 Clefairy/5/102 Base Set",
@@ -3488,12 +4192,20 @@
      34.0,
      44.4
     ],
+    "colour_plain": [
+     50.0,
+     52.6
+    ],
+    "colour_with_profile": [
+     50.0,
+     52.6
+    ],
     "with_set_profile": [
      50.0,
      46.0
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG H7871208 Charizard/4/102 Base Set",
@@ -3523,12 +4235,16 @@
      56.7,
      47.6
     ],
+    "colour_plain": [
+     55.4,
+     44.4
+    ],
     "with_set_profile": [
      54.7,
      45.7
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG M5339170 Charizard/4/102 Base Set",
@@ -3558,12 +4274,20 @@
      54.2,
      48.6
     ],
+    "colour_plain": [
+     50.0,
+     47.9
+    ],
+    "colour_with_profile": [
+     50.0,
+     47.9
+    ],
     "with_set_profile": [
      50.8,
      49.5
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG Q5471998 Clefairy/5/102 Base Set",
@@ -3593,12 +4317,20 @@
      54.5,
      38.1
     ],
+    "colour_plain": [
+     49.2,
+     44.4
+    ],
+    "colour_with_profile": [
+     49.2,
+     44.4
+    ],
     "with_set_profile": [
      50.0,
      38.6
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG Y4086919 Alakazam/1/102 Base Set",
@@ -3628,12 +4360,20 @@
      54.9,
      51.5
     ],
+    "colour_plain": [
+     51.6,
+     52.1
+    ],
+    "colour_with_profile": [
+     51.6,
+     52.1
+    ],
     "with_set_profile": [
      52.3,
      51.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   },
   {
    "title": "TAG F1655822 Mewtwo/10/102 Base Set",
@@ -3668,7 +4408,7 @@
      55.4
     ]
    },
-   "sec": 2.2
+   "sec": 3.0
   },
   {
    "title": "TAG N2224432 Chansey/3/102 Base Set",
@@ -3698,12 +4438,20 @@
      55.6,
      37.1
     ],
+    "colour_plain": [
+     54.0,
+     51.4
+    ],
+    "colour_with_profile": [
+     54.0,
+     51.4
+    ],
     "with_set_profile": [
      53.8,
      44.3
     ]
    },
-   "sec": 1.3
+   "sec": 1.6
   },
   {
    "title": "TAG M7503379 Hitmonchan/7/102 Base Set",
@@ -3738,7 +4486,7 @@
      44.4
     ]
    },
-   "sec": 1.2
+   "sec": 1.7
   },
   {
    "title": "TAG Q7711623 Chansey/3/102 Base Set",
@@ -3768,12 +4516,20 @@
      56.3,
      35.0
     ],
+    "colour_plain": [
+     54.7,
+     47.9
+    ],
+    "colour_with_profile": [
+     54.7,
+     47.9
+    ],
     "with_set_profile": [
      53.8,
      42.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG H9457984 Hitmonchan/7/102 Base Set",
@@ -3808,7 +4564,7 @@
      41.2
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG Z2077918 Chansey/3/102 Base Set",
@@ -3838,12 +4594,20 @@
      52.8,
      35.3
     ],
+    "colour_plain": [
+     47.7,
+     50.0
+    ],
+    "colour_with_profile": [
+     47.7,
+     50.0
+    ],
     "with_set_profile": [
      47.7,
      43.9
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG W6080886 Chansey/3/102 Base Set",
@@ -3873,12 +4637,20 @@
      49.6,
      35.6
     ],
+    "colour_plain": [
+     51.6,
+     49.3
+    ],
+    "colour_with_profile": [
+     51.6,
+     49.3
+    ],
     "with_set_profile": [
      51.6,
      42.4
     ]
    },
-   "sec": 1.1
+   "sec": 1.6
   },
   {
    "title": "TAG H9353226 mtg 1994",
@@ -3903,9 +4675,13 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     57.9,
+     50.7
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG F4522970 mtg 1994",
@@ -3930,9 +4706,13 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     54.4,
+     55.7
     ]
    },
-   "sec": 1.3
+   "sec": 1.4
   },
   {
    "title": "TAG C9508895 mtg 1995",
@@ -3959,7 +4739,7 @@
      880
     ]
    },
-   "sec": 1.2
+   "sec": 1.6
   },
   {
    "title": "TAG R1052557 mtg 1994",
@@ -3984,9 +4764,13 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     51.7,
+     49.3
     ]
    },
-   "sec": 1.3
+   "sec": 1.4
   },
   {
    "title": "TAG K2480807 mtg 1994",
@@ -4011,9 +4795,13 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     47.4,
+     54.9
     ]
    },
-   "sec": 1.3
+   "sec": 1.4
   },
   {
    "title": "TAG L5353391 sports 2018",
@@ -4067,7 +4855,7 @@
      880
     ]
    },
-   "sec": 1.1
+   "sec": 1.4
   },
   {
    "title": "TAG J9865182 sports 2018",
@@ -4094,7 +4882,7 @@
      880
     ]
    },
-   "sec": 1.4
+   "sec": 1.5
   },
   {
    "title": "TAG U9192247 mtg 1995",
@@ -4119,9 +4907,13 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     51.0,
+     45.3
     ]
    },
-   "sec": 1.2
+   "sec": 1.4
   },
   {
    "title": "TAG U3848288 sports 2003",
@@ -4146,10 +4938,14 @@
     "card_px": [
      630,
      880
+    ],
+    "colour_plain": [
+     51.6,
+     57.8
     ]
    },
-   "sec": 1.2
+   "sec": 1.5
   }
  ],
- "at": "2026-10-30T19:25Z"
+ "at": "2026-10-30T19:29Z"
 }

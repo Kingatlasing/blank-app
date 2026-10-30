@@ -26,5 +26,33 @@
   "mean": 5.5,
   "within2": 13,
   "over5": 67
+ },
+ "colour_plain": {
+  "n": 101,
+  "median": 1.3999999999999986,
+  "mean": 1.63,
+  "within2": 71,
+  "over5": 1
+ },
+ "colour_with_profile": {
+  "n": 91,
+  "median": 1.2999999999999972,
+  "mean": 1.63,
+  "within2": 64,
+  "over5": 1
+ },
+ "plain_where_colour_with_profile": {
+  "n": 91,
+  "median": 1.3999999999999986,
+  "mean": 1.85,
+  "within2": 63,
+  "over5": 3
+ },
+ "plain_where_colour_plain": {
+  "n": 101,
+  "median": 1.3999999999999986,
+  "mean": 1.88,
+  "within2": 69,
+  "over5": 4
  }
 }
