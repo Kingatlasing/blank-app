@@ -27,16 +27,16 @@ jobs:
       - name: Install
         run: pip install -q opencv-python-headless imagehash pillow numpy requests
       - name: Run
-        working-directory: streamlit
+        working-directory: slab-scout/streamlit
         run: |
-          mkdir -p ../_work/lab-data
+          mkdir -p ../../_work/lab-data
           python - <<'PY'
           import json, subprocess, sys
           j = json.load(open("lab/job.json"))
-          out = "../_work/lab-data/" + j["out"]
-          log = open("../_work/lab-data/lab-run.log", "w")
+          out = "../../_work/lab-data/" + j["out"]
+          log = open("../../_work/lab-data/lab-run.log", "w")
           r = subprocess.run([sys.executable, j["script"], *j["args"], out], stdout=log, stderr=subprocess.STDOUT)
-          print(open("../_work/lab-data/lab-run.log").read()[-3000:])
+          print(open("../../_work/lab-data/lab-run.log").read()[-3000:])
           sys.exit(r.returncode)
           PY
       - name: Save numbers
