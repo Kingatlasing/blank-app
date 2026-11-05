@@ -312,6 +312,21 @@ def _recut(f: dict, x: dict | None) -> None:
     card, info = r
     if not info.get("snapped"):
         return  # the design alone can't say where this card's edges are (that would copy the reference's centering)
+    # keep the first cut when lining up with the clean picture moves the centering a lot: on TAG's scans the plain
+    # colour-border reading matched TAG to ~1.4 points while re-cut cards were ~10 points off (median)
+    try:
+        def _pct(L):
+            l, r, t, b = L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"]
+            return 100 * l / max(1, l + r), 100 * t / max(1, t + b)
+        before = vision.border_by_colour(f["card"], None)
+        after = vision.border_by_colour(card, None)
+        if before and after and before.get("spread", 99) < 8 and after.get("spread", 99) < 8:
+            (bl, bt), (al, at) = _pct(before), _pct(after)
+            if max(abs(bl - al), abs(bt - at)) > 5:
+                f["recut_rejected"] = {"before": [round(bl), round(bt)], "after": [round(al), round(at)]}
+                return
+    except Exception:
+        pass
     f["card_first"] = f["card"]
     f["card"] = card
     f["found"] = True
@@ -1033,6 +1048,10 @@ def _apply_style(scan: dict, x: dict) -> str:
         sb = catalog.set_profile(sid)
         prof = {"l": sb["border"][0], "r": sb["border"][1], "t": sb["border"][2], "b": sb["border"][3], "n": sb.get("n", 1), "borderless": sb.get("borderless", 0)}
     expect = {k: prof[k] for k in ("l", "r", "t", "b")} if prof and prof.get("n", 0) >= 2 and (prof.get("borderless") or 0) < 0.5 else None
+    # The learned border widths only help when the border lines can't be found on their own: tested on 110 TAG
+    # scans, steering found lines with them moved centering from 1.4 to 7.9 points off TAG's (median).
+    if expect and all((f.get("_edges0") or f["edges"]).get("found", {}).values()):
+        expect = None
     sig = (style, tuple(expect.values()) if expect else None)
     if scan.get("_style_sig") != sig:
         if "_edges0" not in f:
