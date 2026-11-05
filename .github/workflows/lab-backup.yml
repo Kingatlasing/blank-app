@@ -49,7 +49,7 @@ jobs:
               git commit -q -m "lab-data backup $(date -u +%Y-%m-%dT%H:%MZ)"
               for i in 1 2 3; do git pull -q --rebase origin slab-scout-work && git push -q origin HEAD:slab-scout-work && break; sleep 5; done
             fi
-            [ "$round" -lt 11 ] && sleep 1800
+            if [ "$round" -lt 11 ]; then sleep 1800; fi
           done
       - name: Start the next run
         if: always()
