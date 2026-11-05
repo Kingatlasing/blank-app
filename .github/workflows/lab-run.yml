@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install
-        run: pip install -q opencv-python-headless imagehash pillow numpy requests
+        run: pip install -q -r slab-scout/streamlit/requirements.txt
       - name: Run
         working-directory: slab-scout/streamlit
         run: |
