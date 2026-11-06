@@ -1,58 +1,62 @@
+2026-11-06 15:39:42.787 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+[0;93m2026-11-06 15:39:42.858488768 [W:onnxruntime:Default, device_discovery.cc:95 GetPciBusId] Skipping pci_bus_id for PCI path at "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/MSFT1000:00/5620e0c7-8062-4dce-aeb7-520c7ef76171" because filename "5620e0c7-8062-4dce-aeb7-520c7ef76171" did not match expected pattern of [0-9a-f]+:[0-9a-f]+:[0-9a-f]+[.][0-9a-f]+[m
+2026-11-06 15:40:16.439 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
+TAG X8218196 Clefairy/5/102 Base Set [53, 47, 46, 54] [51, 56] 
+TAG U4565024 Clefairy/5/102 Base Set [49, 51, 52, 48] [54, 53] 
+TAG V6645348 Hitmonchan/7/102 Base Set [49, 51, 47, 53] [64, 62] 
+TAG V8008537 Clefairy/5/102 Base Set [46, 54, 50, 50] [54, 51] 
+TAG W4129580 Clefairy/5/102 Base Set [50, 50, 47, 53] [55, 62] 
+TAG V6702901 Chansey/3/102 Base Set [55, 45, 52, 48] [63, 80] 
+TAG V3064813 Chansey/3/102 Base Set [52, 48, 48, 52] [55, 81] 
+TAG S4904773 Hitmonchan/7/102 Base Set [54, 46, 50, 50] [53, 51] 
+TAG H6697591 Clefairy/5/102 Base Set [57, 43, 47, 53] [71, 51] 
+TAG X2433568 Hitmonchan/7/102 Base Set [56, 44, 52, 48] [54, 68] 
+TAG K4799621 Clefairy/5/102 Base Set [47, 53, 49, 51] [65, 81] 
+TAG F8882687 Magneton/9/102 Base Set [47, 53, 54, 46] [53, 58] 
+TAG T2295132 Hitmonchan/7/102 Base Set [52, 48, 47, 53] [50, 52] 
+TAG Z9323261 Clefairy/5/102 Base Set [46, 54, 55, 45] [55, 64] 
+TAG P3757824 Chansey/3/102 Base Set [47, 53, 53, 47] [54, 51] 
+TAG Q5254691 Hitmonchan/7/102 Base Set [47, 53, 44, 56] [51, 54] 
+TAG Y1075772 Clefairy/5/102 Base Set [52, 48, 57, 43] [60, 69] 
+TAG L1681582 Hitmonchan/7/102 Base Set [60, 40, 46, 54] [55, 51] 
+TAG S9646936 Chansey/3/102 Base Set [50, 50, 47, 53] [67, 73] 
+TAG C4729468 Hitmonchan/7/102 Base Set [49, 51, 43, 57] [55, 60] 
+TAG X2283620 Chansey/3/102 Base Set [52, 48, 51, 49] [64, 74] 
+TAG K2483952 Hitmonchan/7/102 Base Set [49, 51, 49, 51] [52, 50] 
+TAG N1087442 Chansey/3/102 Base Set [52, 48, 39, 61] [54, 69] 
+TAG S7236700 Chansey/3/102 Base Set [44, 56, 57, 43] [53, 74] 
+TAG D5773432 Hitmonchan/7/102 Base Set [51, 49, 47, 53] [52, 53] 
+TAG K2939354 Hitmonchan/7/102 Base Set [51, 49, 45, 55] [55, 68] 
+TAG W9756737 Alakazam/1/102 Base Set [53, 47, 49, 51] [56, 53] 
+TAG V9398090 Chansey/3/102 Base Set [46, 54, 54, 46] [53, 53] 
+TAG Y9801137 Clefairy/5/102 Base Set [55, 45, 50, 50] [51, 64] 
+TAG W3785749 Alakazam/1/102 Base Set [42, 58, 49, 51] [62, 64] 
 {
- "plain_all": {
-  "n": 120,
-  "median": 1.6000000000000014,
-  "mean": 3.07,
-  "within2": 77,
-  "over5": 11
+ "final": {
+  "n": 30,
+  "median": 13.0,
+  "over5": 24
  },
- "plain_base_set": {
-  "n": 110,
-  "median": 1.4499999999999993,
-  "mean": 2.26,
-  "within2": 74,
-  "over5": 6
- },
- "with_border_profile": {
-  "n": 110,
-  "median": 7.849999999999998,
-  "mean": 8.73,
-  "within2": 3,
-  "over5": 92
- },
- "with_set_profile": {
-  "n": 110,
-  "median": 5.600000000000001,
-  "mean": 5.5,
-  "within2": 13,
-  "over5": 67
- },
- "colour_plain": {
-  "n": 101,
-  "median": 1.3999999999999986,
-  "mean": 1.63,
-  "within2": 71,
+ "before_recut": {
+  "n": 30,
+  "median": 1.6500000000000021,
   "over5": 1
  },
- "colour_with_profile": {
-  "n": 91,
-  "median": 1.2999999999999972,
-  "mean": 1.63,
-  "within2": 64,
-  "over5": 1
+ "before_recut_colour": {
+  "n": 30,
+  "median": 1.7000000000000028,
+  "over5": 2
  },
- "plain_where_colour_with_profile": {
-  "n": 91,
-  "median": 1.3999999999999986,
-  "mean": 1.85,
-  "within2": 63,
-  "over5": 3
+ "after_recut": {
+  "n": 30,
+  "median": 14.5,
+  "over5": 22
  },
- "plain_where_colour_plain": {
-  "n": 101,
-  "median": 1.3999999999999986,
-  "mean": 1.88,
-  "within2": 69,
-  "over5": 4
- }
+ "after_recut_colour": {
+  "n": 30,
+  "median": 12.75,
+  "over5": 22
+ },
+ "recut_count": 30,
+ "rejected_count": 0
 }
