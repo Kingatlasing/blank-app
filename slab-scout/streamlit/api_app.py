@@ -53,6 +53,18 @@ def _fetch_web():
                 os.makedirs(os.path.dirname(dest), exist_ok=True)
                 with open(dest, "wb") as fh:
                     fh.write(z.read(n))
+        # the build points its scripts and images at /app/static/ (Streamlit's static folder); here it is served
+        # from /web/, so make those links relative to index.html or the page stays black
+        for root, _dirs, files in os.walk(tmp):
+            for fn in files:
+                if fn.endswith((".html", ".js", ".css", ".json", ".map")):
+                    p = os.path.join(root, fn)
+                    try:
+                        txt = open(p, encoding="utf-8").read()
+                    except Exception:
+                        continue
+                    if "/app/static/" in txt:
+                        open(p, "w", encoding="utf-8").write(txt.replace('"/app/static/', '"./').replace("'/app/static/", "'./").replace("/app/static/", "./"))
         shutil.rmtree(WEB_DIR, ignore_errors=True)
         os.replace(tmp, WEB_DIR)
     except Exception:
