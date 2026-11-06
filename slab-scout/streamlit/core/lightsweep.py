@@ -85,7 +85,9 @@ def analyse(frames: list[np.ndarray]) -> dict:
         mad = np.median(np.abs(mv - med)) * 1.4826 + 1e-3
         return np.where(valid, (m - med) / mad, 0)
     zp, zm, zs = z(r_peak), z(r_mean), z(r_gloss)
-    score = np.maximum.reduce([zp, zm, np.clip(zs, 0, None)])
+    # lab test: the highlight-timing signal finds dents / creases / scratches best; the gloss drop adds matte scuffs;
+    # the highlight-strength signal mostly fires on print edges, so it is kept as a map but not scored
+    score = np.clip(zp, 0, None) + 0.5 * np.clip(zs, 0, None)
     score = cv2.morphologyEx(score.astype(np.float32), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))   # single-pixel noise
     damage = np.clip((score - 4) / 6, 0, 1)
     info.update(valid_pct=round(float(valid.mean() * 100), 1), damage_pct=round(float((damage > 0.3).mean() * 100), 2))
