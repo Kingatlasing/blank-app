@@ -1,62 +1,248 @@
-2026-11-06 15:47:20.981 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
-[0;93m2026-11-06 15:47:21.050867144 [W:onnxruntime:Default, device_discovery.cc:95 GetPciBusId] Skipping pci_bus_id for PCI path at "/sys/devices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/MSFT1000:00/5620e0c7-8062-4dce-aeb7-520c7ef76171" because filename "5620e0c7-8062-4dce-aeb7-520c7ef76171" did not match expected pattern of [0-9a-f]+:[0-9a-f]+:[0-9a-f]+[.][0-9a-f]+[m
-2026-11-06 15:47:48.629 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager
-TAG X8218196 Clefairy/5/102 Base Set [53, 47, 46, 54] [51, 56] 
-TAG U4565024 Clefairy/5/102 Base Set [49, 51, 52, 48] [51, 51] 
-TAG V6645348 Hitmonchan/7/102 Base Set [49, 51, 47, 53] [50, 53] 
-TAG V8008537 Clefairy/5/102 Base Set [46, 54, 50, 50] [54, 51] 
-TAG W4129580 Clefairy/5/102 Base Set [50, 50, 47, 53] [51, 55] 
-TAG V6702901 Chansey/3/102 Base Set [55, 45, 52, 48] [54, 51] 
-TAG V3064813 Chansey/3/102 Base Set [52, 48, 48, 52] [65, 79] 
-TAG S4904773 Hitmonchan/7/102 Base Set [54, 46, 50, 50] [53, 52] 
-TAG H6697591 Clefairy/5/102 Base Set [57, 43, 47, 53] [56, 53] 
-TAG X2433568 Hitmonchan/7/102 Base Set [56, 44, 52, 48] [52, 53] 
-TAG K4799621 Clefairy/5/102 Base Set [47, 53, 49, 51] [52, 50] 
-TAG F8882687 Magneton/9/102 Base Set [47, 53, 54, 46] [51, 53] 
-TAG T2295132 Hitmonchan/7/102 Base Set [52, 48, 47, 53] [51, 52] 
-TAG Z9323261 Clefairy/5/102 Base Set [46, 54, 55, 45] [56, 53] 
-TAG P3757824 Chansey/3/102 Base Set [47, 53, 53, 47] [52, 51] 
-TAG Q5254691 Hitmonchan/7/102 Base Set [47, 53, 44, 56] [51, 55] 
-TAG Y1075772 Clefairy/5/102 Base Set [52, 48, 57, 43] [52, 54] 
-TAG L1681582 Hitmonchan/7/102 Base Set [60, 40, 46, 54] [55, 51] 
-TAG S9646936 Chansey/3/102 Base Set [50, 50, 47, 53] [51, 54] 
-TAG C4729468 Hitmonchan/7/102 Base Set [49, 51, 43, 57] [51, 58] 
-TAG X2283620 Chansey/3/102 Base Set [52, 48, 51, 49] [51, 51] 
-TAG K2483952 Hitmonchan/7/102 Base Set [49, 51, 49, 51] [52, 51] 
-TAG N1087442 Chansey/3/102 Base Set [52, 48, 39, 61] [53, 62] 
-TAG S7236700 Chansey/3/102 Base Set [44, 56, 57, 43] [54, 55] 
-TAG D5773432 Hitmonchan/7/102 Base Set [51, 49, 47, 53] [51, 53] 
-TAG K2939354 Hitmonchan/7/102 Base Set [51, 49, 45, 55] [51, 54] 
-TAG W9756737 Alakazam/1/102 Base Set [53, 47, 49, 51] [53, 51] 
-TAG V9398090 Chansey/3/102 Base Set [46, 54, 54, 46] [52, 53] 
-TAG Y9801137 Clefairy/5/102 Base Set [55, 45, 50, 50] [54, 51] 
-TAG W3785749 Alakazam/1/102 Base Set [42, 58, 49, 51] [58, 51] 
+0 C1502144 ok
+1 C2187246 ok
+2 C8291659 ok
+3 C8657068 ok
+4 D1099976 ok
+5 D2890206 ok
+6 D8975836 ok
+7 D9586854 ok
+8 E3621843 ok
+9 E7382097 ok
+10 F1935760 ok
+11 F2147298 ok
+12 F2722567 ok
+13 F2743783 ok
+14 F4228593 ok
+15 F5128519 ok
+16 F5748668 ok
+17 F6900252 ok
+18 F7562736 ok
+19 F8072187 ok
+20 F8529558 ok
+21 F8872325 ok
+22 G2539091 ok
+23 G5538773 ok
+24 G6955859 ok
+25 G8978683 ok
+26 H2193132 ok
+27 H4935952 ok
+28 H6528065 ok
+29 H8695066 ok
+30 H8779912 ok
+31 J5175855 ok
+32 J5387461 ok
+33 J7197551 ok
+34 J8567231 ok
+35 K1105037 ok
+36 K1845628 ok
+37 K2820342 ok
+38 K7630239 ok
+39 L1198930 ok
+40 L3028637 ok
+41 L5227665 ok
+42 L5287045 ok
+43 L5954214 ok
+44 L6339287 ok
+45 M5848489 ok
+46 M5866204 ok
+47 M7016767 ok
+48 M7345153 ok
+49 M8567165 ok
+50 M8713150 ok
+51 M8817388 ok
+52 M9014367 ok
+53 M9499826 ok
+54 M9630511 ok
+55 N2788156 ok
+56 N9088125 ok
+57 P3009667 ok
+58 P6966103 ok
+59 Q1342712 ok
+60 Q1370096 ok
+61 Q3042526 ok
+62 Q3959173 ok
+63 Q3996910 ok
+64 Q4438231 ok
+65 Q5065602 ok
+66 Q6761426 ok
+67 Q8118850 ok
+68 Q8170195 ok
+69 R1336946 ok
+70 R2314144 ok
+71 R2364790 ok
+72 R2629371 ok
+73 R2821634 ok
+74 R2886781 ok
+75 R4662523 ok
+76 R4998755 ok
+77 R5353100 ok
+78 R5670605 ok
+79 R7242769 ok
+80 R8828886 ok
+81 R9871558 ok
+82 S2002604 ok
+83 S3192262 ok
+84 S3680602 ok
+85 S3859875 ok
+86 S7398745 ok
+87 T4620760 ok
+88 T6002847 ok
+89 T8559384 ok
+90 T8838960 ok
+91 U2239743 ok
+92 U2960566 ok
+93 U3168578 ok
+94 U3429196 ok
+95 U6876045 ok
+96 U8203734 ok
+97 U8315400 ok
+98 U9385345 ok
+99 V1116497 ok
+100 V1166297 ok
+101 V1869196 ok
+102 V3312263 ok
+103 V4972315 ok
+104 V5067526 ok
+105 V6810341 ok
+106 V7264052 ok
+107 V7497729 ok
+108 V8212421 ok
+109 V8476500 ok
+110 W1968939 ok
+111 W3348164 ok
+112 W6289580 ok
+113 W6299798 ok
+114 W6973318 ok
+115 X1042758 ok
+116 X2387133 ok
+117 X2533516 ok
+118 X3696605 ok
+119 X4894947 ok
+120 X6802842 ok
+121 X9405493 ok
+122 X9776504 ok
+123 Y1492663 ok
+124 Y5594221 ok
+125 Y7634787 ok
+126 Y8509765 ok
+127 Z1635748 ok
+128 Z6390306 ok
+129 Z7338625 ok
+130 Z7453176 ok
+131 Z7698408 ok
+132 Z9000969 ok
+133 Z9591000 ok
 {
- "final": {
-  "n": 30,
-  "median": 6.0,
-  "over5": 16
+ "B CORNER WEAR": {
+  "n": 289,
+  "white": 0.01,
+  "bg": 0.439,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.01,
+  "ctl_bg": 0.473,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.45
  },
- "before_recut": {
-  "n": 30,
-  "median": 1.6500000000000021,
-  "over5": 1
+ "B EDGE WEAR": {
+  "n": 116,
+  "white": 0.06,
+  "bg": 0.44,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.018,
+  "ctl_bg": 0.381,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.5
  },
- "before_recut_colour": {
-  "n": 30,
-  "median": 1.7000000000000028,
-  "over5": 2
+ "F EDGE WEAR": {
+  "n": 8,
+  "white": 0.25,
+  "bg": 0.0,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.031,
+  "ctl_bg": 0.0,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.25
  },
- "after_recut": {
-  "n": 30,
-  "median": 1.4499999999999993,
-  "over5": 1
+ "B Print Line(s)": {
+  "n": 23,
+  "white": 0.0,
+  "bg": 0.913,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.0,
+  "ctl_bg": 0.484,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.913
  },
- "after_recut_colour": {
-  "n": 30,
-  "median": 1.7000000000000028,
-  "over5": 2
+ "F CORNER WEAR": {
+  "n": 2,
+  "white": 0.0,
+  "bg": 0.0,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.0,
+  "ctl_bg": 0.0,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.0
  },
- "recut_count": 9,
- "rejected_count": 21
+ "F Print Line(s)": {
+  "n": 2,
+  "white": 0.0,
+  "bg": 1.0,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.188,
+  "ctl_bg": 1.0,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 1.0
+ },
+ "F Scratch(es)": {
+  "n": 11,
+  "white": 0.273,
+  "bg": 1.0,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.25,
+  "ctl_bg": 0.943,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 1.0
+ },
+ "B Scratch(es)": {
+  "n": 6,
+  "white": 0.167,
+  "bg": 0.667,
+  "scratch": 0.0,
+  "speck": 0.0,
+  "stain": 0.0,
+  "ctl_white": 0.167,
+  "ctl_bg": 0.688,
+  "ctl_scratch": 0.0,
+  "ctl_speck": 0.0,
+  "ctl_stain": 0.0,
+  "any": 0.667
+ }
 }
