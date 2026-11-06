@@ -41,6 +41,18 @@ CBOX, CG = 100, 10   # corner box 5 mm, 10 x 10 grid
 CDN = "https://d39lwrz0lm7c9r.cloudfront.net/card-images/{}_{}_MAIN.jpg"
 
 
+def card_box(a):
+    """The card inside TAG's image: TAG photographs it on a plain (orange) background. Each side is where the share of
+    non-background pixels in that row / column crosses half, so the rounded corners don't pull the box in."""
+    bg = np.median(np.concatenate([a[:8].reshape(-1, 3), a[-8:].reshape(-1, 3), a[:, :8].reshape(-1, 3), a[:, -8:].reshape(-1, 3)]), 0)
+    m = np.abs(a.astype(np.int16) - bg.astype(np.int16)).sum(2) > 90
+    rows, cols = m.mean(1), m.mean(0)
+    ys, xs = np.where(rows > 0.5)[0], np.where(cols > 0.5)[0]
+    if len(ys) < a.shape[0] * 0.5 or len(xs) < a.shape[1] * 0.5:
+        return None
+    return int(xs[0]), int(ys[0]), int(xs[-1]) + 1, int(ys[-1]) + 1
+
+
 def edge_feats(lab):
     """(4 edges, NPOS, 4 bins, 3) Lab means; edges in order top, bottom, left, right; positions run left->right / top->bottom."""
     f = np.zeros((4, NPOS, len(BINS), 3), np.float32)
@@ -104,11 +116,15 @@ for i, (cert, o) in enumerate(items):
                 continue
             im = Image.open(io.BytesIO(r.content)).convert("RGB")
             iw, ih = im.size
+            box = card_box(np.asarray(im))
+            if box is None:
+                rec["sides"][S] = {"err": "card not found", "size": [iw, ih]}
+                continue
+            im = im.crop(box)
             lab = cv2.cvtColor(np.asarray(im.resize((W, H), Image.LANCZOS)), cv2.COLOR_RGB2LAB).astype(np.float32)
             ef_[s], cf_[s] = edge_feats(lab), corner_feats(lab)
-            # what lies just outside the card in TAG's image (to check the image is cut tight to the card)
-            a = np.asarray(im)
-            rec["sides"][S] = {"size": [iw, ih], "aspect": round(ih / iw, 4), "corner_px": a[2, 2].tolist(), "base": baseline(im)}
+            a = np.asarray(Image.open(io.BytesIO(r.content)).convert("RGB"))   # corner pixel = TAG's background
+            rec["sides"][S] = {"size": [iw, ih], "box": list(box), "aspect": round(im.height / im.width, 4), "corner_px": a[2, 2].tolist(), "base": baseline(im)}
         except Exception as e:
             rec["sides"][S] = {"err": str(e)[:120]}
             traceback.print_exc()
