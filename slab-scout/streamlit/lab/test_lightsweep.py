@@ -126,3 +126,10 @@ clean = sc[card & ~anyd]
 for fpr in (0.5, 1, 2):
     th = np.percentile(clean, 100 - fpr)
     print(f"at {fpr}% clean false alarms (score>{th:.1f}): " + ", ".join(f"{k} {(sc[m] > th).mean()*100:.0f}%" for k, m in T.items()))
+
+# which signal raises the false alarms on print edges
+for name in ("z_peak", "z_mean", "z_gloss"):
+    zm = res["maps"][name]
+    th = np.percentile(zm[card & ~anyd], 99)
+    print(f"{name:8s}: print-edge pixels over its 99th pct {(zm[ge & card & ~anyd] > th).mean()*100:.1f}%, elsewhere {(zm[~ge & card & ~anyd] > th).mean()*100:.2f}% | "
+          + ", ".join(f"{k} {(zm[m] > th).mean()*100:.0f}%" for k, m in T.items()))
