@@ -312,16 +312,17 @@ def _recut(f: dict, x: dict | None) -> None:
     card, info = r
     if not info.get("snapped"):
         return  # the design alone can't say where this card's edges are (that would copy the reference's centering)
-    # keep the first cut when lining up with the clean picture moves the centering a lot: on TAG's scans the plain
-    # colour-border reading matched TAG to ~1.4 points while re-cut cards were ~10 points off (median)
+    # Keep the first cut when it already found all four edges and the re-cut would move the centering by more
+    # than 5 points. Lab test on 30 TAG scans through this exact pipeline: first cut 1.65 points off TAG's
+    # centering (median), after re-cut 14.5 points off. The re-cut still helps when the first cut failed
+    # (card in a hand, sleeve or busy background), so it is only refused when the first cut was clean.
     try:
         def _pct(L):
             l, r, t, b = L["il"] - L["ol"], L["or"] - L["ir"], L["it"] - L["ot"], L["ob"] - L["ib"]
             return 100 * l / max(1, l + r), 100 * t / max(1, t + b)
-        before = vision.border_by_colour(f["card"], None)
-        after = vision.border_by_colour(card, None)
-        if before and after and before.get("spread", 99) < 8 and after.get("spread", 99) < 8:
-            (bl, bt), (al, at) = _pct(before), _pct(after)
+        L0 = f.get("edges") or {}
+        if f.get("found") and L0 and all(L0.get("found", {}).values()):
+            (bl, bt), (al, at) = _pct(L0), _pct(vision.find_lines(card, True))
             if max(abs(bl - al), abs(bt - at)) > 5:
                 f["recut_rejected"] = {"before": [round(bl), round(bt)], "after": [round(al), round(at)]}
                 return
