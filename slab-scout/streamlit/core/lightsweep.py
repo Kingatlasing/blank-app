@@ -52,7 +52,7 @@ def analyse(frames: list[np.ndarray]) -> dict:
     if n < 6:
         return {"ok": False, "info": info}
     V = np.stack([cv2.cvtColor(f, cv2.COLOR_RGB2HSV)[..., 2] for f in S]).astype(np.float32)   # n,h,w brightness
-    V = cv2.GaussianBlur(V.transpose(1, 2, 0), (3, 3), 0).transpose(2, 0, 1)
+    V = cv2.GaussianBlur(V.transpose(1, 2, 0), (5, 5), 1.5).transpose(2, 0, 1)   # forgive sub-pixel alignment error
     lo = np.percentile(V, 10, axis=0)        # diffuse (print) level
     hi = V.max(0)
     spec = hi - lo                            # how strongly the spot reflects the light
@@ -61,11 +61,18 @@ def analyse(frames: list[np.ndarray]) -> dict:
     # Each frame's highlight on an undamaged card is a broad, smooth patch. A median filter keeps that patch and
     # drops anything small, so the difference between a spot's curve and the filtered curves around it is the
     # light it reflects differently from a flat glossy surface: tilted (dent / crease) or scattering (scratch / scuff).
-    C = np.clip((V - lo) / np.maximum(spec, 8.0), 0, 1)
-    k = 31
-    R = np.stack([np.abs(c - cv2.medianBlur((c * 255).astype(np.uint8), k).astype(np.float32) / 255) for c in C])
-    r_peak = R.max(0)                          # biggest single-frame departure
-    r_mean = R.mean(0)                         # departure over the whole sweep
+    # Separate the highlight from the print: as the light moves, the print's (diffuse) brightness changes slowly,
+    # while the glossy highlight flashes past in a few frames. Taking away a running minimum over time leaves only
+    # the highlight, whatever colour the print under it is.
+    from scipy.ndimage import grey_opening, median_filter
+    Sp = V - grey_opening(V, size=(9, 1, 1))
+    nrm = np.sqrt((Sp ** 2).sum(0)) + 1e-3
+    Cn = Sp / nrm                                # shape of each spot's highlight curve (its size cancels out)
+    ref = median_filter(Cn, size=(1, 21, 21))    # what the flat card around it does
+    ref /= np.sqrt((ref ** 2).sum(0)) + 1e-3
+    r_peak = 1 - (Cn * ref).sum(0)               # 0 = same highlight timing as around it, up to 2 = opposite
+    r_mean = np.log((nrm + 5) / (median_filter(nrm, size=21) + 5))   # highlight weaker / stronger than around it
+    r_mean = np.abs(r_mean)
     r_gloss = _smooth_surface(spec, valid) - spec   # less gloss than around it (matte scuff)
 
     def z(m):
@@ -78,4 +85,4 @@ def analyse(frames: list[np.ndarray]) -> dict:
     score = cv2.morphologyEx(score.astype(np.float32), cv2.MORPH_OPEN, np.ones((2, 2), np.uint8))   # single-pixel noise
     damage = np.clip((score - 4) / 6, 0, 1)
     info.update(valid_pct=round(float(valid.mean() * 100), 1), damage_pct=round(float((damage > 0.3).mean() * 100), 2))
-    return {"ok": True, "info": info, "damage": damage, "maps": {"gloss": spec, "valid": valid, "z_peak": zp, "z_mean": zm, "z_gloss": zs}}
+    return {"ok": True, "info": info, "damage": damage, "maps": {"score": score, "gloss": spec, "valid": valid, "z_peak": zp, "z_mean": zm, "z_gloss": zs}}

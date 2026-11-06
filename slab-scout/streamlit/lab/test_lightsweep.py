@@ -37,7 +37,7 @@ def artwork():
 
 def damage():
     hgt = np.zeros((H, W), np.float32)
-    rough = np.full((H, W), 0.06, np.float32)
+    rough = np.full((H, W), 0.10, np.float32)
     truth = {}
     yy, xx = np.mgrid[0:H, 0:W].astype(np.float32)
     # dent: shallow round depression
@@ -79,12 +79,12 @@ def render(albedo, hgt, rough, light_x, light_y=300):
     return np.clip(img, 0, 255).astype(np.uint8)
 
 
-def wobble(img):
+def wobble(img, still=False):
     pad = 40
     big = cv2.copyMakeBorder(img, pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(20, 20, 20))
     h, w = big.shape[:2]
     src = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
-    dst = src + rng.normal(0, 4, src.shape).astype(np.float32)
+    dst = src + (0 if still else rng.normal(0, 4, src.shape).astype(np.float32))
     M = cv2.getPerspectiveTransform(src, dst)
     out = cv2.warpPerspective(big, M, (w, h), borderValue=(20, 20, 20))
     return np.clip(out + rng.normal(0, 2.0, out.shape), 0, 255).astype(np.uint8)
@@ -93,8 +93,8 @@ def wobble(img):
 albedo = artwork()
 hgt, rough, truth = damage()
 # the person tilts the card both ways (a slow zig-zag), so the highlight crosses every part of the card
-path = [(lx if r % 2 == 0 else W - lx, ly) for r, ly in enumerate(np.linspace(-200, H + 200, 4)) for lx in np.linspace(-400, W + 400, 10)]
-frames = [wobble(render(albedo, hgt, rough, lx, ly)) for lx, ly in path]
+path = [(lx if r % 2 == 0 else W - lx, ly) for r, ly in enumerate(np.linspace(-200, H + 200, 6)) for lx in np.linspace(-400, W + 400, 15)]
+frames = [wobble(render(albedo, hgt, rough, lx, ly), still=(i == 0)) for i, (lx, ly) in enumerate(path)]   # frame 0 = the grid the truth is drawn on
 res = lightsweep.analyse(frames)
 print("info", res["info"])
 pad = 40
@@ -114,3 +114,15 @@ print(f"clean card flagged: {(dmg[card & ~anyd] > 0.3).mean()*100:.2f}%")
 mid = render(albedo, hgt, rough, W / 2)
 ins = condition.inspect_card(Image.fromarray(mid))
 print("single photo surface subgrade", ins.subgrades.get("surface"), [f.what for f in ins.findings if f.area == "surface"])
+
+# where do the false alarms sit? near artwork edges (print), near the card's own edge, or elsewhere
+a0 = cv2.resize(cv2.copyMakeBorder(albedo.astype(np.uint8), pad, pad, pad, pad, cv2.BORDER_CONSTANT, value=(20, 20, 20)), (dmg.shape[1], dmg.shape[0]))
+ge = cv2.dilate((cv2.Canny(cv2.cvtColor(a0, cv2.COLOR_RGB2GRAY), 40, 120) > 0).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+fp = (dmg > 0.3) & card & ~anyd
+print(f"false alarms on print edges: {fp[ge].mean()*100:.1f}% of print-edge pixels; elsewhere {fp[~ge & card & ~anyd].mean()*100:.2f}%  (print edges are {ge[card].mean()*100:.0f}% of the card)")
+
+sc = res["maps"]["score"]
+clean = sc[card & ~anyd]
+for fpr in (0.5, 1, 2):
+    th = np.percentile(clean, 100 - fpr)
+    print(f"at {fpr}% clean false alarms (score>{th:.1f}): " + ", ".join(f"{k} {(sc[m] > th).mean()*100:.0f}%" for k, m in T.items()))
