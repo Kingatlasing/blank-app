@@ -65,7 +65,11 @@ def analyse(frames: list[np.ndarray]) -> dict:
     # while the glossy highlight flashes past in a few frames. Taking away a running minimum over time leaves only
     # the highlight, whatever colour the print under it is.
     from scipy.ndimage import grey_opening, median_filter
-    Sp = V - grey_opening(V, size=(9, 1, 1))
+    # A highlight is the light's own colour, so it brightens red, green and blue together; a print edge sliding a
+    # pixel between frames brightens only some channels. Keep the part all three channels share.
+    Sc = S.astype(np.float32)
+    Sc = np.stack([cv2.GaussianBlur(Sc[..., ch].transpose(1, 2, 0), (5, 5), 1.5).transpose(2, 0, 1) for ch in range(3)])
+    Sp = np.min(np.stack([Sc[ch] - grey_opening(Sc[ch], size=(9, 1, 1)) for ch in range(3)]), axis=0)
     nrm = np.sqrt((Sp ** 2).sum(0)) + 1e-3
     Cn = Sp / nrm                                # shape of each spot's highlight curve (its size cancels out)
     ref = median_filter(Cn, size=(1, 21, 21))    # what the flat card around it does
