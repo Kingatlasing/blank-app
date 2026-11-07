@@ -43,6 +43,7 @@ poke = {c: o for c, o in reps.items() if game_of(o) == "pokemon"}
 evalc = [(c, o) for c, o in poke.items() if o.get("d") is not None]
 modelc = [(c, o) for c, o in poke.items() if o.get("d") is None][:NMODEL]
 print("pokemon", len(poke), "eval", len(evalc), "model", len(modelc), flush=True)
+T0 = time.time()
 CDN = "https://d39lwrz0lm7c9r.cloudfront.net/card-images/{}_BACK_MAIN.jpg"
 SCALES = (10, 20, 40)
 
@@ -112,7 +113,7 @@ for i, (c, o) in enumerate(modelc):
         store[s]["edge"].append(lab)
         if W is not None:
             store[s]["print"].append(warp(lab, W, s))
-    print("model", i, c, flush=True)
+    print("model", i, c, round(time.time() - T0), "s", flush=True)
     time.sleep(0.3)
 for s in SCALES:
     models[s] = {k: robust(np.stack(v)) for k, v in store[s].items()}
@@ -126,9 +127,9 @@ def zmap(lab, med, mad):
 
 
 def local_z(lab, s):
-    L = lab[..., 0].astype(np.float32)
+    L = lab[..., 0]
     k = max(3, int(s)) | 1
-    d = np.abs(L - median_filter(L, size=k))
+    d = np.abs(L.astype(np.float32) - cv2.medianBlur(np.ascontiguousarray(L), k).astype(np.float32))   # cv2 median: fast on uint8
     return d / (np.median(d) * 1.4826 + 1.0)
 
 
@@ -153,7 +154,7 @@ for i, (c, o) in enumerate(evalc):
             zp = cv2.warpAffine(zp, W2, (zp.shape[1], zp.shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
         zl = local_z(lab, s)
         for name, z in (("edge_model", ze), ("print_model", zp), ("local", zl)):
-            pooled = maximum_filter(z, size=2 * r + 1)
+            pooled = cv2.dilate(z.astype(np.float32), np.ones((2 * r + 1, 2 * r + 1), np.uint8))
             mm[(s, name)] = cv2.resize(pooled, (315, 440), interpolation=cv2.INTER_AREA if s > 10 else cv2.INTER_NEAREST).astype(np.float16)
     maps[c] = mm
     cw, ch = x1 - x0, y1 - y0
@@ -163,7 +164,7 @@ for i, (c, o) in enumerate(evalc):
         x, y = (d[2] - x0) / cw * 315, (d[3] - y0) / ch * 440
         if 0 <= x < 315 and 0 <= y < 440:
             marks.append({"cert": c, "type": d[1], "sev": d[4], "x": int(x), "y": int(y)})
-    print("eval", i, c, flush=True)
+    print("eval", i, c, round(time.time() - T0), "s", flush=True)
     time.sleep(0.3)
 
 # ---- AUC per scale / method / mark type
