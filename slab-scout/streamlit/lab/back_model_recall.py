@@ -175,6 +175,13 @@ for i, (c, o) in enumerate(evalc):
         mm[(10, "app_now")] = cv2.resize(wm, (315, 440), interpolation=cv2.INTER_AREA).astype(np.float16)
     except Exception as e:
         print("app baseline failed", e, flush=True)
+    # pixels that are card (not TAG's orange background showing at the rounded corners), shrunk by 0.2 mm
+    a_ = card.astype(np.int16)
+    bgc = np.array([255, 118, 40], np.int16)
+    inside = (np.abs(a_ - bgc).sum(2) > 120).astype(np.uint8)
+    inside = cv2.resize(inside, (315, 440), interpolation=cv2.INTER_AREA)
+    inside = cv2.erode(inside, np.ones((3, 3), np.uint8))
+    mm["inside"] = inside.astype(bool)
     maps[c] = mm
     regions_src[c] = (x0, y0, x1 - x0, y1 - y0, [d for d in o["d"] if d[0] == "B"])
     cw, ch = x1 - x0, y1 - y0
@@ -191,7 +198,7 @@ for i, (c, o) in enumerate(evalc):
 rng = np.random.default_rng(1)
 pts = {c: [(m["x"], m["y"]) for m in marks if m["cert"] == c] for c in maps}
 res = {}
-for (s, name) in [k for k in next(iter(maps.values())).keys() if k[1] != "app_now"]:
+for (s, name) in [k for k in next(iter(maps.values())).keys() if k != "inside" and k[1] != "app_now"]:
     by = {}
     for m in marks:
         v = float(maps[m["cert"]][(s, name)][m["y"], m["x"]])
@@ -254,15 +261,20 @@ def auc(pos, neg):
 
 
 reg_res = {}
-for key in next(iter(maps.values())).keys():
+for key in [k for k in next(iter(maps.values())).keys() if k != "inside"]:
     P = {"corner": [], "edge": []}; N = {"corner": [], "edge": []}
     for c, mm in maps.items():
         if key not in mm:
             continue
         corners, edges = label(regions_src[c])
         m = mm[key].astype(np.float32)
+        ins = mm.get("inside")
         for kind, rid, (a, b, c2, d2) in REG:
-            v = float(m[b:d2, a:c2].max())
+            blk = m[b:d2, a:c2]
+            ib = ins[b:d2, a:c2] if ins is not None else np.ones_like(blk, bool)
+            if ib.sum() < 3:
+                continue
+            v = float(np.percentile(blk[ib], 95))   # card pixels only, robust to one stray pixel
             hit = (rid in corners) if kind == "corner" else (rid in edges)
             (P if hit else N)[kind].append(v)
     name = f"{key[0]}px/mm {key[1]}"
