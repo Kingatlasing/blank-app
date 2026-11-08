@@ -1,0 +1,205 @@
+{
+ "auc": {
+  "10px/mm edge_model": {
+   "CORNER WEAR": [
+    0.576,
+    292
+   ],
+   "ALL": [
+    0.554,
+    463
+   ],
+   "EDGE WEAR": [
+    0.558,
+    130
+   ],
+   "Print Line(s)": [
+    0.414,
+    35
+   ],
+   "Scratch(es)": [
+    0.25,
+    6
+   ]
+  },
+  "10px/mm print_model": {
+   "CORNER WEAR": [
+    0.535,
+    292
+   ],
+   "ALL": [
+    0.529,
+    463
+   ],
+   "EDGE WEAR": [
+    0.582,
+    130
+   ],
+   "Print Line(s)": [
+    0.31,
+    35
+   ],
+   "Scratch(es)": [
+    0.417,
+    6
+   ]
+  },
+  "10px/mm local": {
+   "CORNER WEAR": [
+    0.514,
+    292
+   ],
+   "ALL": [
+    0.581,
+    463
+   ],
+   "EDGE WEAR": [
+    0.772,
+    130
+   ],
+   "Print Line(s)": [
+    0.479,
+    35
+   ],
+   "Scratch(es)": [
+    0.333,
+    6
+   ]
+  },
+  "20px/mm edge_model": {
+   "CORNER WEAR": [
+    0.573,
+    292
+   ],
+   "ALL": [
+    0.561,
+    463
+   ],
+   "EDGE WEAR": [
+    0.588,
+    130
+   ],
+   "Print Line(s)": [
+    0.406,
+    35
+   ],
+   "Scratch(es)": [
+    0.317,
+    6
+   ]
+  },
+  "20px/mm print_model": {
+   "CORNER WEAR": [
+    0.532,
+    292
+   ],
+   "ALL": [
+    0.526,
+    463
+   ],
+   "EDGE WEAR": [
+    0.568,
+    130
+   ],
+   "Print Line(s)": [
+    0.329,
+    35
+   ],
+   "Scratch(es)": [
+    0.483,
+    6
+   ]
+  },
+  "20px/mm local": {
+   "CORNER WEAR": [
+    0.499,
+    292
+   ],
+   "ALL": [
+    0.572,
+    463
+   ],
+   "EDGE WEAR": [
+    0.758,
+    130
+   ],
+   "Print Line(s)": [
+    0.504,
+    35
+   ],
+   "Scratch(es)": [
+    0.5,
+    6
+   ]
+  },
+  "40px/mm edge_model": {
+   "CORNER WEAR": [
+    0.561,
+    292
+   ],
+   "ALL": [
+    0.566,
+    463
+   ],
+   "EDGE WEAR": [
+    0.619,
+    130
+   ],
+   "Print Line(s)": [
+    0.449,
+    35
+   ],
+   "Scratch(es)": [
+    0.35,
+    6
+   ]
+  },
+  "40px/mm print_model": {
+   "CORNER WEAR": [
+    0.527,
+    292
+   ],
+   "ALL": [
+    0.527,
+    463
+   ],
+   "EDGE WEAR": [
+    0.575,
+    130
+   ],
+   "Print Line(s)": [
+    0.357,
+    35
+   ],
+   "Scratch(es)": [
+    0.458,
+    6
+   ]
+  },
+  "40px/mm local": {
+   "CORNER WEAR": [
+    0.516,
+    292
+   ],
+   "ALL": [
+    0.576,
+    463
+   ],
+   "EDGE WEAR": [
+    0.737,
+    130
+   ],
+   "Print Line(s)": [
+    0.497,
+    35
+   ],
+   "Scratch(es)": [
+    0.417,
+    6
+   ]
+  }
+ },
+ "marks": 463,
+ "eval_cards": 189,
+ "model_cards": 40
+}

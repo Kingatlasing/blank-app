@@ -1,105 +1,240 @@
-pokemon 507 eval 170 model 40
-model 0 C1684466
-model 1 C4729468
-model 2 C6617332
-model 3 C7850631
-model 4 C9210282
-model 5 D3885725
-model 6 D5422706
-model 7 D5773432
-model 8 D8982517
-model 9 E8150227
-model 10 E9961589
-model 11 F1655822
-model 12 F3701551
-model 13 F6329456
-model 14 F7860874
-model 15 F8882687
-model 16 G4203793
-model 17 G8839570
-model 18 G9324574
-model 19 H2940984
-model 20 H6697591
-model 21 H7871208
-model 22 H8437205
-model 23 H9457984
-model 24 J1280597
-model 25 J1561230
-model 26 J2255621
-model 27 J2531429
-model 28 J9546426
-model 29 K1334366
-model 30 K2139031
-model 31 K2483952
-model 32 K2939354
-model 33 K3440872
-model 34 K4799621
-model 35 K9898759
-model 36 L1681582
-model 37 L2846778
-model 38 L3798285
-model 39 L8895361
+pokemon 526 eval 189 model 40
+model 0 C1684466 2 s
+model 1 C4729468 4 s
+model 2 C6617332 6 s
+model 3 C7850631 7 s
+model 4 C9210282 9 s
+model 5 D3885725 11 s
+model 6 D5422706 13 s
+model 7 D5773432 15 s
+model 8 D8982517 17 s
+model 9 E8150227 18 s
+model 10 E9961589 20 s
+model 11 F1655822 22 s
+model 12 F3701551 24 s
+model 13 F6329456 26 s
+model 14 F7860874 28 s
+model 15 F8882687 30 s
+model 16 G4203793 32 s
+model 17 G8839570 34 s
+model 18 G9324574 35 s
+model 19 H2940984 37 s
+model 20 H6697591 39 s
+model 21 H7871208 41 s
+model 22 H8437205 43 s
+model 23 H9457984 45 s
+model 24 J1280597 46 s
+model 25 J1561230 48 s
+model 26 J2255621 50 s
+model 27 J2531429 52 s
+model 28 J9546426 54 s
+model 29 K1334366 56 s
+model 30 K2139031 58 s
+model 31 K2483952 59 s
+model 32 K2939354 61 s
+model 33 K3440872 63 s
+model 34 K4799621 65 s
+model 35 K9898759 67 s
+model 36 L1681582 69 s
+model 37 L2846778 71 s
+model 38 L3798285 73 s
+model 39 L8895361 74 s
 models built
-eval 0 C1502144
-eval 1 C2187246
-eval 2 C8291659
-eval 3 C8657068
-eval 4 D1099976
-eval 5 D2890206
-eval 6 D8405165
-eval 7 D8975836
-eval 8 D9586854
-eval 9 E3621843
-eval 10 E4288148
-eval 11 E7382097
-eval 12 F1935760
-eval 13 F2147298
-eval 14 F2722567
-eval 15 F2743783
-eval 16 F4228593
-eval 17 F4505812
-eval 18 F5128519
-eval 19 F5748668
-eval 20 F6900252
-eval 21 F7562736
-eval 22 F8072187
-eval 23 F8529558
-eval 24 F8872325
-eval 25 F9217590
-eval 26 G2539091
-eval 27 G5538773
-eval 28 G6955859
-eval 29 G8978683
-eval 30 H2193132
-eval 31 H2876012
-eval 32 H4935952
-eval 33 H6528065
-eval 34 H8695066
-eval 35 H8779912
-eval 36 J5175855
-eval 37 J5387461
-eval 38 J7197551
-eval 39 J8567231
-eval 40 J9982240
-eval 41 K1105037
-eval 42 K1845628
-eval 43 K2820342
-eval 44 K4390309
-eval 45 K6919325
-eval 46 K7630239
-eval 47 L1198930
-eval 48 L2156816
-eval 49 L3028637
-eval 50 L5227665
-eval 51 L5287045
-eval 52 L5954214
-eval 53 L6339287
-eval 54 L6673379
-eval 55 M5848489
-eval 56 M5866204
-eval 57 M7016767
-eval 58 M7345153
-eval 59 M8545105
-eval 60 M8567165
-eval 61 M8713150
-eval 62 M8817388
+eval 0 C1502144 144 s
+eval 1 C2187246 147 s
+eval 2 C8291659 150 s
+eval 3 C8657068 153 s
+eval 4 D1099976 155 s
+eval 5 D2102939 158 s
+eval 6 D2890206 161 s
+eval 7 D8405165 164 s
+eval 8 D8975836 166 s
+eval 9 D9586854 169 s
+eval 10 E3621843 172 s
+eval 11 E4288148 175 s
+eval 12 E7382097 178 s
+eval 13 E8359124 180 s
+eval 14 F1935760 183 s
+eval 15 F2147298 186 s
+eval 16 F2722567 189 s
+eval 17 F2743783 192 s
+eval 18 F4228593 194 s
+eval 19 F4505812 197 s
+eval 20 F4791080 200 s
+eval 21 F5128519 203 s
+eval 22 F5748668 206 s
+eval 23 F6900252 209 s
+eval 24 F7562736 211 s
+eval 25 F8072187 214 s
+eval 26 F8529558 217 s
+eval 27 F8872325 220 s
+eval 28 F9217590 222 s
+eval 29 F9377951 225 s
+eval 30 G2539091 228 s
+eval 31 G5538773 231 s
+eval 32 G6955859 234 s
+eval 33 G8978683 237 s
+eval 34 H2193132 239 s
+eval 35 H2876012 242 s
+eval 36 H4935952 245 s
+eval 37 H6528065 248 s
+eval 38 H8695066 251 s
+eval 39 H8779912 254 s
+eval 40 J5175855 256 s
+eval 41 J5387461 259 s
+eval 42 J7197551 262 s
+eval 43 J7293566 265 s
+eval 44 J8567231 268 s
+eval 45 J9982240 270 s
+eval 46 K1105037 273 s
+eval 47 K1845628 276 s
+eval 48 K2820342 279 s
+eval 49 K4390309 282 s
+eval 50 K6919325 284 s
+eval 51 K7630239 287 s
+eval 52 K7977500 290 s
+eval 53 L1198930 293 s
+eval 54 L2156816 295 s
+eval 55 L3028637 298 s
+eval 56 L5227665 301 s
+eval 57 L5287045 304 s
+eval 58 L5954214 307 s
+eval 59 L6339287 309 s
+eval 60 L6673379 312 s
+eval 61 M5848489 315 s
+eval 62 M5866204 318 s
+eval 63 M7016767 321 s
+eval 64 M7345153 324 s
+eval 65 M8545105 327 s
+eval 66 M8567165 330 s
+eval 67 M8713150 332 s
+eval 68 M8817388 335 s
+eval 69 M9014367 338 s
+eval 70 M9102851 341 s
+eval 71 M9499826 344 s
+eval 72 M9630511 347 s
+eval 73 N2788156 350 s
+eval 74 N4615295 352 s
+eval 75 N7689652 355 s
+eval 76 N9088125 358 s
+eval 77 P3009667 361 s
+eval 78 P6966103 364 s
+eval 79 Q1342712 366 s
+eval 80 Q1370096 369 s
+eval 81 Q2263927 372 s
+eval 82 Q3042526 375 s
+eval 83 Q3572674 378 s
+eval 84 Q3959173 380 s
+eval 85 Q3996910 383 s
+eval 86 Q4438231 386 s
+eval 87 Q5065602 389 s
+eval 88 Q5500653 392 s
+eval 89 Q5836931 394 s
+eval 90 Q6761426 397 s
+eval 91 Q7242453 400 s
+eval 92 Q8118850 403 s
+eval 93 Q8170195 405 s
+eval 94 Q8448575 408 s
+eval 95 Q9592115 411 s
+eval 96 R1336946 414 s
+eval 97 R2314144 417 s
+eval 98 R2364790 419 s
+eval 99 R2629371 422 s
+eval 100 R2821634 425 s
+eval 101 R2886781 428 s
+eval 102 R4662523 431 s
+eval 103 R4998755 434 s
+eval 104 R5353100 436 s
+eval 105 R5526112 439 s
+eval 106 R5542113 442 s
+eval 107 R5670605 445 s
+eval 108 R7242769 448 s
+eval 109 R7717066 450 s
+eval 110 R8828886 453 s
+eval 111 R9871558 456 s
+eval 112 R9900756 459 s
+eval 113 S2002604 462 s
+eval 114 S3192262 464 s
+eval 115 S3680602 467 s
+eval 116 S3859875 470 s
+eval 117 S4321812 473 s
+eval 118 S7288023 476 s
+eval 119 S7398745 478 s
+eval 120 S8325957 481 s
+eval 121 S9309195 484 s
+eval 122 T1676201 487 s
+eval 123 T3349813 489 s
+eval 124 T4620760 492 s
+eval 125 T5108673 495 s
+eval 126 T6002847 498 s
+eval 127 T8559384 500 s
+eval 128 T8838960 503 s
+eval 129 U2239743 506 s
+eval 130 U2960566 509 s
+eval 131 U3168578 512 s
+eval 132 U3429196 515 s
+eval 133 U5933013 518 s
+eval 134 U6038818 520 s
+eval 135 U6876045 523 s
+eval 136 U8203734 526 s
+eval 137 U8315400 529 s
+eval 138 U9385345 532 s
+eval 139 V1116497 535 s
+eval 140 V1166297 537 s
+eval 141 V1869196 540 s
+eval 142 V2169239 543 s
+eval 143 V3312263 546 s
+eval 144 V4972315 549 s
+eval 145 V5067526 551 s
+eval 146 V6810341 554 s
+eval 147 V7264052 557 s
+eval 148 V7497729 565 s
+eval 149 V8212421 568 s
+eval 150 V8476500 571 s
+eval 151 V9480049 574 s
+eval 152 V9779783 576 s
+eval 153 W1687217 579 s
+eval 154 W1968939 582 s
+eval 155 W3348164 585 s
+eval 156 W4029004 588 s
+eval 157 W6191286 590 s
+eval 158 W6289580 593 s
+eval 159 W6299798 596 s
+eval 160 W6973318 599 s
+eval 161 X1042758 601 s
+eval 162 X2387133 604 s
+eval 163 X2533516 607 s
+eval 164 X3696605 610 s
+eval 165 X4894947 612 s
+eval 166 X5658517 615 s
+eval 167 X6802842 618 s
+eval 168 X7333485 621 s
+eval 169 X8363584 623 s
+eval 170 X9405493 626 s
+eval 171 X9776504 629 s
+eval 172 Y1083008 631 s
+eval 173 Y1492663 634 s
+eval 174 Y2880520 637 s
+eval 175 Y3287178 640 s
+eval 176 Y5594221 643 s
+eval 177 Y7634787 646 s
+eval 178 Y8345381 649 s
+eval 179 Y8509765 651 s
+eval 180 Z1635748 654 s
+eval 181 Z6211605 657 s
+eval 182 Z6390306 660 s
+eval 183 Z7338625 663 s
+eval 184 Z7453176 665 s
+eval 185 Z7698408 668 s
+eval 186 Z9000969 671 s
+eval 187 Z9187123 674 s
+eval 188 Z9591000 677 s
+10px/mm edge_model {'CORNER WEAR': (np.float64(0.576), 292), 'ALL': (np.float64(0.554), 463), 'EDGE WEAR': (np.float64(0.558), 130), 'Print Line(s)': (np.float64(0.414), 35), 'Scratch(es)': (np.float64(0.25), 6)}
+10px/mm print_model {'CORNER WEAR': (np.float64(0.535), 292), 'ALL': (np.float64(0.529), 463), 'EDGE WEAR': (np.float64(0.582), 130), 'Print Line(s)': (np.float64(0.31), 35), 'Scratch(es)': (np.float64(0.417), 6)}
+10px/mm local {'CORNER WEAR': (np.float64(0.514), 292), 'ALL': (np.float64(0.581), 463), 'EDGE WEAR': (np.float64(0.772), 130), 'Print Line(s)': (np.float64(0.479), 35), 'Scratch(es)': (np.float64(0.333), 6)}
+20px/mm edge_model {'CORNER WEAR': (np.float64(0.573), 292), 'ALL': (np.float64(0.561), 463), 'EDGE WEAR': (np.float64(0.588), 130), 'Print Line(s)': (np.float64(0.406), 35), 'Scratch(es)': (np.float64(0.317), 6)}
+20px/mm print_model {'CORNER WEAR': (np.float64(0.532), 292), 'ALL': (np.float64(0.526), 463), 'EDGE WEAR': (np.float64(0.568), 130), 'Print Line(s)': (np.float64(0.329), 35), 'Scratch(es)': (np.float64(0.483), 6)}
+20px/mm local {'CORNER WEAR': (np.float64(0.499), 292), 'ALL': (np.float64(0.572), 463), 'EDGE WEAR': (np.float64(0.758), 130), 'Print Line(s)': (np.float64(0.504), 35), 'Scratch(es)': (np.float64(0.5), 6)}
+40px/mm edge_model {'CORNER WEAR': (np.float64(0.561), 292), 'ALL': (np.float64(0.566), 463), 'EDGE WEAR': (np.float64(0.619), 130), 'Print Line(s)': (np.float64(0.449), 35), 'Scratch(es)': (np.float64(0.35), 6)}
+40px/mm print_model {'CORNER WEAR': (np.float64(0.527), 292), 'ALL': (np.float64(0.527), 463), 'EDGE WEAR': (np.float64(0.575), 130), 'Print Line(s)': (np.float64(0.357), 35), 'Scratch(es)': (np.float64(0.458), 6)}
+40px/mm local {'CORNER WEAR': (np.float64(0.516), 292), 'ALL': (np.float64(0.576), 463), 'EDGE WEAR': (np.float64(0.737), 130), 'Print Line(s)': (np.float64(0.497), 35), 'Scratch(es)': (np.float64(0.417), 6)}
