@@ -199,6 +199,128 @@
    ]
   }
  },
+ "regions": {
+  "10px/mm edge_model": {
+   "corner": {
+    "auc": 0.511,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.549,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "10px/mm print_model": {
+   "corner": {
+    "auc": 0.507,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.576,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "10px/mm local": {
+   "corner": {
+    "auc": 0.505,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.743,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "20px/mm edge_model": {
+   "corner": {
+    "auc": 0.514,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.553,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "20px/mm print_model": {
+   "corner": {
+    "auc": 0.512,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.57,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "20px/mm local": {
+   "corner": {
+    "auc": 0.508,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.709,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "40px/mm edge_model": {
+   "corner": {
+    "auc": 0.508,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.561,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "40px/mm print_model": {
+   "corner": {
+    "auc": 0.513,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.563,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "40px/mm local": {
+   "corner": {
+    "auc": 0.497,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.693,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  },
+  "10px/mm app_now": {
+   "corner": {
+    "auc": 0.508,
+    "marked": 393,
+    "unmarked": 363
+   },
+   "edge": {
+    "auc": 0.522,
+    "marked": 146,
+    "unmarked": 6280
+   }
+  }
+ },
  "marks": 463,
  "eval_cards": 189,
  "model_cards": 40
