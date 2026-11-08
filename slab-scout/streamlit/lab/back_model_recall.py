@@ -135,7 +135,7 @@ def local_z(lab, s):
 
 # ---- evaluation maps for each eval card, kept small: only the max-pooled score around each point is needed,
 # so store per scale a max-filtered (0.5 mm) map downsampled to 5 px/mm
-maps, marks = {}, []
+maps, marks, regions_src = {}, [], {}
 for i, (c, o) in enumerate(evalc):
     f = fetch(o)
     if f is None:
@@ -156,7 +156,27 @@ for i, (c, o) in enumerate(evalc):
         for name, z in (("edge_model", ze), ("print_model", zp), ("local", zl)):
             pooled = cv2.dilate(z.astype(np.float32), np.ones((2 * r + 1, 2 * r + 1), np.uint8))
             mm[(s, name)] = cv2.resize(pooled, (315, 440), interpolation=cv2.INTER_AREA if s > 10 else cv2.INTER_NEAREST).astype(np.float16)
+    # the app's current check (condition.inspect_card at 630 x 880): its whitening mask as a map, for comparison
+    try:
+        from core import condition
+        cap = {}
+        orig = condition._views
+
+        def _spy(card_, a_, gray_, white_m, *rest):
+            cap["w"] = white_m
+            return {}
+        condition._views = _spy
+        try:
+            condition.inspect_card(Image.fromarray(cv2.resize(card, (630, 880), interpolation=cv2.INTER_AREA)), is_back=True,
+                                   corner_radius=condition.corner_radius_px("pokemon"))
+        finally:
+            condition._views = orig
+        wm = cv2.dilate(cap["w"].astype(np.float32), np.ones((5, 5), np.uint8))
+        mm[(10, "app_now")] = cv2.resize(wm, (315, 440), interpolation=cv2.INTER_AREA).astype(np.float16)
+    except Exception as e:
+        print("app baseline failed", e, flush=True)
     maps[c] = mm
+    regions_src[c] = (x0, y0, x1 - x0, y1 - y0, [d for d in o["d"] if d[0] == "B"])
     cw, ch = x1 - x0, y1 - y0
     for d in o["d"]:
         if d[0] != "B":
@@ -171,7 +191,7 @@ for i, (c, o) in enumerate(evalc):
 rng = np.random.default_rng(1)
 pts = {c: [(m["x"], m["y"]) for m in marks if m["cert"] == c] for c in maps}
 res = {}
-for (s, name) in next(iter(maps.values())).keys():
+for (s, name) in [k for k in next(iter(maps.values())).keys() if k[1] != "app_now"]:
     by = {}
     for m in marks:
         v = float(maps[m["cert"]][(s, name)][m["y"], m["x"]])
@@ -183,4 +203,69 @@ for (s, name) in next(iter(maps.values())).keys():
             b[1] += 1
     res[f"{s}px/mm {name}"] = {t: (round(a / n, 3), n) for t, (a, n) in by.items()}
     print(f"{s}px/mm {name}", res[f"{s}px/mm {name}"], flush=True)
-json.dump({"auc": res, "marks": len(marks), "eval_cards": len(maps), "model_cards": len(modelc)}, open(out, "w"), indent=1)
+
+# ---- region test: TAG pins a corner mark to the corner itself (not to the exact worn spot), so score whole regions:
+# each corner (3 x 3 mm) and each 8 mm stretch of edge (1.5 mm deep), labelled by whether TAG marked it.
+PX = 5   # stored maps are 5 px per mm
+def regions():
+    out = []
+    for k, (cx, cy) in enumerate(((0, 0), (1, 0), (0, 1), (1, 1))):
+        x0_, y0_ = (0 if cx == 0 else 315 - 3 * PX), (0 if cy == 0 else 440 - 3 * PX)
+        out.append(("corner", k, (x0_, y0_, x0_ + 3 * PX, y0_ + 3 * PX)))
+    for side in ("top", "bottom", "left", "right"):
+        L = 63 if side in ("top", "bottom") else 88
+        for j, a in enumerate(range(3, L - 3 - 7, 8)):
+            if side == "top":
+                b = (a * PX, 0, (a + 8) * PX, int(1.5 * PX))
+            elif side == "bottom":
+                b = (a * PX, 440 - int(1.5 * PX), (a + 8) * PX, 440)
+            elif side == "left":
+                b = (0, a * PX, int(1.5 * PX), (a + 8) * PX)
+            else:
+                b = (315 - int(1.5 * PX), a * PX, 315, (a + 8) * PX)
+            out.append(("edge", (side, j), b))
+    return out
+REG = regions()
+
+
+def label(src):
+    x0_, y0_, cw_, ch_, ds = src
+    corners, edges = set(), set()
+    for d in ds:
+        xm = min(63, max(0, (d[2] - x0_) / cw_ * 63)); ym = min(88, max(0, (d[3] - y0_) / ch_ * 88))
+        if "CORNER" in d[1].upper():
+            corners.add((1 if xm > 31.5 else 0) + (2 if ym > 44 else 0))
+        elif "EDGE" in d[1].upper():
+            dist = {"top": ym, "bottom": 88 - ym, "left": xm, "right": 63 - xm}
+            side = min(dist, key=dist.get)
+            a = xm if side in ("top", "bottom") else ym
+            edges.add((side, int((a - 3) // 8)))
+    return corners, edges
+
+
+def auc(pos, neg):
+    if not pos or not neg:
+        return None
+    allv = np.concatenate([pos, neg]); r = np.argsort(np.argsort(allv)).astype(float)
+    # ties: average ranks
+    from scipy.stats import rankdata
+    r = rankdata(allv)
+    return round(float((r[:len(pos)].sum() - len(pos) * (len(pos) + 1) / 2) / (len(pos) * len(neg))), 3)
+
+
+reg_res = {}
+for key in next(iter(maps.values())).keys():
+    P = {"corner": [], "edge": []}; N = {"corner": [], "edge": []}
+    for c, mm in maps.items():
+        if key not in mm:
+            continue
+        corners, edges = label(regions_src[c])
+        m = mm[key].astype(np.float32)
+        for kind, rid, (a, b, c2, d2) in REG:
+            v = float(m[b:d2, a:c2].max())
+            hit = (rid in corners) if kind == "corner" else (rid in edges)
+            (P if hit else N)[kind].append(v)
+    name = f"{key[0]}px/mm {key[1]}"
+    reg_res[name] = {k: {"auc": auc(P[k], N[k]), "marked": len(P[k]), "unmarked": len(N[k])} for k in P}
+    print("REGION", name, reg_res[name], flush=True)
+json.dump({"auc": res, "regions": reg_res, "marks": len(marks), "eval_cards": len(maps), "model_cards": len(modelc)}, open(out, "w"), indent=1)
