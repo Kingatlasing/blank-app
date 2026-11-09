@@ -10,7 +10,7 @@ import { soldLinks } from '../core/databases';
 import { currentValue, recordImage } from '../core/portfolio';
 import { useApp } from '../appContext';
 import { useLayout } from '../layout';
-import { GRADERS, estimateMiss, exportResults, markReturned, markSent } from '../core/submissions';
+import { GRADERS, estimateMiss, exportResults, markReturned, markSent, ourEstimate, unmarkSent } from '../core/submissions';
 
 export default function RecordSheet({ rec, onClose, onOpenCard }: { rec: VaultRecord | null; onClose: () => void; onOpenCard?: (key: string) => void }) {
   const app = useApp();
@@ -19,12 +19,14 @@ export default function RecordSheet({ rec, onClose, onOpenCard }: { rec: VaultRe
   const [pickCo, setPickCo] = useState(false);
   const [retGrade, setRetGrade] = useState('');
   const [retCert, setRetCert] = useState('');
+  const [retSubs, setRetSubs] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     setConfirmDel(false);
     setPickCo(false);
     setRetGrade('');
     setRetCert('');
+    setRetSubs('');
   }, [rec?.id]);
   const save = async (r: VaultRecord) => {
     setBusy(true);
@@ -105,21 +107,26 @@ export default function RecordSheet({ rec, onClose, onOpenCard }: { rec: VaultRe
                   <>
                     <Text style={S.body}>
                       Sent to {open.submission.company} on {open.submission.sent_on}
-                      {open.submission.estimate?.psa != null ? ` · our estimate PSA ${open.submission.estimate.psa}` : ''}
+                      {ourEstimate(open.submission) != null ? ` · our estimate ${open.submission.company === 'TAG' ? 'TAG' : 'PSA'} ${ourEstimate(open.submission)}` : ''}
                     </Text>
                     <Text style={S.muted}>Got it back? Enter the grade on the label.</Text>
                     <View style={[S.row, { gap: 8 }]}>
                       <TextInput value={retGrade} onChangeText={setRetGrade} placeholder="Grade (e.g. 9)" placeholderTextColor={C.ink2} keyboardType="decimal-pad" style={[S.input, { flex: 1 }]} />
                       <TextInput value={retCert} onChangeText={setRetCert} placeholder="Cert # (optional)" placeholderTextColor={C.ink2} keyboardType="number-pad" style={[S.input, { flex: 1.4 }]} />
                     </View>
-                    <Btn label="Save grade" disabled={!retGrade.trim() || busy} onPress={() => save(markReturned(open, retGrade, retCert))} />
+                    <TextInput value={retSubs} onChangeText={setRetSubs} placeholder="Subgrades if the label has them (optional)" placeholderTextColor={C.ink2} style={S.input} />
+                    <Btn label="Save grade" disabled={!retGrade.trim() || busy} onPress={() => save(markReturned(open, retGrade, retCert, retSubs))} />
+                    <Pressable disabled={busy} onPress={() => save(unmarkSent(open))} hitSlop={8}>
+                      <Text style={[S.muted, { textDecorationLine: 'underline' }]}>Not sent after all? Undo</Text>
+                    </Pressable>
                   </>
                 ) : (
                   <>
                     <Text style={S.body}>
                       {open.submission.company} {open.submission.returned.grade}
                       {open.submission.returned.cert ? ` · cert ${open.submission.returned.cert}` : ''}
-                      {open.submission.estimate?.psa != null ? ` · we estimated ${open.submission.estimate.psa}` : ''}
+                      {ourEstimate(open.submission) != null ? ` · we estimated ${ourEstimate(open.submission)}` : ''}
+                      {open.submission.returned.subs ? `\nSubgrades: ${open.submission.returned.subs}` : ''}
                     </Text>
                     {(() => {
                       const m = estimateMiss(open.submission);

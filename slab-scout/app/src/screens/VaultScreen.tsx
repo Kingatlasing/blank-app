@@ -14,6 +14,7 @@ import { changeOver, currentValue, gradeWorthy, groupRecords, isGraded, recordIm
 import { addToBinder, Binder, createBinder, deleteBinder, loadBinders, normalizeHex, saveBinders } from '../core/binders';
 import { keepPhoto } from '../storage';
 import { useApp } from '../appContext';
+import { estimateMiss, exportResults, ourEstimate, submissionStats } from '../core/submissions';
 import { Layout, useLayout } from '../layout';
 import { useCollection, useValueHistory } from '../portfolioHooks';
 import { BINDER_COLORS } from '../theme';
@@ -174,6 +175,7 @@ export default function VaultScreen() {
       .map(([l, d]) => ({ l, c: changeOver(hist, total, d) }))
       .filter((x) => x.c);
     const worthy = gradeWorthy(items);
+    const subs = submissionStats(app.vault);
     body = (
       <View style={{ gap: L.sp(14) }}>
         <View style={{ gap: 2 }}>
@@ -191,6 +193,46 @@ export default function VaultScreen() {
         </ScrollView>
         {hist.length ? <ValueChart points={hist} /> : null}
         {hist.length < 2 ? <Text style={[S.muted, { fontSize: L.fs(12) }]}>The chart fills in day by day as Slab Scout records your collection's value.</Text> : null}
+        {subs.out.length || subs.back.length ? (
+          <View style={[S.card, { gap: L.sp(8) }]}>
+            <Text style={[S.h3, { fontSize: L.fs(17) }]}>Out for grading</Text>
+            {subs.out.length ? (
+              subs.out.map(({ rec: r, days }) => (
+                <Pressable key={r.id} onPress={() => setOpenRec(r)} style={[S.row, { justifyContent: 'space-between', gap: 8 }]}>
+                  <Text style={[S.body, { flex: 1 }]} numberOfLines={1}>{r.card?.name || 'Card'}</Text>
+                  <Text style={S.muted}>{r.submission!.company} · {days === 0 ? 'today' : `${days} day${days === 1 ? '' : 's'}`}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <Text style={S.muted}>Nothing out right now.</Text>
+            )}
+            {subs.back.length ? (
+              <>
+                <Text style={[S.h3, { fontSize: L.fs(15), marginTop: L.sp(4) }]}>Back from grading</Text>
+                {subs.back.slice(0, 6).map((r) => {
+                  const m = estimateMiss(r.submission);
+                  return (
+                    <Pressable key={r.id} onPress={() => setOpenRec(r)} style={[S.row, { justifyContent: 'space-between', gap: 8 }]}>
+                      <Text style={[S.body, { flex: 1 }]} numberOfLines={1}>{r.card?.name || 'Card'}</Text>
+                      <Text style={[S.muted, m != null ? { color: Math.abs(m) <= 1 ? C.lime : C.warn } : null]}>
+                        {r.submission!.company} {r.submission!.returned!.grade}
+                        {ourEstimate(r.submission) != null ? ` · we said ${ourEstimate(r.submission)}` : ''}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {subs.compared ? (
+                  <Text style={S.muted}>
+                    Our estimate was within 1 grade on {subs.within1} of {subs.compared} card{subs.compared === 1 ? '' : 's'}
+                    {subs.avgMiss != null ? ` · off by ${subs.avgMiss.toFixed(1)} on average` : ''}
+                    {subs.lean != null && Math.abs(subs.lean) >= 0.25 ? ` · graders came in ${subs.lean > 0 ? 'higher' : 'lower'} than us` : ''}.
+                  </Text>
+                ) : null}
+                <Btn label="Share grading results (with photos)" onPress={() => exportResults(app.vault).catch(() => {})} />
+              </>
+            ) : null}
+          </View>
+        ) : null}
         {worthy.length ? (
           <View style={{ gap: L.sp(10) }}>
             <SectionTitle title="Grade Worthy" />

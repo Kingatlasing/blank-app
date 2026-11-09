@@ -12,8 +12,9 @@ export interface Submission {
   company: string;
   sent_on: string;
   /** what we estimated when it was sent (copied from the record's grade at that moment) */
-  estimate?: { psa?: number | string | null; label?: string; sub?: Record<string, number> | null; method?: string };
-  returned?: { grade: string; cert?: string; on: string };
+  estimate?: { psa?: number | string | null; tag?: number | string | null; label?: string; sub?: Record<string, number> | null; method?: string };
+  /** subs: the label's subgrades as typed (BGS / TAG / CGC print them), e.g. "Ce 9.5 Co 9 E 9 S 10" */
+  returned?: { grade: string; cert?: string; on: string; subs?: string };
 }
 
 const photoDir = () => {
@@ -44,19 +45,34 @@ export const markSent = (r: VaultRecord, company: string): VaultRecord => ({
   submission: {
     company,
     sent_on: new Date().toISOString().slice(0, 10),
-    estimate: { psa: r.grade?.psa ?? null, label: r.grade?.psa_label || r.grade?.label || '', sub: r.grade?.sub || null, method: r.grade?.method || '' },
+    estimate: { psa: r.grade?.psa ?? null, tag: r.grade?.tag_grade ?? null, label: r.grade?.psa_label || r.grade?.label || '', sub: r.grade?.sub || null, method: r.grade?.method || '' },
   },
 });
 
-export const markReturned = (r: VaultRecord, grade: string, cert: string): VaultRecord => ({
+/** Undo "sent for grading" (marked by mistake, or the card never went). */
+export const unmarkSent = (r: VaultRecord): VaultRecord => {
+  const { submission, ...rest } = r;
+  return rest as VaultRecord;
+};
+
+export const markReturned = (r: VaultRecord, grade: string, cert: string, subs = ''): VaultRecord => ({
   ...r,
-  submission: { ...(r.submission as Submission), returned: { grade: grade.trim(), cert: cert.trim() || undefined, on: new Date().toISOString().slice(0, 10) } },
+  submission: {
+    ...(r.submission as Submission),
+    returned: { grade: grade.trim(), cert: cert.trim() || undefined, on: new Date().toISOString().slice(0, 10), subs: subs.trim() || undefined },
+  },
   grade: { ...(r.grade || {}), label: `${r.submission?.company || ''} ${grade.trim()}`.trim() },
 });
 
+/** Our estimate in the company's own scale: the TAG-style estimate for TAG, the PSA estimate for everyone else. */
+export const ourEstimate = (s?: Submission): number | null => {
+  const v = parseFloat(String((s?.company === 'TAG' && s?.estimate?.tag != null ? s.estimate.tag : s?.estimate?.psa) ?? ''));
+  return Number.isFinite(v) ? v : null;
+};
+
 /** How far off the estimate was (their grade minus ours), when both are numbers. */
 export function estimateMiss(s?: Submission): number | null {
-  const ours = parseFloat(String(s?.estimate?.psa ?? ''));
+  const ours = ourEstimate(s) ?? NaN;
   const theirs = parseFloat(String(s?.returned?.grade ?? '').replace(/[^0-9.]/g, ''));
   return Number.isFinite(ours) && Number.isFinite(theirs) ? theirs - ours : null;
 }
@@ -84,4 +100,24 @@ export async function exportResults(recs: VaultRecord[]): Promise<number> {
   f.write(JSON.stringify({ v: 1, exported_at: new Date().toISOString(), results: rows }));
   await Share.share({ url: f.uri, title: 'Slab Scout grading results', message: `${rows.length} graded cards with photos` });
   return rows.length;
+}
+
+const daysSince = (d: string) => Math.max(0, Math.floor((Date.now() - new Date(d + 'T12:00:00').getTime()) / 86400000));
+
+/** Everything sent off: what is still out (and for how long), and how close our estimates were on what came back. */
+export function submissionStats(recs: VaultRecord[]) {
+  const sent = recs.filter((r) => r.submission && r.list !== 'wishlist');
+  const out = sent.filter((r) => !r.submission!.returned).map((r) => ({ rec: r, days: daysSince(r.submission!.sent_on) })).sort((a, b) => b.days - a.days);
+  const back = sent.filter((r) => r.submission!.returned);
+  const misses = back.map((r) => estimateMiss(r.submission)).filter((m): m is number => m != null);
+  return {
+    out,
+    back,
+    compared: misses.length,
+    exact: misses.filter((m) => m === 0).length,
+    within1: misses.filter((m) => Math.abs(m) <= 1).length,
+    avgMiss: misses.length ? misses.reduce((a, m) => a + Math.abs(m), 0) / misses.length : null,
+    /** positive = the companies graded higher than we estimated, on average */
+    lean: misses.length ? misses.reduce((a, m) => a + m, 0) / misses.length : null,
+  };
 }
