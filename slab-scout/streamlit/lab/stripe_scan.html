@@ -1,0 +1,155 @@
+<title>Slab Scout Stripe Scan</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one narrow column of setup notes and controls; the scan itself takes the whole screen. */
+:root {
+  --bg: #f3f5f7; --panel: #ffffff; --fg: #15191e; --muted: #5b6672; --line: #d9dfe5;
+  --accent: #1f6feb; --accent-ink: #ffffff; --warn: #b54708;
+  --display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0f1317; --panel: #171c22; --fg: #e8edf2; --muted: #9aa6b2; --line: #2a323b;
+  --accent: #4c8dff; --accent-ink: #0b0f14; --warn: #f5a35b; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0f1317; --panel: #171c22; --fg: #e8edf2; --muted: #9aa6b2; --line: #2a323b;
+  --accent: #4c8dff; --accent-ink: #0b0f14; --warn: #f5a35b; color-scheme: dark }
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--fg); font-family: var(--body); line-height: 1.5; }
+.wrap { max-width: 44rem; margin: 0 auto; padding-block: 28px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 22px; }
+h1 { font-family: var(--display); font-size: 1.9rem; margin: 0; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-family: var(--display); font-size: 1.1rem; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 62ch; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+ol { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 8px; }
+.preview { height: 64px; border-radius: 6px; border: 1px solid var(--line); background-image: repeating-linear-gradient(90deg, #000 0, #fff 16px, #000 32px); }
+.row { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 12px; }
+label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--muted); }
+input { font: 500 1rem var(--mono); padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--fg); }
+button { font: 600 1.05rem var(--body); padding: 14px 18px; border-radius: 8px; border: 0; background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.note { font-size: 0.85rem; color: var(--muted); }
+.timing { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.warn { color: var(--warn); font-size: 0.85rem; }
+#stage { position: fixed; inset: 0; background: #000; z-index: 50; cursor: none; }
+#stage canvas { width: 100%; height: 100%; display: block; }
+#hud { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom, 0px));
+  font: 600 1rem var(--mono); color: #888; text-align: center; z-index: 51; pointer-events: none; }
+#stop { position: fixed; top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(10px + env(safe-area-inset-right, 0px));
+  z-index: 52; font-size: 0.85rem; padding: 8px 12px; background: #333; color: #ddd; cursor: pointer; }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <h1>Stripe Scan</h1>
+    <p class="lede">This screen shows shifting stripes, and the card reflects them. Your phone films the reflection, and Slab Scout reads dents, creases, scratches and scuffs from how the stripes bend. That includes flaws you can't see in a normal photo.</p>
+  </header>
+
+  <section class="panel" aria-labelledby="setup">
+    <h2 id="setup">Set up (2 minutes)</h2>
+    <ol>
+      <li>Darken the room. Turn the screen's brightness all the way up.</li>
+      <li>Lay the card flat on the table, a little in front of the screen. Tilt the screen back until you can see it reflected in the card's surface.</li>
+      <li>Prop the phone so it looks at the card from the other side, roughly where your eyes are when you see that reflection. It must stay <strong>completely still</strong> for the whole scan, so lean it on something.</li>
+      <li>On the phone: 2× zoom, the card filling most of the picture, 4K video. Press and hold on the card until <strong>AE/AF LOCK</strong> shows.</li>
+      <li>Start recording, then press <strong>Start scan</strong> here. Stop recording when the screen flashes white the second time.</li>
+    </ol>
+    <div class="preview" aria-hidden="true"></div>
+    <p class="note">The stripes should look sharp in the card's reflection, about 8 to 15 stripes across the card. If they look blurry, make them wider. If you only see a few, make them narrower.</p>
+  </section>
+
+  <section class="panel" aria-labelledby="settings">
+    <h2 id="settings">Scan</h2>
+    <div class="row">
+      <label for="period">Stripe width (screen pixels)<input id="period" type="number" min="12" max="200" step="2" value="40"></label>
+      <label for="hold">Seconds per step<input id="hold" type="number" min="0.3" max="3" step="0.1" value="0.8"></label>
+      <label for="steps">Steps each way<input id="steps" type="number" min="4" max="16" step="1" value="8"></label>
+    </div>
+    <p class="timing" id="timing"></p>
+    <button id="start" type="button">Start scan</button>
+    <p class="warn" id="msg" hidden></p>
+    <p class="note">Send me the video along with these three numbers if you changed them. The defaults are 40, 0.8 and 8.</p>
+  </section>
+</div>
+
+<div id="stage" hidden><canvas id="cv"></canvas></div>
+<div id="hud" hidden></div>
+<button id="stop" type="button" hidden>Stop</button>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const PRE = 3.0, BLACK = 1.5, FLASH = 0.6, GAP = 0.6, MID = 0.5;
+function plan() {
+  const hold = +$("hold").value || 0.8, steps = Math.round(+$("steps").value || 8);
+  const seq = [];
+  seq.push({ kind: "black", t: BLACK, label: "Starting" });
+  seq.push({ kind: "white", t: FLASH, label: "Sync" });
+  seq.push({ kind: "black", t: GAP, label: "" });
+  for (let k = 0; k < steps; k++) seq.push({ kind: "x", k, steps, t: hold, label: `Stripes 1: ${k + 1}/${steps}` });
+  seq.push({ kind: "black", t: MID, label: "" });
+  for (let k = 0; k < steps; k++) seq.push({ kind: "y", k, steps, t: hold, label: `Stripes 2: ${k + 1}/${steps}` });
+  seq.push({ kind: "black", t: GAP, label: "" });
+  seq.push({ kind: "white", t: FLASH, label: "Done, stop recording" });
+  seq.push({ kind: "black", t: 1.0, label: "Done, stop recording" });
+  return seq;
+}
+function updateTiming() {
+  const total = plan().reduce((a, s) => a + s.t, 0);
+  $("timing").textContent = `Scan length ${(PRE + total).toFixed(1)} s, including a ${PRE.toFixed(0)} s countdown. The first white flash is the sync mark.`;
+}
+["period", "hold", "steps"].forEach((id) => $(id).addEventListener("input", updateTiming));
+updateTiming();
+
+const cv = $("cv"), ctx = cv.getContext("2d");
+function size() { const d = window.devicePixelRatio || 1; cv.width = Math.round(innerWidth * d); cv.height = Math.round(innerHeight * d); }
+function draw(step) {
+  const W = cv.width, H = cv.height;
+  if (step.kind === "black" || step.kind === "white") { ctx.fillStyle = step.kind === "black" ? "#000" : "#fff"; ctx.fillRect(0, 0, W, H); return; }
+  const P = (+$("period").value || 40) * (window.devicePixelRatio || 1);
+  const phase = (2 * Math.PI * step.k) / step.steps;
+  const horizontal = step.kind === "x";        // "x" stripes vary along x (vertical bars)
+  const L = horizontal ? W : H;
+  const line = ctx.createImageData(horizontal ? W : 1, horizontal ? 1 : H);
+  for (let i = 0; i < L; i++) {
+    const v = Math.round(255 * (0.5 + 0.5 * Math.cos((2 * Math.PI * i) / P + phase)));
+    line.data[i * 4] = line.data[i * 4 + 1] = line.data[i * 4 + 2] = v; line.data[i * 4 + 3] = 255;
+  }
+  if (horizontal) { for (let y = 0; y < H; y++) ctx.putImageData(line, 0, y); }
+  else { for (let x = 0; x < W; x++) ctx.putImageData(line, x, 0); }
+}
+let running = false, wake = null, timer = null;
+async function start() {
+  $("msg").hidden = true;
+  running = true;
+  $("stage").hidden = false; $("hud").hidden = false; $("stop").hidden = false;
+  try { await document.documentElement.requestFullscreen?.(); } catch (e) { /* optional */ }
+  try { wake = await navigator.wakeLock?.request("screen"); } catch (e) { wake = null; }
+  size();
+  const seq = plan();
+  for (let c = PRE; c > 0 && running; c -= 1) { draw({ kind: "black" }); $("hud").textContent = `Recording? Starting in ${c.toFixed(0)}`; await wait(1000); }
+  for (const s of seq) {
+    if (!running) break;
+    draw(s); $("hud").textContent = s.label;
+    await wait(s.t * 1000);
+  }
+  stop(running ? "Scan finished. Stop recording and send me the video." : "");
+}
+function wait(ms) { return new Promise((r) => { timer = setTimeout(r, ms); }); }
+function stop(note) {
+  running = false; clearTimeout(timer);
+  $("stage").hidden = true; $("hud").hidden = true; $("stop").hidden = true;
+  try { if (document.fullscreenElement) document.exitFullscreen(); } catch (e) {}
+  try { wake?.release(); } catch (e) {}
+  if (note) { $("msg").textContent = note; $("msg").hidden = false; }
+}
+$("start").addEventListener("click", start);
+$("stop").addEventListener("click", () => stop("Scan stopped."));
+addEventListener("keydown", (e) => { if (e.key === "Escape" && running) stop("Scan stopped."); });
+addEventListener("resize", () => { if (running) size(); });
+</script>
